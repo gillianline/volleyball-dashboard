@@ -1,17 +1,27 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
-import math # Added for precise rounding
+import math 
 
 # --- PAGE CONFIG ---
 st.set_page_config(page_title="Performance Lab", layout="wide")
 
-# Sleek White Styling
+# Sleek White Styling + FORCE CENTER TABLE TEXT
 st.markdown("""
     <style>
     .stApp { background-color: #FFFFFF; color: #1D1D1F; }
-    [data-testid="stDataTable"] th { text-align: center !important; background-color: #F5F5F7 !important; }
-    [data-testid="stDataTable"] td { text-align: center !important; }
+    
+    /* FORCE CENTER ALL TABLE CONTENT */
+    [data-testid="stTable"] th { text-align: center !important; }
+    [data-testid="stTable"] td { text-align: center !important; }
+    [data-testid="stDataFrame"] div[data-testid="stTable"] div { text-align: center !important; }
+    
+    /* Target specifically the dataframe cells */
+    div[data-testid="stDataFrame"] div[role="gridcell"] > div {
+        justify-content: center !important;
+        text-align: center !important;
+        display: flex;
+    }
 
     .img-container { display: flex; justify-content: center; margin-bottom: 20px; }
     .player-photo {
@@ -68,7 +78,7 @@ try:
     day_df = df[df['Date'] == sel_date_dt].copy()
     day_phase_df = phase_df[phase_df['Date'] == sel_date_dt].copy()
 
-    # --- UPDATED SCORING & PHOTO LOGIC ---
+    # --- SCORING & PHOTO LOGIC ---
     grading_map = {
         'Total Jumps': 'Total Jumps',
         'IMA Jump Count Med Band': 'Moderate Jumps',
@@ -80,10 +90,7 @@ try:
         'High Intensity Movement': 'High Intensity Movements'
     }
 
-    # 1. Get Season Maxes
     overall_maxes = df.groupby('Name')[list(grading_map.keys())].max()
-    
-    # 2. Get the FIRST available PhotoURL for each person (ignores empty rows)
     photo_map = df.dropna(subset=['PhotoURL']).drop_duplicates('Name').set_index('Name')['PhotoURL'].to_dict()
 
     def process_player(row):
@@ -93,20 +100,15 @@ try:
         for internal in grading_map.keys():
             curr = row[internal]
             m_val = p_maxes[internal]
-            
-            # ROUNDUP logic using math.ceil
             if m_val > 0:
+                # Precise ROUNDUP
                 grade = math.ceil((curr / m_val) * 100)
             else:
                 grade = 0
-                
             row[f'{internal}_Max'] = m_val
             row[f'{internal}_Grade'] = grade
             grades.append(grade)
-        
-        # Final Practice Score is Average of Grades
         row['Practice Score'] = math.ceil(sum(grades) / len(grades))
-        # Attach Photo from the map
         row['PhotoURL_Fixed'] = photo_map.get(p_name, "https://www.w3schools.com/howto/img_avatar.png")
         return row
 
@@ -148,7 +150,8 @@ try:
                     "Max": round(p_data[f'{internal}_Max'], 1) if is_dec else int(p_data[f'{internal}_Max']),
                     "Grade": int(p_data[f'{internal}_Grade'])
                 })
-            st.dataframe(pd.DataFrame(card_rows), use_container_width=True, hide_index=True)
+            # We use st.table for a more "Locked" centered look on the Profile tab
+            st.table(pd.DataFrame(card_rows))
             
         with col_score:
             st.markdown(f'<div style="text-align:center; font-weight:bold; margin-top:20px;">Practice Score</div>', unsafe_allow_html=True)
@@ -165,6 +168,7 @@ try:
 
     with tab3:
         st.subheader("Leaderboard")
+        # Center this using st.table or st.dataframe
         st.dataframe(day_df[['Name', 'Total Jumps', 'Total Player Load', 'Practice Score']].sort_values('Practice Score', ascending=False), use_container_width=True, hide_index=True)
 
 except Exception as e:
