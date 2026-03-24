@@ -6,13 +6,17 @@ import math
 # --- PAGE CONFIG ---
 st.set_page_config(page_title="Performance Lab", layout="wide")
 
-# --- CSS: TENNESSEE STYLE + CENTERED TABLES + NO INDEX ---
+# --- CSS: TENNESSEE STYLE + CENTERED TABLES + NO INDEX + NO BARS ---
 st.markdown("""
     <style>
     .stApp { background-color: #FFFFFF; color: #1D1D1F; }
+    
+    /* HARD RESET: Remove all default dividers/bars/lines */
     hr { display: none !important; }
+    div[data-testid="stVerticalBlock"] > div:empty { display: none !important; }
     [data-testid="column"] { padding: 0px 10px !important; }
 
+    /* Centered HTML Tables (No Index) */
     .scout-table {
         width: 100%;
         border-collapse: collapse;
@@ -26,6 +30,10 @@ st.markdown("""
     .gallery-photo { border-radius: 50%; width: 110px; height: 110px; object-fit: cover; border: 4px solid #FF8200; }
     .score-box { padding: 20px 40px; border-radius: 12px; font-size: 44px; font-weight: 800; text-align: center; }
     .gallery-card { border: 1px solid #E5E5E7; padding: 20px; border-radius: 15px; background-color: #FFFFFF; margin-bottom: 10px; }
+    
+    /* Arrow Styling */
+    .up-arrow { color: #dc3545; font-weight: bold; } /* Red for Intensity Up */
+    .down-arrow { color: #28a745; font-weight: bold; } /* Green for Intensity Down */
     </style>
     """, unsafe_allow_html=True)
 
@@ -45,24 +53,25 @@ def load_all_data():
     df = pd.read_csv(st.secrets["GOOGLE_SHEET_URL"])
     df.columns = df.columns.str.strip()
     df['Date'] = pd.to_datetime(df['Date'])
-    phase_df = pd.read_csv(st.secrets["PHASE_SHEET_URL"])
-    phase_df.columns = phase_df.columns.str.strip()
-    phase_df['Date'] = pd.to_datetime(phase_df['Date'])
-    return df, phase_df
+    
+    p_df = pd.read_csv(st.secrets["PHASE_SHEET_URL"])
+    p_df.columns = p_df.columns.str.strip()
+    p_df['Date'] = pd.to_datetime(p_df['Date'])
+    return df, p_df
 
 try:
     df, phase_df = load_all_data()
     date_options = [d.strftime('%m/%d/%Y') for d in sorted(df['Date'].unique())]
     
     st.markdown("<h3 style='text-align: center;'>Practice Selection</h3>", unsafe_allow_html=True)
-    c_date1, c_date2 = st.columns(2)
-    with c_date1:
-        date_a = st.selectbox("Primary Date", date_options, index=len(date_options)-1)
-    with c_date2:
-        date_b = st.selectbox("Comparison Date (Optional)", ["None"] + date_options, index=0)
+    c_d1, c_d2 = st.columns(2)
+    with c_d1: date_a = st.selectbox("Primary Date", date_options, index=len(date_options)-1)
+    with c_d2: date_b = st.selectbox("Comparison Date (Optional)", ["None"] + date_options, index=0)
 
     sel_date_a = pd.to_datetime(date_a)
     day_df = df[df['Date'] == sel_date_a].copy()
+    # Fixed Session Flow Filter
+    day_phase_df = phase_df[phase_df['Date'] == sel_date_a].copy()
 
     # --- LOGIC ---
     def get_excel_gradient(score):
@@ -96,48 +105,54 @@ try:
             html += '<tr>'
             for c in cols:
                 val = r[c]
-                html += f'<td>{int(round(val,0)) if isinstance(val, (int, float)) and "%" not in str(val) else val}</td>'
+                # Apply Color Arrows to % Difference Column
+                if c == "% Diff" and isinstance(val, str):
+                    if "+" in val: val = f'<span class="up-arrow">▲ {val}</span>'
+                    elif "-" in val: val = f'<span class="down-arrow">▼ {val}</span>'
+                html += f'<td>{val if "▲" in str(val) or "▼" in str(val) else (int(round(val,0)) if isinstance(val, (int, float)) else val)}</td>'
             html += '</tr>'
         return html + '</tbody></table>'
 
     # --- TABS ---
     t1, t2, t3, t4, t5 = st.tabs(["Session Flow", "Individual Profile", "Team Gallery", "Leaderboard", "Practice Comparison"])
 
+    with t1:
+        st.subheader(f"Drill Intensity: {date_a}")
+        if not day_phase_df.empty:
+            phase_stats = day_phase_df.groupby('Phase', sort=False)[['Total Jumps', 'Total Player Load']].mean().reset_index()
+            fig_p = px.bar(phase_stats, x="Phase", y="Total Player Load", title="Workload per Drill", template="plotly_white", color_discrete_sequence=["#FF8200"])
+            st.plotly_chart(fig_p, use_container_width=True)
+        else:
+            st.warning("No Phase data found for this date.")
+
     with t5:
         if date_b == "None":
-            st.info("Select a 'Comparison Date' above to see the % Difference analysis.")
+            st.info("Select a 'Comparison Date' above.")
         else:
-            st.subheader(f"Session Comparison: {date_a} vs {date_b}")
-            sel_date_b = pd.to_datetime(date_b)
-            df_b = df[df['Date'] == sel_date_b].copy()
-            
+            st.subheader(f"Trend: {date_a} vs {date_b}")
+            df_b = df[df['Date'] == pd.to_datetime(date_b)].copy()
             avg_a = day_df[list(grading_map.keys())].mean()
             avg_b = df_b[list(grading_map.keys())].mean()
             
             comp_rows = []
             for internal, display in grading_map.items():
-                val_a = avg_a[internal]
-                val_b = avg_b[internal]
-                
-                # Percent Difference Logic
-                if val_b != 0:
-                    perc_diff = ((val_a - val_b) / val_b) * 100
-                    perc_str = f"{'+' if perc_diff > 0 else ''}{int(round(perc_diff, 0))}%"
-                else:
-                    perc_str = "0%"
-
+                val_a, val_b = avg_a[internal], avg_b[internal]
+                perc_diff = ((val_a - val_b) / val_b * 100) if val_b != 0 else 0
                 comp_rows.append({
                     "Metric": display,
                     date_a: int(round(val_a, 0)),
                     date_b: int(round(val_b, 0)),
-                    "% Difference": perc_str
+                    "% Diff": f"{'+' if perc_diff > 0 else ''}{int(round(perc_diff, 0))}%"
                 })
             
-            st.markdown(render_table(pd.DataFrame(comp_rows), ["Metric", date_a, date_b, "% Difference"]), unsafe_allow_html=True)
+            # 1. Table with Arrows
+            st.markdown(render_table(pd.DataFrame(comp_rows), ["Metric", date_a, date_b, "% Diff"]), unsafe_allow_html=True)
             
-            # Comparison Chart
-            comp_chart_df = pd.DataFrame(comp_rows).melt(id_vars="Metric", value_vars=[date_a, date_b], var_name="Session", value_name="Avg Value")
-            fig_comp = px.bar(comp_chart_df, x="Metric", y="Avg Value", color="Session", barmode="group", template="plotly_white", color_discrete_sequence=["#FF8200", "#545454"])
+            # 2. Graph EXCLUDING Estimated Distance
+            st.divider()
+            graph_rows = [r for r in comp_rows if r["Metric"] != "Estimated Distance (y)"]
+            comp_chart_df = pd.DataFrame(graph_rows).melt(id_vars="Metric", value_vars=[date_a, date_b], var_name="Session", value_name="Avg")
+            fig_comp = px.bar(comp_chart_df, x="Metric", y="Avg", color="Session", barmode="group", template="plotly_white", color_discrete_sequence=["#FF8200", "#545454"])
             st.plotly_chart(fig_comp, use_container_width=True)
 
     with t2:
