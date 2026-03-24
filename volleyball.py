@@ -11,19 +11,15 @@ st.markdown("""
     <style>
     .stApp { background-color: #FFFFFF; color: #1D1D1F; }
     hr { display: none !important; }
-    
-    /* Center all table content */
     .scout-table { width: 100%; border-collapse: collapse; text-align: center; margin-top: 5px; }
     .scout-table th { background-color: #F5F5F7; padding: 10px; border-bottom: 2px solid #E5E5E7; font-weight: 700; }
     .scout-table td { padding: 8px; border-bottom: 1px solid #F5F5F7; }
-
     .player-photo-large { border-radius: 50%; width: 240px; height: 240px; object-fit: cover; border: 6px solid #FF8200; }
     .gallery-photo { border-radius: 50%; width: 110px; height: 110px; object-fit: cover; border: 4px solid #FF8200; }
     .score-box { padding: 20px 40px; border-radius: 12px; font-size: 40px; font-weight: 800; text-align: center; color: #1D1D1F; }
     .gallery-card { border: 1px solid #E5E5E7; padding: 20px; border-radius: 15px; background-color: #FFFFFF; margin-bottom: 10px; }
-    
-    .trend-up { color: #28a745; font-weight: bold; }   /* Green if Primary is higher */
-    .trend-down { color: #dc3545; font-weight: bold; } /* Red if Primary is lower */
+    .trend-up { color: #28a745; font-weight: bold; }
+    .trend-down { color: #dc3545; font-weight: bold; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -51,10 +47,9 @@ def load_all_data():
 
 try:
     df, phase_df = load_all_data()
-    # Sort dates for the dropdowns
     date_options = [d.strftime('%m/%d/%Y') for d in sorted(df['Date'].unique(), reverse=True)]
     
-    # --- CENTERED DATE SELECTION (ONLY THING AT TOP) ---
+    # --- CENTERED DATE SELECTION ---
     st.markdown("<h3 style='text-align: center;'>Practice Selection</h3>", unsafe_allow_html=True)
     c_d1, c_d2 = st.columns(2)
     with c_d1: date_a_str = st.selectbox("Current Practice", date_options, index=0)
@@ -62,8 +57,6 @@ try:
 
     date_a = pd.to_datetime(date_a_str)
     day_df = df[df['Date'] == date_a].copy()
-    
-    # Session Flow Fix: Ensure dates match exactly for filtering
     day_phase_df = phase_df[phase_df['Date'] == date_a].copy()
 
     # --- LOGIC ---
@@ -111,44 +104,37 @@ try:
     with t1:
         st.subheader(f"Drill Breakdown: {date_a_str}")
         if not day_phase_df.empty:
-            # High-Level Metric View
-            phase_stats = day_phase_df.groupby('Phase', sort=False)[['Total Jumps', 'Total Player Load']].mean().reset_index()
+            # Aggregate and fill empty values with 0
+            p_cols = ['Total Jumps', 'Total Player Load', 'IMA Jump Count High Band']
+            phase_stats = day_phase_df.groupby('Phase', sort=False)[p_cols].mean().fillna(0).reset_index()
             st.plotly_chart(px.bar(phase_stats, x="Phase", y="Total Player Load", template="plotly_white", color_discrete_sequence=["#FF8200"]), use_container_width=True)
-            
-            # Detailed Drill Stats
-            drill_cols = ['Phase', 'Total Jumps', 'IMA Jump Count High Band', 'Total Player Load']
-            st.markdown(render_table(phase_stats, drill_cols), unsafe_allow_html=True)
+            st.markdown(render_table(phase_stats, ['Phase', 'Total Jumps', 'IMA Jump Count High Band', 'Total Player Load']), unsafe_allow_html=True)
         else:
-            st.info("No phase-specific data available for this session.")
+            st.info("No phase data available for this date.")
 
     with t2:
         selected_player = st.selectbox("Select Athlete", day_df['Name'].unique())
         p_data = day_df[day_df['Name'] == selected_player].iloc[0]
-        
-        c_p1, c_p2, c_p3 = st.columns([1.2, 2, 1])
-        with c_p1:
+        c1, c2, c3 = st.columns([1.2, 2, 1])
+        with c1:
             st.markdown(f'<div style="text-align:center;"><img src="{p_data["PhotoURL_Fixed"]}" class="player-photo-large"></div>', unsafe_allow_html=True)
             st.markdown(f'<h2 style="text-align:center;">{p_data["Name"]}</h2>', unsafe_allow_html=True)
-        
-        with c_p2:
+        with c2:
             p_rows = []
-            # Check if we are comparing
             if date_b_str != "None":
                 date_b = pd.to_datetime(date_b_str)
-                p_data_b = df[(df['Name'] == selected_player) & (df['Date'] == date_b)]
-                if not p_data_b.empty:
-                    p_data_b = process_player(p_data_b.iloc[0])
+                p_b = df[(df['Name'] == selected_player) & (df['Date'] == date_b)]
+                if not p_b.empty:
+                    p_b = process_player(p_b.iloc[0])
                     for k in grading_map.keys():
-                        p_rows.append({"Metric": grading_map[k], f"{date_a_str}": p_data[k], f"{date_b_str}": p_data_b[k], "Grade (Current)": p_data[f'{k}_Grade']})
-                    st.markdown(render_table(pd.DataFrame(p_rows), ["Metric", date_a_str, date_b_str, "Grade (Current)"]), unsafe_allow_html=True)
-                else:
-                    st.warning(f"No data for this player on {date_b_str}")
+                        p_rows.append({"Metric": grading_map[k], f"{date_a_str}": p_data[k], f"{date_b_str}": p_b[k], "Grade (Now)": p_data[f'{k}_Grade']})
+                    st.markdown(render_table(pd.DataFrame(p_rows), ["Metric", date_a_str, date_b_str, "Grade (Now)"]), unsafe_allow_html=True)
+                else: st.warning(f"No data for {date_b_str}")
             else:
                 for k in grading_map.keys():
                     p_rows.append({"Metric": grading_map[k], "Current": p_data[k], "Max": p_data[f'{k}_Max'], "Grade": p_data[f'{k}_Grade']})
                 st.markdown(render_table(pd.DataFrame(p_rows), ["Metric", "Current", "Max", "Grade"]), unsafe_allow_html=True)
-
-        with c_p3:
+        with c3:
             st.markdown(f'<div style="text-align:center; font-weight:bold; font-size:20px; margin-top:20px;">Practice Score</div>', unsafe_allow_html=True)
             st.markdown(f'<div class="score-box" style="background-color:{get_excel_gradient(p_data["Practice Score"])};">{int(p_data["Practice Score"])}</div>', unsafe_allow_html=True)
 
@@ -168,27 +154,22 @@ try:
                             rows = [{"Metric": grading_map[k], "Current": p_d[k], "Max": p_d[f'{k}_Max'], "Grade": p_d[f'{k}_Grade']} for k in grading_map.keys()]
                             st.markdown(render_table(pd.DataFrame(rows), ["Metric", "Current", "Max", "Grade"]), unsafe_allow_html=True)
                         with cs:
-                            st.markdown(f'<div style="background-color:{get_excel_gradient(p_d["Practice Score"])}; border-radius:10px; text-align:center; padding:15px; font-size:24px; font-weight:800; margin-top:45px; color:#1D1D1F;">{int(p_d["Practice Score"])}</div>', unsafe_allow_html=True)
+                            st.markdown(f'<div style="background-color:{get_excel_gradient(p_d["Practice Score"])}; border-radius:10px; text-align:center; padding:15px; font-size:24px; font-weight:800; margin-top:45px;">{int(p_d["Practice Score"])}</div>', unsafe_allow_html=True)
                         st.markdown('</div>', unsafe_allow_html=True)
 
     with t5:
-        if date_b_str == "None":
-            st.info("Select a comparison date at the top to see team-wide trends.")
-        else:
+        if date_b_str != "None":
             date_b = pd.to_datetime(date_b_str)
             df_b = df[df['Date'] == date_b].copy()
             avg_a, avg_b = day_df[list(grading_map.keys())].mean(), df_b[list(grading_map.keys())].mean()
-            
             comp_rows = []
             for k, display in grading_map.items():
                 perc_diff = ((avg_a[k] - avg_b[k]) / avg_b[k] * 100) if avg_b[k] != 0 else 0
                 comp_rows.append({"Metric": display, date_a_str: avg_a[k], date_b_str: avg_b[k], "% Diff": f"{'+' if perc_diff > 0 else ''}{int(round(perc_diff, 0))}%"})
-            
             st.markdown(render_table(pd.DataFrame(comp_rows), ["Metric", date_a_str, date_b_str, "% Diff"]), unsafe_allow_html=True)
-            
-            # Chart excluding Estimated Distance
-            graph_rows = [r for r in comp_rows if "Distance" not in r["Metric"]]
-            st.plotly_chart(px.bar(pd.DataFrame(graph_rows).melt(id_vars="Metric", value_vars=[date_a_str, date_b_str]), x="Metric", y="value", color="variable", barmode="group", template="plotly_white", color_discrete_sequence=["#FF8200", "#545454"]), use_container_width=True)
+            # Graph WITHOUT Estimated Distance
+            g_rows = [r for r in comp_rows if "Distance" not in r["Metric"]]
+            st.plotly_chart(px.bar(pd.DataFrame(g_rows).melt(id_vars="Metric", value_vars=[date_a_str, date_b_str]), x="Metric", y="value", color="variable", barmode="group", template="plotly_white", color_discrete_sequence=["#FF8200", "#545454"]), use_container_width=True)
 
 except Exception as e:
     st.error(f"Sync Error: {e}")
