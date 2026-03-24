@@ -25,7 +25,7 @@ st.markdown("""
     .player-photo-large { border-radius: 50%; width: 220px; height: 220px; object-fit: cover; border: 6px solid #FF8200; }
     .gallery-photo { border-radius: 50%; width: 90px; height: 90px; object-fit: cover; border: 4px solid #FF8200; }
     .score-box { padding: 15px 30px; border-radius: 12px; font-size: 36px; font-weight: 800; text-align: center; color: #1D1D1F; }
-    .gallery-card { border: 1px solid #E5E5E7; padding: 12px; border-radius: 15px; background-color: #FFFFFF; margin-bottom: 12px; }
+    .gallery-card { border: 1px solid #E5E5E7; padding: 12px; border-radius: 15px; background-color: #FFFFFF; margin-bottom: 12px; min-height: 380px; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -58,10 +58,10 @@ def load_all_data():
     df = df.rename(columns=rename_map)
     df['Date'] = pd.to_datetime(df['Date'])
     
-    # Sort and fill Position/Photo (only entered once in sheet)
+    # Sort and fill Position/Photo
     df = df.sort_values(['Name', 'Date'])
-    df['Position'] = df.groupby('Name')['Position'].ffill().bfill()
-    df['PhotoURL'] = df.groupby('Name')['PhotoURL'].ffill().bfill()
+    df['Position'] = df.groupby('Name')['Position'].ffill().bfill().fillna("N/A")
+    df['PhotoURL'] = df.groupby('Name')['PhotoURL'].ffill().bfill().fillna("https://www.w3schools.com/howto/img_avatar.png")
     
     metric_cols = ['Total Jumps', 'Moderate Jumps', 'High Jumps', 'Jump Load', 'Player Load', 'Estimated Distance', 'Explosive Efforts', 'High Intensity Movements']
     df[metric_cols] = df[metric_cols].fillna(0)
@@ -78,29 +78,22 @@ try:
     df, phase_df = load_all_data()
     date_options = [d.strftime('%m/%d/%Y') for d in sorted(df['Date'].unique(), reverse=True)]
 
-    # --- 1. SELECTION ---
+    # --- 1. HEADER SELECTION ---
     st.markdown("<h3 style='text-align: center; margin-bottom: 0px;'>Performance Lab</h3>", unsafe_allow_html=True)
-    c_main, c_pos, c_toggle, c_comp = st.columns([2, 1.5, 1, 2])
+    c_main, c_pos = st.columns([2, 2])
     
     with c_main:
         date_a_str = st.selectbox("Current Practice", date_options, index=0)
     with c_pos:
-        pos_list = sorted([p for p in df['Position'].unique() if pd.notna(p)])
+        pos_list = sorted([p for p in df['Position'].unique() if p != "N/A"])
         pos_filter = st.selectbox("Position Filter", ["All Positions"] + pos_list)
-    with c_toggle:
-        compare_on = st.checkbox("Compare", value=False)
-    
-    date_b_str = "None"
-    if compare_on:
-        with c_comp:
-            date_b_str = st.selectbox("Compare Date", [d for d in date_options if d != date_a_str])
 
     date_a = pd.to_datetime(date_a_str)
     day_df = df[df['Date'] == date_a].copy()
     if pos_filter != "All Positions":
         day_df = day_df[day_df['Position'] == pos_filter]
 
-    # --- METRICS ---
+    # --- METRICS & GRADING ---
     all_metrics = ['Total Jumps', 'Moderate Jumps', 'High Jumps', 'Jump Load', 'Player Load', 'Estimated Distance', 'Explosive Efforts', 'High Intensity Movements']
     overall_maxes = df.groupby('Name')[all_metrics].max()
 
@@ -135,18 +128,18 @@ try:
             for _, r in phase_stats.iterrows():
                 html += f"<tr><td>{r['Phase']}</td><td>{int(r['Player Load'])}</td><td>{int(r['Explosive Efforts'])}</td><td>{int(r['Total Jumps'])}</td></tr>"
             st.markdown(html + '</tbody></table>', unsafe_allow_html=True)
-        else:
-            st.warning("No drill data found.")
 
     with t_player:
         if not day_df.empty:
             selected_player = st.selectbox("Select Athlete", day_df['Name'].unique())
             p_data = day_df[day_df['Name'] == selected_player].iloc[0]
+            
             c1, c2, c3 = st.columns([1.2, 2.5, 1.2])
             with c1:
                 st.markdown(f'<div style="text-align:center;"><img src="{p_data["PhotoURL"]}" class="player-photo-large"></div>', unsafe_allow_html=True)
                 st.markdown(f'<h2 style="text-align:center;">{p_data["Name"]} ({p_data["Position"]})</h2>', unsafe_allow_html=True)
             with c2:
+                # FULL 8 METRIC PROFILE
                 html = '<table class="scout-table"><thead><tr><th>Metric</th><th>Today</th><th>Season Max</th><th>Grade</th></tr></thead><tbody>'
                 for k in all_metrics:
                     html += f"<tr><td>{k}</td><td>{int(p_data[k])}</td><td>{int(p_data[f'{k}_Max'])}</td><td>{int(p_data[f'{k}_Grade'])}</td></tr>"
@@ -163,8 +156,9 @@ try:
                     if i + j < len(day_df):
                         p_d = day_df.iloc[i + j]
                         with cols[j]:
+                            # Gallery Table (Top 4 Metrics for clarity)
                             rows_html = ""
-                            for k in all_metrics[:4]: # Show first 4 on card for space
+                            for k in all_metrics[:4]:
                                 rows_html += f"<tr><td>{k}</td><td>{int(p_d[k])}</td><td>{int(p_d[f'{k}_Grade'])}</td></tr>"
                             
                             st.markdown(f"""
@@ -188,16 +182,18 @@ try:
                             """, unsafe_allow_html=True)
 
     with t_comp:
-        if compare_on and date_b_str != "None":
-            avg_a = day_df[all_metrics].mean()
-            avg_b = df[df['Date'] == pd.to_datetime(date_b_str)][all_metrics].mean()
-            
-            comp_html = f'<h4 style="text-align:center;">{date_a_str} vs {date_b_str}</h4>'
-            comp_html += '<table class="scout-table"><thead><tr><th>Metric</th><th>Today</th><th>Comparison</th><th>% Diff</th></tr></thead><tbody>'
-            for k in all_metrics:
-                diff = ((avg_a[k] - avg_b[k]) / avg_b[k] * 100) if avg_b[k] != 0 else 0
-                comp_html += f"<tr><td>{k}</td><td>{int(avg_a[k])}</td><td>{int(avg_b[k])}</td><td>{int(diff)}%</td></tr>"
-            st.markdown(comp_html + '</tbody></table>', unsafe_allow_html=True)
+        st.markdown("#### Team Session Comparison")
+        date_b_str = st.selectbox("Select Comparison Date", [d for d in date_options if d != date_a_str])
+        
+        avg_a = day_df[all_metrics].mean()
+        df_b = df[df['Date'] == pd.to_datetime(date_b_str)]
+        avg_b = df_b[all_metrics].mean()
+        
+        comp_html = f'<table class="scout-table"><thead><tr><th>Metric</th><th>{date_a_str}</th><th>{date_b_str}</th><th>% Diff</th></tr></thead><tbody>'
+        for k in all_metrics:
+            diff = ((avg_a[k] - avg_b[k]) / avg_b[k] * 100) if avg_b[k] != 0 else 0
+            comp_html += f"<tr><td>{k}</td><td>{int(avg_a[k])}</td><td>{int(avg_b[k])}</td><td>{int(diff)}%</td></tr>"
+        st.markdown(comp_html + '</tbody></table>', unsafe_allow_html=True)
 
 except Exception as e:
     st.error(f"Sync Error: {e}")
