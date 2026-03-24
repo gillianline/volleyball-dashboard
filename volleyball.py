@@ -1,23 +1,22 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
-import plotly.graph_objects as go
 
 # --- PAGE CONFIG ---
-st.set_page_config(page_title="VB Performance Lab", layout="wide", initial_sidebar_state="collapsed")
+st.set_page_config(page_title="VB Performance Lab", layout="wide")
 
-# Custom CSS for a "Pro" Look
+# Custom CSS for a "Pro Sports" Dark Theme
 st.markdown("""
     <style>
-    .main { background-color: #0e1117; }
-    div[data-testid="stMetricValue"] { font-size: 1.8rem; color: #00d4ff; }
-    label[data-testid="stMetricLabel"] { font-size: 1rem; }
+    .stApp { background-color: #0e1117; color: white; }
+    div[data-testid="stMetricValue"] { font-size: 2rem; color: #00d4ff; font-weight: bold; }
+    .stTable { background-color: #161b22; }
     </style>
-    """, unsafe_allow_state_set=True)
+    """, unsafe_allow_html=True)
 
 # --- 1. SECURITY ---
 if "password_correct" not in st.session_state:
-    st.title("Coach Secure Access")
+    st.title("🏐 Coach Secure Access")
     pwd = st.text_input("Access Key:", type="password")
     if st.button("Unlock"):
         if pwd == st.secrets["COACH_PWD"]:
@@ -27,87 +26,80 @@ if "password_correct" not in st.session_state:
             st.error("Denied")
     st.stop()
 
-# --- 2. DATA ---
+# --- 2. DATA LOADING ---
 @st.cache_data(ttl=300)
 def load_data():
+    # Pulling from the Google Sheet URL in your Secrets
     df = pd.read_csv(st.secrets["GOOGLE_SHEET_URL"])
     df.columns = df.columns.str.strip()
     return df
 
-df = load_data()
-all_dates = df['Date'].unique()
-selected_date = st.sidebar.selectbox("Practice Date", all_dates)
-day_df = df[df['Date'] == selected_date].sort_values('Total Jumps', ascending=False)
+try:
+    df = load_data()
+    all_dates = df['Date'].unique()
+    
+    # Sidebar Filters
+    st.sidebar.header("Controls")
+    selected_date = st.sidebar.selectbox("Select Practice Date", all_dates)
+    
+    # Filter data for that day
+    day_df = df[df['Date'] == selected_date].sort_values('Total Jumps', ascending=False)
 
-# --- 3. THE "PRACTICE AT A GLANCE" SECTION ---
-st.title(f"Practice Report: {selected_date}")
-
-# Instead of team totals, let's show the "High Load" outliers
-col1, col2, col3 = st.columns(3)
-
-with col1:
+    # --- 3. THE "PRACTICE LEADERS" (Instead of Team Totals) ---
+    st.title(f"📊 Practice Report: {selected_date}")
+    
+    col1, col2, col3 = st.columns(3)
+    
+    # Get top performers for the day
     top_jumper = day_df.iloc[0]
-    st.metric("Highest Jump Volume", top_jumper['Name'], f"{int(top_jumper['Total Jumps'])} Jumps")
-
-with col2:
     top_load = day_df.sort_values('Total Player Load', ascending=False).iloc[0]
-    st.metric("Highest Workload", top_load['Name'], f"{int(top_load['Total Player Load'])} Load")
-
-with col3:
-    # Identify someone who did a lot of high-intensity movement
     top_intensity = day_df.sort_values('High Intensity Movement', ascending=False).iloc[0]
-    st.metric("Intensity Leader", top_intensity['Name'], f"{int(top_intensity['High Intensity Movement'])} Efforts")
 
-st.divider()
+    with col1:
+        st.metric("Top Jump Volume", top_jumper['Name'], f"{int(top_jumper['Total Jumps'])} Jumps")
+    with col2:
+        st.metric("Highest Workload", top_load['Name'], f"{int(top_load['Total Player Load'])} Load")
+    with col3:
+        st.metric("Intensity Leader", top_intensity['Name'], f"{int(top_intensity['High Intensity Movement'])} Efforts")
 
-# --- 4. THE VISUALS ---
-left_chart, right_chart = st.columns([2, 1])
+    st.divider()
 
-with left_chart:
-    st.subheader("Jump Distribution (Intensity Bands)")
-    # Stacked bar but cleaner
+    # --- 4. INDIVIDUAL PERFORMANCE CARDS ---
+    st.subheader("Player Jump Profiles")
+    # Stacked bar with clean colors
     fig_jumps = px.bar(
         day_df, x="Name", 
         y=["IMA Jump Count Low Band", "IMA Jump Count Med Band", "IMA Jump Count High Band"],
         barmode="stack",
         color_discrete_map={
-            "IMA Jump Count High Band": "#FF4B4B", # Danger/High
-            "IMA Jump Count Med Band": "#FFAA00",  # Warning/Med
-            "IMA Jump Count Low Band": "#00D4FF"   # Safe/Low
+            "IMA Jump Count High Band": "#FF4B4B", # Red
+            "IMA Jump Count Med Band": "#FFAA00",  # Orange
+            "IMA Jump Count Low Band": "#00D4FF"   # Blue
         },
         template="plotly_dark"
     )
+    # Clean up the chart axes
     fig_jumps.update_layout(
-        showlegend=True, 
-        legend_title="",
-        xaxis_title=None,
-        yaxis_title="Total Jumps",
-        margin=dict(l=20, r=20, t=30, b=20)
+        xaxis_title=None, 
+        yaxis_title="Count", 
+        legend_title="Intensity",
+        margin=dict(l=0, r=0, t=30, b=0)
     )
     st.plotly_chart(fig_jumps, use_container_width=True)
 
-with right_chart:
-    st.subheader("Workload Balance")
-    # A Radar or Scatter showing who is working hardest vs jumping most
-    fig_balance = px.scatter(
-        day_df, x="Total Jumps", y="Total Player Load",
-        color="Explosive Efforts",
-        size="High Intensity Movement",
-        hover_name="Name",
-        text="Name",
-        template="plotly_dark"
+    st.divider()
+
+    # --- 5. DETAILED STATS TABLE ---
+    st.subheader("Individual Breakdown")
+    # Select specific columns the coach cares about
+    stats_to_show = ['Name', 'Total Jumps', 'IMA Jump Count High Band', 'Total Player Load', 'Explosive Efforts']
+    
+    # Highlight the high-load players in red in the table
+    st.dataframe(
+        day_df[stats_to_show].style.background_gradient(subset=['Total Player Load'], cmap='Reds'),
+        use_container_width=True,
+        hide_index=True
     )
-    fig_balance.update_traces(textposition='top center')
-    st.plotly_chart(fig_balance, use_container_width=True)
 
-st.divider()
-
-# --- 5. THE DATA TABLE ---
-st.subheader("Individual Practice Breakdown")
-# Create a cleaner table for the coach to scroll through
-display_columns = ['Name', 'Total Jumps', 'IMA Jump Count High Band', 'Total Player Load', 'Explosive Efforts', 'BMP Total Basketball Load']
-st.dataframe(
-    day_df[display_columns].style.background_gradient(subset=['Total Player Load', 'IMA Jump Count High Band'], cmap='Reds'),
-    use_container_width=True,
-    hide_index=True
-)
+except Exception as e:
+    st.error(f"Waiting for data... or Error: {e}")
