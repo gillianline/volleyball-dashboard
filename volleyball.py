@@ -48,20 +48,25 @@ try:
     df, phase_df = load_all_data()
     date_options = [d.strftime('%m/%d/%Y') for d in sorted(df['Date'].unique(), reverse=True)]
 
-    # --- 1. SMART DATE SELECTION (COMPACT) ---
+    # --- 1. MINIMALIST DATE SELECTION ---
     st.markdown("<h3 style='text-align: center;'>Practice Session</h3>", unsafe_allow_html=True)
-    date_a_str = st.selectbox("Select Date", date_options, index=0, label_visibility="collapsed")
+    c_main, c_comp = st.columns([3, 1])
+    with c_main:
+        date_a_str = st.selectbox("Current Practice", date_options, index=0, label_visibility="collapsed")
+    with c_comp:
+        compare_mode = st.toggle("Compare Session")
     
-    # Comparison tool is hidden in an expander
-    with st.expander("Compare with another session?"):
-        date_b_str = st.selectbox("Comparison Practice", ["None"] + date_options, index=0)
+    date_b_str = "None"
+    if compare_mode:
+        date_b_str = st.selectbox("Select Comparison Date", ["None"] + date_options, index=0)
 
     date_a = pd.to_datetime(date_a_str)
     day_df = df[df['Date'] == date_a].copy()
 
-    # --- NEUTRAL LOGIC (EQUAL WEIGHTING) ---
+    # --- LOGIC ---
     grading_metrics = ['Total Jumps', 'IMA Jump Count Med Band', 'IMA Jump Count High Band', 'BMP Jumping Load', 'Total Player Load', 'Explosive Efforts', 'High Intensity Movement', 'Estimated Distance (y)']
     overall_maxes = df.groupby('Name')[grading_metrics].max()
+    overall_avgs = df.groupby('Name')[grading_metrics].mean()
     photo_map = df.dropna(subset=['PhotoURL']).drop_duplicates('Name').set_index('Name')['PhotoURL'].to_dict()
 
     def get_excel_gradient(score):
@@ -98,13 +103,11 @@ try:
     t_flow, t_player, t_gallery, t_comp = st.tabs(["Session Flow", "Individual Profile", "Team Gallery", "Team Comparison"])
 
     with t_flow:
-        st.subheader(f"Drill Analysis: {date_a_str}")
+        st.subheader(f"Drill Comparison: {date_a_str}")
         day_phase_df = phase_df[phase_df['Date'] == date_a].copy()
         if not day_phase_df.empty:
             phase_stats = day_phase_df.groupby('Phase', sort=False)[['Total Jumps', 'Total Player Load', 'High Intensity Movement']].mean().fillna(0).reset_index()
-            # New Comparison Chart
-            fig_p = px.bar(phase_stats, x="Phase", y=["Total Jumps", "Total Player Load"], barmode="group", template="plotly_white", color_discrete_sequence=["#FF8200", "#545454"])
-            st.plotly_chart(fig_p, use_container_width=True)
+            # Show a clear drill-by-drill data table instead of just a graph
             st.markdown(render_table(phase_stats, ['Phase', 'Total Jumps', 'Total Player Load', 'High Intensity Movement']), unsafe_allow_html=True)
         else:
             st.warning("No drill-specific data found.")
@@ -118,24 +121,34 @@ try:
             st.markdown(f'<div style="text-align:center;"><img src="{p_data["PhotoURL_Fixed"]}" class="player-photo-large"></div>', unsafe_allow_html=True)
             st.markdown(f'<h2 style="text-align:center;">{p_data["Name"]}</h2>', unsafe_allow_html=True)
         with c2:
-            rows = [{"Metric": k, "Current": p_data[k], "Max": p_data[f'{k}_Max'], "Grade": p_data[f'{k}_Grade']} for k in grading_metrics]
-            st.markdown(render_table(pd.DataFrame(rows), ["Metric", "Current", "Max", "Grade"]), unsafe_allow_html=True)
+            # Table logic: Side-by-Side if Comparison Date is picked
+            p_rows = []
+            if date_b_str != "None":
+                p_b = df[(df['Name'] == selected_player) & (df['Date'] == pd.to_datetime(date_b_str))]
+                if not p_b.empty:
+                    p_b = process_player(p_b.iloc[0])
+                    for k in grading_metrics:
+                        p_rows.append({"Metric": k, f"{date_a_str}": p_data[k], f"{date_b_str}": p_b[k], "Grade (Today)": p_data[f'{k}_Grade']})
+                    st.markdown(render_table(pd.DataFrame(p_rows), ["Metric", date_a_str, date_b_str, "Grade (Today)"]), unsafe_allow_html=True)
+            else:
+                for k in grading_metrics:
+                    p_rows.append({"Metric": k, "Current": p_data[k], "Max": p_data[f'{k}_Max'], "Grade": p_data[f'{k}_Grade']})
+                st.markdown(render_table(pd.DataFrame(p_rows), ["Metric", "Current", "Max", "Grade"]), unsafe_allow_html=True)
         with c3:
             st.markdown(f'<div style="text-align:center; font-weight:bold; font-size:20px; margin-top:20px;">Practice Score</div>', unsafe_allow_html=True)
             st.markdown(f'<div class="score-box" style="background-color:{get_excel_gradient(p_data["Practice Score"])};">{int(p_data["Practice Score"])}</div>', unsafe_allow_html=True)
 
+        # ADDED INFO: Season Trends
         st.divider()
-        st.subheader("Intensity Distribution & Quality")
-        col_pa, col_pb = st.columns(2)
-        with col_pa:
-            low_j = p_data['Total Jumps'] - (p_data['IMA Jump Count Med Band'] + p_data['IMA Jump Count High Band'])
-            j_df = pd.DataFrame({'Band': ['Low', 'Med', 'High'], 'Count': [max(0, low_j), p_data['IMA Jump Count Med Band'], p_data['IMA Jump Count High Band']]})
-            st.plotly_chart(px.bar(j_df, x="Count", y="Band", orientation='h', color="Band", color_discrete_map={"Low":"#28a745", "Med":"#FFC107", "High":"#dc3545"}, title="Jump Bands", template="plotly_white"), use_container_width=True)
-        with col_pb:
-            # New Correlation Plot for Profile
-            history = df[df['Name'] == selected_player]
-            fig_scat = px.scatter(history, x="Total Jumps", y="High Intensity Movement", color="Date", title="Session Quality Trend", template="plotly_white")
-            st.plotly_chart(fig_scat, use_container_width=True)
+        st.subheader("Vs. Season Average")
+        p_avgs = overall_avgs.loc[selected_player]
+        trend_rows = []
+        for k in grading_metrics:
+            curr = p_data[k]
+            avg = p_avgs[k]
+            diff = ((curr - avg) / avg * 100) if avg != 0 else 0
+            trend_rows.append({"Metric": k, "Today": curr, "Season Avg": avg, "% Difference": f"{'+' if diff > 0 else ''}{int(round(diff,0))}%"})
+        st.markdown(render_table(pd.DataFrame(trend_rows), ["Metric", "Today", "Season Avg", "% Difference"]), unsafe_allow_html=True)
 
     with t_gallery:
         for i in range(0, len(day_df), 2):
@@ -157,7 +170,7 @@ try:
 
     with t_comp:
         if date_b_str == "None":
-            st.info("Expand the 'Practice Session' menu at the top to select a comparison date.")
+            st.info("Toggle 'Compare Session' at the top to see team-wide trends.")
         else:
             date_b = pd.to_datetime(date_b_str)
             df_b = df[df['Date'] == date_b].copy()
