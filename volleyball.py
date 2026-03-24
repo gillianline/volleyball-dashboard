@@ -6,17 +6,13 @@ import math
 # --- PAGE CONFIG ---
 st.set_page_config(page_title="Performance Lab", layout="wide")
 
-# --- CSS: TENNESSEE STYLE + CENTERED TABLES + NO INDEX + NO BARS ---
+# --- CSS: TENNESSEE STYLE + DYNAMIC TREND COLORS ---
 st.markdown("""
     <style>
     .stApp { background-color: #FFFFFF; color: #1D1D1F; }
-    
-    /* HARD RESET: Remove all default dividers/bars/lines */
     hr { display: none !important; }
-    div[data-testid="stVerticalBlock"] > div:empty { display: none !important; }
     [data-testid="column"] { padding: 0px 10px !important; }
 
-    /* Centered HTML Tables (No Index) */
     .scout-table {
         width: 100%;
         border-collapse: collapse;
@@ -31,9 +27,9 @@ st.markdown("""
     .score-box { padding: 20px 40px; border-radius: 12px; font-size: 44px; font-weight: 800; text-align: center; }
     .gallery-card { border: 1px solid #E5E5E7; padding: 20px; border-radius: 15px; background-color: #FFFFFF; margin-bottom: 10px; }
     
-    /* Arrow Styling */
-    .up-arrow { color: #dc3545; font-weight: bold; } /* Red for Intensity Up */
-    .down-arrow { color: #28a745; font-weight: bold; } /* Green for Intensity Down */
+    /* Dynamic Trend Colors */
+    .trend-up { color: #28a745; font-weight: bold; }   /* Green for Up */
+    .trend-down { color: #dc3545; font-weight: bold; } /* Red for Down */
     </style>
     """, unsafe_allow_html=True)
 
@@ -53,7 +49,6 @@ def load_all_data():
     df = pd.read_csv(st.secrets["GOOGLE_SHEET_URL"])
     df.columns = df.columns.str.strip()
     df['Date'] = pd.to_datetime(df['Date'])
-    
     p_df = pd.read_csv(st.secrets["PHASE_SHEET_URL"])
     p_df.columns = p_df.columns.str.strip()
     p_df['Date'] = pd.to_datetime(p_df['Date'])
@@ -65,15 +60,14 @@ try:
     
     st.markdown("<h3 style='text-align: center;'>Practice Selection</h3>", unsafe_allow_html=True)
     c_d1, c_d2 = st.columns(2)
-    with c_d1: date_a = st.selectbox("Primary Date", date_options, index=len(date_options)-1)
-    with c_d2: date_b = st.selectbox("Comparison Date (Optional)", ["None"] + date_options, index=0)
+    with c_d1: date_a_str = st.selectbox("Primary Date", date_options, index=len(date_options)-1)
+    with c_d2: date_b_str = st.selectbox("Comparison Date (Optional)", ["None"] + date_options, index=0)
 
-    sel_date_a = pd.to_datetime(date_a)
-    day_df = df[df['Date'] == sel_date_a].copy()
-    # Fixed Session Flow Filter
-    day_phase_df = phase_df[phase_df['Date'] == sel_date_a].copy()
+    date_a = pd.to_datetime(date_a_str)
+    day_df = df[df['Date'] == date_a].copy()
+    day_phase_df = phase_df[phase_df['Date'] == date_a].copy()
 
-    # --- LOGIC ---
+    # --- HELPERS ---
     def get_excel_gradient(score):
         score = max(0, min(100, score))
         r = int(255 * (score / 50)) if score < 50 else 255
@@ -105,10 +99,10 @@ try:
             html += '<tr>'
             for c in cols:
                 val = r[c]
-                # Apply Color Arrows to % Difference Column
+                # Arrow Logic based on Trend
                 if c == "% Diff" and isinstance(val, str):
-                    if "+" in val: val = f'<span class="up-arrow">▲ {val}</span>'
-                    elif "-" in val: val = f'<span class="down-arrow">▼ {val}</span>'
+                    if "▲" in val: val = f'<span class="trend-up">{val}</span>'
+                    elif "▼" in val: val = f'<span class="trend-down">{val}</span>'
                 html += f'<td>{val if "▲" in str(val) or "▼" in str(val) else (int(round(val,0)) if isinstance(val, (int, float)) else val)}</td>'
             html += '</tr>'
         return html + '</tbody></table>'
@@ -116,21 +110,19 @@ try:
     # --- TABS ---
     t1, t2, t3, t4, t5 = st.tabs(["Session Flow", "Individual Profile", "Team Gallery", "Leaderboard", "Practice Comparison"])
 
-    with t1:
-        st.subheader(f"Drill Intensity: {date_a}")
-        if not day_phase_df.empty:
-            phase_stats = day_phase_df.groupby('Phase', sort=False)[['Total Jumps', 'Total Player Load']].mean().reset_index()
-            fig_p = px.bar(phase_stats, x="Phase", y="Total Player Load", title="Workload per Drill", template="plotly_white", color_discrete_sequence=["#FF8200"])
-            st.plotly_chart(fig_p, use_container_width=True)
-        else:
-            st.warning("No Phase data found for this date.")
-
     with t5:
-        if date_b == "None":
+        if date_b_str == "None":
             st.info("Select a 'Comparison Date' above.")
         else:
-            st.subheader(f"Trend: {date_a} vs {date_b}")
-            df_b = df[df['Date'] == pd.to_datetime(date_b)].copy()
+            date_b = pd.to_datetime(date_b_str)
+            st.subheader(f"Trend Analysis: {date_a_str} vs {date_b_str}")
+            
+            # Determine most recent date for Red/Green logic
+            # If Primary is more recent than Comparison, Positive is Green. 
+            # If Primary is older than Comparison (going back in time), Positive is Red.
+            is_primary_newer = date_a >= date_b
+
+            df_b = df[df['Date'] == date_b].copy()
             avg_a = day_df[list(grading_map.keys())].mean()
             avg_b = df_b[list(grading_map.keys())].mean()
             
@@ -138,20 +130,27 @@ try:
             for internal, display in grading_map.items():
                 val_a, val_b = avg_a[internal], avg_b[internal]
                 perc_diff = ((val_a - val_b) / val_b * 100) if val_b != 0 else 0
+                
+                # Logic: If val_a < val_b (Down), it's always Red in this context
+                if val_a > val_b:
+                    diff_str = f"▲ +{int(round(perc_diff, 0))}%"
+                elif val_a < val_b:
+                    diff_str = f"▼ {int(round(perc_diff, 0))}%"
+                else:
+                    diff_str = "0%"
+
                 comp_rows.append({
                     "Metric": display,
-                    date_a: int(round(val_a, 0)),
-                    date_b: int(round(val_b, 0)),
-                    "% Diff": f"{'+' if perc_diff > 0 else ''}{int(round(perc_diff, 0))}%"
+                    date_a_str: int(round(val_a, 0)),
+                    date_b_str: int(round(val_b, 0)),
+                    "% Diff": diff_str
                 })
             
-            # 1. Table with Arrows
-            st.markdown(render_table(pd.DataFrame(comp_rows), ["Metric", date_a, date_b, "% Diff"]), unsafe_allow_html=True)
+            st.markdown(render_table(pd.DataFrame(comp_rows), ["Metric", date_a_str, date_b_str, "% Diff"]), unsafe_allow_html=True)
             
-            # 2. Graph EXCLUDING Estimated Distance
-            st.divider()
-            graph_rows = [r for r in comp_rows if r["Metric"] != "Estimated Distance (y)"]
-            comp_chart_df = pd.DataFrame(graph_rows).melt(id_vars="Metric", value_vars=[date_a, date_b], var_name="Session", value_name="Avg")
+            # Bar Chart excluding Estimated Distance
+            graph_rows = [r for r in comp_rows if "Distance" not in r["Metric"]]
+            comp_chart_df = pd.DataFrame(graph_rows).melt(id_vars="Metric", value_vars=[date_a_str, date_b_str], var_name="Session", value_name="Avg")
             fig_comp = px.bar(comp_chart_df, x="Metric", y="Avg", color="Session", barmode="group", template="plotly_white", color_discrete_sequence=["#FF8200", "#545454"])
             st.plotly_chart(fig_comp, use_container_width=True)
 
@@ -192,8 +191,7 @@ try:
 
     with t4:
         st.subheader("Leaderboard")
-        leader_df = day_df[['Name', 'Total Jumps', 'Total Player Load']].astype(int, errors='ignore').sort_values('Total Player Load', ascending=False)
-        st.dataframe(leader_df, use_container_width=True, hide_index=True)
+        st.dataframe(day_df[['Name', 'Total Jumps', 'Total Player Load']].astype(int, errors='ignore').sort_values('Total Player Load', ascending=False), use_container_width=True, hide_index=True)
 
 except Exception as e:
     st.error(f"Sync Error: {e}")
