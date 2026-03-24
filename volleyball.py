@@ -7,9 +7,10 @@ import math
 # --- PAGE CONFIG ---
 st.set_page_config(page_title="Performance Lab", layout="wide")
 
-# --- CSS: TENNESSEE STYLE ---
+# --- CSS: TENNESSEE STYLE & ENHANCED GALLERY ---
 st.markdown("""
     <style>
+    /* Global Styles */
     .stApp { background-color: #FFFFFF; color: #1D1D1F; }
     hr { display: none !important; }
     [data-testid="stVerticalBlock"] > div:empty { display: none !important; }
@@ -18,14 +19,18 @@ st.markdown("""
 
     /* Table Styles */
     .scout-table { width: 100%; border-collapse: collapse; text-align: center; table-layout: auto; }
-    .scout-table th { background-color: #F5F5F7; padding: 6px; border-bottom: 2px solid #E5E5E7; font-weight: 700; font-size: 13px; }
-    .scout-table td { padding: 5px; border-bottom: 1px solid #F5F5F7; font-size: 13px; }
+    .scout-table th { background-color: #F5F5F7; padding: 4px; border-bottom: 2px solid #E5E5E7; font-weight: 700; font-size: 11px; }
+    .scout-table td { padding: 4px; border-bottom: 1px solid #F5F5F7; font-size: 11px; }
     
-    /* Photo & Card Styles */
+    /* Photo & Card Styles (Global/Profile) */
     .player-photo-large { border-radius: 50%; width: 220px; height: 220px; object-fit: cover; border: 6px solid #FF8200; }
-    .gallery-photo { border-radius: 50%; width: 90px; height: 90px; object-fit: cover; border: 4px solid #FF8200; }
     .score-box { padding: 15px 30px; border-radius: 12px; font-size: 36px; font-weight: 800; text-align: center; color: #1D1D1F; }
-    .gallery-card { border: 1px solid #E5E5E7; padding: 12px; border-radius: 15px; background-color: #FFFFFF; margin-bottom: 12px; min-height: 420px; }
+    .gallery-card { border: 1px solid #E5E5E7; padding: 10px; border-radius: 15px; background-color: #FFFFFF; margin-bottom: 12px; min-height: 420px; }
+
+    /* SPECIFIC ENHANCEMENTS FOR GALLERY */
+    .gallery-photo { border-radius: 50%; width: 120px; height: 120px; object-fit: cover; border: 5px solid #FF8200; margin-top: 10px; }
+    .gallery-score-box { padding: 25px 5px; border-radius: 12px; text-align: center; margin-top: 60px; height: 120px; display: flex; align-items: center; justify-content: center;}
+    .gallery-score { font-size: 42px; font-weight: 900; color: #1D1D1F; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -80,15 +85,13 @@ try:
     st.markdown("<h3 style='text-align: center; margin-bottom: 0px;'>Performance Lab</h3>", unsafe_allow_html=True)
     c_main, c_pos = st.columns([2, 2])
     with c_main:
-        date_a_str = st.selectbox("Current Practice", date_options, index=0)
+        date_a_str = st.selectbox("Current Practice", date_options, index=0, key="main_date_sel")
     with c_pos:
         pos_list = sorted([p for p in df['Position'].unique() if p != "N/A"])
-        pos_filter = st.selectbox("Position Filter", ["All Positions"] + pos_list)
+        pos_filter = st.selectbox("Position Filter", ["All Positions"] + pos_list, key="main_pos_filter")
 
     date_a = pd.to_datetime(date_a_str)
     day_df = df[df['Date'] == date_a].copy()
-    
-    # Global position filtering logic
     if pos_filter != "All Positions":
         day_df = day_df[day_df['Position'] == pos_filter]
 
@@ -119,7 +122,7 @@ try:
     t_flow, t_player, t_gallery, t_comp = st.tabs(["Session Flow", "Individual Profile", "Team Gallery", "Team Comparison"])
 
     with t_flow:
-        # Filter Session Flow based on position by cross-referencing names in day_df
+        st.subheader(f"Intensity Breakdown: {date_a_str}")
         current_names = day_df['Name'].unique()
         day_phase_df = phase_df[(phase_df['Date'] == date_a) & (phase_df['Name'].isin(current_names))].copy()
         
@@ -132,11 +135,11 @@ try:
                 html += f"<tr><td>{r['Phase']}</td><td>{int(r['Player Load'])}</td><td>{int(r['Explosive Efforts'])}</td><td>{int(r['Total Jumps'])}</td></tr>"
             st.markdown(html + '</tbody></table>', unsafe_allow_html=True)
         else:
-            st.warning(f"No drill data found for {pos_filter} on this date.")
+            st.warning(f"No drill data found.")
 
     with t_player:
         if not day_df.empty:
-            selected_player = st.selectbox("Select Athlete", day_df['Name'].unique())
+            selected_player = st.selectbox("Select Athlete", day_df['Name'].unique(), key="profile_selector")
             p_data = day_df[day_df['Name'] == selected_player].iloc[0]
             
             c1, c2, c3 = st.columns([1.2, 2.5, 1.2])
@@ -152,7 +155,6 @@ try:
                 st.markdown(f'<div style="text-align:center; font-weight:bold; font-size:18px; margin-top:15px;">Practice Score</div>', unsafe_allow_html=True)
                 st.markdown(f'<div class="score-box" style="background-color:{get_gradient(p_data["Practice Score"])};">{int(p_data["Practice Score"])}</div>', unsafe_allow_html=True)
 
-            # RESTORED CHARTS
             st.divider()
             st.markdown("### 📊 Performance Insights")
             g1, g2 = st.columns(2)
@@ -181,36 +183,42 @@ try:
                 for j in range(2):
                     if i + j < len(day_df):
                         p_d = day_df.iloc[i + j]
+                        
+                        rows_html = ""
+                        for k in all_metrics:
+                            rows_html += f"<tr><td>{k}</td><td>{int(p_d[k])}</td><td>{int(p_d[f'{k}_Grade'])}</td></tr>"
+                        
                         with cols[j]:
-                            rows_html = ""
-                            for k in all_metrics:
-                                rows_html += f"<tr><td>{k}</td><td>{int(p_d[k])}</td><td>{int(p_d[f'{k}_Grade'])}</td></tr>"
+                            # Updated flex ratios for better balance: 1.2:2.5:1
                             st.markdown(f"""
                             <div class="gallery-card">
-                                <div style="display: flex; align-items: center;">
-                                    <div style="flex: 1; text-align: center;">
+                                <div style="display: flex; align-items: flex-start; gap: 5px;">
+                                    <div style="flex: 1.2; text-align: center;">
                                         <img src="{p_d['PhotoURL']}" class="gallery-photo">
-                                        <p style="font-weight:bold; font-size:14px; margin-top:5px;">{p_d['Name']}<br><small>{p_d['Position']}</small></p>
+                                        <p style="font-weight:bold; font-size:15px; margin-top:8px;">{p_d['Name']}<br><small style="color:#FF8200;">{p_d['Position']}</small></p>
                                     </div>
-                                    <div style="flex: 2.5;">
+                                    <div style="flex: 2.5; padding-top: 5px;">
                                         <table class="scout-table">
                                             <thead><tr><th>Metric</th><th>Val</th><th>Grade</th></tr></thead>
                                             <tbody>{rows_html}</tbody>
                                         </table>
                                     </div>
-                                    <div style="flex: 0.8; text-align: center;">
-                                        <div style="background-color:{get_gradient(p_d['Practice Score'])}; border-radius:10px; padding:8px; font-size:20px; font-weight:800;">{int(p_d['Practice Score'])}</div>
+                                    <div style="flex: 1; text-align: center;">
+                                        <div class="gallery-score-box" style="background-color:{get_gradient(p_d['Practice Score'])};">
+                                            <div class="gallery-score">{int(p_d['Practice Score'])}</div>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
                             """, unsafe_allow_html=True)
+        else:
+            st.warning("No athletes found.")
 
     with t_comp:
         st.markdown("#### Team Session Comparison")
-        date_b_str = st.selectbox("Select Comparison Date", [d for d in date_options if d != date_a_str])
+        date_b_str = st.selectbox("Select Comparison Date", [d for d in date_options if d != date_a_str], key="comp_date_tab_sel")
         if date_b_str:
             avg_a = day_df[all_metrics].mean()
-            # Comparison also respects position filter
             df_comp = df[df['Date'] == pd.to_datetime(date_b_str)]
             if pos_filter != "All Positions":
                 df_comp = df_comp[df_comp['Position'] == pos_filter]
