@@ -25,7 +25,7 @@ st.markdown("""
     .player-photo-large { border-radius: 50%; width: 220px; height: 220px; object-fit: cover; border: 6px solid #FF8200; }
     .gallery-photo { border-radius: 50%; width: 90px; height: 90px; object-fit: cover; border: 4px solid #FF8200; }
     .score-box { padding: 15px 30px; border-radius: 12px; font-size: 36px; font-weight: 800; text-align: center; color: #1D1D1F; }
-    .gallery-card { border: 1px solid #E5E5E7; padding: 12px; border-radius: 15px; background-color: #FFFFFF; margin-bottom: 8px; position: relative; min-height: 380px; }
+    .gallery-card { border: 1px solid #E5E5E7; padding: 12px; border-radius: 15px; background-color: #FFFFFF; margin-bottom: 12px; position: relative; min-height: 380px; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -58,14 +58,12 @@ def load_all_data():
     df = df.rename(columns=rename_map)
     df['Date'] = pd.to_datetime(df['Date'])
     
-    # 1. Sort to ensure ffill works correctly
+    # 1. Sort & Fill Strings
     df = df.sort_values(['Name', 'Date'])
-    
-    # 2. Fill Strings separately (DO NOT FILL WITH 0)
     df['Position'] = df.groupby('Name')['Position'].ffill().bfill().fillna("N/A")
     df['PhotoURL'] = df.groupby('Name')['PhotoURL'].ffill().bfill().fillna("https://www.w3schools.com/howto/img_avatar.png")
     
-    # 3. Fill Metrics with 0
+    # 2. Fill Metrics
     metric_cols = ['Total Jumps', 'Moderate Jumps', 'High Jumps', 'Jump Load', 'Player Load', 'Estimated Distance', 'Explosive Efforts', 'High Intensity Movements']
     df[metric_cols] = df[metric_cols].fillna(0)
     
@@ -118,20 +116,17 @@ try:
     def process_player(row):
         p_name = row['Name']
         p_maxes = overall_maxes.loc[p_name]
-        
         grades = [math.ceil((float(row[k]) / float(p_maxes[k])) * 100) if float(p_maxes[k]) > 0 else 0 for k in grading_metrics]
         row['Practice Score'] = math.ceil(sum(grades) / len(grades))
         for k in grading_metrics:
             row[f'{k}_Grade'] = math.ceil((float(row[k]) / float(p_maxes[k])) * 100) if float(p_maxes[k]) > 0 else 0
             row[f'{k}_Max'] = p_maxes[k]
-        
         try:
             curr_eff = float(row['Explosive Efforts']) / float(row['Player Load']) if float(row['Player Load']) > 0 else 0
             s_avg_eff = float(overall_avgs.loc[p_name]['Explosive Efforts']) / float(overall_avgs.loc[p_name]['Player Load']) if float(overall_avgs.loc[p_name]['Player Load']) > 0 else 0
             row['Is_Fatigued'] = bool(curr_eff < (s_avg_eff * 0.85)) and curr_eff > 0
         except:
             row['Is_Fatigued'] = False
-            
         return row
 
     def render_table(dataframe, cols):
@@ -212,7 +207,7 @@ try:
 
     with t_gallery:
         if not day_df.empty:
-            # GALLERY RENDERING
+            # FIXED: TWO-COLUMN GALLERY LOOP
             for i in range(0, len(day_df), 2):
                 cols = st.columns(2)
                 for j in range(2):
@@ -220,6 +215,12 @@ try:
                         p_d = day_df.iloc[i + j]
                         is_top = (p_d['Practice Score'] == top_score and top_score > 0)
                         
+                        # Generate the metric table rows for the card
+                        card_metrics = grading_metrics[:4]
+                        rows_html = ""
+                        for k in card_metrics:
+                            rows_html += f"<tr><td>{k}</td><td>{int(p_d[k])}</td><td>{int(p_d[f'{k}_Grade'])}</td></tr>"
+
                         with cols[j]:
                             st.markdown(f"""
                             <div class="gallery-card">
@@ -233,7 +234,10 @@ try:
                                         <p style="font-weight:bold; font-size:14px; margin-top:5px;">{p_d['Name']}<br><small>{p_d['Position']}</small></p>
                                     </div>
                                     <div style="flex: 2.5;">
-                                        {render_table(pd.DataFrame([{"Metric": k, "Val": p_d[k], "Grade": p_d[f'{k}_Grade']} for k in grading_metrics[:4]]), ["Metric", "Val", "Grade"])}
+                                        <table class="scout-table">
+                                            <thead><tr><th>Metric</th><th>Val</th><th>Grade</th></tr></thead>
+                                            <tbody>{rows_html}</tbody>
+                                        </table>
                                     </div>
                                     <div style="flex: 0.8; text-align: center;">
                                         <div style="background-color:{get_excel_gradient(p_d['Practice Score'])}; border-radius:10px; padding:8px; font-size:20px; font-weight:800;">{int(p_d['Practice Score'])}</div>
