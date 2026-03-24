@@ -10,7 +10,6 @@ st.set_page_config(page_title="Performance Lab", layout="wide")
 # --- CSS: TENNESSEE STYLE & TIGHT GALLERY ---
 st.markdown("""
     <style>
-    /* Global Styles */
     .stApp { background-color: #FFFFFF; color: #1D1D1F; }
     hr { display: none !important; }
     [data-testid="stVerticalBlock"] > div:empty { display: none !important; }
@@ -22,25 +21,23 @@ st.markdown("""
     .scout-table th { background-color: #F5F5F7; padding: 4px; border-bottom: 2px solid #E5E5E7; font-weight: 700; font-size: 11px; }
     .scout-table td { padding: 4px; border-bottom: 1px solid #F5F5F7; font-size: 11px; }
     
-    /* Photo & Card Styles (Global/Profile) */
+    /* Profile Photo */
     .player-photo-large { border-radius: 50%; width: 220px; height: 220px; object-fit: cover; border: 6px solid #FF8200; }
     .score-box { padding: 15px 30px; border-radius: 12px; font-size: 36px; font-weight: 800; text-align: center; color: #1D1D1F; }
     
-    /* GALLERY CARD: REDUCED MIN-HEIGHT & TIGHTER SPACING */
+    /* Gallery Card */
     .gallery-card { 
         border: 1px solid #E5E5E7; 
         padding: 15px; 
         border-radius: 15px; 
         background-color: #FFFFFF; 
         margin-bottom: 12px; 
-        min-height: 320px; /* Reduced from 420px */
+        min-height: 320px;
         display: flex;
         flex-direction: column;
         justify-content: center;
     }
-
     .gallery-photo { border-radius: 50%; width: 110px; height: 110px; object-fit: cover; border: 5px solid #FF8200; }
-    
     .gallery-score-box { 
         padding: 10px; 
         border-radius: 12px; 
@@ -50,7 +47,7 @@ st.markdown("""
         display: flex; 
         align-items: center; 
         justify-content: center;
-        margin: auto; /* Centers vertically in the flex column */
+        margin: auto; 
     }
     .gallery-score { font-size: 38px; font-weight: 900; color: #1D1D1F; }
     </style>
@@ -85,7 +82,6 @@ def load_all_data():
     df = df.rename(columns=rename_map)
     df['Date'] = pd.to_datetime(df['Date'])
     
-    # Sort and fill Position/Photo
     df = df.sort_values(['Name', 'Date'])
     df['Position'] = df.groupby('Name')['Position'].ffill().bfill().fillna("N/A")
     df['PhotoURL'] = df.groupby('Name')['PhotoURL'].ffill().bfill().fillna("https://www.w3schools.com/howto/img_avatar.png")
@@ -103,24 +99,24 @@ try:
     df, phase_df = load_all_data()
     date_options = [d.strftime('%m/%d/%Y') for d in sorted(df['Date'].unique(), reverse=True)]
 
-    # --- 1. HEADER SELECTION ---
+    # --- HEADER ---
     st.markdown("<h3 style='text-align: center; margin-bottom: 0px;'>Performance Lab</h3>", unsafe_allow_html=True)
     c_main, c_pos = st.columns([2, 2])
     with c_main:
-        date_a_str = st.selectbox("Current Practice", date_options, index=0, key="main_date_sel")
+        date_a_str = st.selectbox("Current Practice", date_options, index=0)
     with c_pos:
         pos_list = sorted([p for p in df['Position'].unique() if p != "N/A"])
-        pos_filter = st.selectbox("Position Filter", ["All Positions"] + pos_list, key="main_pos_filter")
+        pos_filter = st.selectbox("Position Filter", ["All Positions"] + pos_list)
 
     date_a = pd.to_datetime(date_a_str)
     day_df = df[df['Date'] == date_a].copy()
     if pos_filter != "All Positions":
         day_df = day_df[day_df['Position'] == pos_filter]
 
-    # --- METRICS & GRADING ---
+    # --- LOGIC ---
     all_metrics = ['Total Jumps', 'Moderate Jumps', 'High Jumps', 'Jump Load', 'Player Load', 'Estimated Distance', 'Explosive Efforts', 'High Intensity Movements']
     overall_maxes = df.groupby('Name')[all_metrics].max()
-    pos_avgs_today = day_df[all_metrics].mean()
+    team_maxes = df[all_metrics].max()
 
     def get_gradient(score):
         score = max(0, min(100, float(score)))
@@ -140,28 +136,22 @@ try:
     if not day_df.empty:
         day_df = day_df.apply(process_player, axis=1).sort_values('Name')
 
-    # --- TABS ---
     t_flow, t_player, t_gallery, t_comp = st.tabs(["Session Flow", "Individual Profile", "Team Gallery", "Team Comparison"])
 
     with t_flow:
-        st.subheader(f"Intensity Breakdown: {date_a_str}")
         current_names = day_df['Name'].unique()
         day_phase_df = phase_df[(phase_df['Date'] == date_a) & (phase_df['Name'].isin(current_names))].copy()
-        
         if not day_phase_df.empty:
             phase_stats = day_phase_df.groupby('Phase', sort=False).agg({'Player Load': 'mean', 'Explosive Efforts': 'mean', 'Total Jumps': 'mean'}).reset_index()
-            st.plotly_chart(px.bar(phase_stats, x='Phase', y='Player Load', color='Explosive Efforts', color_continuous_scale='Oranges').update_layout(height=380, title=f"Drill Workload: {pos_filter}"), use_container_width=True)
-            
+            st.plotly_chart(px.bar(phase_stats, x='Phase', y='Player Load', color='Explosive Efforts', color_continuous_scale='Oranges').update_layout(height=380), use_container_width=True)
             html = '<table class="scout-table"><thead><tr><th>Phase</th><th>Player Load</th><th>Explosive Efforts</th><th>Total Jumps</th></tr></thead><tbody>'
             for _, r in phase_stats.iterrows():
                 html += f"<tr><td>{r['Phase']}</td><td>{int(r['Player Load'])}</td><td>{int(r['Explosive Efforts'])}</td><td>{int(r['Total Jumps'])}</td></tr>"
             st.markdown(html + '</tbody></table>', unsafe_allow_html=True)
-        else:
-            st.warning(f"No drill data found.")
 
     with t_player:
         if not day_df.empty:
-            selected_player = st.selectbox("Select Athlete", day_df['Name'].unique(), key="profile_selector")
+            selected_player = st.selectbox("Select Athlete", day_df['Name'].unique())
             p_data = day_df[day_df['Name'] == selected_player].iloc[0]
             
             c1, c2, c3 = st.columns([1.2, 2.5, 1.2])
@@ -178,24 +168,30 @@ try:
                 st.markdown(f'<div class="score-box" style="background-color:{get_gradient(p_data["Practice Score"])};">{int(p_data["Practice Score"])}</div>', unsafe_allow_html=True)
 
             st.divider()
-            st.markdown("### 📊 Performance Insights")
             g1, g2 = st.columns(2)
             with g1:
+                # NEW BASELINE FILTER
+                radar_baseline = st.radio("Baseline Comparison:", ["Position", "Team"], horizontal=True)
                 radar_m = ['Total Jumps', 'Explosive Efforts', 'High Intensity Movements', 'Jump Load', 'Player Load']
                 r_vals = [math.ceil((float(p_data[m]) / float(overall_maxes.loc[selected_player][m])) * 100) if float(overall_maxes.loc[selected_player][m]) > 0 else 0 for m in radar_m]
-                t_vals = [math.ceil((float(pos_avgs_today[m]) / float(df[m].max())) * 100) if float(df[m].max()) > 0 else 0 for m in radar_m]
                 
+                if radar_baseline == "Position":
+                    comp_vals = [math.ceil((float(df[df['Position'] == p_data['Position']][m].mean()) / float(team_maxes[m])) * 100) if team_maxes[m] > 0 else 0 for m in radar_m]
+                    label = f"{p_data['Position']} Avg"
+                else:
+                    comp_vals = [math.ceil((float(df[m].mean()) / float(team_maxes[m])) * 100) if team_maxes[m] > 0 else 0 for m in radar_m]
+                    label = "Team Avg"
+
                 fig_radar = go.Figure()
                 fig_radar.add_trace(go.Scatterpolar(r=r_vals, theta=radar_m, fill='toself', name=selected_player, line_color='#FF8200'))
-                fig_radar.add_trace(go.Scatterpolar(r=t_vals, theta=radar_m, fill='toself', name=f'{pos_filter} Avg', line_color='#1D1D1F', opacity=0.3))
-                fig_radar.update_layout(polar=dict(radialaxis=dict(visible=True, range=[0, 100])), margin=dict(l=90, r=90, t=60, b=60), height=400, title="Physical Profile vs Team")
+                fig_radar.add_trace(go.Scatterpolar(r=comp_vals, theta=radar_m, fill='toself', name=label, line_color='#1D1D1F', opacity=0.3))
+                fig_radar.update_layout(polar=dict(radialaxis=dict(visible=True, range=[0, 100])), height=400, title="Physical Profile")
                 st.plotly_chart(fig_radar, use_container_width=True)
             with g2:
-                hist_m = st.selectbox("Season Trend", all_metrics, key="player_hist_sel")
+                hist_m = st.selectbox("Season Trend", all_metrics)
                 p_hist = df[df['Name'] == selected_player].sort_values('Date')
-                fig_line = px.line(p_hist, x='Date', y=hist_m, markers=True, title=f"{hist_m} History")
-                fig_line.update_traces(line_color='#FF8200')
-                fig_line.update_layout(height=400)
+                fig_line = px.line(p_hist, x='Date', y=hist_m, markers=True)
+                fig_line.update_traces(line_color='#FF8200').update_layout(height=400)
                 st.plotly_chart(fig_line, use_container_width=True)
 
     with t_gallery:
@@ -205,11 +201,7 @@ try:
                 for j in range(2):
                     if i + j < len(day_df):
                         p_d = day_df.iloc[i + j]
-                        
-                        rows_html = ""
-                        for k in all_metrics:
-                            rows_html += f"<tr><td>{k}</td><td>{int(p_d[k])}</td><td>{int(p_d[f'{k}_Grade'])}</td></tr>"
-                        
+                        rows_html = "".join([f"<tr><td>{k}</td><td>{int(p_d[k])}</td><td>{int(p_d[f'{k}_Grade'])}</td></tr>" for k in all_metrics])
                         with cols[j]:
                             st.markdown(f"""
                             <div class="gallery-card">
@@ -218,34 +210,20 @@ try:
                                         <img src="{p_d['PhotoURL']}" class="gallery-photo">
                                         <p style="font-weight:bold; font-size:15px; margin-top:8px;">{p_d['Name']}<br><small style="color:#FF8200;">{p_d['Position']}</small></p>
                                     </div>
-                                    <div style="flex: 2.5;">
-                                        <table class="scout-table">
-                                            <thead><tr><th>Metric</th><th>Val</th><th>Grade</th></tr></thead>
-                                            <tbody>{rows_html}</tbody>
-                                        </table>
-                                    </div>
-                                    <div style="flex: 1; text-align: center;">
-                                        <div class="gallery-score-box" style="background-color:{get_gradient(p_d['Practice Score'])};">
-                                            <div class="gallery-score">{int(p_d['Practice Score'])}</div>
-                                        </div>
-                                    </div>
+                                    <div style="flex: 2.5;"><table class="scout-table"><thead><tr><th>Metric</th><th>Val</th><th>Grade</th></tr></thead><tbody>{rows_html}</tbody></table></div>
+                                    <div style="flex: 1; text-align: center;"><div class="gallery-score-box" style="background-color:{get_gradient(p_d['Practice Score'])};"><div class="gallery-score">{int(p_d['Practice Score'])}</div></div></div>
                                 </div>
                             </div>
                             """, unsafe_allow_html=True)
-        else:
-            st.warning("No athletes found.")
 
     with t_comp:
-        st.markdown("#### Team Session Comparison")
-        date_b_str = st.selectbox("Select Comparison Date", [d for d in date_options if d != date_a_str], key="comp_date_tab_sel")
+        date_b_str = st.selectbox("Compare Date", [d for d in date_options if d != date_a_str])
         if date_b_str:
             avg_a = day_df[all_metrics].mean()
             df_comp = df[df['Date'] == pd.to_datetime(date_b_str)]
-            if pos_filter != "All Positions":
-                df_comp = df_comp[df_comp['Position'] == pos_filter]
-            
+            if pos_filter != "All Positions": df_comp = df_comp[df_comp['Position'] == pos_filter]
             avg_b = df_comp[all_metrics].mean()
-            html = f'<table class="scout-table"><thead><tr><th>Metric</th><th>{date_a_str}</th><th>{date_b_str}</th><th>% Diff</th></tr></thead><tbody>'
+            html = '<table class="scout-table"><thead><tr><th>Metric</th><th>Today</th><th>Comparison</th><th>% Diff</th></tr></thead><tbody>'
             for k in all_metrics:
                 diff = ((avg_a[k] - avg_b[k]) / avg_b[k] * 100) if avg_b[k] != 0 else 0
                 html += f"<tr><td>{k}</td><td>{int(avg_a[k])}</td><td>{int(avg_b[k])}</td><td>{int(diff)}%</td></tr>"
