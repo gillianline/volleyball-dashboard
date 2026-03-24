@@ -7,18 +7,28 @@ import math
 # --- PAGE CONFIG ---
 st.set_page_config(page_title="Performance Lab", layout="wide")
 
-# --- CSS: TENNESSEE STYLE ---
+# --- CSS: TENNESSEE STYLE & GAP FIXES ---
 st.markdown("""
     <style>
+    /* Global Styles */
     .stApp { background-color: #FFFFFF; color: #1D1D1F; }
+    
+    /* HIDE THE BIG SPACING BAR & EXCESS PADDING */
     hr { display: none !important; }
-    .scout-table { width: 100%; border-collapse: collapse; text-align: center; margin-top: 5px; }
-    .scout-table th { background-color: #F5F5F7; padding: 10px; border-bottom: 2px solid #E5E5E7; font-weight: 700; }
-    .scout-table td { padding: 8px; border-bottom: 1px solid #F5F5F7; }
-    .player-photo-large { border-radius: 50%; width: 240px; height: 240px; object-fit: cover; border: 6px solid #FF8200; }
-    .gallery-photo { border-radius: 50%; width: 110px; height: 110px; object-fit: cover; border: 4px solid #FF8200; }
-    .score-box { padding: 20px 40px; border-radius: 12px; font-size: 40px; font-weight: 800; text-align: center; color: #1D1D1F; }
-    .gallery-card { border: 1px solid #E5E5E7; padding: 20px; border-radius: 15px; background-color: #FFFFFF; margin-bottom: 10px; min-height: 450px; }
+    .stHeader { display: none !important; }
+    .block-container { padding-top: 2rem !important; padding-bottom: 0rem !important; }
+    [data-testid="stVerticalBlock"] > div:empty { display: none !important; }
+    
+    /* Table Styles */
+    .scout-table { width: 100%; border-collapse: collapse; text-align: center; margin-top: 5px; table-layout: auto; }
+    .scout-table th { background-color: #F5F5F7; padding: 8px; border-bottom: 2px solid #E5E5E7; font-weight: 700; font-size: 13px; }
+    .scout-table td { padding: 6px; border-bottom: 1px solid #F5F5F7; font-size: 13px; }
+    
+    /* Photo & Card Styles */
+    .player-photo-large { border-radius: 50%; width: 220px; height: 220px; object-fit: cover; border: 6px solid #FF8200; }
+    .gallery-photo { border-radius: 50%; width: 100px; height: 100px; object-fit: cover; border: 4px solid #FF8200; }
+    .score-box { padding: 15px 30px; border-radius: 12px; font-size: 36px; font-weight: 800; text-align: center; color: #1D1D1F; }
+    .gallery-card { border: 1px solid #E5E5E7; padding: 15px; border-radius: 15px; background-color: #FFFFFF; margin-bottom: 5px; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -47,28 +57,24 @@ try:
     df, phase_df = load_all_data()
     date_options = [d.strftime('%m/%d/%Y') for d in sorted(df['Date'].unique(), reverse=True)]
 
-    # --- 1. DATE SELECTION (FIXED TO PREVENT JUMPS) ---
-    st.markdown("<h3 style='text-align: center;'>Practice Session</h3>", unsafe_allow_html=True)
-    
-    # We use columns for selection to keep the UI tight
+    # --- 1. DATE SELECTION ---
+    st.markdown("<h3 style='text-align: center; margin-bottom: 0px;'>Practice Session</h3>", unsafe_allow_html=True)
     c_main, c_toggle, c_comp = st.columns([2, 1, 2])
     
     with c_main:
-        date_a_str = st.selectbox("Current Practice", date_options, index=0, key="current_date_select")
-    
+        date_a_str = st.selectbox("Current Practice", date_options, index=0, key="curr_date")
     with c_toggle:
-        # Use a key to ensure Streamlit tracks the state without refreshing the whole app logic
-        compare_on = st.toggle("Compare Session", key="compare_toggle_state")
+        compare_on = st.checkbox("Compare Session", key="comp_mode")
     
     date_b_str = "None"
     if compare_on:
         with c_comp:
-            date_b_str = st.selectbox("Select Comparison Date", ["None"] + date_options, index=0, key="compare_date_select")
+            date_b_str = st.selectbox("Select Comparison Date", [d for d in date_options if d != date_a_str], index=0, key="compare_date")
 
     date_a = pd.to_datetime(date_a_str)
     day_df = df[df['Date'] == date_a].copy()
 
-    # --- METRICS SETUP ---
+    # --- METRICS & GRADING ---
     grading_metrics = ['Total Jumps', 'IMA Jump Count Med Band', 'IMA Jump Count High Band', 'BMP Jumping Load', 'Total Player Load', 'Explosive Efforts', 'High Intensity Movement', 'Estimated Distance (y)']
     overall_maxes = df.groupby('Name')[grading_metrics].max()
     overall_avgs = df.groupby('Name')[grading_metrics].mean()
@@ -98,8 +104,10 @@ try:
         for _, r in dataframe.iterrows():
             html += '<tr>'
             for c in cols:
-                val = r[c]
-                html += f'<td>{int(round(val,0)) if isinstance(val, (int, float)) else val}</td>'
+                val = r.get(c, 0)
+                # Force strictly numeric display for metrics
+                display_val = f"{int(round(val,0))}" if isinstance(val, (int, float)) else str(val)
+                html += f'<td>{display_val}</td>'
             html += '</tr>'
         return html + '</tbody></table>'
 
@@ -109,33 +117,30 @@ try:
     t_flow, t_player, t_gallery, t_comp = st.tabs(["Session Flow", "Individual Profile", "Team Gallery", "Team Comparison"])
 
     with t_flow:
-        st.subheader(f"Drill Comparison: {date_a_str}")
         day_phase_df = phase_df[phase_df['Date'] == date_a].copy()
         if not day_phase_df.empty:
             phase_stats = day_phase_df.groupby('Phase', sort=False)[['Total Jumps', 'Total Player Load', 'High Intensity Movement']].mean().fillna(0).reset_index()
             st.markdown(render_table(phase_stats, ['Phase', 'Total Jumps', 'Total Player Load', 'High Intensity Movement']), unsafe_allow_html=True)
         else:
-            st.warning("No drill-specific data found.")
+            st.warning("No drill data found.")
 
     with t_player:
-        selected_player = st.selectbox("Select Athlete", day_df['Name'].unique(), key="profile_selector")
+        selected_player = st.selectbox("Select Athlete", day_df['Name'].unique(), key="player_select_final")
         p_data = day_df[day_df['Name'] == selected_player].iloc[0]
         
-        # --- PLAYER CARD (ORIGINAL) ---
         c1, c2, c3 = st.columns([1.2, 2.5, 1.2])
         with c1:
             st.markdown(f'<div style="text-align:center;"><img src="{p_data["PhotoURL_Fixed"]}" class="player-photo-large"></div>', unsafe_allow_html=True)
             st.markdown(f'<h2 style="text-align:center;">{p_data["Name"]}</h2>', unsafe_allow_html=True)
         with c2:
             p_rows = []
-            # Only switch to comparison table if mode is ON and date is VALID
             if compare_on and date_b_str != "None":
                 p_b = df[(df['Name'] == selected_player) & (df['Date'] == pd.to_datetime(date_b_str))]
                 if not p_b.empty:
-                    p_b_proc = process_player(p_b.iloc[0])
+                    p_b_val = p_b.iloc[0]
                     for k in grading_metrics:
-                        p_rows.append({"Metric": k, f"{date_a_str}": p_data[k], f"{date_b_str}": p_b_proc[k], "Grade (Today)": p_data[f'{k}_Grade']})
-                    st.markdown(render_table(pd.DataFrame(p_rows), ["Metric", date_a_str, date_b_str, "Grade (Today)"]), unsafe_allow_html=True)
+                        p_rows.append({"Metric": k, "Today": p_data[k], "Comparison": p_b_val[k], "Grade": p_data[f'{k}_Grade']})
+                    st.markdown(render_table(pd.DataFrame(p_rows), ["Metric", "Today", "Comparison", "Grade"]), unsafe_allow_html=True)
             else:
                 for k in grading_metrics:
                     p_rows.append({"Metric": k, "Current": p_data[k], "Max": p_data[f'{k}_Max'], "Grade": p_data[f'{k}_Grade']})
@@ -144,18 +149,6 @@ try:
             st.markdown(f'<div style="text-align:center; font-weight:bold; font-size:20px; margin-top:20px;">Practice Score</div>', unsafe_allow_html=True)
             st.markdown(f'<div class="score-box" style="background-color:{get_excel_gradient(p_data["Practice Score"])};">{int(p_data["Practice Score"])}</div>', unsafe_allow_html=True)
 
-        st.divider()
-        st.subheader("Vs. Season Average")
-        p_avgs = overall_avgs.loc[selected_player]
-        trend_rows = []
-        for k in grading_metrics:
-            curr = p_data[k]
-            avg = p_avgs[k]
-            diff = ((curr - avg) / avg * 100) if avg != 0 else 0
-            trend_rows.append({"Metric": k, "Today": curr, "Season Avg": avg, "% Difference": f"{'+' if diff > 0 else ''}{int(round(diff,0))}%"})
-        st.markdown(render_table(pd.DataFrame(trend_rows), ["Metric", "Today", "Season Avg", "% Difference"]), unsafe_allow_html=True)
-
-        # --- NEW ANALYTICS SECTION ---
         st.markdown("### 📊 Advanced Performance Insights")
         g1, g2 = st.columns(2)
         with g1:
@@ -165,17 +158,18 @@ try:
             fig_radar = go.Figure()
             fig_radar.add_trace(go.Scatterpolar(r=r_vals, theta=radar_m, fill='toself', name=selected_player, line_color='#FF8200'))
             fig_radar.add_trace(go.Scatterpolar(r=t_vals, theta=radar_m, fill='toself', name='Team Avg', line_color='#1D1D1F', opacity=0.3))
-            fig_radar.update_layout(polar=dict(radialaxis=dict(visible=True, range=[0, 100])), title="Physical Output Shape", height=400)
+            fig_radar.update_layout(polar=dict(radialaxis=dict(visible=True, range=[0, 100])), title="Physical Profile", height=350)
             st.plotly_chart(fig_radar, use_container_width=True)
         with g2:
-            hist_m = st.selectbox("Track Progress Over Time", grading_metrics, key="player_hist_metric")
+            hist_m = st.selectbox("Metric Trend", grading_metrics, key="p_trend_final")
             p_hist = df[df['Name'] == selected_player].sort_values('Date')
-            fig_line = px.line(p_hist, x='Date', y=hist_m, markers=True, title=f"{hist_m} Progress")
+            fig_line = px.line(p_hist, x='Date', y=hist_m, markers=True, title=f"{hist_m} Over Season")
             fig_line.update_traces(line_color='#FF8200')
+            fig_line.update_layout(height=350)
             st.plotly_chart(fig_line, use_container_width=True)
 
     with t_gallery:
-        # --- TEAM GALLERY (RESTORING ALL METRICS) ---
+        # HIDE SPACING BARS IN GALLERY
         for i in range(0, len(day_df), 2):
             cols = st.columns(2)
             for j in range(2):
@@ -185,18 +179,17 @@ try:
                         st.markdown('<div class="gallery-card">', unsafe_allow_html=True)
                         ci, ct, cs = st.columns([1, 2.5, 0.8])
                         with ci:
-                            st.markdown(f'<div style="text-align:center;"><img src="{p_d["PhotoURL_Fixed"]}" class="gallery-photo"></div><p style="text-align:center; font-weight:bold;">{p_d["Name"]}</p>', unsafe_allow_html=True)
+                            st.markdown(f'<div style="text-align:center;"><img src="{p_d["PhotoURL_Fixed"]}" class="gallery-photo"></div><p style="text-align:center; font-weight:bold; font-size:14px; margin-top:5px;">{p_d["Name"]}</p>', unsafe_allow_html=True)
                         with ct:
-                            # Restored to show the full list of metrics just like the individual cards
-                            rows = [{"Metric": k, "Current": p_d[k], "Grade": p_d[f'{k}_Grade']} for k in grading_metrics]
-                            st.markdown(render_table(pd.DataFrame(rows), ["Metric", "Current", "Grade"]), unsafe_allow_html=True)
+                            g_rows = [{"Metric": k, "Val": p_d[k], "Grade": p_d[f'{k}_Grade']} for k in grading_metrics]
+                            st.markdown(render_table(pd.DataFrame(g_rows), ["Metric", "Val", "Grade"]), unsafe_allow_html=True)
                         with cs:
-                            st.markdown(f'<div style="background-color:{get_excel_gradient(p_d["Practice Score"])}; border-radius:10px; text-align:center; padding:15px; font-size:24px; font-weight:800; margin-top:45px;">{int(p_d["Practice Score"])}</div>', unsafe_allow_html=True)
+                            st.markdown(f'<div style="background-color:{get_excel_gradient(p_d["Practice Score"])}; border-radius:10px; text-align:center; padding:10px; font-size:22px; font-weight:800; margin-top:40px;">{int(p_d["Practice Score"])}</div>', unsafe_allow_html=True)
                         st.markdown('</div>', unsafe_allow_html=True)
 
     with t_comp:
         if not compare_on or date_b_str == "None":
-            st.info("Toggle 'Compare Session' at the top to see team-wide trends.")
+            st.info("Check 'Compare Session' above.")
         else:
             date_b = pd.to_datetime(date_b_str)
             df_b = df[df['Date'] == date_b].copy()
@@ -204,8 +197,8 @@ try:
             comp_rows = []
             for k in grading_metrics:
                 diff = ((avg_a[k] - avg_b[k]) / avg_b[k] * 100) if avg_b[k] != 0 else 0
-                comp_rows.append({"Metric": k, date_a_str: avg_a[k], date_b_str: date_b_str, "% Diff": f"{'+' if diff > 0 else ''}{int(round(diff, 0))}%"})
-            st.markdown(render_table(pd.DataFrame(comp_rows), ["Metric", date_a_str, date_b_str, "% Diff"]), unsafe_allow_html=True)
+                comp_rows.append({"Metric": k, "Today": avg_a[k], "Compare": avg_b[k], "% Diff": f"{'+' if diff > 0 else ''}{int(round(diff, 0))}%"})
+            st.markdown(render_table(pd.DataFrame(comp_rows), ["Metric", "Today", "Compare", "% Diff"]), unsafe_allow_html=True)
 
 except Exception as e:
     st.error(f"Sync Error: {e}")
