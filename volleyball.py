@@ -6,12 +6,11 @@ import math
 # --- PAGE CONFIG ---
 st.set_page_config(page_title="Performance Lab", layout="wide")
 
-# Styling: Force Center, BIG PHOTOS, Orange Borders, and Clean Gallery
+# Styling: Big Photos, Orange Borders, Centered Tables, No Index
 st.markdown("""
     <style>
     .stApp { background-color: #FFFFFF; color: #1D1D1F; }
     
-    /* Manual Table Centering & No Index */
     .scout-table {
         width: 100%;
         border-collapse: collapse;
@@ -20,13 +19,15 @@ st.markdown("""
     }
     .scout-table th {
         background-color: #F5F5F7;
-        padding: 10px;
+        padding: 8px;
         border-bottom: 2px solid #E5E5E7;
         font-weight: 700;
+        font-size: 14px;
     }
     .scout-table td {
-        padding: 8px;
+        padding: 6px;
         border-bottom: 1px solid #F5F5F7;
+        font-size: 14px;
     }
 
     .player-photo-large {
@@ -47,28 +48,25 @@ st.markdown("""
     }
 
     .score-box {
-        color: white;
         padding: 20px 40px;
         border-radius: 12px;
         font-size: 44px;
         font-weight: 800;
         text-align: center;
-        text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
+        text-shadow: 1px 1px 2px rgba(0,0,0,0.2);
     }
 
-    /* Team Gallery Card - No spacing bars, clean borders */
     .gallery-card {
         border: 1px solid #E5E5E7;
         padding: 20px;
         border-radius: 15px;
         background-color: #FFFFFF;
+        margin-bottom: 15px;
         height: 100%;
     }
     
-    /* Remove default Streamlit padding between columns to close gaps */
-    [data-testid="column"] {
-        padding: 5px !important;
-    }
+    /* Remove vertical spacing bars/dividers between columns */
+    [data-testid="column"] { padding: 0px 8px !important; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -105,6 +103,16 @@ try:
     day_df = df[df['Date'] == sel_date_dt].copy()
     day_phase_df = phase_df[phase_df['Date'] == sel_date_dt].copy()
 
+    # --- THREE-COLOR EXCEL GRADIENT (Green -> Yellow -> Red) ---
+    def get_excel_gradient(score):
+        score = max(0, min(100, score))
+        if score < 50:
+            r = int(255 * (score / 50))
+            return f"rgb({r}, 255, 0)"
+        else:
+            g = int(255 * (1 - (score - 50) / 50))
+            return f"rgb(255, {g}, 0)"
+
     # --- SCORING LOGIC (Season Maxes) ---
     grading_map = {
         'Total Jumps': 'Total Jumps',
@@ -119,15 +127,6 @@ try:
 
     overall_maxes = df.groupby('Name')[list(grading_map.keys())].max()
     photo_map = df.dropna(subset=['PhotoURL']).drop_duplicates('Name').set_index('Name')['PhotoURL'].to_dict()
-
-    def get_gradient_color(score):
-        # Excel-style Green-Yellow-Red Gradient
-        if score <= 50:
-            r = int(255 * (score / 50))
-            return f"rgb({r}, 200, 50)" # Slightly darker green/yellow for readability
-        else:
-            g = int(200 * (1 - (score - 50) / 50))
-            return f"rgb(220, {g}, 50)" # Slightly deeper red
 
     def process_player(row):
         p_name = row['Name']
@@ -166,9 +165,10 @@ try:
     with tab2:
         selected_player = st.selectbox("Select Player Profile", day_df['Name'].unique())
         p_data = day_df[day_df['Name'] == selected_player].iloc[0]
-        score_bg = get_gradient_color(p_data['Practice Score'])
+        score_bg = get_excel_gradient(p_data['Practice Score'])
+        txt_color = "white" if p_data['Practice Score'] > 70 or p_data['Practice Score'] < 30 else "#1D1D1F"
         
-        c_head1, c_head2, c_head3 = st.columns([1, 2, 1])
+        c_head1, c_head2, c_head3 = st.columns([1.2, 2, 1])
         with c_head1:
             st.markdown(f'<div style="text-align:center;"><img src="{p_data["PhotoURL_Fixed"]}" class="player-photo-large"></div>', unsafe_allow_html=True)
             st.markdown(f'<h2 style="text-align:center;">{p_data["Name"]}</h2>', unsafe_allow_html=True)
@@ -177,36 +177,39 @@ try:
             st.markdown(render_custom_table(pd.DataFrame(card_rows), ["Metric", "Current", "Max", "Grade"]), unsafe_allow_html=True)
         with c_head3:
             st.markdown(f'<div style="text-align:center; font-weight:bold; font-size:22px; margin-top:20px;">Practice Score</div>', unsafe_allow_html=True)
-            st.markdown(f'<div class="score-box" style="background-color:{score_bg};">{int(p_data["Practice Score"])}</div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="score-box" style="background-color:{score_bg}; color:{txt_color};">{int(p_data["Practice Score"])}</div>', unsafe_allow_html=True)
 
         st.divider()
-        st.subheader("Jump Volume by Intensity")
+        st.subheader("Jump Intensity Profile")
         jump_cols = ['IMA Jump Count Low Band', 'IMA Jump Count Med Band', 'IMA Jump Count High Band']
         jump_data = pd.DataFrame({'Band': ['Low', 'Med', 'High'], 'Count': [int(p_data[c]) for c in jump_cols]})
         fig_jumps = px.bar(jump_data, x='Band', y='Count', color='Band', 
-                           color_discrete_map={'Low': '#28a745', 'Med': '#FF8200', 'High': '#dc3545'},
+                           color_discrete_map={'Low': '#28a745', 'Med': '#FFC107', 'High': '#dc3545'},
                            template="plotly_white", text_auto=True)
         st.plotly_chart(fig_jumps, use_container_width=True)
 
     with tab3:
-        # Team Gallery: 2 per row, no vertical "spacing bars"
         for i in range(0, len(day_df), 2):
             cols = st.columns(2)
             for j in range(2):
                 if i + j < len(day_df):
                     p_data = day_df.iloc[i + j]
-                    p_score_bg = get_gradient_color(p_data['Practice Score'])
+                    p_score_bg = get_excel_gradient(p_data['Practice Score'])
+                    # Contrast text check
+                    p_txt_color = "white" if p_data['Practice Score'] > 70 or p_data['Practice Score'] < 30 else "#1D1D1F"
+                    
                     with cols[j]:
                         st.markdown(f'<div class="gallery-card">', unsafe_allow_html=True)
-                        ci, ct, cs = st.columns([1, 2, 0.8])
+                        ci, ct, cs = st.columns([1, 2.5, 0.8])
                         with ci:
                             st.markdown(f'<div style="text-align:center;"><img src="{p_data["PhotoURL_Fixed"]}" class="gallery-photo"></div>', unsafe_allow_html=True)
                             st.markdown(f'<p style="text-align:center; font-weight:bold; margin-top:5px;">{p_data["Name"]}</p>', unsafe_allow_html=True)
                         with ct:
-                            c_rows = [{"Metric": grading_map[k], "Current": p_data[k], "Grade": p_data[f'{k}_Grade']} for k in grading_map.keys()]
-                            st.markdown(render_custom_table(pd.DataFrame(c_rows), ["Metric", "Current", "Grade"]), unsafe_allow_html=True)
+                            # Max is now included here as requested
+                            c_rows = [{"Metric": grading_map[k], "Current": p_data[k], "Max": p_data[f'{k}_Max'], "Grade": p_data[f'{k}_Grade']} for k in grading_map.keys()]
+                            st.markdown(render_custom_table(pd.DataFrame(c_rows), ["Metric", "Current", "Max", "Grade"]), unsafe_allow_html=True)
                         with cs:
-                            st.markdown(f'<div style="background-color:{p_score_bg}; color:white; border-radius:10px; text-align:center; padding:15px; font-size:26px; font-weight:800; margin-top:45px;">{int(p_data["Practice Score"])}</div>', unsafe_allow_html=True)
+                            st.markdown(f'<div style="background-color:{p_score_bg}; color:{p_txt_color}; border-radius:10px; text-align:center; padding:15px; font-size:26px; font-weight:800; margin-top:45px;">{int(p_data["Practice Score"])}</div>', unsafe_allow_html=True)
                         st.markdown('</div>', unsafe_allow_html=True)
 
     with tab4:
