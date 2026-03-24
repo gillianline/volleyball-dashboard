@@ -45,7 +45,6 @@ def load_all_data():
     df = pd.read_csv(st.secrets["GOOGLE_SHEET_URL"])
     df.columns = df.columns.str.strip()
     
-    # RENAME SENSOR DATA TO COACH METRICS
     rename_map = {
         'Total Jumps': 'Total Jumps',
         'IMA Jump Count Med Band': 'Moderate Jumps',
@@ -59,17 +58,21 @@ def load_all_data():
     df = df.rename(columns=rename_map)
     df['Date'] = pd.to_datetime(df['Date'])
     
-    # --- CRITICAL FIX: FILL POSITION DATA ---
-    # Since position is only entered once, we sort and ffill so it attaches to every row for that player
+    # --- CRITICAL FIX: SMART FILLING ---
+    # 1. Fill Position and PhotoURL using forward/backward fill first
     df = df.sort_values(['Name', 'Date'])
     df['Position'] = df.groupby('Name')['Position'].ffill().bfill()
-    df = df.fillna(0) # Fill metric NaNs with 0
+    df['PhotoURL'] = df.groupby('Name')['PhotoURL'].ffill().bfill()
+    
+    # 2. ONLY fill numeric metric columns with 0
+    metric_cols = ['Total Jumps', 'Moderate Jumps', 'High Jumps', 'Jump Load', 'Player Load', 'Estimated Distance', 'Explosive Efforts', 'High Intensity Movements']
+    df[metric_cols] = df[metric_cols].fillna(0)
     
     p_df = pd.read_csv(st.secrets["PHASE_SHEET_URL"])
     p_df.columns = p_df.columns.str.strip()
     p_df = p_df.rename(columns=rename_map)
     p_df['Date'] = pd.to_datetime(p_df['Date'])
-    p_df = p_df.fillna(0)
+    p_df[metric_cols] = p_df[metric_cols].fillna(0)
     
     return df, p_df
 
@@ -78,13 +81,13 @@ try:
     date_options = [d.strftime('%m/%d/%Y') for d in sorted(df['Date'].unique(), reverse=True)]
 
     # --- 1. SELECTION BAR ---
-    st.markdown("<h3 style='text-align: center; margin-bottom: 0px;'>Practice Session</h3>", unsafe_allow_html=True)
+    st.markdown("<h3 style='text-align: center; margin-bottom: 0px;'>Performance Lab</h3>", unsafe_allow_html=True)
     c_main, c_pos, c_toggle, c_comp = st.columns([2, 1.5, 1, 2])
     
     with c_main:
         date_a_str = st.selectbox("Current Practice", date_options, index=0, key="date_a_final")
     with c_pos:
-        pos_list = sorted([p for p in df['Position'].unique() if p != 0 and pd.notna(p)])
+        pos_list = sorted([p for p in df['Position'].unique() if pd.notna(p)])
         pos_filter = st.selectbox("Position Filter", ["All Positions"] + pos_list, key="pos_filter_final")
     with c_toggle:
         compare_on = st.checkbox("Compare", value=False, key="do_compare_final")
@@ -102,9 +105,9 @@ try:
 
     # --- METRICS & LOGIC ---
     grading_metrics = ['Total Jumps', 'Moderate Jumps', 'High Jumps', 'Jump Load', 'Player Load', 'Estimated Distance', 'Explosive Efforts', 'High Intensity Movements']
-    overall_maxes = df.groupby('Name')[grading_metrics].max().fillna(0)
-    overall_avgs = df.groupby('Name')[grading_metrics].mean().fillna(0)
-    pos_avgs_today = day_df[grading_metrics].mean().fillna(0)
+    overall_maxes = df.groupby('Name')[grading_metrics].max()
+    overall_avgs = df.groupby('Name')[grading_metrics].mean()
+    pos_avgs_today = day_df[grading_metrics].mean()
     
     photo_map = df.dropna(subset=['PhotoURL']).drop_duplicates('Name').set_index('Name')['PhotoURL'].to_dict()
 
@@ -117,14 +120,12 @@ try:
         p_name = row['Name']
         p_maxes = overall_maxes.loc[p_name]
         
-        # Grading Logic: Season Max
         grades = [math.ceil((float(row[k]) / float(p_maxes[k])) * 100) if float(p_maxes[k]) > 0 else 0 for k in grading_metrics]
         row['Practice Score'] = math.ceil(sum(grades) / len(grades))
         for k in grading_metrics:
             row[f'{k}_Grade'] = math.ceil((float(row[k]) / float(p_maxes[k])) * 100) if float(p_maxes[k]) > 0 else 0
             row[f'{k}_Max'] = p_maxes[k]
         
-        # Fatigue Logic
         try:
             curr_eff = float(row['Explosive Efforts']) / float(row['Player Load']) if float(row['Player Load']) > 0 else 0
             s_avg_eff = float(overall_avgs.loc[p_name]['Explosive Efforts']) / float(overall_avgs.loc[p_name]['Player Load']) if float(overall_avgs.loc[p_name]['Player Load']) > 0 else 0
@@ -132,7 +133,7 @@ try:
         except:
             row['Is_Fatigued'] = False
             
-        row['PhotoURL_Fixed'] = photo_map.get(p_name, "https://www.w3schools.com/howto/img_avatar.png")
+        row['PhotoURL_Fixed'] = row['PhotoURL'] if pd.notna(row['PhotoURL']) else "https://www.w3schools.com/howto/img_avatar.png"
         return row
 
     def render_table(dataframe, cols):
@@ -195,7 +196,7 @@ try:
                 st.markdown(f'<div class="score-box" style="background-color:{get_excel_gradient(p_data["Practice Score"])};">{int(p_data["Practice Score"])}</div>', unsafe_allow_html=True)
 
             st.divider()
-            st.markdown("### 📊 Advanced Performance Insights")
+            st.markdown("### 📊 Advanced Insights")
             g1, g2 = st.columns(2)
             with g1:
                 radar_m = ['Total Jumps', 'Explosive Efforts', 'High Intensity Movements', 'Jump Load', 'Player Load']
@@ -211,9 +212,7 @@ try:
                 st.plotly_chart(px.line(df[df['Name'] == selected_player].sort_values('Date'), x='Date', y=hist_m, markers=True).update_traces(line_color='#FF8200').update_layout(height=400), use_container_width=True)
 
     with t_gallery:
-        if day_df.empty:
-            st.warning("No athletes found for this selection.")
-        else:
+        if not day_df.empty:
             for i in range(0, len(day_df), 2):
                 cols = st.columns(2)
                 for j in range(2):
@@ -241,6 +240,8 @@ try:
                                 </div>
                             </div>
                             """, unsafe_allow_html=True)
+        else:
+            st.warning("No athletes found.")
 
     with t_comp:
         if compare_on and date_b_str != "None":
