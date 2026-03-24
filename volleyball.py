@@ -7,10 +7,12 @@ import math
 # --- PAGE CONFIG ---
 st.set_page_config(page_title="Performance Lab", layout="wide")
 
-# --- CSS: TENNESSEE STYLE ---
+# --- CSS: TENNESSEE STYLE & UI CLEANUP ---
 st.markdown("""
     <style>
     .stApp { background-color: #FFFFFF; color: #1D1D1F; }
+    
+    /* HIDE THE SPACING BAR & EXCESS GAPS */
     hr { display: none !important; }
     [data-testid="stVerticalBlock"] > div:empty { display: none !important; }
     .st-emotion-cache-16idsys p { margin-bottom: 0px; }
@@ -18,14 +20,14 @@ st.markdown("""
 
     /* Table Styles */
     .scout-table { width: 100%; border-collapse: collapse; text-align: center; table-layout: auto; }
-    .scout-table th { background-color: #F5F5F7; padding: 4px; border-bottom: 2px solid #E5E5E7; font-weight: 700; font-size: 12px; }
-    .scout-table td { padding: 4px; border-bottom: 1px solid #F5F5F7; font-size: 12px; }
+    .scout-table th { background-color: #F5F5F7; padding: 6px; border-bottom: 2px solid #E5E5E7; font-weight: 700; font-size: 13px; }
+    .scout-table td { padding: 5px; border-bottom: 1px solid #F5F5F7; font-size: 13px; }
     
     /* Photo & Card Styles */
     .player-photo-large { border-radius: 50%; width: 220px; height: 220px; object-fit: cover; border: 6px solid #FF8200; }
     .gallery-photo { border-radius: 50%; width: 90px; height: 90px; object-fit: cover; border: 4px solid #FF8200; }
     .score-box { padding: 15px 30px; border-radius: 12px; font-size: 36px; font-weight: 800; text-align: center; color: #1D1D1F; }
-    .gallery-card { border: 1px solid #E5E5E7; padding: 12px; border-radius: 15px; background-color: #FFFFFF; margin-bottom: 12px; position: relative; min-height: 250px; overflow: hidden; }
+    .gallery-card { border: 1px solid #E5E5E7; padding: 12px; border-radius: 15px; background-color: #FFFFFF; margin-bottom: 12px; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -58,10 +60,10 @@ def load_all_data():
     df = df.rename(columns=rename_map)
     df['Date'] = pd.to_datetime(df['Date'])
     
-    # Sort and fill Position/Photo once per player
+    # Sort and fill Position/Photo once per player so they don't show as NaN
     df = df.sort_values(['Name', 'Date'])
-    df['Position'] = df.groupby('Name')['Position'].ffill().bfill().fillna("N/A")
-    df['PhotoURL'] = df.groupby('Name')['PhotoURL'].ffill().bfill().fillna("https://www.w3schools.com/howto/img_avatar.png")
+    df['Position'] = df.groupby('Name')['Position'].ffill().bfill()
+    df['PhotoURL'] = df.groupby('Name')['PhotoURL'].ffill().bfill()
     
     metric_cols = ['Total Jumps', 'Moderate Jumps', 'High Jumps', 'Jump Load', 'Player Load', 'Estimated Distance', 'Explosive Efforts', 'High Intensity Movements']
     df[metric_cols] = df[metric_cols].fillna(0)
@@ -78,14 +80,14 @@ try:
     df, phase_df = load_all_data()
     date_options = [d.strftime('%m/%d/%Y') for d in sorted(df['Date'].unique(), reverse=True)]
 
-    # --- UI SELECTION ---
+    # --- 1. SELECTION ---
     st.markdown("<h3 style='text-align: center; margin-bottom: 0px;'>Performance Lab</h3>", unsafe_allow_html=True)
     c_main, c_pos, c_toggle, c_comp = st.columns([2, 1.5, 1, 2])
     
     with c_main:
         date_a_str = st.selectbox("Current Practice", date_options, index=0)
     with c_pos:
-        pos_list = sorted([p for p in df['Position'].unique() if p != "N/A"])
+        pos_list = sorted([p for p in df['Position'].unique() if pd.notna(p)])
         pos_filter = st.selectbox("Position Filter", ["All Positions"] + pos_list)
     with c_toggle:
         compare_on = st.checkbox("Compare", value=False)
@@ -100,11 +102,9 @@ try:
     if pos_filter != "All Positions":
         day_df = day_df[day_df['Position'] == pos_filter]
 
-    # --- LOGIC ---
-    metrics = ['Total Jumps', 'Moderate Jumps', 'High Jumps', 'Jump Load', 'Player Load', 'Estimated Distance', 'Explosive Efforts', 'High Intensity Movements']
-    overall_maxes = df.groupby('Name')[metrics].max()
-    overall_avgs = df.groupby('Name')[metrics].mean()
-    pos_avgs_today = day_df[metrics].mean()
+    # --- METRICS ---
+    grading_metrics = ['Total Jumps', 'Moderate Jumps', 'High Jumps', 'Jump Load', 'Player Load', 'Estimated Distance', 'Explosive Efforts', 'High Intensity Movements']
+    overall_maxes = df.groupby('Name')[grading_metrics].max()
 
     def get_gradient(score):
         score = max(0, min(100, float(score)))
@@ -114,25 +114,49 @@ try:
     def process_player(row):
         p_name = row['Name']
         p_maxes = overall_maxes.loc[p_name]
-        grades = [math.ceil((float(row[k]) / float(p_maxes[k])) * 100) if float(p_maxes[k]) > 0 else 0 for k in metrics]
+        grades = [math.ceil((float(row[k]) / float(p_maxes[k])) * 100) if float(p_maxes[k]) > 0 else 0 for k in grading_metrics]
         row['Practice Score'] = math.ceil(sum(grades) / len(grades))
-        for k in metrics:
+        for k in grading_metrics:
             row[f'{k}_Grade'] = math.ceil((float(row[k]) / float(p_maxes[k])) * 100) if float(p_maxes[k]) > 0 else 0
             row[f'{k}_Max'] = p_maxes[k]
-        try:
-            curr_eff = float(row['Explosive Efforts']) / float(row['Player Load']) if float(row['Player Load']) > 0 else 0
-            avg_eff = float(overall_avgs.loc[p_name]['Explosive Efforts']) / float(overall_avgs.loc[p_name]['Player Load']) if float(overall_avgs.loc[p_name]['Player Load']) > 0 else 0
-            row['Is_Fatigued'] = bool(curr_eff < (avg_eff * 0.85)) and curr_eff > 0
-        except: row['Is_Fatigued'] = False
         return row
 
     if not day_df.empty:
-        day_df = day_df.apply(process_player, axis=1).sort_values('Practice Score', ascending=False)
-        top_score = day_df['Practice Score'].max()
-    else: top_score = 0
+        day_df = day_df.apply(process_player, axis=1).sort_values('Name')
 
     # --- TABS ---
     t_flow, t_player, t_gallery, t_comp = st.tabs(["Session Flow", "Individual Profile", "Team Gallery", "Team Comparison"])
+
+    with t_flow:
+        day_phase_df = phase_df[phase_df['Date'] == date_a].copy()
+        if not day_phase_df.empty:
+            phase_stats = day_phase_df.groupby('Phase', sort=False).agg({'Player Load': 'mean', 'Explosive Efforts': 'mean', 'Total Jumps': 'mean'}).reset_index()
+            st.plotly_chart(px.bar(phase_stats, x='Phase', y='Player Load', color='Explosive Efforts', color_continuous_scale='Oranges').update_layout(height=380), use_container_width=True)
+        else:
+            st.warning("No drill data found.")
+
+    with t_player:
+        if not day_df.empty:
+            selected_player = st.selectbox("Select Athlete", day_df['Name'].unique())
+            p_data = day_df[day_df['Name'] == selected_player].iloc[0]
+            c1, c2, c3 = st.columns([1.2, 2.5, 1.2])
+            with c1:
+                st.markdown(f'<div style="text-align:center;"><img src="{p_data["PhotoURL"]}" class="player-photo-large"></div>', unsafe_allow_html=True)
+                st.markdown(f'<h2 style="text-align:center;">{p_data["Name"]} ({p_data["Position"]})</h2>', unsafe_allow_html=True)
+            with c2:
+                p_rows = []
+                for k in grading_metrics:
+                    p_rows.append({"Metric": k, "Today": p_data[k], "Max": p_data[f'{k}_Max'], "Grade": p_data[f'{k}_Grade']})
+                
+                # Render Table Logic
+                html = '<table class="scout-table"><thead><tr><th>Metric</th><th>Today</th><th>Max</th><th>Grade</th></tr></thead><tbody>'
+                for r in p_rows:
+                    html += f"<tr><td>{r['Metric']}</td><td>{int(r['Today'])}</td><td>{int(r['Max'])}</td><td>{int(r['Grade'])}</td></tr>"
+                html += '</tbody></table>'
+                st.markdown(html, unsafe_allow_html=True)
+            with c3:
+                st.markdown(f'<div style="text-align:center; font-weight:bold; font-size:18px; margin-top:15px;">Practice Score</div>', unsafe_allow_html=True)
+                st.markdown(f'<div class="score-box" style="background-color:{get_gradient(p_data["Practice Score"])};">{int(p_data["Practice Score"])}</div>', unsafe_allow_html=True)
 
     with t_gallery:
         if not day_df.empty:
@@ -141,19 +165,14 @@ try:
                 for j in range(2):
                     if i + j < len(day_df):
                         p_d = day_df.iloc[i + j]
-                        is_top = (p_d['Practice Score'] == top_score and top_score > 0)
-                        
-                        rows_html = ""
-                        for k in metrics[:4]: # Using first 4 metrics for the card
-                            rows_html += f"<tr><td>{k}</td><td>{int(p_d[k])}</td><td>{int(p_d[f'{k}_Grade'])}</td></tr>"
-
                         with cols[j]:
+                            # Gallery Table HTML
+                            rows_html = ""
+                            for k in grading_metrics[:4]:
+                                rows_html += f"<tr><td>{k}</td><td>{int(p_d[k])}</td><td>{int(p_d[f'{k}_Grade'])}</td></tr>"
+                            
                             st.markdown(f"""
                             <div class="gallery-card">
-                                <div style='position: absolute; top: 10px; right: 10px; display: flex; gap: 5px;'>
-                                    {"<div title='Top Performer' style='color:#FFD700; font-size:20px;'>⭐</div>" if is_top else ""}
-                                    {"<div title='Fatigue Detected' style='font-size:20px;'>⚠️</div>" if p_d['Is_Fatigued'] else ""}
-                                </div>
                                 <div style="display: flex; align-items: center;">
                                     <div style="flex: 1; text-align: center;">
                                         <img src="{p_d['PhotoURL']}" class="gallery-photo">
@@ -171,12 +190,21 @@ try:
                                 </div>
                             </div>
                             """, unsafe_allow_html=True)
-        else: st.warning("No athletes found.")
 
-    # (Simplified tabs for brevity, keep your existing logic for Profile, Flow, and Comp)
-    with t_player: st.info("Select athlete in the dropdown above to view details.")
-    with t_flow: st.info("Select a practice date to view flow intensity.")
-    with t_comp: st.info("Check 'Compare' to view team session deltas.")
+    with t_comp:
+        if compare_on and date_b_str != "None":
+            st.info(f"Comparing {date_a_str} to {date_b_str}")
+            # Simplified comparison table
+            avg_a = day_df[grading_metrics].mean()
+            df_b = df[df['Date'] == pd.to_datetime(date_b_str)]
+            avg_b = df_b[grading_metrics].mean()
+            
+            comp_html = '<table class="scout-table"><thead><tr><th>Metric</th><th>Today</th><th>Comparison</th><th>% Diff</th></tr></thead><tbody>'
+            for k in grading_metrics:
+                diff = ((avg_a[k] - avg_b[k]) / avg_b[k] * 100) if avg_b[k] != 0 else 0
+                comp_html += f"<tr><td>{k}</td><td>{int(avg_a[k])}</td><td>{int(avg_b[k])}</td><td>{int(diff)}%</td></tr>"
+            comp_html += '</tbody></table>'
+            st.markdown(comp_html, unsafe_allow_html=True)
 
 except Exception as e:
     st.error(f"Sync Error: {e}")
