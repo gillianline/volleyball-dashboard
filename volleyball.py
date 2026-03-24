@@ -6,18 +6,22 @@ import math
 # --- PAGE CONFIG ---
 st.set_page_config(page_title="Performance Lab", layout="wide")
 
-# --- CSS: TENNESSEE STYLE + NO INDEX ---
+# --- CSS: TENNESSEE STYLE + NO INDEX + NO BARS ---
 st.markdown("""
     <style>
     .stApp { background-color: #FFFFFF; color: #1D1D1F; }
     hr { display: none !important; }
+    
+    /* Center all table content */
     .scout-table { width: 100%; border-collapse: collapse; text-align: center; margin-top: 5px; }
     .scout-table th { background-color: #F5F5F7; padding: 10px; border-bottom: 2px solid #E5E5E7; font-weight: 700; }
     .scout-table td { padding: 8px; border-bottom: 1px solid #F5F5F7; }
+
     .player-photo-large { border-radius: 50%; width: 240px; height: 240px; object-fit: cover; border: 6px solid #FF8200; }
     .gallery-photo { border-radius: 50%; width: 110px; height: 110px; object-fit: cover; border: 4px solid #FF8200; }
     .score-box { padding: 20px 40px; border-radius: 12px; font-size: 40px; font-weight: 800; text-align: center; color: #1D1D1F; }
     .gallery-card { border: 1px solid #E5E5E7; padding: 20px; border-radius: 15px; background-color: #FFFFFF; margin-bottom: 10px; }
+    
     .trend-up { color: #28a745; font-weight: bold; }
     .trend-down { color: #dc3545; font-weight: bold; }
     </style>
@@ -75,7 +79,7 @@ try:
         p_name = row['Name']
         p_maxes = overall_maxes.loc[p_name]
         
-        # Equal weighting across all tracked metrics
+        # Neutral weighting (arithmetic average of all grades)
         grades = [math.ceil((row[k] / p_maxes[k]) * 100) if p_maxes[k] > 0 else 0 for k in grading_metrics]
         row['Practice Score'] = math.ceil(sum(grades) / len(grades))
         
@@ -107,11 +111,11 @@ try:
     t_flow, t_player, t_gallery, t_comp = st.tabs(["Session Flow", "Individual Profile", "Team Gallery", "Team Comparison"])
 
     with t_flow:
-        st.subheader(f"Jump Volume by Drill: {date_a_str}")
+        st.subheader(f"Jump Breakdown by Drill: {date_a_str}")
         day_phase_df = phase_df[phase_df['Date'] == date_a].copy()
         if not day_phase_df.empty:
-            # Graph prioritized by Jumps as requested
             phase_stats = day_phase_df.groupby('Phase', sort=False)[['Total Jumps', 'Total Player Load']].mean().fillna(0).reset_index()
+            # Leading with Jumps as requested
             st.plotly_chart(px.bar(phase_stats, x="Phase", y="Total Jumps", template="plotly_white", color_discrete_sequence=["#FF8200"]), use_container_width=True)
             st.markdown(render_table(phase_stats, ['Phase', 'Total Jumps', 'Total Player Load']), unsafe_allow_html=True)
         else:
