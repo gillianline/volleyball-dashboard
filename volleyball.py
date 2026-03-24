@@ -44,9 +44,24 @@ if "password_correct" not in st.session_state:
 def load_all_data():
     df = pd.read_csv(st.secrets["GOOGLE_SHEET_URL"])
     df.columns = df.columns.str.strip()
+    
+    # RENAME SENSOR DATA TO COACH METRICS
+    rename_map = {
+        'Total Jumps': 'Total Jumps',
+        'IMA Jump Count Med Band': 'Moderate Jumps',
+        'IMA Jump Count High Band': 'High Jumps',
+        'BMP Jumping Load': 'Jump Load',
+        'Total Player Load': 'Player Load',
+        'Estimated Distance (y)': 'Estimated Distance',
+        'Explosive Efforts': 'Explosive Efforts',
+        'High Intensity Movement': 'High Intensity Movements'
+    }
+    df = df.rename(columns=rename_map)
     df['Date'] = pd.to_datetime(df['Date'])
+    
     p_df = pd.read_csv(st.secrets["PHASE_SHEET_URL"])
     p_df.columns = p_df.columns.str.strip()
+    p_df = p_df.rename(columns=rename_map)
     p_df['Date'] = pd.to_datetime(p_df['Date'])
     return df, p_df
 
@@ -77,7 +92,7 @@ try:
         day_df = day_df[day_df['Position'] == pos_filter]
 
     # --- METRICS ---
-    grading_metrics = ['Total Jumps', 'IMA Jump Count High Band', 'BMP Jumping Load', 'Total Player Load', 'Explosive Efforts', 'High Intensity Movement', 'Estimated Distance (y)']
+    grading_metrics = ['Total Jumps', 'Moderate Jumps', 'High Jumps', 'Jump Load', 'Player Load', 'Estimated Distance', 'Explosive Efforts', 'High Intensity Movements']
     overall_maxes = df.groupby('Name')[grading_metrics].max()
     overall_avgs = df.groupby('Name')[grading_metrics].mean()
     pos_avgs_today = day_df[grading_metrics].mean()
@@ -93,7 +108,7 @@ try:
         p_name = row['Name']
         p_maxes = overall_maxes.loc[p_name]
         
-        # Grading Logic - Back to Season Max
+        # Grading Logic - Strictly Season Max
         grades = [math.ceil((float(row[k]) / float(p_maxes[k])) * 100) if float(p_maxes[k]) > 0 else 0 for k in grading_metrics]
         row['Practice Score'] = math.ceil(sum(grades) / len(grades))
         for k in grading_metrics:
@@ -101,8 +116,8 @@ try:
             row[f'{k}_Max'] = p_maxes[k]
         
         try:
-            curr_eff = float(row['Explosive Efforts']) / float(row['Total Player Load']) if float(row['Total Player Load']) > 0 else 0
-            s_avg_eff = float(overall_avgs.loc[p_name]['Explosive Efforts']) / float(overall_avgs.loc[p_name]['Total Player Load']) if float(overall_avgs.loc[p_name]['Total Player Load']) > 0 else 0
+            curr_eff = float(row['Explosive Efforts']) / float(row['Player Load']) if float(row['Player Load']) > 0 else 0
+            s_avg_eff = float(overall_avgs.loc[p_name]['Explosive Efforts']) / float(overall_avgs.loc[p_name]['Player Load']) if float(overall_avgs.loc[p_name]['Player Load']) > 0 else 0
             row['Is_Fatigued'] = bool(curr_eff < (s_avg_eff * 0.85)) and curr_eff > 0
         except:
             row['Is_Fatigued'] = False
@@ -135,9 +150,9 @@ try:
         st.subheader(f"Intensity Breakdown: {date_a_str}")
         day_phase_df = phase_df[phase_df['Date'] == date_a].copy()
         if not day_phase_df.empty:
-            phase_stats = day_phase_df.groupby('Phase', sort=False).agg({'Total Player Load': 'mean', 'Explosive Efforts': 'mean', 'Total Jumps': 'mean'}).reset_index()
-            st.plotly_chart(px.bar(phase_stats, x='Phase', y='Total Player Load', color='Explosive Efforts', color_continuous_scale='Oranges').update_layout(height=380), use_container_width=True)
-            st.markdown(render_table(phase_stats, ['Phase', 'Total Player Load', 'Explosive Efforts', 'Total Jumps']), unsafe_allow_html=True)
+            phase_stats = day_phase_df.groupby('Phase', sort=False).agg({'Player Load': 'mean', 'Explosive Efforts': 'mean', 'Total Jumps': 'mean'}).reset_index()
+            st.plotly_chart(px.bar(phase_stats, x='Phase', y='Player Load', color='Explosive Efforts', color_continuous_scale='Oranges').update_layout(height=380), use_container_width=True)
+            st.markdown(render_table(phase_stats, ['Phase', 'Player Load', 'Explosive Efforts', 'Total Jumps']), unsafe_allow_html=True)
         else:
             st.warning("No drill data.")
 
@@ -158,8 +173,8 @@ try:
                 st.markdown(render_table(pd.DataFrame(p_rows), ["Metric", date_a_str, date_b_str, "Grade"]), unsafe_allow_html=True)
             else:
                 for k in grading_metrics:
-                    p_rows.append({"Metric": k, "Current": p_data[k], "Max": p_data[f'{k}_Max'], "Grade": p_data[f'{k}_Grade']})
-                st.markdown(render_table(pd.DataFrame(p_rows), ["Metric", "Current", "Max", "Grade"]), unsafe_allow_html=True)
+                    p_rows.append({"Metric": k, "Today": p_data[k], "Max": p_data[f'{k}_Max'], "Grade": p_data[f'{k}_Grade']})
+                st.markdown(render_table(pd.DataFrame(p_rows), ["Metric", "Today", "Max", "Grade"]), unsafe_allow_html=True)
         with c3:
             st.markdown(f'<div style="text-align:center; font-weight:bold; font-size:18px; margin-top:15px;">Practice Score</div>', unsafe_allow_html=True)
             st.markdown(f'<div class="score-box" style="background-color:{get_excel_gradient(p_data["Practice Score"])};">{int(p_data["Practice Score"])}</div>', unsafe_allow_html=True)
@@ -168,7 +183,7 @@ try:
         st.markdown("### 📊 Advanced Performance Insights")
         g1, g2 = st.columns(2)
         with g1:
-            radar_m = ['Total Jumps', 'Explosive Efforts', 'High Intensity Movement', 'BMP Jumping Load', 'Total Player Load']
+            radar_m = ['Total Jumps', 'Explosive Efforts', 'High Intensity Movements', 'Jump Load', 'Player Load']
             r_vals = [math.ceil((float(p_data[m]) / float(overall_maxes.loc[selected_player][m])) * 100) if float(overall_maxes.loc[selected_player][m]) > 0 else 0 for m in radar_m]
             t_vals = [math.ceil((float(pos_avgs_today[m]) / float(df[m].max())) * 100) if float(df[m].max()) > 0 else 0 for m in radar_m]
             fig_radar = go.Figure()
