@@ -6,7 +6,7 @@ import math
 # --- PAGE CONFIG ---
 st.set_page_config(page_title="Performance Lab", layout="wide")
 
-# --- CSS: TENNESSEE STYLE ---
+# --- CSS: TENNESSEE STYLE + NO INDEX + CLEAN UI ---
 st.markdown("""
     <style>
     .stApp { background-color: #FFFFFF; color: #1D1D1F; }
@@ -18,6 +18,8 @@ st.markdown("""
     .gallery-photo { border-radius: 50%; width: 110px; height: 110px; object-fit: cover; border: 4px solid #FF8200; }
     .score-box { padding: 20px 40px; border-radius: 12px; font-size: 40px; font-weight: 800; text-align: center; color: #1D1D1F; }
     .gallery-card { border: 1px solid #E5E5E7; padding: 20px; border-radius: 15px; background-color: #FFFFFF; margin-bottom: 10px; }
+    .trend-up { color: #28a745; font-weight: bold; }
+    .trend-down { color: #dc3545; font-weight: bold; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -46,38 +48,25 @@ try:
     df, phase_df = load_all_data()
     date_options = [d.strftime('%m/%d/%Y') for d in sorted(df['Date'].unique(), reverse=True)]
 
-    # --- TOP SELECTION ---
-    st.markdown("<h3 style='text-align: center;'>Practice Selection</h3>", unsafe_allow_html=True)
-    c_main, c_toggle, c_compare = st.columns([2, 1, 2])
+    # --- 1. MINIMALIST DATE SELECTION ---
+    st.markdown("<h3 style='text-align: center;'>Practice Session</h3>", unsafe_allow_html=True)
+    c_main, c_comp = st.columns([3, 1])
     with c_main:
-        date_a_str = st.selectbox("Current Practice", date_options, index=0)
-    with c_toggle:
-        compare_on = st.toggle("Compare Session")
-    with c_compare:
-        date_b_str = st.selectbox("Comparison Practice", ["None"] + date_options, index=0) if compare_on else "None"
+        date_a_str = st.selectbox("Current Practice", date_options, index=0, label_visibility="collapsed")
+    with c_comp:
+        compare_mode = st.toggle("Compare Session")
+    
+    date_b_str = "None"
+    if compare_mode:
+        date_b_str = st.selectbox("Select Comparison Date", ["None"] + date_options, index=0)
 
     date_a = pd.to_datetime(date_a_str)
     day_df = df[df['Date'] == date_a].copy()
 
-    # --- COLUMN MAPPING (Technical Sheet Header -> Display Name) ---
-    metrics_map = {
-        'Total Jumps': 'Total Jumps',
-        'IMA Jump Count Med Band': 'Moderate Jumps',
-        'IMA Jump Count High Band': 'High Jumps',
-        'BMP Jumping Load': 'Jump Load',
-        'Total Player Load': 'Player Load',
-        'Estimated Distance (y)': 'Estimated Distance',
-        'Explosive Efforts': 'Explosive Efforts',
-        'High Intensity Movement': 'High Intensity Movements'
-    }
-    
-    # Extra BMP metrics for Flow/Comparison tabs
-    bmp_extras = ['BMP Running Load', 'BMP Active Load', 'BMP Dynamic Load', 'BMP Total Basketball Load']
-    
-    technical_cols = list(metrics_map.keys())
-    all_metrics = technical_cols + bmp_extras
-    
-    overall_maxes = df.groupby('Name')[all_metrics].max()
+    # --- LOGIC ---
+    grading_metrics = ['Total Jumps', 'IMA Jump Count Med Band', 'IMA Jump Count High Band', 'BMP Jumping Load', 'Total Player Load', 'Explosive Efforts', 'High Intensity Movement', 'Estimated Distance (y)']
+    overall_maxes = df.groupby('Name')[grading_metrics].max()
+    overall_avgs = df.groupby('Name')[grading_metrics].mean()
     photo_map = df.dropna(subset=['PhotoURL']).drop_duplicates('Name').set_index('Name')['PhotoURL'].to_dict()
 
     def get_excel_gradient(score):
@@ -88,19 +77,17 @@ try:
     def process_player(row):
         p_name = row['Name']
         p_maxes = overall_maxes.loc[p_name]
-        grades = [math.ceil((row[k] / p_maxes[k]) * 100) if p_maxes[k] > 0 else 0 for k in all_metrics]
+        grades = [math.ceil((row[k] / p_maxes[k]) * 100) if p_maxes[k] > 0 else 0 for k in grading_metrics]
         row['Practice Score'] = math.ceil(sum(grades) / len(grades))
-        for k in all_metrics:
+        for k in grading_metrics:
             row[f'{k}_Max'] = p_maxes[k]
             row[f'{k}_Grade'] = math.ceil((row[k] / p_maxes[k]) * 100) if p_maxes[k] > 0 else 0
         row['PhotoURL_Fixed'] = photo_map.get(p_name, "https://www.w3schools.com/howto/img_avatar.png")
         return row
 
-    def render_table(dataframe, cols, rename_dict=None):
+    def render_table(dataframe, cols):
         html = '<table class="scout-table"><thead><tr>'
-        for c in cols:
-            display_name = rename_dict.get(c, c) if rename_dict else c
-            html += f'<th>{display_name}</th>'
+        for c in cols: html += f'<th>{c}</th>'
         html += '</tr></thead><tbody>'
         for _, r in dataframe.iterrows():
             html += '<tr>'
@@ -112,47 +99,87 @@ try:
 
     day_df = day_df.apply(process_player, axis=1).sort_values('Name')
 
-    # --- TABS ---
-    t1, t2, t3, t4 = st.tabs(["Session Flow", "Individual Profile", "Team Gallery", "Team Comparison"])
+    # --- 2. TABS ---
+    t_flow, t_player, t_gallery, t_comp = st.tabs(["Session Flow", "Individual Profile", "Team Gallery", "Team Comparison"])
 
-    with t1:
-        st.subheader(f"Drill Breakdown: {date_a_str}")
-        day_p = phase_df[phase_df['Date'] == date_a].copy()
-        if not day_p.empty:
-            p_stats = day_p.groupby('Phase', sort=False)[all_metrics].mean().fillna(0).reset_index()
-            # Table 1: Screenshot Metrics (Mapped)
-            st.markdown(render_table(p_stats, ['Phase'] + technical_cols[:4], metrics_map), unsafe_allow_html=True)
-            st.divider()
-            # Table 2: BMP Extras
-            st.markdown(render_table(p_stats, ['Phase'] + bmp_extras), unsafe_allow_html=True)
-        else: st.warning("No drill data available.")
+    with t_flow:
+        st.subheader(f"Drill Comparison: {date_a_str}")
+        day_phase_df = phase_df[phase_df['Date'] == date_a].copy()
+        if not day_phase_df.empty:
+            phase_stats = day_phase_df.groupby('Phase', sort=False)[['Total Jumps', 'Total Player Load', 'High Intensity Movement']].mean().fillna(0).reset_index()
+            # Show a clear drill-by-drill data table instead of just a graph
+            st.markdown(render_table(phase_stats, ['Phase', 'Total Jumps', 'Total Player Load', 'High Intensity Movement']), unsafe_allow_html=True)
+        else:
+            st.warning("No drill-specific data found.")
 
-    with t2:
-        sel_p = st.selectbox("Select Athlete", day_df['Name'].unique())
-        p_d = day_df[day_df['Name'] == sel_p].iloc[0]
+    with t_player:
+        selected_player = st.selectbox("Select Athlete", day_df['Name'].unique())
+        p_data = day_df[day_df['Name'] == selected_player].iloc[0]
+        
         c1, c2, c3 = st.columns([1.2, 2.5, 1.2])
         with c1:
-            st.markdown(f'<div style="text-align:center;"><img src="{p_d["PhotoURL_Fixed"]}" class="player-photo-large"></div><h2 style="text-align:center;">{p_d["Name"]}</h2>', unsafe_allow_html=True)
+            st.markdown(f'<div style="text-align:center;"><img src="{p_data["PhotoURL_Fixed"]}" class="player-photo-large"></div>', unsafe_allow_html=True)
+            st.markdown(f'<h2 style="text-align:center;">{p_data["Name"]}</h2>', unsafe_allow_html=True)
         with c2:
+            # Table logic: Side-by-Side if Comparison Date is picked
             p_rows = []
-            for k, disp in metrics_map.items():
-                p_rows.append({"Metric": disp, "Current": p_d[k], "Max": p_d[f'{k}_Max'], "Grade": p_d[f'{k}_Grade']})
-            st.markdown(render_table(pd.DataFrame(p_rows), ["Metric", "Current", "Max", "Grade"]), unsafe_allow_html=True)
+            if date_b_str != "None":
+                p_b = df[(df['Name'] == selected_player) & (df['Date'] == pd.to_datetime(date_b_str))]
+                if not p_b.empty:
+                    p_b = process_player(p_b.iloc[0])
+                    for k in grading_metrics:
+                        p_rows.append({"Metric": k, f"{date_a_str}": p_data[k], f"{date_b_str}": p_b[k], "Grade (Today)": p_data[f'{k}_Grade']})
+                    st.markdown(render_table(pd.DataFrame(p_rows), ["Metric", date_a_str, date_b_str, "Grade (Today)"]), unsafe_allow_html=True)
+            else:
+                for k in grading_metrics:
+                    p_rows.append({"Metric": k, "Current": p_data[k], "Max": p_data[f'{k}_Max'], "Grade": p_data[f'{k}_Grade']})
+                st.markdown(render_table(pd.DataFrame(p_rows), ["Metric", "Current", "Max", "Grade"]), unsafe_allow_html=True)
         with c3:
-            st.markdown(f'<div style="text-align:center; font-weight:bold; font-size:18px; margin-top:20px;">Practice Score</div><div class="score-box" style="background-color:{get_excel_gradient(p_d["Practice Score"])};">{int(p_d["Practice Score"])}</div>', unsafe_allow_html=True)
+            st.markdown(f'<div style="text-align:center; font-weight:bold; font-size:20px; margin-top:20px;">Practice Score</div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="score-box" style="background-color:{get_excel_gradient(p_data["Practice Score"])};">{int(p_data["Practice Score"])}</div>', unsafe_allow_html=True)
 
-    with t3:
+        # ADDED INFO: Season Trends
+        st.divider()
+        st.subheader("Vs. Season Average")
+        p_avgs = overall_avgs.loc[selected_player]
+        trend_rows = []
+        for k in grading_metrics:
+            curr = p_data[k]
+            avg = p_avgs[k]
+            diff = ((curr - avg) / avg * 100) if avg != 0 else 0
+            trend_rows.append({"Metric": k, "Today": curr, "Season Avg": avg, "% Difference": f"{'+' if diff > 0 else ''}{int(round(diff,0))}%"})
+        st.markdown(render_table(pd.DataFrame(trend_rows), ["Metric", "Today", "Season Avg", "% Difference"]), unsafe_allow_html=True)
+
+    with t_gallery:
         for i in range(0, len(day_df), 2):
             cols = st.columns(2)
             for j in range(2):
                 if i + j < len(day_df):
-                    p_i = day_df.iloc[i + j]
+                    p_d = day_df.iloc[i + j]
                     with cols[j]:
                         st.markdown('<div class="gallery-card">', unsafe_allow_html=True)
                         ci, ct, cs = st.columns([1, 2.5, 0.8])
                         with ci:
-                            st.markdown(f'<div style="text-align:center;"><img src="{p_i["PhotoURL_Fixed"]}" class="gallery-photo"></div><p style="text-align:center; font-weight:bold;">{p_i["Name"]}</p>', unsafe_allow_html=True)
+                            st.markdown(f'<div style="text-align:center;"><img src="{p_d["PhotoURL_Fixed"]}" class="gallery-photo"></div><p style="text-align:center; font-weight:bold;">{p_d["Name"]}</p>', unsafe_allow_html=True)
                         with ct:
-                            g_rows = []
-                            for k in technical_cols[:4]:
-                                g_rows.append({"Metric": metrics_map[k], "Current": p_i[k], "Max": p_i[f'{k}_Max'], "
+                            rows = [{"Metric": k, "Current": p_d[k], "Grade": p_d[f'{k}_Grade']} for k in grading_metrics[:4]]
+                            st.markdown(render_table(pd.DataFrame(rows), ["Metric", "Current", "Grade"]), unsafe_allow_html=True)
+                        with cs:
+                            st.markdown(f'<div style="background-color:{get_excel_gradient(p_d["Practice Score"])}; border-radius:10px; text-align:center; padding:15px; font-size:24px; font-weight:800; margin-top:45px;">{int(p_d["Practice Score"])}</div>', unsafe_allow_html=True)
+                        st.markdown('</div>', unsafe_allow_html=True)
+
+    with t_comp:
+        if date_b_str == "None":
+            st.info("Toggle 'Compare Session' at the top to see team-wide trends.")
+        else:
+            date_b = pd.to_datetime(date_b_str)
+            df_b = df[df['Date'] == date_b].copy()
+            avg_a, avg_b = day_df[grading_metrics].mean(), df_b[grading_metrics].mean()
+            comp_rows = []
+            for k in grading_metrics:
+                diff = ((avg_a[k] - avg_b[k]) / avg_b[k] * 100) if avg_b[k] != 0 else 0
+                comp_rows.append({"Metric": k, date_a_str: avg_a[k], date_b_str: date_b_str, "% Diff": f"{'+' if diff > 0 else ''}{int(round(diff, 0))}%"})
+            st.markdown(render_table(pd.DataFrame(comp_rows), ["Metric", date_a_str, date_b_str, "% Diff"]), unsafe_allow_html=True)
+
+except Exception as e:
+    st.error(f"Sync Error: {e}")
