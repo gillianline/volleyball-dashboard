@@ -61,14 +61,14 @@ try:
     c_main, c_toggle, c_comp = st.columns([2, 1, 2])
     
     with c_main:
-        date_a_str = st.selectbox("Current Practice", date_options, index=0, key="date_a")
+        date_a_str = st.selectbox("Current Practice", date_options, index=0, key="date_a_final")
     with c_toggle:
-        compare_on = st.checkbox("Compare Session", value=False, key="do_compare")
+        compare_on = st.checkbox("Compare Session", value=False, key="do_compare_final")
     
     date_b_str = "None"
     if compare_on:
         with c_comp:
-            date_b_str = st.selectbox("Select Comparison Date", [d for d in date_options if d != date_a_str], index=0, key="date_b")
+            date_b_str = st.selectbox("Select Comparison Date", [d for d in date_options if d != date_a_str], index=0, key="date_b_final")
 
     date_a = pd.to_datetime(date_a_str)
     day_df = df[df['Date'] == date_a].copy()
@@ -123,7 +123,7 @@ try:
             st.warning("No drill data found.")
 
     with t_player:
-        selected_player = st.selectbox("Select Athlete", day_df['Name'].unique(), key="player_card_sel")
+        selected_player = st.selectbox("Select Athlete", day_df['Name'].unique(), key="player_card_final_sel")
         p_data = day_df[day_df['Name'] == selected_player].iloc[0]
         
         c1, c2, c3 = st.columns([1.2, 2.5, 1.2])
@@ -157,25 +157,25 @@ try:
             fig_radar.add_trace(go.Scatterpolar(r=r_vals, theta=radar_m, fill='toself', name=selected_player, line_color='#FF8200'))
             fig_radar.add_trace(go.Scatterpolar(r=t_vals, theta=radar_m, fill='toself', name='Team Avg', line_color='#1D1D1F', opacity=0.3))
             
-            # FIXED: INCREASED MARGINS AND ADDED PADDING TO STOP TEXT CLIPPING
+            # UPDATED: LARGER PADDING ALL AROUND (L/R/T/B) TO PREVENT ALL CLIPPING
             fig_radar.update_layout(
                 polar=dict(
-                    radialaxis=dict(visible=True, range=[0, 100]),
-                    angularaxis=dict(direction="clockwise", period=5)
+                    radialaxis=dict(visible=True, range=[0, 100], tickfont=dict(size=10)),
+                    angularaxis=dict(tickfont=dict(size=11))
                 ),
-                title="Physical Profile",
-                height=350,
-                margin=dict(l=80, r=80, t=40, b=40), # Added large left/right margins
+                title=dict(text="Physical Profile", y=0.98),
+                height=380,
+                margin=dict(l=90, r=90, t=60, b=60), # Expanded Top (t) and Bottom (b)
                 showlegend=True,
-                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+                legend=dict(orientation="h", yanchor="bottom", y=1.05, xanchor="center", x=0.5)
             )
             st.plotly_chart(fig_radar, use_container_width=True)
         with g2:
-            hist_m = st.selectbox("Metric Trend", grading_metrics, key="trend_sel_final")
+            hist_m = st.selectbox("Metric Trend", grading_metrics, key="trend_final_final")
             p_hist = df[df['Name'] == selected_player].sort_values('Date')
             fig_line = px.line(p_hist, x='Date', y=hist_m, markers=True, title=f"{hist_m} History")
             fig_line.update_traces(line_color='#FF8200')
-            fig_line.update_layout(height=350, margin=dict(t=40, b=40, l=20, r=20))
+            fig_line.update_layout(height=380, margin=dict(t=60, b=60, l=30, r=30))
             st.plotly_chart(fig_line, use_container_width=True)
 
     with t_gallery:
