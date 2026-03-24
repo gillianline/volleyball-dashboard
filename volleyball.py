@@ -3,103 +3,94 @@ import pandas as pd
 import plotly.express as px
 
 # --- PAGE CONFIG ---
-st.set_page_config(page_title="VB Performance Lab", layout="wide")
+st.set_page_config(page_title="Performance Lab", layout="wide")
 
-# Custom CSS for a "Pro Sports" Dark Theme
+# Sleek White Styling
 st.markdown("""
     <style>
-    .stApp { background-color: #0e1117; color: white; }
-    div[data-testid="stMetricValue"] { font-size: 2rem; color: #00d4ff; font-weight: bold; }
-    .stTable { background-color: #161b22; }
+    .stApp { background-color: #FFFFFF; color: #1D1D1F; }
+    div[data-testid="stMetricValue"] { font-size: 1.8rem; color: #007AFF; font-weight: 600; }
+    .stTable { border-radius: 10px; }
     </style>
     """, unsafe_allow_html=True)
 
 # --- 1. SECURITY ---
 if "password_correct" not in st.session_state:
-    st.title("🏐 Coach Secure Access")
-    pwd = st.text_input("Access Key:", type="password")
-    if st.button("Unlock"):
+    st.title("🔒 Access Restricted")
+    pwd = st.text_input("Enter Access Key:", type="password")
+    if st.button("Unlock Dashboard"):
         if pwd == st.secrets["COACH_PWD"]:
             st.session_state["password_correct"] = True
             st.rerun()
         else:
-            st.error("Denied")
+            st.error("Invalid Key")
     st.stop()
 
-# --- 2. DATA LOADING ---
+# --- 2. DATA LOADING & SORTING ---
 @st.cache_data(ttl=300)
 def load_data():
-    # Pulling from the Google Sheet URL in your Secrets
     df = pd.read_csv(st.secrets["GOOGLE_SHEET_URL"])
     df.columns = df.columns.str.strip()
+    # Ensure Date is actually a datetime object for sorting
+    df['Date'] = pd.to_datetime(df['Date'])
     return df
 
 try:
     df = load_data()
-    all_dates = df['Date'].unique()
     
-    # Sidebar Filters
-    st.sidebar.header("Controls")
-    selected_date = st.sidebar.selectbox("Select Practice Date", all_dates)
+    # Sort dates so the sidebar is always in order
+    sorted_dates = sorted(df['Date'].unique())
+    # Convert back to string for the selector display
+    date_options = [d.strftime('%m/%d/%Y') for d in sorted_dates]
     
-    # Filter data for that day
-    day_df = df[df['Date'] == selected_date].sort_values('Total Jumps', ascending=False)
+    st.sidebar.header("Session Filter")
+    selected_date_str = st.sidebar.selectbox("Select Date", date_options, index=len(date_options)-1)
+    
+    # Filter data for the selected day
+    day_df = df[df['Date'] == pd.to_datetime(selected_date_str)].sort_values('Total Jumps', ascending=False)
 
-    # --- 3. THE "PRACTICE LEADERS" (Instead of Team Totals) ---
-    st.title(f"📊 Practice Report: {selected_date}")
-    
-    col1, col2, col3 = st.columns(3)
-    
-    # Get top performers for the day
-    top_jumper = day_df.iloc[0]
-    top_load = day_df.sort_values('Total Player Load', ascending=False).iloc[0]
-    top_intensity = day_df.sort_values('High Intensity Movement', ascending=False).iloc[0]
+    # --- 3. CLEAN DASHBOARD UI ---
+    st.title(f"Volleyball Session Report")
+    st.caption(f"Analysis for {selected_date_str}")
 
-    with col1:
-        st.metric("Top Jump Volume", top_jumper['Name'], f"{int(top_jumper['Total Jumps'])} Jumps")
-    with col2:
-        st.metric("Highest Workload", top_load['Name'], f"{int(top_load['Total Player Load'])} Load")
-    with col3:
-        st.metric("Intensity Leader", top_intensity['Name'], f"{int(top_intensity['High Intensity Movement'])} Efforts")
+    # Top Performer Row (Clean metrics)
+    m1, m2, m3 = st.columns(3)
+    m1.metric("Jump Leader", day_df.iloc[0]['Name'], f"{int(day_df.iloc[0]['Total Jumps'])}")
+    
+    highest_load = day_df.sort_values('Total Player Load', ascending=False).iloc[0]
+    m2.metric("Workload Leader", highest_load['Name'], f"{int(highest_load['Total Player Load'])}")
+    
+    highest_int = day_df.sort_values('High Intensity Movement', ascending=False).iloc[0]
+    m3.metric("Intensity Leader", highest_int['Name'], f"{int(highest_int['High Intensity Movement'])}")
 
     st.divider()
 
-    # --- 4. INDIVIDUAL PERFORMANCE CARDS ---
-    st.subheader("Player Jump Profiles")
-    # Stacked bar with clean colors
+    # --- 4. THE JUMP GRAPH ---
+    st.subheader("Jump Intensity Breakdown")
     fig_jumps = px.bar(
         day_df, x="Name", 
         y=["IMA Jump Count Low Band", "IMA Jump Count Med Band", "IMA Jump Count High Band"],
         barmode="stack",
         color_discrete_map={
-            "IMA Jump Count High Band": "#FF4B4B", # Red
-            "IMA Jump Count Med Band": "#FFAA00",  # Orange
-            "IMA Jump Count Low Band": "#00D4FF"   # Blue
+            "IMA Jump Count High Band": "#FF3B30", # Clean Apple Red
+            "IMA Jump Count Med Band": "#FF9500", # Clean Apple Orange
+            "IMA Jump Count Low Band": "#007AFF"  # Clean Apple Blue
         },
-        template="plotly_dark"
+        template="plotly_white"
     )
-    # Clean up the chart axes
     fig_jumps.update_layout(
         xaxis_title=None, 
-        yaxis_title="Count", 
-        legend_title="Intensity",
-        margin=dict(l=0, r=0, t=30, b=0)
+        yaxis_title="Jumps",
+        legend_title=None,
+        margin=dict(l=0, r=0, t=20, b=0)
     )
     st.plotly_chart(fig_jumps, use_container_width=True)
 
-    st.divider()
-
-    # --- 5. DETAILED STATS TABLE ---
-    st.subheader("Individual Breakdown")
-    # Select specific columns the coach cares about
-    stats_to_show = ['Name', 'Total Jumps', 'IMA Jump Count High Band', 'Total Player Load', 'Explosive Efforts']
-    
-    # Highlight the high-load players in red in the table
-    st.dataframe(
-        day_df[stats_to_show].style.background_gradient(subset=['Total Player Load'], cmap='Reds'),
-        use_container_width=True,
-        hide_index=True
-    )
+    # --- 5. SIMPLE DATA TABLE ---
+    st.subheader("Individual Performance Data")
+    # Using a simple dataframe to avoid the matplotlib gradient error
+    cols = ['Name', 'Total Jumps', 'IMA Jump Count High Band', 'Total Player Load', 'Explosive Efforts']
+    st.dataframe(day_df[cols], use_container_width=True, hide_index=True)
 
 except Exception as e:
-    st.error(f"Waiting for data... or Error: {e}")
+    st.error(f"Issue connecting to data: {e}")
