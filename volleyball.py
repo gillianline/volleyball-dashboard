@@ -92,13 +92,17 @@ try:
     def process_player(row):
         p_name = row['Name']
         p_maxes = overall_maxes.loc[p_name]
-        grades = [math.ceil((float(row[k]) / float(p_maxes[k])) * 100) if float(p_maxes[k]) > 0 else 0 for k in grading_metrics]
+        p_avgs = overall_avgs.loc[p_name]
+        
+        # Grading Logic - Now using season averages as requested
+        grades = [math.ceil((float(row[k]) / float(p_avgs[k])) * 100) if float(p_avgs[k]) > 0 else 0 for k in grading_metrics]
         row['Practice Score'] = math.ceil(sum(grades) / len(grades))
         for k in grading_metrics:
-            row[f'{k}_Grade'] = math.ceil((float(row[k]) / float(p_maxes[k])) * 100) if float(p_maxes[k]) > 0 else 0
+            row[f'{k}_Grade'] = math.ceil((float(row[k]) / float(p_avgs[k])) * 100) if float(p_avgs[k]) > 0 else 0
+        
         try:
             curr_eff = float(row['Explosive Efforts']) / float(row['Total Player Load']) if float(row['Total Player Load']) > 0 else 0
-            s_avg_eff = float(overall_avgs.loc[p_name]['Explosive Efforts']) / float(overall_avgs.loc[p_name]['Total Player Load']) if float(overall_avgs.loc[p_name]['Total Player Load']) > 0 else 0
+            s_avg_eff = float(p_avgs['Explosive Efforts']) / float(p_avgs['Total Player Load']) if float(p_avgs['Total Player Load']) > 0 else 0
             row['Is_Fatigued'] = bool(curr_eff < (s_avg_eff * 0.85)) and curr_eff > 0
         except:
             row['Is_Fatigued'] = False
@@ -140,7 +144,6 @@ try:
         selected_player = st.selectbox("Select Athlete", day_df['Name'].unique(), key="p_sel")
         p_data = day_df[day_df['Name'] == selected_player].iloc[0]
         
-        # RESTORED: INDIVIDUAL PLAYER CARD
         c1, c2, c3 = st.columns([1.2, 2.5, 1.2])
         with c1:
             st.markdown(f'<div style="text-align:center;"><img src="{p_data["PhotoURL_Fixed"]}" class="player-photo-large"></div>', unsafe_allow_html=True)
@@ -177,7 +180,6 @@ try:
             st.plotly_chart(px.line(df[df['Name'] == selected_player].sort_values('Date'), x='Date', y=hist_m, markers=True).update_traces(line_color='#FF8200').update_layout(height=400), use_container_width=True)
 
     with t_gallery:
-        # RESTORED: TEAM GALLERY LAYOUT
         for i in range(0, len(day_df), 2):
             cols = st.columns(2)
             for j in range(2):
