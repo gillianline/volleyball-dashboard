@@ -3,13 +3,14 @@ import pandas as pd
 import plotly.express as px
 
 # --- PAGE CONFIG ---
-st.set_page_config(page_title="VB Performance Lab", layout="wide")
+st.set_page_config(page_title="Performance Lab", layout="wide")
 
 # Sleek White Styling
 st.markdown("""
     <style>
     .stApp { background-color: #FFFFFF; color: #1D1D1F; }
     div[data-testid="stMetricValue"] { font-size: 1.8rem; color: #007AFF; font-weight: 600; }
+    .stHeader { color: #1D1D1F; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -30,12 +31,12 @@ if "password_correct" not in st.session_state:
 def load_all_data():
     # Load Main Totals (Sheet 1)
     df = pd.read_csv(st.secrets["GOOGLE_SHEET_URL"])
-    df.columns = df.columns.str.strip() # Remove hidden spaces
+    df.columns = df.columns.str.strip() 
     df['Date'] = pd.to_datetime(df['Date'])
     
     # Load Phase Breakdown (Sheet 2)
     phase_df = pd.read_csv(st.secrets["PHASE_SHEET_URL"])
-    phase_df.columns = phase_df.columns.str.strip() # Remove hidden spaces
+    phase_df.columns = phase_df.columns.str.strip()
     phase_df['Date'] = pd.to_datetime(phase_df['Date'])
     
     return df, phase_df
@@ -43,7 +44,7 @@ def load_all_data():
 try:
     df, phase_df = load_all_data()
     
-    # Sort dates for sidebar
+    # Sort dates chronologically for the sidebar
     sorted_dates = sorted(df['Date'].unique())
     date_options = [d.strftime('%m/%d/%Y') for d in sorted_dates]
     
@@ -51,37 +52,39 @@ try:
     selected_date_str = st.sidebar.selectbox("Select Practice Date", date_options, index=len(date_options)-1)
     sel_date_dt = pd.to_datetime(selected_date_str)
     
-    # Filter both datasets
+    # Filter both datasets for the selected day
     day_df = df[df['Date'] == sel_date_dt].sort_values('Total Jumps', ascending=False)
     day_phase_df = phase_df[phase_df['Date'] == sel_date_dt]
 
     st.title(f"Volleyball Practice Analysis")
     st.caption(f"Session data for {selected_date_str}")
 
-    # --- 3. DRILL / PHASE OVERVIEW ---
-    st.subheader("Practice Phase Volume")
+    # --- 3. DRILL / PHASE OVERVIEW (AVERAGES) ---
+    st.subheader("Phase Intensity (Average per Player)")
     
-    # Changed from 'PhaseName' to 'Phase' to match your sheet
-    phase_summary = day_phase_df.groupby('Phase')[['Total Jumps', 'Explosive Efforts']].sum().reset_index()
+    # Grouping by 'Phase' and calculating MEAN
+    phase_summary = day_phase_df.groupby('Phase')[['Total Jumps', 'Explosive Efforts']].mean().reset_index().round(1)
     
     col_left, col_right = st.columns(2)
     
     with col_left:
         fig_phase_j = px.bar(
             phase_summary, x="Phase", y="Total Jumps",
-            title="Total Jumps per Drill",
+            title="Avg Jumps per Player by Drill",
             color_discrete_sequence=["#007AFF"],
             template="plotly_white"
         )
+        fig_phase_j.update_layout(xaxis_title=None, yaxis_title="Avg Jumps")
         st.plotly_chart(fig_phase_j, use_container_width=True)
         
     with col_right:
         fig_phase_e = px.bar(
             phase_summary, x="Phase", y="Explosive Efforts",
-            title="Explosive Efforts per Drill",
+            title="Avg Explosive Efforts per Player by Drill",
             color_discrete_sequence=["#5856D6"],
             template="plotly_white"
         )
+        fig_phase_e.update_layout(xaxis_title=None, yaxis_title="Avg Efforts")
         st.plotly_chart(fig_phase_e, use_container_width=True)
 
     st.divider()
@@ -105,6 +108,7 @@ try:
         },
         template="plotly_white"
     )
+    fig_player_mix.update_layout(xaxis_title=None, yaxis_title="Intensity Count", legend_title=None)
     st.plotly_chart(fig_player_mix, use_container_width=True)
 
     st.divider()
@@ -116,4 +120,4 @@ try:
 
 except Exception as e:
     st.error(f"Error loading data: {e}")
-    st.info("Check your Logs in Streamlit for the specific missing column name.")
+    st.info("Ensure Sheet 2 has a column named 'Phase' and Sheet 1/2 have a column named 'Name'.")
