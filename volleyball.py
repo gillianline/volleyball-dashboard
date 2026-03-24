@@ -7,7 +7,7 @@ import math
 # --- PAGE CONFIG ---
 st.set_page_config(page_title="Performance Lab", layout="wide")
 
-# --- CSS: TENNESSEE STYLE & ENHANCED GALLERY ---
+# --- CSS: TENNESSEE STYLE & TIGHT GALLERY ---
 st.markdown("""
     <style>
     /* Global Styles */
@@ -25,12 +25,34 @@ st.markdown("""
     /* Photo & Card Styles (Global/Profile) */
     .player-photo-large { border-radius: 50%; width: 220px; height: 220px; object-fit: cover; border: 6px solid #FF8200; }
     .score-box { padding: 15px 30px; border-radius: 12px; font-size: 36px; font-weight: 800; text-align: center; color: #1D1D1F; }
-    .gallery-card { border: 1px solid #E5E5E7; padding: 10px; border-radius: 15px; background-color: #FFFFFF; margin-bottom: 12px; min-height: 420px; }
+    
+    /* GALLERY CARD: REDUCED MIN-HEIGHT & TIGHTER SPACING */
+    .gallery-card { 
+        border: 1px solid #E5E5E7; 
+        padding: 15px; 
+        border-radius: 15px; 
+        background-color: #FFFFFF; 
+        margin-bottom: 12px; 
+        min-height: 320px; /* Reduced from 420px */
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+    }
 
-    /* SPECIFIC ENHANCEMENTS FOR GALLERY */
-    .gallery-photo { border-radius: 50%; width: 120px; height: 120px; object-fit: cover; border: 5px solid #FF8200; margin-top: 10px; }
-    .gallery-score-box { padding: 25px 5px; border-radius: 12px; text-align: center; margin-top: 60px; height: 120px; display: flex; align-items: center; justify-content: center;}
-    .gallery-score { font-size: 42px; font-weight: 900; color: #1D1D1F; }
+    .gallery-photo { border-radius: 50%; width: 110px; height: 110px; object-fit: cover; border: 5px solid #FF8200; }
+    
+    .gallery-score-box { 
+        padding: 10px; 
+        border-radius: 12px; 
+        text-align: center; 
+        height: 100px; 
+        width: 100px;
+        display: flex; 
+        align-items: center; 
+        justify-content: center;
+        margin: auto; /* Centers vertically in the flex column */
+    }
+    .gallery-score { font-size: 38px; font-weight: 900; color: #1D1D1F; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -189,15 +211,14 @@ try:
                             rows_html += f"<tr><td>{k}</td><td>{int(p_d[k])}</td><td>{int(p_d[f'{k}_Grade'])}</td></tr>"
                         
                         with cols[j]:
-                            # Updated flex ratios for better balance: 1.2:2.5:1
                             st.markdown(f"""
                             <div class="gallery-card">
-                                <div style="display: flex; align-items: flex-start; gap: 5px;">
+                                <div style="display: flex; align-items: center; gap: 10px;">
                                     <div style="flex: 1.2; text-align: center;">
                                         <img src="{p_d['PhotoURL']}" class="gallery-photo">
                                         <p style="font-weight:bold; font-size:15px; margin-top:8px;">{p_d['Name']}<br><small style="color:#FF8200;">{p_d['Position']}</small></p>
                                     </div>
-                                    <div style="flex: 2.5; padding-top: 5px;">
+                                    <div style="flex: 2.5;">
                                         <table class="scout-table">
                                             <thead><tr><th>Metric</th><th>Val</th><th>Grade</th></tr></thead>
                                             <tbody>{rows_html}</tbody>
