@@ -6,7 +6,7 @@ import math
 # --- PAGE CONFIG ---
 st.set_page_config(page_title="Performance Lab", layout="wide")
 
-# --- CSS: TENNESSEE STYLE + STABLE LAYOUT ---
+# --- CSS: TENNESSEE STYLE + NO INDEX ---
 st.markdown("""
     <style>
     .stApp { background-color: #FFFFFF; color: #1D1D1F; }
@@ -52,18 +52,14 @@ try:
     with c_main:
         date_a_str = st.selectbox("Current Practice", date_options, index=0)
     with c_toggle:
-        compare_on = st.toggle("Compare Session", key="comp_toggle")
+        compare_on = st.toggle("Compare Session", key="stable_comp")
     with c_compare:
-        if compare_on:
-            date_b_str = st.selectbox("Comparison Practice", ["None"] + date_options, index=0)
-        else:
-            st.write("") # Spacer to keep layout from shifting
-            date_b_str = "None"
+        date_b_str = st.selectbox("Comparison Practice", ["None"] + date_options, index=0) if compare_on else "None"
 
     date_a = pd.to_datetime(date_a_str)
     day_df = df[df['Date'] == date_a].copy()
 
-    # --- FULL METRIC LIST ---
+    # --- FULL METRIC SUITE ---
     metrics = [
         'Total Jumps', 'IMA Jump Count High Band', 'IMA Jump Count Med Band', 'IMA Jump Count Low Band',
         'Total Player Load', 'Estimated Distance (y)', 'High Intensity Movement', 'Explosive Efforts',
@@ -107,11 +103,11 @@ try:
     t_flow, t_player, t_gallery, t_comp = st.tabs(["Session Flow", "Individual Profile", "Team Gallery", "Team Comparison"])
 
     with t_flow:
-        st.subheader(f"Session Workload: {date_a_str}")
+        st.subheader(f"Drill Analysis: {date_a_str}")
         day_p = phase_df[phase_df['Date'] == date_a].copy()
         if not day_p.empty:
             p_stats = day_p.groupby('Phase', sort=False)[metrics].mean().fillna(0).reset_index()
-            # Multi-metric table for drill comparison
+            # Split tables for readability
             st.markdown(render_table(p_stats, ['Phase'] + metrics[:6]), unsafe_allow_html=True)
             st.divider()
             st.markdown(render_table(p_stats, ['Phase'] + metrics[6:]), unsafe_allow_html=True)
@@ -142,6 +138,7 @@ try:
                         with ci:
                             st.markdown(f'<div style="text-align:center;"><img src="{p_i["PhotoURL_Fixed"]}" class="gallery-photo"></div><p style="text-align:center; font-weight:bold;">{p_i["Name"]}</p>', unsafe_allow_html=True)
                         with ct:
+                            # Gallery cards now show Current, Max, and Grade for the top 4 metrics
                             g_rows = [{"Metric": k, "Current": p_i[k], "Max": p_i[f'{k}_Max'], "Grade": p_i[f'{k}_Grade']} for k in metrics[:4]]
                             st.markdown(render_table(pd.DataFrame(g_rows), ["Metric", "Current", "Max", "Grade"]), unsafe_allow_html=True)
                         with cs:
