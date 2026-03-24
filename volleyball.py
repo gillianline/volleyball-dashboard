@@ -92,17 +92,17 @@ try:
     def process_player(row):
         p_name = row['Name']
         p_maxes = overall_maxes.loc[p_name]
-        p_avgs = overall_avgs.loc[p_name]
         
-        # Grading Logic - Now using season averages as requested
-        grades = [math.ceil((float(row[k]) / float(p_avgs[k])) * 100) if float(p_avgs[k]) > 0 else 0 for k in grading_metrics]
+        # Grading Logic - Back to Season Max
+        grades = [math.ceil((float(row[k]) / float(p_maxes[k])) * 100) if float(p_maxes[k]) > 0 else 0 for k in grading_metrics]
         row['Practice Score'] = math.ceil(sum(grades) / len(grades))
         for k in grading_metrics:
-            row[f'{k}_Grade'] = math.ceil((float(row[k]) / float(p_avgs[k])) * 100) if float(p_avgs[k]) > 0 else 0
+            row[f'{k}_Grade'] = math.ceil((float(row[k]) / float(p_maxes[k])) * 100) if float(p_maxes[k]) > 0 else 0
+            row[f'{k}_Max'] = p_maxes[k]
         
         try:
             curr_eff = float(row['Explosive Efforts']) / float(row['Total Player Load']) if float(row['Total Player Load']) > 0 else 0
-            s_avg_eff = float(p_avgs['Explosive Efforts']) / float(p_avgs['Total Player Load']) if float(p_avgs['Total Player Load']) > 0 else 0
+            s_avg_eff = float(overall_avgs.loc[p_name]['Explosive Efforts']) / float(overall_avgs.loc[p_name]['Total Player Load']) if float(overall_avgs.loc[p_name]['Total Player Load']) > 0 else 0
             row['Is_Fatigued'] = bool(curr_eff < (s_avg_eff * 0.85)) and curr_eff > 0
         except:
             row['Is_Fatigued'] = False
@@ -132,6 +132,7 @@ try:
     t_flow, t_player, t_gallery, t_comp = st.tabs(["Session Flow", "Individual Profile", "Team Gallery", "Team Comparison"])
 
     with t_flow:
+        st.subheader(f"Intensity Breakdown: {date_a_str}")
         day_phase_df = phase_df[phase_df['Date'] == date_a].copy()
         if not day_phase_df.empty:
             phase_stats = day_phase_df.groupby('Phase', sort=False).agg({'Total Player Load': 'mean', 'Explosive Efforts': 'mean', 'Total Jumps': 'mean'}).reset_index()
@@ -157,8 +158,8 @@ try:
                 st.markdown(render_table(pd.DataFrame(p_rows), ["Metric", date_a_str, date_b_str, "Grade"]), unsafe_allow_html=True)
             else:
                 for k in grading_metrics:
-                    p_rows.append({"Metric": k, "Today": p_data[k], "Season Avg": int(overall_avgs.loc[selected_player][k]), "Grade": p_data[f'{k}_Grade']})
-                st.markdown(render_table(pd.DataFrame(p_rows), ["Metric", "Today", "Season Avg", "Grade"]), unsafe_allow_html=True)
+                    p_rows.append({"Metric": k, "Current": p_data[k], "Max": p_data[f'{k}_Max'], "Grade": p_data[f'{k}_Grade']})
+                st.markdown(render_table(pd.DataFrame(p_rows), ["Metric", "Current", "Max", "Grade"]), unsafe_allow_html=True)
         with c3:
             st.markdown(f'<div style="text-align:center; font-weight:bold; font-size:18px; margin-top:15px;">Practice Score</div>', unsafe_allow_html=True)
             st.markdown(f'<div class="score-box" style="background-color:{get_excel_gradient(p_data["Practice Score"])};">{int(p_data["Practice Score"])}</div>', unsafe_allow_html=True)
