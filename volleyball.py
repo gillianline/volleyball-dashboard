@@ -14,20 +14,18 @@ st.markdown("""
     /* FORCE CENTER ALL TABLE CONTENT */
     [data-testid="stTable"] th { text-align: center !important; }
     [data-testid="stTable"] td { text-align: center !important; }
-    [data-testid="stDataFrame"] div[data-testid="stTable"] div { text-align: center !important; }
     
-    /* Target specifically the dataframe cells */
+    /* Targeting Dataframe cells for centering */
     div[data-testid="stDataFrame"] div[role="gridcell"] > div {
         justify-content: center !important;
         text-align: center !important;
-        display: flex;
     }
 
     .img-container { display: flex; justify-content: center; margin-bottom: 20px; }
     .player-photo {
         border-radius: 50%;
-        width: 180px;
-        height: 180px;
+        width: 150px;
+        height: 150px;
         object-fit: cover;
         border: 4px solid #007AFF;
     }
@@ -100,11 +98,9 @@ try:
         for internal in grading_map.keys():
             curr = row[internal]
             m_val = p_maxes[internal]
-            if m_val > 0:
-                # Precise ROUNDUP
-                grade = math.ceil((curr / m_val) * 100)
-            else:
-                grade = 0
+            # ROUNDUP
+            grade = math.ceil((curr / m_val) * 100) if m_val > 0 else 0
+            row[f'{grading_map[internal]} Grade'] = grade # Using Pretty Name for Heatmap
             row[f'{internal}_Max'] = m_val
             row[f'{internal}_Grade'] = grade
             grades.append(grade)
@@ -115,7 +111,7 @@ try:
     day_df = day_df.apply(process_player, axis=1)
 
     # --- TABS ---
-    tab1, tab2, tab3 = st.tabs(["Session Flow", "Player Profile", "Leaderboard"])
+    tab1, tab2, tab3, tab4 = st.tabs(["Session Flow", "Player Profile", "Leaderboard", "Team Heatmap"])
 
     with tab1:
         st.subheader("Practice Intensity by Phase")
@@ -135,7 +131,6 @@ try:
         p_data = day_df[day_df['Name'] == selected_player].iloc[0]
 
         col_img, col_card, col_score = st.columns([1, 2, 1])
-        
         with col_img:
             st.markdown(f'<div class="img-container"><img src="{p_data["PhotoURL_Fixed"]}" class="player-photo"></div>', unsafe_allow_html=True)
             st.markdown(f'<h2 style="text-align:center;">{p_data["Name"]}</h2>', unsafe_allow_html=True)
@@ -143,33 +138,32 @@ try:
         with col_card:
             card_rows = []
             for internal, display in grading_map.items():
-                is_dec = 'Distance' in display or 'Load' in display
                 card_rows.append({
                     "Metric": display,
-                    "Current": round(p_data[internal], 1) if is_dec else int(p_data[internal]),
-                    "Max": round(p_data[f'{internal}_Max'], 1) if is_dec else int(p_data[f'{internal}_Max']),
+                    "Current": int(round(p_data[internal], 0)),
+                    "Max": int(round(p_data[f'{internal}_Max'], 0)),
                     "Grade": int(p_data[f'{internal}_Grade'])
                 })
-            # We use st.table for a more "Locked" centered look on the Profile tab
-            st.table(pd.DataFrame(card_rows))
+            st.table(pd.DataFrame(card_rows)) # Centered Table
             
         with col_score:
             st.markdown(f'<div style="text-align:center; font-weight:bold; margin-top:20px;">Practice Score</div>', unsafe_allow_html=True)
             st.markdown(f'<div class="score-box">{int(p_data["Practice Score"])}</div>', unsafe_allow_html=True)
 
-        st.divider()
-        st.subheader("Drill Intensity Breakdown")
-        p_phase = day_phase_df[day_phase_df['Name'] == selected_player]
-        fig_p = px.bar(p_phase, x="Phase", y=["IMA Jump Count Low Band", "IMA Jump Count Med Band", "IMA Jump Count High Band"],
-                       barmode="group", color_discrete_map={"IMA Jump Count High Band": "#FF3B30", "IMA Jump Count Med Band": "#FF9500", "IMA Jump Count Low Band": "#007AFF"},
-                       template="plotly_white")
-        fig_p.update_layout(xaxis={'categoryorder':'trace'}, xaxis_title=None, legend_title=None)
-        st.plotly_chart(fig_p, use_container_width=True)
-
     with tab3:
         st.subheader("Leaderboard")
-        # Center this using st.table or st.dataframe
-        st.dataframe(day_df[['Name', 'Total Jumps', 'Total Player Load', 'Practice Score']].sort_values('Practice Score', ascending=False), use_container_width=True, hide_index=True)
+        st.dataframe(day_df[['Name', 'Total Jumps', 'Total Player Load', 'Practice Score']].astype(int, errors='ignore').sort_values('Practice Score', ascending=False), use_container_width=True, hide_index=True)
+
+    with tab4:
+        st.subheader("Team Grade Heatmap")
+        st.caption("Lower Intensity (Green) -> Higher Intensity (Red)")
+        
+        # Select just the Grade columns
+        heatmap_cols = ['Name'] + [f'{v} Grade' for v in grading_map.values()] + ['Practice Score']
+        heatmap_df = day_df[heatmap_cols].set_index('Name').astype(int)
+        
+        # Color scale: Green (low) to Red (high)
+        st.dataframe(heatmap_df.style.background_gradient(cmap='RdYlGn_r', axis=None).format("{:.0f}"), use_container_width=True)
 
 except Exception as e:
     st.error(f"Sync Error: {e}")
