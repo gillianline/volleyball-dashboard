@@ -6,39 +6,41 @@ import math
 # --- PAGE CONFIG ---
 st.set_page_config(page_title="Performance Lab", layout="wide")
 
-# Sleek White Styling + FORCE CENTER TABLE TEXT
+# Sleek White Styling + FORCE CENTER + Color Logic
 st.markdown("""
     <style>
     .stApp { background-color: #FFFFFF; color: #1D1D1F; }
     
-    /* FORCE CENTER ALL TABLE CONTENT */
-    [data-testid="stTable"] th { text-align: center !important; }
+    /* Center all table content */
+    [data-testid="stTable"] th { text-align: center !important; background-color: #F5F5F7 !important; }
     [data-testid="stTable"] td { text-align: center !important; }
     
-    /* Targeting Dataframe cells for centering */
-    div[data-testid="stDataFrame"] div[role="gridcell"] > div {
-        justify-content: center !important;
-        text-align: center !important;
-    }
-
-    .img-container { display: flex; justify-content: center; margin-bottom: 20px; }
+    .img-container { display: flex; justify-content: center; margin-bottom: 10px; }
     .player-photo {
         border-radius: 50%;
-        width: 150px;
-        height: 150px;
+        width: 120px;
+        height: 120px;
         object-fit: cover;
-        border: 4px solid #007AFF;
+        border: 3px solid #007AFF;
     }
 
+    /* Practice Score Box */
+    .score-container { display: flex; flex-direction: column; align-items: center; justify-content: center; }
+    .score-label { font-size: 16px; font-weight: 700; margin-bottom: 5px; }
     .score-box {
         background-color: #F2994A;
         color: white;
-        padding: 25px 55px;
-        border-radius: 12px;
-        font-size: 48px;
+        padding: 15px 30px;
+        border-radius: 10px;
+        font-size: 32px;
         font-weight: 800;
         text-align: center;
     }
+
+    /* Color Scale for Grades (Green to Red) */
+    .grade-low { color: #28a745; font-weight: bold; } /* Green */
+    .grade-mid { color: #ffc107; font-weight: bold; } /* Yellow */
+    .grade-high { color: #dc3545; font-weight: bold; } /* Red */
     </style>
     """, unsafe_allow_html=True)
 
@@ -76,7 +78,7 @@ try:
     day_df = df[df['Date'] == sel_date_dt].copy()
     day_phase_df = phase_df[phase_df['Date'] == sel_date_dt].copy()
 
-    # --- SCORING & PHOTO LOGIC ---
+    # --- SCORING LOGIC ---
     grading_map = {
         'Total Jumps': 'Total Jumps',
         'IMA Jump Count Med Band': 'Moderate Jumps',
@@ -98,9 +100,7 @@ try:
         for internal in grading_map.keys():
             curr = row[internal]
             m_val = p_maxes[internal]
-            # ROUNDUP
             grade = math.ceil((curr / m_val) * 100) if m_val > 0 else 0
-            row[f'{grading_map[internal]} Grade'] = grade # Using Pretty Name for Heatmap
             row[f'{internal}_Max'] = m_val
             row[f'{internal}_Grade'] = grade
             grades.append(grade)
@@ -108,10 +108,10 @@ try:
         row['PhotoURL_Fixed'] = photo_map.get(p_name, "https://www.w3schools.com/howto/img_avatar.png")
         return row
 
-    day_df = day_df.apply(process_player, axis=1)
+    day_df = day_df.apply(process_player, axis=1).sort_values('Practice Score', ascending=False)
 
     # --- TABS ---
-    tab1, tab2, tab3, tab4 = st.tabs(["Session Flow", "Player Profile", "Leaderboard", "Team Heatmap"])
+    tab1, tab2, tab3 = st.tabs(["Session Flow", "Team Report Cards", "Leaderboard"])
 
     with tab1:
         st.subheader("Practice Intensity by Phase")
@@ -127,43 +127,47 @@ try:
             st.plotly_chart(fig2, use_container_width=True)
 
     with tab2:
-        selected_player = st.selectbox("Select Player", day_df['Name'].unique())
-        p_data = day_df[day_df['Name'] == selected_player].iloc[0]
+        st.subheader("Full Roster Report Cards")
+        
+        for index, p_data in day_df.iterrows():
+            with st.container():
+                col_img, col_card, col_score = st.columns([1, 2, 1])
+                
+                with col_img:
+                    st.markdown(f'<div class="img-container"><img src="{p_data["PhotoURL_Fixed"]}" class="player-photo"></div>', unsafe_allow_html=True)
+                    st.markdown(f'<h3 style="text-align:center;">{p_data["Name"]}</h3>', unsafe_allow_html=True)
 
-        col_img, col_card, col_score = st.columns([1, 2, 1])
-        with col_img:
-            st.markdown(f'<div class="img-container"><img src="{p_data["PhotoURL_Fixed"]}" class="player-photo"></div>', unsafe_allow_html=True)
-            st.markdown(f'<h2 style="text-align:center;">{p_data["Name"]}</h2>', unsafe_allow_html=True)
-
-        with col_card:
-            card_rows = []
-            for internal, display in grading_map.items():
-                card_rows.append({
-                    "Metric": display,
-                    "Current": int(round(p_data[internal], 0)),
-                    "Max": int(round(p_data[f'{internal}_Max'], 0)),
-                    "Grade": int(p_data[f'{internal}_Grade'])
-                })
-            st.table(pd.DataFrame(card_rows)) # Centered Table
-            
-        with col_score:
-            st.markdown(f'<div style="text-align:center; font-weight:bold; margin-top:20px;">Practice Score</div>', unsafe_allow_html=True)
-            st.markdown(f'<div class="score-box">{int(p_data["Practice Score"])}</div>', unsafe_allow_html=True)
+                with col_card:
+                    card_rows = []
+                    for internal, display in grading_map.items():
+                        grade_val = int(p_data[f'{internal}_Grade'])
+                        # Applying Green-to-Red Logic
+                        color_class = "grade-low" if grade_val < 40 else "grade-mid" if grade_val < 75 else "grade-high"
+                        
+                        card_rows.append({
+                            "Metric": display,
+                            "Current": int(round(p_data[internal], 0)),
+                            "Max": int(round(p_data[f'{internal}_Max'], 0)),
+                            "Grade": grade_val
+                        })
+                    
+                    # Convert to HTML to remove index numbers and center
+                    st.write(pd.DataFrame(card_rows).to_html(index=False, justify='center', classes='center-table'), unsafe_allow_html=True)
+                    
+                with col_score:
+                    st.markdown(f"""
+                        <div class="score-container">
+                            <div class="score-label">Practice Score</div>
+                            <div class="score-box">{int(p_data['Practice Score'])}</div>
+                        </div>
+                    """, unsafe_allow_html=True)
+                
+                st.markdown("<br><hr><br>", unsafe_allow_html=True)
 
     with tab3:
         st.subheader("Leaderboard")
+        # hide_index=True removes the numbers on the left
         st.dataframe(day_df[['Name', 'Total Jumps', 'Total Player Load', 'Practice Score']].astype(int, errors='ignore').sort_values('Practice Score', ascending=False), use_container_width=True, hide_index=True)
-
-    with tab4:
-        st.subheader("Team Grade Heatmap")
-        st.caption("Lower Intensity (Green) -> Higher Intensity (Red)")
-        
-        # Select just the Grade columns
-        heatmap_cols = ['Name'] + [f'{v} Grade' for v in grading_map.values()] + ['Practice Score']
-        heatmap_df = day_df[heatmap_cols].set_index('Name').astype(int)
-        
-        # Color scale: Green (low) to Red (high)
-        st.dataframe(heatmap_df.style.background_gradient(cmap='RdYlGn_r', axis=None).format("{:.0f}"), use_container_width=True)
 
 except Exception as e:
     st.error(f"Sync Error: {e}")
