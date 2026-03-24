@@ -33,10 +33,12 @@ if "password_correct" not in st.session_state:
 # --- 2. DATA LOADING ---
 @st.cache_data(ttl=300)
 def load_all_data():
+    # Load Main Totals
     df = pd.read_csv(st.secrets["GOOGLE_SHEET_URL"])
     df.columns = df.columns.str.strip()
     df['Date'] = pd.to_datetime(df['Date'])
     
+    # Load Phase Breakdown
     phase_df = pd.read_csv(st.secrets["PHASE_SHEET_URL"])
     phase_df.columns = phase_df.columns.str.strip()
     phase_df['Date'] = pd.to_datetime(phase_df['Date'])
@@ -52,20 +54,19 @@ try:
     selected_date_str = st.sidebar.selectbox("Select Date", date_options, index=len(date_options)-1)
     sel_date_dt = pd.to_datetime(selected_date_str)
     
+    # Filter and copy to avoid column conflicts
     day_df = df[df['Date'] == sel_date_dt].copy()
     day_phase_df = phase_df[phase_df['Date'] == sel_date_dt].copy()
 
-    # --- 3. CALCULATE GRADES & PRACTICE SCORE ---
-    # Based on Screenshot: (Current / Max) * 100
-    # For this to work, ensure Sheet 1 has columns like 'Max Jumps', 'Max Load', etc.
-    # If Max columns aren't in your sheet yet, we will use the Team Max for that day as a placeholder.
-    
+    # --- 3. CALCULATE GRADES (Current / Max * 100) ---
     metrics = ['Total Jumps', 'Total Player Load', 'Explosive Efforts', 'High Intensity Movement']
     for m in metrics:
         max_val = day_df[m].max()
-        day_df[f'{m} Grade'] = (day_df[m] / max_val * 100).round(0)
+        if max_val > 0:
+            day_df[f'{m} Grade'] = (day_df[m] / max_val * 100).round(0)
+        else:
+            day_df[f'{m} Grade'] = 0
     
-    # Practice Score = Average of all grades for that player
     grade_cols = [f'{m} Grade' for m in metrics]
     day_df['Practice Score'] = day_df[grade_cols].mean(axis=1).round(0)
 
@@ -75,15 +76,19 @@ try:
 
     with tab1:
         st.subheader("Practice Intensity by Phase")
-        # sort=False keeps the order from the Google Sheet
-        phase_avg = day_phase_df.groupby('Phase', sort=False)[metrics + ['Total Player Load']].mean().reset_index().round(0)
+        
+        # Explicitly select only phase columns to avoid "Total Player Load 2 times" error
+        phase_cols = ['Phase', 'Total Jumps', 'Total Player Load', 'Explosive Efforts']
+        phase_avg = day_phase_df[phase_cols].groupby('Phase', sort=False).mean().reset_index().round(0)
         
         c1, c2 = st.columns(2)
         with c1:
             fig1 = px.bar(phase_avg, x="Phase", y="Total Jumps", title="Avg Jumps per Player", color_discrete_sequence=["#007AFF"], template="plotly_white")
+            fig1.update_layout(xaxis={'categoryorder':'trace'})
             st.plotly_chart(fig1, use_container_width=True)
         with c2:
             fig2 = px.line(phase_avg, x="Phase", y="Total Player Load", title="Workload Trend", markers=True, color_discrete_sequence=["#FF9500"], template="plotly_white")
+            fig2.update_layout(xaxis={'categoryorder':'trace'})
             st.plotly_chart(fig2, use_container_width=True)
 
     with tab2:
@@ -95,12 +100,11 @@ try:
         m1, m2, m3 = st.columns(3)
         m1.metric("Session Jumps", int(p_day_stats['Total Jumps']))
         m2.metric("Total Load", int(p_day_stats['Total Player Load']))
-        # Highlight the Practice Score from your screenshot logic
+        # Practice Score box matches your screenshot logic
         m3.metric("Practice Score", f"{int(p_day_stats['Practice Score'])}%")
 
         st.divider()
         
-        # Phase order respected here too
         fig_p = px.bar(p_phase_df, x="Phase", y=["IMA Jump Count Low Band", "IMA Jump Count Med Band", "IMA Jump Count High Band"],
                        title=f"Jump Intensity Mix: {selected_player}",
                        barmode="group",
@@ -111,9 +115,8 @@ try:
 
     with tab3:
         st.subheader("Leaderboard and Practice Grades")
-        
-        # Displaying centered table with the new Practice Score
         display_cols = ['Name', 'Total Jumps', 'Total Player Load', 'Explosive Efforts', 'Practice Score']
+        # Convert to int for clean table display
         st.dataframe(day_df[display_cols].astype(int, errors='ignore'), use_container_width=True, hide_index=True)
 
 except Exception as e:
