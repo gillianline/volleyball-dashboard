@@ -102,7 +102,7 @@ try:
     day_df = day_df.apply(process_player, axis=1).sort_values('Name')
 
     # --- 2. TABS ---
-    t_flow, t_player, t_gallery, t_analytics, t_comp = st.tabs(["Session Flow", "Individual Profile", "Team Gallery", "Performance Analytics", "Team Comparison"])
+    t_flow, t_player, t_gallery, t_comp = st.tabs(["Session Flow", "Individual Profile", "Team Gallery", "Team Comparison"])
 
     with t_flow:
         st.subheader(f"Drill Comparison: {date_a_str}")
@@ -117,6 +117,7 @@ try:
         selected_player = st.selectbox("Select Athlete", day_df['Name'].unique())
         p_data = day_df[day_df['Name'] == selected_player].iloc[0]
         
+        # --- PLAYER CARD AREA (UNTOUCHED) ---
         c1, c2, c3 = st.columns([1.2, 2.5, 1.2])
         with c1:
             st.markdown(f'<div style="text-align:center;"><img src="{p_data["PhotoURL_Fixed"]}" class="player-photo-large"></div>', unsafe_allow_html=True)
@@ -149,7 +150,38 @@ try:
             trend_rows.append({"Metric": k, "Today": curr, "Season Avg": avg, "% Difference": f"{'+' if diff > 0 else ''}{int(round(diff,0))}%"})
         st.markdown(render_table(pd.DataFrame(trend_rows), ["Metric", "Today", "Season Avg", "% Difference"]), unsafe_allow_html=True)
 
+        # --- ADVANCED PERFORMANCE INSIGHTS (NEW ADDITION UNDER CARDS) ---
+        st.markdown("### 📊 Advanced Performance Insights")
+        g1, g2 = st.columns(2)
+
+        with g1:
+            # Radar Chart: Physical Output vs Team
+            radar_metrics = ['Total Jumps', 'Explosive Efforts', 'High Intensity Movement', 'BMP Jumping Load', 'Total Player Load']
+            
+            # Use max-normalized values (0-100) to keep the radar shape clean
+            r_vals = [math.ceil((p_data[m] / overall_maxes[m].max()) * 100) if overall_maxes[m].max() > 0 else 0 for m in radar_metrics]
+            t_vals = [math.ceil((team_avgs_today[m] / overall_maxes[m].max()) * 100) if overall_maxes[m].max() > 0 else 0 for m in radar_metrics]
+
+            fig_radar = go.Figure()
+            fig_radar.add_trace(go.Scatterpolar(r=r_vals, theta=radar_metrics, fill='toself', name=selected_player, line_color='#FF8200'))
+            fig_radar.add_trace(go.Scatterpolar(r=t_vals, theta=radar_metrics, fill='toself', name='Team Average', line_color='#1D1D1F', opacity=0.3))
+            fig_radar.update_layout(
+                polar=dict(radialaxis=dict(visible=True, range=[0, 100])),
+                title="Physical Output Shape", height=450, showlegend=True
+            )
+            st.plotly_chart(fig_radar, use_container_width=True)
+
+        with g2:
+            # Trend Line: Historical Progress
+            hist_metric = st.selectbox("Track Progress Over Time", grading_metrics, key="hist_metric")
+            p_hist = df[df['Name'] == selected_player].sort_values('Date')
+            fig_line = px.line(p_hist, x='Date', y=hist_metric, markers=True, title=f"{hist_metric} Progress")
+            fig_line.update_traces(line_color='#FF8200', marker=dict(size=10))
+            fig_line.update_layout(height=450)
+            st.plotly_chart(fig_line, use_container_width=True)
+
     with t_gallery:
+        # --- TEAM GALLERY (UNTOUCHED) ---
         for i in range(0, len(day_df), 2):
             cols = st.columns(2)
             for j in range(2):
@@ -166,42 +198,6 @@ try:
                         with cs:
                             st.markdown(f'<div style="background-color:{get_excel_gradient(p_d["Practice Score"])}; border-radius:10px; text-align:center; padding:15px; font-size:24px; font-weight:800; margin-top:45px;">{int(p_d["Practice Score"])}</div>', unsafe_allow_html=True)
                         st.markdown('</div>', unsafe_allow_html=True)
-
-    with t_analytics:
-        st.subheader("Advanced Performance Insights")
-        
-        # Select Player for Radar/Trend
-        ana_player = st.selectbox("Select Player to Analyze", day_df['Name'].unique(), key="ana_select")
-        ana_data = day_df[day_df['Name'] == ana_player].iloc[0]
-
-        g1, g2 = st.columns(2)
-
-        with g1:
-            # 1. RADAR CHART: Player vs Team
-            radar_metrics = ['Total Jumps', 'Explosive Efforts', 'High Intensity Movement', 'BMP Jumping Load', 'Total Player Load']
-            fig_radar = go.Figure()
-            fig_radar.add_trace(go.Scatterpolar(r=[ana_data[m] for m in radar_metrics], theta=radar_metrics, fill='toself', name=ana_player, line_color='#FF8200'))
-            fig_radar.add_trace(go.Scatterpolar(r=[team_avgs_today[m] for m in radar_metrics], theta=radar_metrics, fill='toself', name='Team Avg', line_color='gray', opacity=0.5))
-            fig_radar.update_layout(polar=dict(radialaxis=dict(visible=True)), showlegend=True, title=f"{ana_player} vs Team Profile")
-            st.plotly_chart(fig_radar, use_container_width=True)
-
-        with g2:
-            # 2. SCATTER: Efficiency (Load vs Distance)
-            fig_scatter = px.scatter(day_df, x="Estimated Distance (y)", y="Total Player Load", text="Name", 
-                                     title="Workload Efficiency (Load per Yard)", color="Total Player Load", color_continuous_scale="Viridis")
-            fig_scatter.update_traces(textposition='top center')
-            st.plotly_chart(fig_scatter, use_container_width=True)
-
-        st.divider()
-        
-        # 3. LONGITUDINAL TREND
-        st.subheader("Historical Progress")
-        trend_metric = st.selectbox("Select Metric to Track over Time", grading_metrics)
-        player_history = df[df['Name'] == ana_player].sort_values('Date')
-        
-        fig_trend = px.line(player_history, x='Date', y=trend_metric, markers=True, title=f"{ana_player}: {trend_metric} Trend over Season")
-        fig_trend.update_traces(line_color='#FF8200')
-        st.plotly_chart(fig_trend, use_container_width=True)
 
     with t_comp:
         if date_b_str == "None":
