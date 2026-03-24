@@ -7,12 +7,10 @@ import math
 # --- PAGE CONFIG ---
 st.set_page_config(page_title="Performance Lab", layout="wide")
 
-# --- CSS: TENNESSEE STYLE & UI CLEANUP ---
+# --- CSS: TENNESSEE STYLE ---
 st.markdown("""
     <style>
     .stApp { background-color: #FFFFFF; color: #1D1D1F; }
-    
-    /* HIDE THE SPACING BAR & EXCESS GAPS */
     hr { display: none !important; }
     [data-testid="stVerticalBlock"] > div:empty { display: none !important; }
     .st-emotion-cache-16idsys p { margin-bottom: 0px; }
@@ -60,7 +58,7 @@ def load_all_data():
     df = df.rename(columns=rename_map)
     df['Date'] = pd.to_datetime(df['Date'])
     
-    # Sort and fill Position/Photo once per player so they don't show as NaN
+    # Sort and fill Position/Photo (only entered once in sheet)
     df = df.sort_values(['Name', 'Date'])
     df['Position'] = df.groupby('Name')['Position'].ffill().bfill()
     df['PhotoURL'] = df.groupby('Name')['PhotoURL'].ffill().bfill()
@@ -103,8 +101,8 @@ try:
         day_df = day_df[day_df['Position'] == pos_filter]
 
     # --- METRICS ---
-    grading_metrics = ['Total Jumps', 'Moderate Jumps', 'High Jumps', 'Jump Load', 'Player Load', 'Estimated Distance', 'Explosive Efforts', 'High Intensity Movements']
-    overall_maxes = df.groupby('Name')[grading_metrics].max()
+    all_metrics = ['Total Jumps', 'Moderate Jumps', 'High Jumps', 'Jump Load', 'Player Load', 'Estimated Distance', 'Explosive Efforts', 'High Intensity Movements']
+    overall_maxes = df.groupby('Name')[all_metrics].max()
 
     def get_gradient(score):
         score = max(0, min(100, float(score)))
@@ -114,9 +112,9 @@ try:
     def process_player(row):
         p_name = row['Name']
         p_maxes = overall_maxes.loc[p_name]
-        grades = [math.ceil((float(row[k]) / float(p_maxes[k])) * 100) if float(p_maxes[k]) > 0 else 0 for k in grading_metrics]
+        grades = [math.ceil((float(row[k]) / float(p_maxes[k])) * 100) if float(p_maxes[k]) > 0 else 0 for k in all_metrics]
         row['Practice Score'] = math.ceil(sum(grades) / len(grades))
-        for k in grading_metrics:
+        for k in all_metrics:
             row[f'{k}_Grade'] = math.ceil((float(row[k]) / float(p_maxes[k])) * 100) if float(p_maxes[k]) > 0 else 0
             row[f'{k}_Max'] = p_maxes[k]
         return row
@@ -132,6 +130,11 @@ try:
         if not day_phase_df.empty:
             phase_stats = day_phase_df.groupby('Phase', sort=False).agg({'Player Load': 'mean', 'Explosive Efforts': 'mean', 'Total Jumps': 'mean'}).reset_index()
             st.plotly_chart(px.bar(phase_stats, x='Phase', y='Player Load', color='Explosive Efforts', color_continuous_scale='Oranges').update_layout(height=380), use_container_width=True)
+            
+            html = '<table class="scout-table"><thead><tr><th>Phase</th><th>Player Load</th><th>Explosive Efforts</th><th>Total Jumps</th></tr></thead><tbody>'
+            for _, r in phase_stats.iterrows():
+                html += f"<tr><td>{r['Phase']}</td><td>{int(r['Player Load'])}</td><td>{int(r['Explosive Efforts'])}</td><td>{int(r['Total Jumps'])}</td></tr>"
+            st.markdown(html + '</tbody></table>', unsafe_allow_html=True)
         else:
             st.warning("No drill data found.")
 
@@ -144,16 +147,10 @@ try:
                 st.markdown(f'<div style="text-align:center;"><img src="{p_data["PhotoURL"]}" class="player-photo-large"></div>', unsafe_allow_html=True)
                 st.markdown(f'<h2 style="text-align:center;">{p_data["Name"]} ({p_data["Position"]})</h2>', unsafe_allow_html=True)
             with c2:
-                p_rows = []
-                for k in grading_metrics:
-                    p_rows.append({"Metric": k, "Today": p_data[k], "Max": p_data[f'{k}_Max'], "Grade": p_data[f'{k}_Grade']})
-                
-                # Render Table Logic
-                html = '<table class="scout-table"><thead><tr><th>Metric</th><th>Today</th><th>Max</th><th>Grade</th></tr></thead><tbody>'
-                for r in p_rows:
-                    html += f"<tr><td>{r['Metric']}</td><td>{int(r['Today'])}</td><td>{int(r['Max'])}</td><td>{int(r['Grade'])}</td></tr>"
-                html += '</tbody></table>'
-                st.markdown(html, unsafe_allow_html=True)
+                html = '<table class="scout-table"><thead><tr><th>Metric</th><th>Today</th><th>Season Max</th><th>Grade</th></tr></thead><tbody>'
+                for k in all_metrics:
+                    html += f"<tr><td>{k}</td><td>{int(p_data[k])}</td><td>{int(p_data[f'{k}_Max'])}</td><td>{int(p_data[f'{k}_Grade'])}</td></tr>"
+                st.markdown(html + '</tbody></table>', unsafe_allow_html=True)
             with c3:
                 st.markdown(f'<div style="text-align:center; font-weight:bold; font-size:18px; margin-top:15px;">Practice Score</div>', unsafe_allow_html=True)
                 st.markdown(f'<div class="score-box" style="background-color:{get_gradient(p_data["Practice Score"])};">{int(p_data["Practice Score"])}</div>', unsafe_allow_html=True)
@@ -166,9 +163,8 @@ try:
                     if i + j < len(day_df):
                         p_d = day_df.iloc[i + j]
                         with cols[j]:
-                            # Gallery Table HTML
                             rows_html = ""
-                            for k in grading_metrics[:4]:
+                            for k in all_metrics[:4]: # Show first 4 on card for space
                                 rows_html += f"<tr><td>{k}</td><td>{int(p_d[k])}</td><td>{int(p_d[f'{k}_Grade'])}</td></tr>"
                             
                             st.markdown(f"""
@@ -193,18 +189,15 @@ try:
 
     with t_comp:
         if compare_on and date_b_str != "None":
-            st.info(f"Comparing {date_a_str} to {date_b_str}")
-            # Simplified comparison table
-            avg_a = day_df[grading_metrics].mean()
-            df_b = df[df['Date'] == pd.to_datetime(date_b_str)]
-            avg_b = df_b[grading_metrics].mean()
+            avg_a = day_df[all_metrics].mean()
+            avg_b = df[df['Date'] == pd.to_datetime(date_b_str)][all_metrics].mean()
             
-            comp_html = '<table class="scout-table"><thead><tr><th>Metric</th><th>Today</th><th>Comparison</th><th>% Diff</th></tr></thead><tbody>'
-            for k in grading_metrics:
+            comp_html = f'<h4 style="text-align:center;">{date_a_str} vs {date_b_str}</h4>'
+            comp_html += '<table class="scout-table"><thead><tr><th>Metric</th><th>Today</th><th>Comparison</th><th>% Diff</th></tr></thead><tbody>'
+            for k in all_metrics:
                 diff = ((avg_a[k] - avg_b[k]) / avg_b[k] * 100) if avg_b[k] != 0 else 0
                 comp_html += f"<tr><td>{k}</td><td>{int(avg_a[k])}</td><td>{int(avg_b[k])}</td><td>{int(diff)}%</td></tr>"
-            comp_html += '</tbody></table>'
-            st.markdown(comp_html, unsafe_allow_html=True)
+            st.markdown(comp_html + '</tbody></table>', unsafe_allow_html=True)
 
 except Exception as e:
     st.error(f"Sync Error: {e}")
