@@ -138,7 +138,6 @@ try:
                     p_b_val = p_b.iloc[0]
                     for k in grading_metrics:
                         p_rows.append({"Metric": k, date_a_str: p_data[k], date_b_str: p_b_val[k], "Grade": p_data[f'{k}_Grade']})
-                    # The headers now dynamically show the chosen dates
                     st.markdown(render_table(pd.DataFrame(p_rows), ["Metric", date_a_str, date_b_str, "Grade"]), unsafe_allow_html=True)
             else:
                 for k in grading_metrics:
@@ -157,14 +156,26 @@ try:
             fig_radar = go.Figure()
             fig_radar.add_trace(go.Scatterpolar(r=r_vals, theta=radar_m, fill='toself', name=selected_player, line_color='#FF8200'))
             fig_radar.add_trace(go.Scatterpolar(r=t_vals, theta=radar_m, fill='toself', name='Team Avg', line_color='#1D1D1F', opacity=0.3))
-            fig_radar.update_layout(polar=dict(radialaxis=dict(visible=True, range=[0, 100])), title="Physical Profile", height=350, margin=dict(t=30, b=30))
+            
+            # FIXED: INCREASED MARGINS AND ADDED PADDING TO STOP TEXT CLIPPING
+            fig_radar.update_layout(
+                polar=dict(
+                    radialaxis=dict(visible=True, range=[0, 100]),
+                    angularaxis=dict(direction="clockwise", period=5)
+                ),
+                title="Physical Profile",
+                height=350,
+                margin=dict(l=80, r=80, t=40, b=40), # Added large left/right margins
+                showlegend=True,
+                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+            )
             st.plotly_chart(fig_radar, use_container_width=True)
         with g2:
             hist_m = st.selectbox("Metric Trend", grading_metrics, key="trend_sel_final")
             p_hist = df[df['Name'] == selected_player].sort_values('Date')
             fig_line = px.line(p_hist, x='Date', y=hist_m, markers=True, title=f"{hist_m} History")
             fig_line.update_traces(line_color='#FF8200')
-            fig_line.update_layout(height=350, margin=dict(t=30, b=30))
+            fig_line.update_layout(height=350, margin=dict(t=40, b=40, l=20, r=20))
             st.plotly_chart(fig_line, use_container_width=True)
 
     with t_gallery:
