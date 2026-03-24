@@ -6,7 +6,7 @@ import math
 # --- PAGE CONFIG ---
 st.set_page_config(page_title="Performance Lab", layout="wide")
 
-# --- CSS: TENNESSEE STYLE + NO INDEX ---
+# --- CSS: TENNESSEE STYLE ---
 st.markdown("""
     <style>
     .stApp { background-color: #FFFFFF; color: #1D1D1F; }
@@ -52,25 +52,26 @@ try:
     with c_main:
         date_a_str = st.selectbox("Current Practice", date_options, index=0)
     with c_toggle:
-        compare_on = st.toggle("Compare Session", key="locked_comp")
+        compare_on = st.toggle("Compare Session", key="final_clean_comp")
     with c_compare:
         date_b_str = st.selectbox("Comparison Practice", ["None"] + date_options, index=0) if compare_on else "None"
 
     date_a = pd.to_datetime(date_a_str)
     day_df = df[df['Date'] == date_a].copy()
 
-    # --- METRIC DEFINITIONS ---
-    card_metrics = [
+    # --- DEFINITIVE METRIC LISTS ---
+    original_8 = [
         'Total Jumps', 'IMA Jump Count Med Band', 'IMA Jump Count High Band', 
         'BMP Jumping Load', 'Total Player Load', 'Estimated Distance (y)', 
         'Explosive Efforts', 'High Intensity Movement'
     ]
     
-    all_metrics = card_metrics + [
+    bmp_extras = [
         'IMA Jump Count Low Band', 'BMP Running Load', 'BMP Active Load', 
         'BMP Dynamic Load', 'BMP Total Basketball Load'
     ]
     
+    all_metrics = original_8 + bmp_extras
     overall_maxes = df.groupby('Name')[all_metrics].max()
     photo_map = df.dropna(subset=['PhotoURL']).drop_duplicates('Name').set_index('Name')['PhotoURL'].to_dict()
 
@@ -82,7 +83,6 @@ try:
     def process_player(row):
         p_name = row['Name']
         p_maxes = overall_maxes.loc[p_name]
-        # Score based on all metrics
         grades = [math.ceil((row[k] / p_maxes[k]) * 100) if p_maxes[k] > 0 else 0 for k in all_metrics]
         row['Practice Score'] = math.ceil(sum(grades) / len(grades))
         for k in all_metrics:
@@ -106,33 +106,31 @@ try:
     day_df = day_df.apply(process_player, axis=1).sort_values('Name')
 
     # --- TABS ---
-    t_flow, t_player, t_gallery, t_comp = st.tabs(["Session Flow", "Individual Profile", "Team Gallery", "Team Comparison"])
+    t1, t2, t3, t4 = st.tabs(["Session Flow", "Individual Profile", "Team Gallery", "Team Comparison"])
 
-    with t_flow:
+    with t1:
         st.subheader(f"Drill Breakdown: {date_a_str}")
         day_p = phase_df[phase_df['Date'] == date_a].copy()
         if not day_p.empty:
             p_stats = day_p.groupby('Phase', sort=False)[all_metrics].mean().fillna(0).reset_index()
-            st.markdown(render_table(p_stats, ['Phase'] + card_metrics[:5]), unsafe_allow_html=True)
+            st.markdown(render_table(p_stats, ['Phase'] + original_8[:4]), unsafe_allow_html=True)
             st.divider()
             st.markdown(render_table(p_stats, ['Phase', 'BMP Running Load', 'BMP Active Load', 'BMP Dynamic Load', 'BMP Total Basketball Load']), unsafe_allow_html=True)
         else: st.warning("No drill data available.")
 
-    with t_player:
+    with t2:
         sel_p = st.selectbox("Select Athlete", day_df['Name'].unique())
         p_d = day_df[day_df['Name'] == sel_p].iloc[0]
-        
         c1, c2, c3 = st.columns([1.2, 2.5, 1.2])
         with c1:
             st.markdown(f'<div style="text-align:center;"><img src="{p_d["PhotoURL_Fixed"]}" class="player-photo-large"></div><h2 style="text-align:center;">{p_d["Name"]}</h2>', unsafe_allow_html=True)
         with c2:
-            # Table shows the "Original 8"
-            p_rows = [{"Metric": k, "Current": p_d[k], "Max": p_d[f'{k}_Max'], "Grade": p_d[f'{k}_Grade']} for k in card_metrics]
+            p_rows = [{"Metric": k, "Current": p_d[k], "Max": p_d[f'{k}_Max'], "Grade": p_d[f'{k}_Grade']} for k in original_8]
             st.markdown(render_table(pd.DataFrame(p_rows), ["Metric", "Current", "Max", "Grade"]), unsafe_allow_html=True)
         with c3:
             st.markdown(f'<div style="text-align:center; font-weight:bold; font-size:18px;">Practice Score</div><div class="score-box" style="background-color:{get_excel_gradient(p_d["Practice Score"])};">{int(p_d["Practice Score"])}</div>', unsafe_allow_html=True)
 
-    with t_gallery:
+    with t3:
         for i in range(0, len(day_df), 2):
             cols = st.columns(2)
             for j in range(2):
@@ -144,14 +142,13 @@ try:
                         with ci:
                             st.markdown(f'<div style="text-align:center;"><img src="{p_i["PhotoURL_Fixed"]}" class="gallery-photo"></div><p style="text-align:center; font-weight:bold;">{p_i["Name"]}</p>', unsafe_allow_html=True)
                         with ct:
-                            # Gallery cards show top 4 original metrics
-                            g_rows = [{"Metric": k, "Current": p_i[k], "Max": p_i[f'{k}_Max'], "Grade": p_i[f'{k}_Grade']} for k in card_metrics[:4]]
+                            g_rows = [{"Metric": k, "Current": p_i[k], "Max": p_i[f'{k}_Max'], "Grade": p_i[f'{k}_Grade']} for k in original_8[:4]]
                             st.markdown(render_table(pd.DataFrame(g_rows), ["Metric", "Current", "Max", "Grade"]), unsafe_allow_html=True)
                         with cs:
                             st.markdown(f'<div style="background-color:{get_excel_gradient(p_i["Practice Score"])}; border-radius:10px; text-align:center; padding:15px; font-size:24px; font-weight:800; margin-top:45px;">{int(p_i["Practice Score"])}</div>', unsafe_allow_html=True)
                         st.markdown('</div>', unsafe_allow_html=True)
 
-    with t_comp:
+    with t4:
         if compare_on and date_b_str != "None":
             avg_a, avg_b = day_df[all_metrics].mean(), df[df['Date']==pd.to_datetime(date_b_str)][all_metrics].mean()
             c_rows = [{"Metric": k, date_a_str: avg_a[k], date_b_str: avg_b[k], "% Diff": f"{int(((avg_a[k]-avg_b[k])/avg_b[k]*100))}%" if avg_b[k]>0 else "0%"} for k in all_metrics]
