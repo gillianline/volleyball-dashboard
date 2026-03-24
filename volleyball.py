@@ -9,12 +9,9 @@ st.set_page_config(page_title="Performance Lab", layout="wide")
 st.markdown("""
     <style>
     .stApp { background-color: #FFFFFF; color: #1D1D1F; }
-    
-    /* Centering Table Text */
     [data-testid="stDataTable"] th { text-align: center !important; background-color: #F5F5F7 !important; border-bottom: 2px solid #E5E5E7 !important; }
     [data-testid="stDataTable"] td { text-align: center !important; }
 
-    /* Practice Score Box Styling */
     .practice-score-container {
         display: flex;
         flex-direction: column;
@@ -69,10 +66,11 @@ try:
     selected_date_str = st.sidebar.selectbox("Select Date", date_options, index=len(date_options)-1)
     sel_date_dt = pd.to_datetime(selected_date_str)
     
+    # Filter day data
     day_df = df[df['Date'] == sel_date_dt].copy()
     day_phase_df = phase_df[phase_df['Date'] == sel_date_dt].copy()
 
-    # --- 3. THE SCORING LOGIC (Using Sheet 1 Totals) ---
+    # --- 3. THE "PERSONAL MAX" SCORING LOGIC ---
     grading_map = {
         'Total Jumps': 'Total Jumps',
         'IMA Jump Count Med Band': 'Moderate Jumps',
@@ -84,22 +82,34 @@ try:
         'High Intensity Movement': 'High Intensity Movements'
     }
 
-    grade_cols = []
-    for internal_name, display_name in grading_map.items():
-        if internal_name in day_df.columns:
-            # We pull the Team Max for that specific day
-            max_val = day_df[internal_name].max()
-            day_df[f'{internal_name}_Max'] = max_val
-            
-            # Grade = Roundup(Current / Max * 100)
-            if max_val > 0:
-                day_df[f'{internal_name}_Grade'] = (day_df[internal_name] / max_val * 100).apply(lambda x: int(-(-x // 1)))
-            else:
-                day_df[f'{internal_name}_Grade'] = 0
-            grade_cols.append(f'{internal_name}_Grade')
+    # Step A: Calculate the Max for EACH PERSON across the ENTIRE Sheet 1
+    # This creates a reference for every player's personal best
+    overall_maxes = df.groupby('Name')[list(grading_map.keys())].max()
 
-    # Practice Score = Average of the individual grades
-    day_df['Practice Score'] = day_df[grade_cols].mean(axis=1).round(0).astype(int)
+    def calculate_grades(row):
+        player_name = row['Name']
+        player_maxes = overall_maxes.loc[player_name]
+        
+        grades = []
+        for internal_name in grading_map.keys():
+            current_val = row[internal_name]
+            max_val = player_maxes[internal_name]
+            
+            if max_val > 0:
+                # Roundup(Current / Max * 100)
+                grade = int(-(-(current_val / max_val * 100) // 1))
+            else:
+                grade = 0
+            
+            row[f'{internal_name}_Max'] = max_val
+            row[f'{internal_name}_Grade'] = grade
+            grades.append(grade)
+            
+        row['Practice Score'] = int(pd.Series(grades).mean().round(0))
+        return row
+
+    # Apply the personal max logic to the selected day's data
+    day_df = day_df.apply(calculate_grades, axis=1)
 
     # --- 4. TABS ---
     tab1, tab2, tab3 = st.tabs(["Session Flow", "Player Profile", "Leaderboard"])
@@ -122,22 +132,18 @@ try:
         selected_player = st.selectbox("Select Player", day_df['Name'].unique())
         p_data = day_df[day_df['Name'] == selected_player].iloc[0]
 
-        # Build Card Table (Strictly pulling Current and Max)
         card_rows = []
         for internal, display in grading_map.items():
-            if internal in day_df.columns:
-                current_val = p_data[internal]
-                max_val = p_data[f'{internal}_Max']
-                
-                # Check if we should use decimals for Distance/Load or Ints for Jumps
-                is_decimal = 'Distance' in display or 'Load' in display
-                
-                card_rows.append({
-                    "Metric": display,
-                    "Current": round(current_val, 1) if is_decimal else int(current_val),
-                    "Max": round(max_val, 1) if is_decimal else int(max_val),
-                    "Grade": int(p_data[f'{internal}_Grade'])
-                })
+            current_val = p_data[internal]
+            max_val = p_data[f'{internal}_Max']
+            is_decimal = 'Distance' in display or 'Load' in display
+            
+            card_rows.append({
+                "Metric": display,
+                "Current": round(current_val, 1) if is_decimal else int(current_val),
+                "Max": round(max_val, 1) if is_decimal else int(max_val),
+                "Grade": int(p_data[f'{internal}_Grade'])
+            })
         
         col_table, col_score = st.columns([2, 1])
         with col_table:
@@ -146,7 +152,7 @@ try:
             st.markdown(f"""
                 <div class="practice-score-container">
                     <div class="score-label">Practice Score</div>
-                    <div class="score-box">{p_data['Practice Score']}</div>
+                    <div class="score-box">{int(p_data['Practice Score'])}</div>
                 </div>
             """, unsafe_allow_html=True)
 
