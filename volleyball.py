@@ -10,7 +10,6 @@ st.markdown("""
     <style>
     .stApp { background-color: #FFFFFF; color: #1D1D1F; }
     div[data-testid="stMetricValue"] { font-size: 1.8rem; color: #007AFF; font-weight: 600; }
-    .stHeader { color: #1D1D1F; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -31,10 +30,12 @@ if "password_correct" not in st.session_state:
 def load_all_data():
     # Load Main Totals (Sheet 1)
     df = pd.read_csv(st.secrets["GOOGLE_SHEET_URL"])
+    df.columns = df.columns.str.strip() # Remove hidden spaces
     df['Date'] = pd.to_datetime(df['Date'])
     
     # Load Phase Breakdown (Sheet 2)
     phase_df = pd.read_csv(st.secrets["PHASE_SHEET_URL"])
+    phase_df.columns = phase_df.columns.str.strip() # Remove hidden spaces
     phase_df['Date'] = pd.to_datetime(phase_df['Date'])
     
     return df, phase_df
@@ -42,7 +43,7 @@ def load_all_data():
 try:
     df, phase_df = load_all_data()
     
-    # Sort dates for sidebar - ensuring chronological order
+    # Sort dates for sidebar
     sorted_dates = sorted(df['Date'].unique())
     date_options = [d.strftime('%m/%d/%Y') for d in sorted_dates]
     
@@ -50,7 +51,7 @@ try:
     selected_date_str = st.sidebar.selectbox("Select Practice Date", date_options, index=len(date_options)-1)
     sel_date_dt = pd.to_datetime(selected_date_str)
     
-    # Filter both datasets for the day
+    # Filter both datasets
     day_df = df[df['Date'] == sel_date_dt].sort_values('Total Jumps', ascending=False)
     day_phase_df = phase_df[phase_df['Date'] == sel_date_dt]
 
@@ -60,29 +61,27 @@ try:
     # --- 3. DRILL / PHASE OVERVIEW ---
     st.subheader("Practice Phase Volume")
     
-    # Aggregate data by PhaseName
-    phase_summary = day_phase_df.groupby('PhaseName')[['Total Jumps', 'Explosive Efforts']].sum().reset_index()
+    # Changed from 'PhaseName' to 'Phase' to match your sheet
+    phase_summary = day_phase_df.groupby('Phase')[['Total Jumps', 'Explosive Efforts']].sum().reset_index()
     
     col_left, col_right = st.columns(2)
     
     with col_left:
         fig_phase_j = px.bar(
-            phase_summary, x="PhaseName", y="Total Jumps",
+            phase_summary, x="Phase", y="Total Jumps",
             title="Total Jumps per Drill",
             color_discrete_sequence=["#007AFF"],
             template="plotly_white"
         )
-        fig_phase_j.update_layout(xaxis_title=None, yaxis_title="Jumps")
         st.plotly_chart(fig_phase_j, use_container_width=True)
         
     with col_right:
         fig_phase_e = px.bar(
-            phase_summary, x="PhaseName", y="Explosive Efforts",
+            phase_summary, x="Phase", y="Explosive Efforts",
             title="Explosive Efforts per Drill",
             color_discrete_sequence=["#5856D6"],
             template="plotly_white"
         )
-        fig_phase_e.update_layout(xaxis_title=None, yaxis_title="Efforts")
         st.plotly_chart(fig_phase_e, use_container_width=True)
 
     st.divider()
@@ -95,7 +94,7 @@ try:
     player_phase = day_phase_df[day_phase_df['Name'] == selected_player]
     
     fig_player_mix = px.bar(
-        player_phase, x="PhaseName", 
+        player_phase, x="Phase", 
         y=["IMA Jump Count Low Band", "IMA Jump Count Med Band", "IMA Jump Count High Band"],
         title=f"Jump Intensity Mix by Drill: {selected_player}",
         barmode="stack",
@@ -106,7 +105,6 @@ try:
         },
         template="plotly_white"
     )
-    fig_player_mix.update_layout(xaxis_title=None, yaxis_title="Jump Intensity Count", legend_title=None)
     st.plotly_chart(fig_player_mix, use_container_width=True)
 
     st.divider()
@@ -117,5 +115,5 @@ try:
     st.dataframe(day_df[cols], use_container_width=True, hide_index=True)
 
 except Exception as e:
-    st.error("Connecting to Google Sheets...")
-    st.info("If this persists, verify your Secret URLs end with '/export?format=csv&gid=...'")
+    st.error(f"Error loading data: {e}")
+    st.info("Check your Logs in Streamlit for the specific missing column name.")
