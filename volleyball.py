@@ -72,7 +72,7 @@ try:
     day_df = df[df['Date'] == sel_date_dt].copy()
     day_phase_df = phase_df[phase_df['Date'] == sel_date_dt].copy()
 
-    # --- 3. THE SCORING LOGIC (Sheet 1) ---
+    # --- 3. THE SCORING LOGIC (Using Sheet 1 Totals) ---
     grading_map = {
         'Total Jumps': 'Total Jumps',
         'IMA Jump Count Med Band': 'Moderate Jumps',
@@ -87,11 +87,9 @@ try:
     grade_cols = []
     for internal_name, display_name in grading_map.items():
         if internal_name in day_df.columns:
+            # We pull the Team Max for that specific day
             max_val = day_df[internal_name].max()
-            avg_val = day_df[internal_name].mean()
-            
             day_df[f'{internal_name}_Max'] = max_val
-            day_df[f'{internal_name}_Avg'] = avg_val
             
             # Grade = Roundup(Current / Max * 100)
             if max_val > 0:
@@ -100,7 +98,7 @@ try:
                 day_df[f'{internal_name}_Grade'] = 0
             grade_cols.append(f'{internal_name}_Grade')
 
-    # Final Practice Score
+    # Practice Score = Average of the individual grades
     day_df['Practice Score'] = day_df[grade_cols].mean(axis=1).round(0).astype(int)
 
     # --- 4. TABS ---
@@ -124,18 +122,20 @@ try:
         selected_player = st.selectbox("Select Player", day_df['Name'].unique())
         p_data = day_df[day_df['Name'] == selected_player].iloc[0]
 
-        # Build Card Table
+        # Build Card Table (Strictly pulling Current and Max)
         card_rows = []
         for internal, display in grading_map.items():
             if internal in day_df.columns:
-                current = p_data[internal]
+                current_val = p_data[internal]
+                max_val = p_data[f'{internal}_Max']
+                
+                # Check if we should use decimals for Distance/Load or Ints for Jumps
                 is_decimal = 'Distance' in display or 'Load' in display
                 
                 card_rows.append({
                     "Metric": display,
-                    "Current": round(current, 1) if is_decimal else int(current),
-                    "Team Avg": round(p_data[f'{internal}_Avg'], 1) if is_decimal else int(p_data[f'{internal}_Avg']),
-                    "Max": round(p_data[f'{internal}_Max'], 1) if is_decimal else int(p_data[f'{internal}_Max']),
+                    "Current": round(current_val, 1) if is_decimal else int(current_val),
+                    "Max": round(max_val, 1) if is_decimal else int(max_val),
                     "Grade": int(p_data[f'{internal}_Grade'])
                 })
         
