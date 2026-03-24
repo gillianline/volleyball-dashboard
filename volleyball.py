@@ -18,14 +18,14 @@ st.markdown("""
 
     /* Table Styles */
     .scout-table { width: 100%; border-collapse: collapse; text-align: center; table-layout: auto; }
-    .scout-table th { background-color: #F5F5F7; padding: 6px; border-bottom: 2px solid #E5E5E7; font-weight: 700; font-size: 13px; }
-    .scout-table td { padding: 5px; border-bottom: 1px solid #F5F5F7; font-size: 13px; }
+    .scout-table th { background-color: #F5F5F7; padding: 4px; border-bottom: 2px solid #E5E5E7; font-weight: 700; font-size: 12px; }
+    .scout-table td { padding: 4px; border-bottom: 1px solid #F5F5F7; font-size: 12px; }
     
     /* Photo & Card Styles */
     .player-photo-large { border-radius: 50%; width: 220px; height: 220px; object-fit: cover; border: 6px solid #FF8200; }
     .gallery-photo { border-radius: 50%; width: 90px; height: 90px; object-fit: cover; border: 4px solid #FF8200; }
     .score-box { padding: 15px 30px; border-radius: 12px; font-size: 36px; font-weight: 800; text-align: center; color: #1D1D1F; }
-    .gallery-card { border: 1px solid #E5E5E7; padding: 12px; border-radius: 15px; background-color: #FFFFFF; margin-bottom: 12px; position: relative; min-height: 380px; }
+    .gallery-card { border: 1px solid #E5E5E7; padding: 12px; border-radius: 15px; background-color: #FFFFFF; margin-bottom: 12px; position: relative; min-height: 250px; overflow: hidden; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -58,12 +58,12 @@ def load_all_data():
     df = df.rename(columns=rename_map)
     df['Date'] = pd.to_datetime(df['Date'])
     
-    # 1. Sort & Fill Strings
+    # Sort & Fill Positioning/Photos
     df = df.sort_values(['Name', 'Date'])
     df['Position'] = df.groupby('Name')['Position'].ffill().bfill().fillna("N/A")
     df['PhotoURL'] = df.groupby('Name')['PhotoURL'].ffill().bfill().fillna("https://www.w3schools.com/howto/img_avatar.png")
     
-    # 2. Fill Metrics
+    # Fill Numeric Metrics
     metric_cols = ['Total Jumps', 'Moderate Jumps', 'High Jumps', 'Jump Load', 'Player Load', 'Estimated Distance', 'Explosive Efforts', 'High Intensity Movements']
     df[metric_cols] = df[metric_cols].fillna(0)
     
@@ -189,25 +189,9 @@ try:
                 st.markdown(f'<div style="text-align:center; font-weight:bold; font-size:18px; margin-top:15px;">Practice Score</div>', unsafe_allow_html=True)
                 st.markdown(f'<div class="score-box" style="background-color:{get_excel_gradient(p_data["Practice Score"])};">{int(p_data["Practice Score"])}</div>', unsafe_allow_html=True)
 
-            st.divider()
-            st.markdown("### 📊 Advanced Insights")
-            g1, g2 = st.columns(2)
-            with g1:
-                radar_m = ['Total Jumps', 'Explosive Efforts', 'High Intensity Movements', 'Jump Load', 'Player Load']
-                r_vals = [math.ceil((float(p_data[m]) / float(overall_maxes.loc[selected_player][m])) * 100) if float(overall_maxes.loc[selected_player][m]) > 0 else 0 for m in radar_m]
-                t_vals = [math.ceil((float(pos_avgs_today[m]) / float(df[m].max())) * 100) if float(df[m].max()) > 0 else 0 for m in radar_m]
-                fig_radar = go.Figure()
-                fig_radar.add_trace(go.Scatterpolar(r=r_vals, theta=radar_m, fill='toself', name=selected_player, line_color='#FF8200'))
-                fig_radar.add_trace(go.Scatterpolar(r=t_vals, theta=radar_m, fill='toself', name=f'{pos_filter} Avg', line_color='#1D1D1F', opacity=0.3))
-                fig_radar.update_layout(polar=dict(radialaxis=dict(visible=True, range=[0, 100])), margin=dict(l=90, r=90, t=60, b=60), height=400)
-                st.plotly_chart(fig_radar, use_container_width=True)
-            with g2:
-                hist_m = st.selectbox("Progress Tracker", grading_metrics, key="player_hist_sel")
-                st.plotly_chart(px.line(df[df['Name'] == selected_player].sort_values('Date'), x='Date', y=hist_m, markers=True).update_traces(line_color='#FF8200').update_layout(height=400), use_container_width=True)
-
     with t_gallery:
         if not day_df.empty:
-            # FIXED: TWO-COLUMN GALLERY LOOP
+            # FIXED: TWO-COLUMN GALLERY LOOP WITH FULL TAG CLOSURES
             for i in range(0, len(day_df), 2):
                 cols = st.columns(2)
                 for j in range(2):
@@ -215,10 +199,9 @@ try:
                         p_d = day_df.iloc[i + j]
                         is_top = (p_d['Practice Score'] == top_score and top_score > 0)
                         
-                        # Generate the metric table rows for the card
-                        card_metrics = grading_metrics[:4]
+                        # Generate the metric table rows
                         rows_html = ""
-                        for k in card_metrics:
+                        for k in grading_metrics[:4]:
                             rows_html += f"<tr><td>{k}</td><td>{int(p_d[k])}</td><td>{int(p_d[f'{k}_Grade'])}</td></tr>"
 
                         with cols[j]:
