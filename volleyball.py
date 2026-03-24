@@ -6,18 +6,22 @@ import math
 # --- PAGE CONFIG ---
 st.set_page_config(page_title="Performance Lab", layout="wide")
 
-# --- CSS: TENNESSEE STYLE + NO INDEX ---
+# --- CSS: TENNESSEE STYLE + NO INDEX + CLEAN UI ---
 st.markdown("""
     <style>
     .stApp { background-color: #FFFFFF; color: #1D1D1F; }
     hr { display: none !important; }
+    
+    /* Center all table content */
     .scout-table { width: 100%; border-collapse: collapse; text-align: center; margin-top: 5px; }
     .scout-table th { background-color: #F5F5F7; padding: 10px; border-bottom: 2px solid #E5E5E7; font-weight: 700; }
     .scout-table td { padding: 8px; border-bottom: 1px solid #F5F5F7; }
+
     .player-photo-large { border-radius: 50%; width: 240px; height: 240px; object-fit: cover; border: 6px solid #FF8200; }
     .gallery-photo { border-radius: 50%; width: 110px; height: 110px; object-fit: cover; border: 4px solid #FF8200; }
     .score-box { padding: 20px 40px; border-radius: 12px; font-size: 40px; font-weight: 800; text-align: center; color: #1D1D1F; }
     .gallery-card { border: 1px solid #E5E5E7; padding: 20px; border-radius: 15px; background-color: #FFFFFF; margin-bottom: 10px; }
+    
     .trend-up { color: #28a745; font-weight: bold; }
     .trend-down { color: #dc3545; font-weight: bold; }
     </style>
@@ -39,6 +43,7 @@ def load_all_data():
     df = pd.read_csv(st.secrets["GOOGLE_SHEET_URL"])
     df.columns = df.columns.str.strip()
     df['Date'] = pd.to_datetime(df['Date'])
+    
     p_df = pd.read_csv(st.secrets["PHASE_SHEET_URL"])
     p_df.columns = p_df.columns.str.strip()
     p_df['Date'] = pd.to_datetime(p_df['Date'])
@@ -48,30 +53,29 @@ try:
     df, phase_df = load_all_data()
     date_options = [d.strftime('%m/%d/%Y') for d in sorted(df['Date'].unique(), reverse=True)]
 
-    # --- TABS DEFINITION ---
-    t_flow, t_player, t_gallery, t_comp = st.tabs(["Session Flow", "Individual Profile", "Team Gallery", "Team Comparison"])
-
-    # --- TOP SELECTION ---
+    # --- 1. PRACTICE SELECTION (ABSOLUTE TOP) ---
     st.markdown("<h3 style='text-align: center;'>Practice Selection</h3>", unsafe_allow_html=True)
-    
-    # Logic: Only show second date picker if on the Comparison Tab
-    # Using a container to keep layout clean
-    col_date1, col_date2 = st.columns(2)
-    with col_date1:
+    c_date1, c_date2 = st.columns(2)
+    with c_date1:
         date_a_str = st.selectbox("Current Practice", date_options, index=0)
-    
-    date_b_str = "None"
-    # We use a placeholder so the UI doesn't shift
-    with col_date2:
-        # Note: In Streamlit, multiselect or conditional visibility works best here
-        # We'll keep it simple: Select box only active for the Comparison Tab logic
+    with c_date2:
         date_b_str = st.selectbox("Comparison Practice (Optional)", ["None"] + date_options, index=0)
 
     date_a = pd.to_datetime(date_a_str)
     day_df = df[df['Date'] == date_a].copy()
 
     # --- LOGIC ---
-    grading_map = {'Total Jumps': 'Total Jumps', 'IMA Jump Count Med Band': 'Moderate Jumps', 'IMA Jump Count High Band': 'High Jumps', 'BMP Jumping Load': 'Jump Load', 'Total Player Load': 'Player Load', 'Estimated Distance (y)': 'Estimated Distance', 'Explosive Efforts': 'Explosive Efforts', 'High Intensity Movement': 'High Intensity Movement'}
+    grading_map = {
+        'Total Jumps': 'Total Jumps', 
+        'IMA Jump Count Med Band': 'Moderate Jumps', 
+        'IMA Jump Count High Band': 'High Jumps', 
+        'BMP Jumping Load': 'Jump Load', 
+        'Total Player Load': 'Player Load', 
+        'Estimated Distance (y)': 'Estimated Distance', 
+        'Explosive Efforts': 'Explosive Efforts', 
+        'High Intensity Movement': 'High Intensity Movement'
+    }
+    
     overall_maxes = df.groupby('Name')[list(grading_map.keys())].max()
     photo_map = df.dropna(subset=['PhotoURL']).drop_duplicates('Name').set_index('Name')['PhotoURL'].to_dict()
 
@@ -108,17 +112,19 @@ try:
 
     day_df = day_df.apply(process_player, axis=1).sort_values('Name')
 
+    # --- 2. TABS (DIRECTLY UNDER SELECTION) ---
+    t_flow, t_player, t_gallery, t_comp = st.tabs(["Session Flow", "Individual Profile", "Team Gallery", "Team Comparison"])
+
     with t_flow:
         st.subheader(f"Drill Intensity Breakdown: {date_a_str}")
-        # Ensure date matching for Phase DF
         day_phase_df = phase_df[phase_df['Date'] == date_a].copy()
         if not day_phase_df.empty:
-            phase_stats = day_phase_df.groupby('Phase', sort=False)[['Total Jumps', 'Total Player Load']].mean().fillna(0).reset_index()
-            fig_p = px.bar(phase_stats, x="Phase", y="Total Player Load", template="plotly_white", color_discrete_sequence=["#FF8200"])
-            st.plotly_chart(fig_p, use_container_width=True)
+            p_metrics = ['Total Jumps', 'Total Player Load']
+            phase_stats = day_phase_df.groupby('Phase', sort=False)[p_metrics].mean().fillna(0).reset_index()
+            st.plotly_chart(px.bar(phase_stats, x="Phase", y="Total Player Load", template="plotly_white", color_discrete_sequence=["#FF8200"]), use_container_width=True)
             st.markdown(render_table(phase_stats, ['Phase', 'Total Jumps', 'Total Player Load']), unsafe_allow_html=True)
         else:
-            st.warning("No drill-specific data found for this date. Check Phase Sheet dates.")
+            st.warning("No drill-specific data found for this date in the Phase Sheet.")
 
     with t_player:
         selected_player = st.selectbox("Select Athlete", day_df['Name'].unique())
@@ -136,12 +142,8 @@ try:
             st.markdown(f'<div class="score-box" style="background-color:{get_excel_gradient(p_data["Practice Score"])};">{int(p_data["Practice Score"])}</div>', unsafe_allow_html=True)
 
         st.divider()
-        
-        # --- NEW: STACKED JUMP BANDS ---
-        st.subheader("Jump Intensity Breakdown")
-        # Logic to find Low/Med/High bands (assuming Low = Total - (Med + High))
+        st.subheader("Jump Intensity Profile")
         low_jumps = p_data['Total Jumps'] - (p_data['IMA Jump Count Med Band'] + p_data['IMA Jump Count High Band'])
-        
         jump_band_df = pd.DataFrame({
             'Intensity': ['Low Band', 'Med Band', 'High Band'],
             'Count': [max(0, low_jumps), p_data['IMA Jump Count Med Band'], p_data['IMA Jump Count High Band']]
@@ -152,7 +154,6 @@ try:
         st.plotly_chart(fig_bands, use_container_width=True)
 
     with t_gallery:
-        # Re-implemented 2-column Gallery
         for i in range(0, len(day_df), 2):
             cols = st.columns(2)
             for j in range(2):
@@ -172,27 +173,18 @@ try:
 
     with t_comp:
         if date_b_str == "None":
-            st.info("Select a 'Comparison Practice' above to see the trend analysis.")
+            st.info("Select a 'Comparison Practice' at the top to see the trend analysis.")
         else:
             date_b = pd.to_datetime(date_b_str)
             df_b = df[df['Date'] == date_b].copy()
-            
-            avg_a = day_df[list(grading_map.keys())].mean()
-            avg_b = df_b[list(grading_map.keys())].mean()
-            
+            avg_a, avg_b = day_df[list(grading_map.keys())].mean(), df_b[list(grading_map.keys())].mean()
             comp_rows = []
             for k, display in grading_map.items():
                 diff = ((avg_a[k] - avg_b[k]) / avg_b[k] * 100) if avg_b[k] != 0 else 0
                 comp_rows.append({"Metric": display, date_a_str: avg_a[k], date_b_str: avg_b[k], "% Diff": f"{'+' if diff > 0 else ''}{int(round(diff, 0))}%"})
-            
             st.markdown(render_table(pd.DataFrame(comp_rows), ["Metric", date_a_str, date_b_str, "% Diff"]), unsafe_allow_html=True)
-            
-            # Graph excluding Estimated Distance
             g_rows = [r for r in comp_rows if "Distance" not in r["Metric"]]
-            fig_comp = px.bar(pd.DataFrame(g_rows).melt(id_vars="Metric", value_vars=[date_a_str, date_b_str]), 
-                               x="Metric", y="value", color="variable", barmode="group", 
-                               template="plotly_white", color_discrete_sequence=["#FF8200", "#545454"])
-            st.plotly_chart(fig_comp, use_container_width=True)
+            st.plotly_chart(px.bar(pd.DataFrame(g_rows).melt(id_vars="Metric", value_vars=[date_a_str, date_b_str]), x="Metric", y="value", color="variable", barmode="group", template="plotly_white", color_discrete_sequence=["#FF8200", "#545454"]), use_container_width=True)
 
 except Exception as e:
     st.error(f"Sync Error: {e}")
