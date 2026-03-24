@@ -1,20 +1,18 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
+import math # Added for precise rounding
 
 # --- PAGE CONFIG ---
 st.set_page_config(page_title="Performance Lab", layout="wide")
 
-# Sleek White Styling with Scout Report UI
+# Sleek White Styling
 st.markdown("""
     <style>
     .stApp { background-color: #FFFFFF; color: #1D1D1F; }
-    
-    /* Centering Table Text */
-    [data-testid="stDataTable"] th { text-align: center !important; background-color: #F5F5F7 !important; border-bottom: 2px solid #E5E5E7 !important; }
+    [data-testid="stDataTable"] th { text-align: center !important; background-color: #F5F5F7 !important; }
     [data-testid="stDataTable"] td { text-align: center !important; }
 
-    /* Circular Player Image */
     .img-container { display: flex; justify-content: center; margin-bottom: 20px; }
     .player-photo {
         border-radius: 50%;
@@ -22,12 +20,8 @@ st.markdown("""
         height: 180px;
         object-fit: cover;
         border: 4px solid #007AFF;
-        box-shadow: 0px 4px 10px rgba(0,0,0,0.1);
     }
 
-    /* Practice Score Box */
-    .score-container { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; }
-    .score-label { font-size: 20px; font-weight: 700; margin-bottom: 8px; color: #1D1D1F; }
     .score-box {
         background-color: #F2994A;
         color: white;
@@ -35,12 +29,12 @@ st.markdown("""
         border-radius: 12px;
         font-size: 48px;
         font-weight: 800;
-        box-shadow: 0px 4px 8px rgba(0,0,0,0.1);
+        text-align: center;
     }
     </style>
     """, unsafe_allow_html=True)
 
-# --- 1. SECURITY ---
+# --- SECURITY ---
 if "password_correct" not in st.session_state:
     st.title("Access Restricted")
     pwd = st.text_input("Access Key:", type="password")
@@ -50,7 +44,7 @@ if "password_correct" not in st.session_state:
             st.rerun()
     st.stop()
 
-# --- 2. DATA LOADING ---
+# --- DATA LOADING ---
 @st.cache_data(ttl=300)
 def load_all_data():
     df = pd.read_csv(st.secrets["GOOGLE_SHEET_URL"])
@@ -74,7 +68,7 @@ try:
     day_df = df[df['Date'] == sel_date_dt].copy()
     day_phase_df = phase_df[phase_df['Date'] == sel_date_dt].copy()
 
-    # --- 3. SCORING LOGIC (Personal Season Max & Roundup) ---
+    # --- UPDATED SCORING & PHOTO LOGIC ---
     grading_map = {
         'Total Jumps': 'Total Jumps',
         'IMA Jump Count Med Band': 'Moderate Jumps',
@@ -86,8 +80,11 @@ try:
         'High Intensity Movement': 'High Intensity Movements'
     }
 
-    # Pull Personal Season Highs from Sheet 1
+    # 1. Get Season Maxes
     overall_maxes = df.groupby('Name')[list(grading_map.keys())].max()
+    
+    # 2. Get the FIRST available PhotoURL for each person (ignores empty rows)
+    photo_map = df.dropna(subset=['PhotoURL']).drop_duplicates('Name').set_index('Name')['PhotoURL'].to_dict()
 
     def process_player(row):
         p_name = row['Name']
@@ -96,17 +93,26 @@ try:
         for internal in grading_map.keys():
             curr = row[internal]
             m_val = p_maxes[internal]
-            # Manual ROUNDUP: int(-(-x // 1))
-            grade = int(-(-(curr / m_val * 100) // 1)) if m_val > 0 else 0
+            
+            # ROUNDUP logic using math.ceil
+            if m_val > 0:
+                grade = math.ceil((curr / m_val) * 100)
+            else:
+                grade = 0
+                
             row[f'{internal}_Max'] = m_val
             row[f'{internal}_Grade'] = grade
             grades.append(grade)
-        row['Practice Score'] = int(pd.Series(grades).mean().round(0))
+        
+        # Final Practice Score is Average of Grades
+        row['Practice Score'] = math.ceil(sum(grades) / len(grades))
+        # Attach Photo from the map
+        row['PhotoURL_Fixed'] = photo_map.get(p_name, "https://www.w3schools.com/howto/img_avatar.png")
         return row
 
     day_df = day_df.apply(process_player, axis=1)
 
-    # --- 4. TABS ---
+    # --- TABS ---
     tab1, tab2, tab3 = st.tabs(["Session Flow", "Player Profile", "Leaderboard"])
 
     with tab1:
@@ -126,12 +132,10 @@ try:
         selected_player = st.selectbox("Select Player", day_df['Name'].unique())
         p_data = day_df[day_df['Name'] == selected_player].iloc[0]
 
-        # SCOUTING REPORT HEADER
         col_img, col_card, col_score = st.columns([1, 2, 1])
         
         with col_img:
-            photo_url = p_data['PhotoURL'] if 'PhotoURL' in p_data and pd.notna(p_data['PhotoURL']) else "https://www.w3schools.com/howto/img_avatar.png"
-            st.markdown(f'<div class="img-container"><img src="{photo_url}" class="player-photo"></div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="img-container"><img src="{p_data["PhotoURL_Fixed"]}" class="player-photo"></div>', unsafe_allow_html=True)
             st.markdown(f'<h2 style="text-align:center;">{p_data["Name"]}</h2>', unsafe_allow_html=True)
 
         with col_card:
@@ -147,19 +151,14 @@ try:
             st.dataframe(pd.DataFrame(card_rows), use_container_width=True, hide_index=True)
             
         with col_score:
-            st.markdown(f"""
-                <div class="score-container">
-                    <div class="score-label">Practice Score</div>
-                    <div class="score-box">{int(p_data['Practice Score'])}</div>
-                </div>
-            """, unsafe_allow_html=True)
+            st.markdown(f'<div style="text-align:center; font-weight:bold; margin-top:20px;">Practice Score</div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="score-box">{int(p_data["Practice Score"])}</div>', unsafe_allow_html=True)
 
         st.divider()
-        st.subheader("Phase Breakdown")
+        st.subheader("Drill Intensity Breakdown")
         p_phase = day_phase_df[day_phase_df['Name'] == selected_player]
         fig_p = px.bar(p_phase, x="Phase", y=["IMA Jump Count Low Band", "IMA Jump Count Med Band", "IMA Jump Count High Band"],
-                       title=f"Jump Intensity Mix: {selected_player}", barmode="group",
-                       color_discrete_map={"IMA Jump Count High Band": "#FF3B30", "IMA Jump Count Med Band": "#FF9500", "IMA Jump Count Low Band": "#007AFF"},
+                       barmode="group", color_discrete_map={"IMA Jump Count High Band": "#FF3B30", "IMA Jump Count Med Band": "#FF9500", "IMA Jump Count Low Band": "#007AFF"},
                        template="plotly_white")
         fig_p.update_layout(xaxis={'categoryorder':'trace'}, xaxis_title=None, legend_title=None)
         st.plotly_chart(fig_p, use_container_width=True)
