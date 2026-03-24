@@ -10,66 +10,22 @@ st.set_page_config(page_title="Performance Lab", layout="wide")
 st.markdown("""
     <style>
     .stApp { background-color: #FFFFFF; color: #1D1D1F; }
-    
-    /* Remove all default dividers/bars */
     hr { display: none !important; }
     [data-testid="column"] { padding: 0px 10px !important; }
 
-    /* Centered HTML Tables (No Index) */
     .scout-table {
         width: 100%;
         border-collapse: collapse;
         text-align: center;
         margin-top: 5px;
     }
-    .scout-table th {
-        background-color: #F5F5F7;
-        padding: 10px;
-        border-bottom: 2px solid #E5E5E7;
-        font-weight: 700;
-        color: #1D1D1F;
-    }
-    .scout-table td {
-        padding: 8px;
-        border-bottom: 1px solid #F5F5F7;
-        color: #1D1D1F;
-    }
+    .scout-table th { background-color: #F5F5F7; padding: 10px; border-bottom: 2px solid #E5E5E7; font-weight: 700; }
+    .scout-table td { padding: 8px; border-bottom: 1px solid #F5F5F7; }
 
-    /* Photos & Borders */
-    .player-photo-large {
-        border-radius: 50%;
-        width: 240px;
-        height: 240px;
-        object-fit: cover;
-        border: 6px solid #FF8200;
-        box-shadow: 0px 4px 15px rgba(0,0,0,0.1);
-    }
-    .gallery-photo {
-        border-radius: 50%;
-        width: 110px;
-        height: 110px;
-        object-fit: cover;
-        border: 4px solid #FF8200;
-    }
-
-    /* Score Box Gradient Style */
-    .score-box {
-        padding: 20px 40px;
-        border-radius: 12px;
-        font-size: 44px;
-        font-weight: 800;
-        text-align: center;
-        text-shadow: 1px 1px 2px rgba(0,0,0,0.2);
-    }
-
-    /* Card Wrapper */
-    .gallery-card {
-        border: 1px solid #E5E5E7;
-        padding: 20px;
-        border-radius: 15px;
-        background-color: #FFFFFF;
-        margin-bottom: 10px;
-    }
+    .player-photo-large { border-radius: 50%; width: 240px; height: 240px; object-fit: cover; border: 6px solid #FF8200; }
+    .gallery-photo { border-radius: 50%; width: 110px; height: 110px; object-fit: cover; border: 4px solid #FF8200; }
+    .score-box { padding: 20px 40px; border-radius: 12px; font-size: 44px; font-weight: 800; text-align: center; }
+    .gallery-card { border: 1px solid #E5E5E7; padding: 20px; border-radius: 15px; background-color: #FFFFFF; margin-bottom: 10px; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -98,41 +54,35 @@ try:
     df, phase_df = load_all_data()
     date_options = [d.strftime('%m/%d/%Y') for d in sorted(df['Date'].unique())]
     
-    st.markdown("<h3 style='text-align: center;'>Practice Session</h3>", unsafe_allow_html=True)
-    selected_date_str = st.selectbox("", date_options, index=len(date_options)-1, label_visibility="collapsed")
-    sel_date_dt = pd.to_datetime(selected_date_str)
-    
-    day_df = df[df['Date'] == sel_date_dt].copy()
-    day_phase_df = phase_df[phase_df['Date'] == sel_date_dt].copy()
+    st.markdown("<h3 style='text-align: center;'>Practice Selection</h3>", unsafe_allow_html=True)
+    c_date1, c_date2 = st.columns(2)
+    with c_date1:
+        date_a = st.selectbox("Primary Date", date_options, index=len(date_options)-1)
+    with c_date2:
+        date_b = st.selectbox("Comparison Date (Optional)", ["None"] + date_options, index=0)
 
-    # --- LOGIC: EXCEL GRADIENT & SCORING ---
+    sel_date_a = pd.to_datetime(date_a)
+    day_df = df[df['Date'] == sel_date_a].copy()
+
+    # --- LOGIC ---
     def get_excel_gradient(score):
         score = max(0, min(100, score))
         r = int(255 * (score / 50)) if score < 50 else 255
         g = 255 if score < 50 else int(255 * (1 - (score - 50) / 50))
         return f"rgb({r}, {g}, 0)"
 
-    grading_map = {
-        'Total Jumps': 'Total Jumps', 'IMA Jump Count Med Band': 'Moderate Jumps', 
-        'IMA Jump Count High Band': 'High Jumps', 'BMP Jumping Load': 'Jump Load', 
-        'Total Player Load': 'Player Load', 'Estimated Distance (y)': 'Estimated Distance', 
-        'Explosive Efforts': 'Explosive Efforts', 'High Intensity Movement': 'High Intensity Movements'
-    }
-
+    grading_map = {'Total Jumps': 'Total Jumps', 'IMA Jump Count Med Band': 'Moderate Jumps', 'IMA Jump Count High Band': 'High Jumps', 'BMP Jumping Load': 'Jump Load', 'Total Player Load': 'Player Load', 'Estimated Distance (y)': 'Estimated Distance', 'Explosive Efforts': 'Explosive Efforts', 'High Intensity Movement': 'High Intensity Movements'}
     overall_maxes = df.groupby('Name')[list(grading_map.keys())].max()
     photo_map = df.dropna(subset=['PhotoURL']).drop_duplicates('Name').set_index('Name')['PhotoURL'].to_dict()
 
     def process_player(row):
         p_name = row['Name']
         p_maxes = overall_maxes.loc[p_name]
-        grades = []
-        for k in grading_map.keys():
-            m_val = p_maxes[k]
-            grade = math.ceil((row[k] / m_val) * 100) if m_val > 0 else 0
-            row[f'{k}_Max'] = m_val
-            row[f'{k}_Grade'] = grade
-            grades.append(grade)
+        grades = [math.ceil((row[k] / p_maxes[k]) * 100) if p_maxes[k] > 0 else 0 for k in grading_map.keys()]
         row['Practice Score'] = math.ceil(sum(grades) / len(grades))
+        for k in grading_map.keys():
+            row[f'{k}_Max'] = p_maxes[k]
+            row[f'{k}_Grade'] = math.ceil((row[k] / p_maxes[k]) * 100) if p_maxes[k] > 0 else 0
         row['PhotoURL_Fixed'] = photo_map.get(p_name, "https://www.w3schools.com/howto/img_avatar.png")
         return row
 
@@ -146,24 +96,54 @@ try:
             html += '<tr>'
             for c in cols:
                 val = r[c]
-                html += f'<td>{int(round(val,0)) if isinstance(val, (int, float)) else val}</td>'
+                html += f'<td>{int(round(val,0)) if isinstance(val, (int, float)) and "%" not in str(val) else val}</td>'
             html += '</tr>'
         return html + '</tbody></table>'
 
     # --- TABS ---
-    t1, t2, t3, t4 = st.tabs(["Session Flow", "Individual Profile", "Team Gallery", "Leaderboard"])
+    t1, t2, t3, t4, t5 = st.tabs(["Session Flow", "Individual Profile", "Team Gallery", "Leaderboard", "Practice Comparison"])
 
-    with t1:
-        st.subheader("Phase Intensity Breakdown")
-        phase_stats = day_phase_df.groupby('Phase', sort=False)[['Total Jumps', 'Total Player Load']].mean().reset_index()
-        fig_p = px.bar(phase_stats, x="Phase", y="Total Player Load", title="Team Workload per Drill", template="plotly_white", color_discrete_sequence=["#FF8200"])
-        st.plotly_chart(fig_p, use_container_width=True)
+    with t5:
+        if date_b == "None":
+            st.info("Select a 'Comparison Date' above to see the % Difference analysis.")
+        else:
+            st.subheader(f"Session Comparison: {date_a} vs {date_b}")
+            sel_date_b = pd.to_datetime(date_b)
+            df_b = df[df['Date'] == sel_date_b].copy()
+            
+            avg_a = day_df[list(grading_map.keys())].mean()
+            avg_b = df_b[list(grading_map.keys())].mean()
+            
+            comp_rows = []
+            for internal, display in grading_map.items():
+                val_a = avg_a[internal]
+                val_b = avg_b[internal]
+                
+                # Percent Difference Logic
+                if val_b != 0:
+                    perc_diff = ((val_a - val_b) / val_b) * 100
+                    perc_str = f"{'+' if perc_diff > 0 else ''}{int(round(perc_diff, 0))}%"
+                else:
+                    perc_str = "0%"
+
+                comp_rows.append({
+                    "Metric": display,
+                    date_a: int(round(val_a, 0)),
+                    date_b: int(round(val_b, 0)),
+                    "% Difference": perc_str
+                })
+            
+            st.markdown(render_table(pd.DataFrame(comp_rows), ["Metric", date_a, date_b, "% Difference"]), unsafe_allow_html=True)
+            
+            # Comparison Chart
+            comp_chart_df = pd.DataFrame(comp_rows).melt(id_vars="Metric", value_vars=[date_a, date_b], var_name="Session", value_name="Avg Value")
+            fig_comp = px.bar(comp_chart_df, x="Metric", y="Avg Value", color="Session", barmode="group", template="plotly_white", color_discrete_sequence=["#FF8200", "#545454"])
+            st.plotly_chart(fig_comp, use_container_width=True)
 
     with t2:
         selected_player = st.selectbox("Select Athlete", day_df['Name'].unique())
         p_data = day_df[day_df['Name'] == selected_player].iloc[0]
         score_bg = get_excel_gradient(p_data['Practice Score'])
-        
         c1, c2, c3 = st.columns([1.2, 2, 1])
         with c1:
             st.markdown(f'<div style="text-align:center;"><img src="{p_data["PhotoURL_Fixed"]}" class="player-photo-large"></div>', unsafe_allow_html=True)
@@ -197,7 +177,8 @@ try:
 
     with t4:
         st.subheader("Leaderboard")
-        st.dataframe(day_df[['Name', 'Total Jumps', 'Total Player Load', 'Practice Score']].astype(int, errors='ignore').sort_values('Practice Score', ascending=False), use_container_width=True, hide_index=True)
+        leader_df = day_df[['Name', 'Total Jumps', 'Total Player Load']].astype(int, errors='ignore').sort_values('Total Player Load', ascending=False)
+        st.dataframe(leader_df, use_container_width=True, hide_index=True)
 
 except Exception as e:
     st.error(f"Sync Error: {e}")
