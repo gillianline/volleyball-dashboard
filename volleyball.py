@@ -1,13 +1,12 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
-import plotly.graph_objects as go
 import math 
 
 # --- PAGE CONFIG ---
 st.set_page_config(page_title="Performance Lab", layout="wide")
 
-# Styling with Dynamic Score Colors & #FF8200 Defaults
+# Styling with Excel-style Gradient & #FF8200 Defaults
 st.markdown("""
     <style>
     .stApp { background-color: #FFFFFF; color: #1D1D1F; }
@@ -44,7 +43,6 @@ st.markdown("""
         border: 4px solid #FF8200;
     }
 
-    /* Base Score Box Style */
     .score-box {
         color: white;
         padding: 25px 50px;
@@ -97,7 +95,7 @@ try:
     day_df = df[df['Date'] == sel_date_dt].copy()
     day_phase_df = phase_df[phase_df['Date'] == sel_date_dt].copy()
 
-    # --- SCORING LOGIC ---
+    # --- SCORING LOGIC (Using full DF for Maxes) ---
     grading_map = {
         'Total Jumps': 'Total Jumps',
         'IMA Jump Count Med Band': 'Moderate Jumps',
@@ -130,10 +128,16 @@ try:
     full_graded_df = df.apply(process_player, axis=1)
     day_df = full_graded_df[full_graded_df['Date'] == sel_date_dt].sort_values('Practice Score', ascending=False)
 
-    def get_score_color(score):
-        if score >= 90: return "#dc3545" # Red (High Intensity)
-        if score >= 70: return "#FF8200" # Orange (Moderate)
-        return "#28a745" # Green (Low Volume)
+    def get_gradient_color(score):
+        # Excel-style Green-Yellow-Red Gradient
+        if score <= 50:
+            # Green to Yellow
+            r = int(255 * (score / 50))
+            return f"rgb({r}, 255, 0)"
+        else:
+            # Yellow to Red
+            g = int(255 * (1 - (score - 50) / 50))
+            return f"rgb(255, {g}, 0)"
 
     def render_custom_table(dataframe, cols_to_show):
         html = '<table class="scout-table"><thead><tr>'
@@ -155,7 +159,7 @@ try:
     with tab2:
         selected_player = st.selectbox("Select Player Profile", day_df['Name'].unique())
         p_data = day_df[day_df['Name'] == selected_player].iloc[0]
-        score_color = get_score_color(p_data['Practice Score'])
+        score_bg = get_gradient_color(p_data['Practice Score'])
         
         c_head1, c_head2, c_head3 = st.columns([1, 2, 1])
         with c_head1:
@@ -168,30 +172,21 @@ try:
         
         with c_head3:
             st.markdown(f'<div style="text-align:center; font-weight:bold; font-size:22px;">Practice Score</div>', unsafe_allow_html=True)
-            st.markdown(f'<div class="score-box" style="background-color:{score_color};">{int(p_data["Practice Score"])}</div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="score-box" style="background-color:{score_bg};">{int(p_data["Practice Score"])}</div>', unsafe_allow_html=True)
 
         st.divider()
         
-        col_g1, col_g2 = st.columns(2)
-        with col_g1:
-            st.subheader("Jump Intensity Breakdown")
-            # Using specific jump band columns
-            jump_bands = ['IMA Jump Count Low Band', 'IMA Jump Count Med Band', 'IMA Jump Count High Band']
-            band_labels = ['Low Band', 'Med Band', 'High Band']
-            band_values = [p_data[b] for b in jump_bands if b in p_data]
-            
-            fig_jumps = px.pie(values=band_values, names=band_labels, 
-                               hole=0.4, color_discrete_sequence=["#28a745", "#FF8200", "#dc3545"],
-                               template="plotly_white")
-            fig_jumps.update_layout(showlegend=True, margin=dict(t=0, b=0, l=0, r=0))
-            st.plotly_chart(fig_jumps, use_container_width=True)
-            
-        with col_g2:
-            st.subheader("Athletic Fingerprint")
-            radar_df = pd.DataFrame(dict(r=[p_data[f'{k}_Grade'] for k in grading_map.keys()], theta=list(grading_map.values())))
-            fig_radar = px.line_polar(radar_df, r='r', theta='theta', line_close=True, range_r=[0,100], template="plotly_white", color_discrete_sequence=["#FF8200"])
-            fig_radar.update_traces(fill='toself')
-            st.plotly_chart(fig_radar, use_container_width=True)
+        st.subheader("Jump Intensity Profile")
+        jump_cols = ['IMA Jump Count Low Band', 'IMA Jump Count Med Band', 'IMA Jump Count High Band']
+        jump_data = pd.DataFrame({
+            'Band': ['Low', 'Med', 'High'],
+            'Count': [int(p_data[c]) for c in jump_cols]
+        })
+        fig_jumps = px.bar(jump_data, x='Band', y='Count', color='Band',
+                           color_discrete_map={'Low': '#28a745', 'Med': '#FF8200', 'High': '#dc3545'},
+                           template="plotly_white", text_auto=True)
+        fig_jumps.update_layout(showlegend=False, xaxis_title=None, yaxis_title="Number of Jumps")
+        st.plotly_chart(fig_jumps, use_container_width=True)
 
     with tab3:
         for i in range(0, len(day_df), 2):
@@ -199,7 +194,7 @@ try:
             for j in range(2):
                 if i + j < len(day_df):
                     p_data = day_df.iloc[i + j]
-                    p_score_color = get_score_color(p_data['Practice Score'])
+                    p_score_bg = get_gradient_color(p_data['Practice Score'])
                     with cols[j]:
                         st.markdown('<div class="gallery-card">', unsafe_allow_html=True)
                         ci, ct, cs = st.columns([1, 2, 0.8])
@@ -210,11 +205,11 @@ try:
                             c_rows = [{"Metric": grading_map[k], "Current": p_data[k], "Grade": p_data[f'{k}_Grade']} for k in grading_map.keys()]
                             st.markdown(render_custom_table(pd.DataFrame(c_rows), ["Metric", "Current", "Grade"]), unsafe_allow_html=True)
                         with cs:
-                            st.markdown(f'<div style="background-color:{p_score_color}; color:white; border-radius:10px; text-align:center; padding:10px; font-size:24px; font-weight:800; margin-top:40px;">{int(p_data["Practice Score"])}</div>', unsafe_allow_html=True)
+                            st.markdown(f'<div style="background-color:{p_score_bg}; color:black; border-radius:10px; text-align:center; padding:10px; font-size:24px; font-weight:800; margin-top:40px;">{int(p_data["Practice Score"])}</div>', unsafe_allow_html=True)
                         st.markdown('</div>', unsafe_allow_html=True)
 
     with tab4:
-        st.subheader("Season Leaderboard")
+        st.subheader("Leaderboard")
         st.dataframe(day_df[['Name', 'Total Jumps', 'Total Player Load', 'Practice Score']].astype(int, errors='ignore'), use_container_width=True, hide_index=True)
 
 except Exception as e:
