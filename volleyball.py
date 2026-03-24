@@ -2,48 +2,52 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 
-# --- SECURITY CHECK ---
+# 1. SECURITY BARRIER
 def check_password():
-    """Returns True if the user had the correct password."""
     if "password_correct" not in st.session_state:
-        st.text_input("Enter Coach Access Key", type="password", on_change=lambda: st.session_state.update({"password_correct": st.session_state.password == "VballCoach2026"}), key="password")
+        st.title("🏐 Coach Login")
+        pwd = st.text_input("Enter Access Key:", type="password")
+        if st.button("Unlock Dashboard"):
+            if pwd == "Vball2026!": # SET YOUR PASSWORD HERE
+                st.session_state["password_correct"] = True
+                st.rerun()
+            else:
+                st.error("Incorrect password")
         return False
-    return st.session_state["password_correct"]
+    return True
 
-if not check_password():
-    st.stop()  # Stop execution if password isn't correct
+if check_password():
+    # 2. DATA CONNECTION
+    # Replace the link below with your OneDrive Direct Download link from Phase 1
+    EXCEL_URL = "https://liveutk-my.sharepoint.com/:x:/r/personal/asmit330_utk_edu/Documents/Volleyball/25-26%20Season/Catapult%20Dashboards/Catapult%20Dashboards.xlsx?download=1"
 
-# --- DATA LOADING ---
-# Tip: Use a 'Share with specific people' link if possible, or a password-protected OneDrive folder.
-# For high sensitivity, use the 'msal' library for official Microsoft Login (OAuth).
-DATA_URL = "https://liveutk-my.sharepoint.com/:x:/r/personal/asmit330_utk_edu/Documents/Volleyball/25-26%20Season/Catapult%20Dashboards/Catapult%20Dashboards.xlsx?download=1"
+    @st.cache_data(ttl=600) # Refresh data every 10 mins
+    def load_data():
+        return pd.read_excel(EXCEL_URL)
 
-@st.cache_data(ttl=3600) # Refresh data every hour
-def get_data():
-    return pd.read_csv(DATA_URL, sep='\t')
+    try:
+        df = load_data()
+        
+        # 3. DASHBOARD LAYOUT
+        st.title("🏐 Performance Dashboard")
+        
+        # Slicers
+        date = st.selectbox("Select Date", df['Date'].unique())
+        day_df = df[df['Date'] == date]
 
-df = get_data()
+        # Metric Row
+        c1, c2, c3 = st.columns(3)
+        c1.metric("Total Jumps", int(day_df['Total Jumps'].sum()))
+        c2.metric("Avg Player Load", round(day_df['Total Player Load'].mean(), 1))
+        c3.metric("High Intensity Effs", day_df['High Intensity Movement'].sum())
 
-# --- THE DASHBOARD ---
-st.title("🛡️ Secure Performance Portal")
-player = st.selectbox("Select Player to Review", df['Player'].unique())
+        # Jump Intensity Chart
+        st.subheader("Jump Intensity by Player")
+        fig = px.bar(day_df, x="Player", 
+                     y=["IMA Jump Count Low Band", "IMA Jump Count Med Band", "IMA Jump Count High Band"],
+                     title="Jump Distribution", barmode="stack",
+                     color_discrete_map={"IMA Jump Count High Band": "red", "IMA Jump Count Med Band": "orange", "IMA Jump Count Low Band": "lightblue"})
+        st.plotly_chart(fig, use_container_width=True)
 
-# Filter for the specific player's profile
-p_data = df[df['Player'] == player]
-
-# Metric Row
-c1, c2, c3 = st.columns(3)
-c1.metric("Total Jumps", p_data['Total Jumps'].values[0])
-c2.metric("Total Load", round(p_data['Total Player Load'].values[0], 1))
-c3.metric("Explosive Efforts", p_data['Explosive Efforts'].values[0])
-
-# Intensity Breakdown
-fig = px.pie(
-    names=['High', 'Med', 'Low'],
-    values=[p_data['IMA Jump Count High Band'].values[0], 
-            p_data['IMA Jump Count Med Band'].values[0], 
-            p_data['IMA Jump Count Low Band'].values[0]],
-    title=f"Jump Intensity Mix: {player}",
-    color_discrete_sequence=['#ef233c', '#ffb703', '#8ecae6']
-)
-st.plotly_chart(fig)
+    except Exception as e:
+        st.error(f"Error loading data: {e}")
