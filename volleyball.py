@@ -25,7 +25,7 @@ st.markdown("""
     .player-photo-large { border-radius: 50%; width: 220px; height: 220px; object-fit: cover; border: 6px solid #FF8200; }
     .gallery-photo { border-radius: 50%; width: 90px; height: 90px; object-fit: cover; border: 4px solid #FF8200; }
     .score-box { padding: 15px 30px; border-radius: 12px; font-size: 36px; font-weight: 800; text-align: center; color: #1D1D1F; }
-    .gallery-card { border: 1px solid #E5E5E7; padding: 12px; border-radius: 15px; background-color: #FFFFFF; margin-bottom: 8px; position: relative; min-height: 350px; }
+    .gallery-card { border: 1px solid #E5E5E7; padding: 12px; border-radius: 15px; background-color: #FFFFFF; margin-bottom: 8px; position: relative; min-height: 380px; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -58,13 +58,14 @@ def load_all_data():
     df = df.rename(columns=rename_map)
     df['Date'] = pd.to_datetime(df['Date'])
     
-    # --- CRITICAL FIX: SMART FILLING ---
-    # 1. Fill Position and PhotoURL using forward/backward fill first
+    # 1. Sort to ensure ffill works correctly
     df = df.sort_values(['Name', 'Date'])
-    df['Position'] = df.groupby('Name')['Position'].ffill().bfill()
-    df['PhotoURL'] = df.groupby('Name')['PhotoURL'].ffill().bfill()
     
-    # 2. ONLY fill numeric metric columns with 0
+    # 2. Fill Strings separately (DO NOT FILL WITH 0)
+    df['Position'] = df.groupby('Name')['Position'].ffill().bfill().fillna("N/A")
+    df['PhotoURL'] = df.groupby('Name')['PhotoURL'].ffill().bfill().fillna("https://www.w3schools.com/howto/img_avatar.png")
+    
+    # 3. Fill Metrics with 0
     metric_cols = ['Total Jumps', 'Moderate Jumps', 'High Jumps', 'Jump Load', 'Player Load', 'Estimated Distance', 'Explosive Efforts', 'High Intensity Movements']
     df[metric_cols] = df[metric_cols].fillna(0)
     
@@ -87,7 +88,7 @@ try:
     with c_main:
         date_a_str = st.selectbox("Current Practice", date_options, index=0, key="date_a_final")
     with c_pos:
-        pos_list = sorted([p for p in df['Position'].unique() if pd.notna(p)])
+        pos_list = sorted([p for p in df['Position'].unique() if p != "N/A"])
         pos_filter = st.selectbox("Position Filter", ["All Positions"] + pos_list, key="pos_filter_final")
     with c_toggle:
         compare_on = st.checkbox("Compare", value=False, key="do_compare_final")
@@ -108,8 +109,6 @@ try:
     overall_maxes = df.groupby('Name')[grading_metrics].max()
     overall_avgs = df.groupby('Name')[grading_metrics].mean()
     pos_avgs_today = day_df[grading_metrics].mean()
-    
-    photo_map = df.dropna(subset=['PhotoURL']).drop_duplicates('Name').set_index('Name')['PhotoURL'].to_dict()
 
     def get_excel_gradient(score):
         score = max(0, min(100, float(score)))
@@ -133,7 +132,6 @@ try:
         except:
             row['Is_Fatigued'] = False
             
-        row['PhotoURL_Fixed'] = row['PhotoURL'] if pd.notna(row['PhotoURL']) else "https://www.w3schools.com/howto/img_avatar.png"
         return row
 
     def render_table(dataframe, cols):
@@ -159,6 +157,7 @@ try:
     t_flow, t_player, t_gallery, t_comp = st.tabs(["Session Flow", "Individual Profile", "Team Gallery", "Team Comparison"])
 
     with t_flow:
+        st.subheader(f"Intensity Breakdown: {date_a_str}")
         day_phase_df = phase_df[phase_df['Date'] == date_a].copy()
         if not day_phase_df.empty:
             phase_stats = day_phase_df.groupby('Phase', sort=False).agg({'Player Load': 'mean', 'Explosive Efforts': 'mean', 'Total Jumps': 'mean'}).reset_index()
@@ -176,7 +175,7 @@ try:
             
             c1, c2, c3 = st.columns([1.2, 2.5, 1.2])
             with c1:
-                st.markdown(f'<div style="text-align:center;"><img src="{p_data["PhotoURL_Fixed"]}" class="player-photo-large"></div>', unsafe_allow_html=True)
+                st.markdown(f'<div style="text-align:center;"><img src="{p_data["PhotoURL"]}" class="player-photo-large"></div>', unsafe_allow_html=True)
                 st.markdown(f'<h2 style="text-align:center;">{p_data["Name"]} ({p_data["Position"]})</h2>', unsafe_allow_html=True)
             with c2:
                 p_rows = []
@@ -213,22 +212,24 @@ try:
 
     with t_gallery:
         if not day_df.empty:
+            # GALLERY RENDERING
             for i in range(0, len(day_df), 2):
                 cols = st.columns(2)
                 for j in range(2):
                     if i + j < len(day_df):
                         p_d = day_df.iloc[i + j]
                         is_top = (p_d['Practice Score'] == top_score and top_score > 0)
+                        
                         with cols[j]:
                             st.markdown(f"""
                             <div class="gallery-card">
                                 <div style='position: absolute; top: 10px; right: 10px; display: flex; gap: 5px;'>
                                     {"<div title='Top Performer' style='color:#FFD700; font-size:20px;'>⭐</div>" if is_top else ""}
-                                    {"<div title='Fatigue Warning' style='font-size:20px;'>⚠️</div>" if p_d['Is_Fatigued'] else ""}
+                                    {"<div title='Fatigue Detected' style='font-size:20px;'>⚠️</div>" if p_d['Is_Fatigued'] else ""}
                                 </div>
                                 <div style="display: flex; align-items: center;">
                                     <div style="flex: 1; text-align: center;">
-                                        <img src="{p_d['PhotoURL_Fixed']}" class="gallery-photo">
+                                        <img src="{p_d['PhotoURL']}" class="gallery-photo">
                                         <p style="font-weight:bold; font-size:14px; margin-top:5px;">{p_d['Name']}<br><small>{p_d['Position']}</small></p>
                                     </div>
                                     <div style="flex: 2.5;">
