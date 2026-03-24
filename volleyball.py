@@ -6,48 +6,52 @@ import math
 # --- PAGE CONFIG ---
 st.set_page_config(page_title="Performance Lab", layout="wide")
 
-# Sleek White Styling + FORCE CENTER + NO INDEX + BIG PHOTOS
+# Sleek White Styling + BIG PHOTOS + MANUAL TABLE CENTERING
 st.markdown("""
     <style>
     .stApp { background-color: #FFFFFF; color: #1D1D1F; }
     
-    /* Center all table content and hide index */
-    [data-testid="stTable"] th { text-align: center !important; background-color: #F5F5F7 !important; border-bottom: 2px solid #E5E5E7 !important; }
-    [data-testid="stTable"] td { text-align: center !important; border-bottom: 1px solid #F5F5F7 !important; }
-    
-    /* Hide the index column in st.table specifically */
-    [data-testid="stTable"] thead tr th:first-child { display: none; }
-    [data-testid="stTable"] tbody tr td:first-child { display: none; }
+    /* Custom CSS for the HTML Table to ensure NO INDEX and CENTERED TEXT */
+    .scout-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 10px 0;
+        font-size: 16px;
+        text-align: center;
+    }
+    .scout-table th {
+        background-color: #F5F5F7;
+        color: #1D1D1F;
+        font-weight: 700;
+        padding: 12px;
+        border-bottom: 2px solid #E5E5E7;
+    }
+    .scout-table td {
+        padding: 10px;
+        border-bottom: 1px solid #F5F5F7;
+        color: #1D1D1F;
+    }
 
     .img-container { display: flex; justify-content: center; margin-bottom: 15px; }
     .player-photo-large {
         border-radius: 50%;
-        width: 220px; /* Bigger Picture */
-        height: 220px;
+        width: 240px; /* Even bigger as requested */
+        height: 240px;
         object-fit: cover;
-        border: 5px solid #FF8200;
+        border: 5px solid #007AFF;
         box-shadow: 0px 4px 15px rgba(0,0,0,0.1);
     }
 
-    /* Practice Score Box */
-    .score-box-container { display: flex; flex-direction: column; align-items: center; justify-content: center; }
-    .score-label { font-size: 20px; font-weight: 700; margin-bottom: 8px; color: #1D1D1F; }
+    .score-box-container { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; }
+    .score-label { font-size: 22px; font-weight: 700; margin-bottom: 8px; }
     .score-box {
         background-color: #F2994A;
         color: white;
-        padding: 25px 50px;
-        border-radius: 12px;
-        font-size: 42px;
+        padding: 30px 60px;
+        border-radius: 15px;
+        font-size: 54px;
         font-weight: 800;
         text-align: center;
-    }
-
-    .card-wrapper {
-        border: 1px solid #E5E5E7;
-        border-radius: 15px;
-        padding: 25px;
-        margin-bottom: 25px;
-        background-color: #FBFBFD;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -116,26 +120,26 @@ try:
         row['PhotoURL_Fixed'] = photo_map.get(p_name, "https://www.w3schools.com/howto/img_avatar.png")
         return row
 
-    # Process all data first to allow for historical trending
     full_graded_df = df.apply(process_player, axis=1)
-    # Selected Day Data
     day_df = full_graded_df[full_graded_df['Date'] == sel_date_dt].sort_values('Practice Score', ascending=False)
+
+    # --- HELPER FUNCTION FOR TABLE ---
+    def render_custom_table(dataframe, cols_to_show):
+        html = '<table class="scout-table"><thead><tr>'
+        for col in cols_to_show:
+            html += f'<th>{col}</th>'
+        html += '</tr></thead><tbody>'
+        for _, row in dataframe.iterrows():
+            html += '<tr>'
+            for col in cols_to_show:
+                val = row[col]
+                html += f'<td>{int(round(val,0)) if isinstance(val, (int, float)) else val}</td>'
+            html += '</tr>'
+        html += '</tbody></table>'
+        return html
 
     # --- TABS ---
     tab1, tab2, tab3, tab4 = st.tabs(["Session Flow", "Player Profile", "Team Gallery", "Leaderboard"])
-
-    with tab1:
-        st.subheader("Practice Intensity by Phase")
-        phase_avg = day_phase_df.groupby('Phase', sort=False)[['Total Jumps', 'Total Player Load']].mean().reset_index()
-        c1, c2 = st.columns(2)
-        with c1:
-            fig1 = px.bar(phase_avg, x="Phase", y="Total Jumps", title="Avg Jumps per Player", color_discrete_sequence=["#007AFF"], template="plotly_white")
-            fig1.update_layout(xaxis={'categoryorder':'trace'})
-            st.plotly_chart(fig1, use_container_width=True)
-        with c2:
-            fig2 = px.line(phase_avg, x="Phase", y="Total Player Load", title="Workload Trend", markers=True, color_discrete_sequence=["#FF9500"], template="plotly_white")
-            fig2.update_layout(xaxis={'categoryorder':'trace'})
-            st.plotly_chart(fig2, use_container_width=True)
 
     with tab2:
         selected_player = st.selectbox("Select Player Profile", day_df['Name'].unique())
@@ -147,20 +151,19 @@ try:
             st.markdown(f'<h2 style="text-align:center;">{p_data["Name"]}</h2>', unsafe_allow_html=True)
         
         with col_card:
-            rows = [{"Metric": display, "Current": int(round(p_data[internal], 0)), "Max": int(round(p_data[f'{internal}_Max'], 0)), "Grade": int(p_data[f'{internal}_Grade'])} for internal, display in grading_map.items()]
-            # st.table hides the index by default with our CSS hack
-            st.table(pd.DataFrame(rows))
+            card_rows = []
+            for internal, display in grading_map.items():
+                card_rows.append({
+                    "Metric": display,
+                    "Current": p_data[internal],
+                    "Max": p_data[f'{internal}_Max'],
+                    "Grade": p_data[f'{internal}_Grade']
+                })
+            # RENDER TABLE WITHOUT INDEX
+            st.markdown(render_custom_table(pd.DataFrame(card_rows), ["Metric", "Current", "Max", "Grade"]), unsafe_allow_html=True)
         
         with col_score:
             st.markdown(f'<div class="score-box-container"><div class="score-label">Practice Score</div><div class="score-box">{int(p_data["Practice Score"])}</div></div>', unsafe_allow_html=True)
-
-        st.divider()
-        
-        # --- NEW DATA: SEASON TREND ---
-        st.subheader(f"Session History: {selected_player}")
-        p_history = full_graded_df[full_graded_df['Name'] == selected_player].sort_values('Date').tail(5)
-        fig_trend = px.area(p_history, x="Date", y="Practice Score", title="Practice Score Trend (Last 5 Sessions)", color_discrete_sequence=["#007AFF"], template="plotly_white")
-        st.plotly_chart(fig_trend, use_container_width=True)
 
     with tab3:
         st.subheader("Full Roster Report Cards")
@@ -170,22 +173,21 @@ try:
                 if i + j < len(day_df):
                     p_data = day_df.iloc[i + j]
                     with cols[j]:
-                        st.markdown('<div class="card-wrapper">', unsafe_allow_html=True)
+                        st.markdown(f'<div style="border:1px solid #E5E5E7; padding:20px; border-radius:15px; margin-bottom:20px;">', unsafe_allow_html=True)
                         c_img, c_table, c_scr = st.columns([1, 2, 1])
                         with c_img:
                             st.markdown(f'<div class="img-container"><img src="{p_data["PhotoURL_Fixed"]}" class="player-photo-large" style="width:100px; height:100px;"></div>', unsafe_allow_html=True)
                             st.markdown(f'<p style="text-align:center; font-weight:bold;">{p_data["Name"]}</p>', unsafe_allow_html=True)
                         with c_table:
-                            rows = [{"Metric": display, "Current": int(round(p_data[internal], 0)), "Grade": int(p_data[f'{internal}_Grade'])} for internal, display in grading_map.items()]
-                            st.table(pd.DataFrame(rows))
+                            card_rows = [{"Metric": grading_map[k], "Current": p_data[k], "Grade": p_data[f'{k}_Grade']} for k in grading_map.keys()]
+                            st.markdown(render_custom_table(pd.DataFrame(card_rows), ["Metric", "Current", "Grade"]), unsafe_allow_html=True)
                         with c_scr:
-                            st.markdown(f'<div class="score-box-container"><div class="score-label" style="font-size:12px;">Score</div><div class="score-box" style="font-size:24px; padding:10px 20px;">{int(p_data["Practice Score"])}</div></div>', unsafe_allow_html=True)
+                            st.markdown(f'<div class="score-box-container"><div class="score-box" style="font-size:24px; padding:15px 30px;">{int(p_data["Practice Score"])}</div></div>', unsafe_allow_html=True)
                         st.markdown('</div>', unsafe_allow_html=True)
 
     with tab4:
         st.subheader("Leaderboard")
-        # hide_index removes the numbers on the left for the leaderboard
-        st.dataframe(day_df[['Name', 'Total Jumps', 'Total Player Load', 'Practice Score']].astype(int, errors='ignore').sort_values('Practice Score', ascending=False), use_container_width=True, hide_index=True)
+        st.dataframe(day_df[['Name', 'Total Jumps', 'Total Player Load', 'Practice Score']].astype(int, errors='ignore'), use_container_width=True, hide_index=True)
 
 except Exception as e:
     st.error(f"Sync Error: {e}")
