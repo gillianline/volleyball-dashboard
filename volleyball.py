@@ -7,12 +7,12 @@ import math
 # --- PAGE CONFIG ---
 st.set_page_config(page_title="Performance Lab", layout="wide")
 
-# --- CSS: CLEAN UI & GAP REMOVAL ---
+# --- CSS: TENNESSEE STYLE & UI CLEANUP ---
 st.markdown("""
     <style>
     .stApp { background-color: #FFFFFF; color: #1D1D1F; }
     
-    /* REMOVE ALL HORIZONTAL BARS AND SPACING GAPS */
+    /* HIDE THE SPACING BAR & EXCESS GAPS */
     hr { display: none !important; }
     [data-testid="stVerticalBlock"] > div:empty { display: none !important; }
     .st-emotion-cache-16idsys p { margin-bottom: 0px; }
@@ -27,7 +27,7 @@ st.markdown("""
     .player-photo-large { border-radius: 50%; width: 220px; height: 220px; object-fit: cover; border: 6px solid #FF8200; }
     .gallery-photo { border-radius: 50%; width: 90px; height: 90px; object-fit: cover; border: 4px solid #FF8200; }
     .score-box { padding: 15px 30px; border-radius: 12px; font-size: 36px; font-weight: 800; text-align: center; color: #1D1D1F; }
-    .gallery-card { border: 1px solid #E5E5E7; padding: 12px; border-radius: 15px; background-color: #FFFFFF; margin-bottom: 5px; }
+    .gallery-card { border: 1px solid #E5E5E7; padding: 12px; border-radius: 15px; background-color: #FFFFFF; margin-bottom: 8px; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -61,14 +61,14 @@ try:
     c_main, c_toggle, c_comp = st.columns([2, 1, 2])
     
     with c_main:
-        date_a_str = st.selectbox("Current Practice", date_options, index=0, key="date_a_final")
+        date_a_str = st.selectbox("Current Practice", date_options, index=0, key="main_date")
     with c_toggle:
-        compare_on = st.checkbox("Compare Session", value=False, key="do_compare_final")
+        compare_on = st.checkbox("Compare Session", value=False, key="compare_mode_active")
     
     date_b_str = "None"
     if compare_on:
         with c_comp:
-            date_b_str = st.selectbox("Select Comparison Date", [d for d in date_options if d != date_a_str], index=0, key="date_b_final")
+            date_b_str = st.selectbox("Select Comparison Date", [d for d in date_options if d != date_a_str], index=0, key="comp_date_final")
 
     date_a = pd.to_datetime(date_a_str)
     day_df = df[df['Date'] == date_a].copy()
@@ -115,15 +115,30 @@ try:
     t_flow, t_player, t_gallery, t_comp = st.tabs(["Session Flow", "Individual Profile", "Team Gallery", "Team Comparison"])
 
     with t_flow:
+        st.subheader(f"Intensity Breakdown: {date_a_str}")
         day_phase_df = phase_df[phase_df['Date'] == date_a].copy()
         if not day_phase_df.empty:
-            phase_stats = day_phase_df.groupby('Phase', sort=False)[['Total Jumps', 'Total Player Load', 'High Intensity Movement']].mean().fillna(0).reset_index()
-            st.markdown(render_table(phase_stats, ['Phase', 'Total Jumps', 'Total Player Load', 'High Intensity Movement']), unsafe_allow_html=True)
+            phase_stats = day_phase_df.groupby('Phase', sort=False).agg({
+                'Total Player Load': 'mean',
+                'Explosive Efforts': 'mean',
+                'Total Jumps': 'mean'
+            }).reset_index()
+
+            fig_flow = px.bar(phase_stats, x='Phase', y='Total Player Load', color='Explosive Efforts',
+                              title="Drill Workload (Color = Explosiveness)", color_continuous_scale='Oranges')
+            fig_flow.update_layout(height=350, margin=dict(l=40, r=40, t=60, b=40))
+            st.plotly_chart(fig_flow, use_container_width=True)
+
+            st.markdown(render_table(phase_stats, ['Phase', 'Total Player Load', 'Explosive Efforts', 'Total Jumps']), unsafe_allow_html=True)
+            
+            c1, c2 = st.columns(2)
+            c1.metric("Highest Workload", phase_stats.loc[phase_stats['Total Player Load'].idxmax()]['Phase'])
+            c2.metric("Most Explosive", phase_stats.loc[phase_stats['Explosive Efforts'].idxmax()]['Phase'])
         else:
             st.warning("No drill data found.")
 
     with t_player:
-        selected_player = st.selectbox("Select Athlete", day_df['Name'].unique(), key="player_card_final_sel")
+        selected_player = st.selectbox("Select Athlete", day_df['Name'].unique(), key="player_selector")
         p_data = day_df[day_df['Name'] == selected_player].iloc[0]
         
         c1, c2, c3 = st.columns([1.2, 2.5, 1.2])
@@ -156,26 +171,16 @@ try:
             fig_radar = go.Figure()
             fig_radar.add_trace(go.Scatterpolar(r=r_vals, theta=radar_m, fill='toself', name=selected_player, line_color='#FF8200'))
             fig_radar.add_trace(go.Scatterpolar(r=t_vals, theta=radar_m, fill='toself', name='Team Avg', line_color='#1D1D1F', opacity=0.3))
-            
-            # UPDATED: LARGER PADDING ALL AROUND (L/R/T/B) TO PREVENT ALL CLIPPING
-            fig_radar.update_layout(
-                polar=dict(
-                    radialaxis=dict(visible=True, range=[0, 100], tickfont=dict(size=10)),
-                    angularaxis=dict(tickfont=dict(size=11))
-                ),
-                title=dict(text="Physical Profile", y=0.98),
-                height=380,
-                margin=dict(l=90, r=90, t=60, b=60), # Expanded Top (t) and Bottom (b)
-                showlegend=True,
-                legend=dict(orientation="h", yanchor="bottom", y=1.05, xanchor="center", x=0.5)
-            )
+            fig_radar.update_layout(polar=dict(radialaxis=dict(visible=True, range=[0, 100])), title="Physical Profile", 
+                                    height=380, margin=dict(l=90, r=90, t=70, b=70), showlegend=True,
+                                    legend=dict(orientation="h", yanchor="bottom", y=1.05, xanchor="center", x=0.5))
             st.plotly_chart(fig_radar, use_container_width=True)
         with g2:
-            hist_m = st.selectbox("Metric Trend", grading_metrics, key="trend_final_final")
+            hist_m = st.selectbox("Historical Progress", grading_metrics, key="history_sel")
             p_hist = df[df['Name'] == selected_player].sort_values('Date')
             fig_line = px.line(p_hist, x='Date', y=hist_m, markers=True, title=f"{hist_m} History")
             fig_line.update_traces(line_color='#FF8200')
-            fig_line.update_layout(height=380, margin=dict(t=60, b=60, l=30, r=30))
+            fig_line.update_layout(height=380, margin=dict(t=70, b=70, l=40, r=40))
             st.plotly_chart(fig_line, use_container_width=True)
 
     with t_gallery:
@@ -198,7 +203,7 @@ try:
 
     with t_comp:
         if not compare_on or date_b_str == "None":
-            st.info("Select a Comparison Date above.")
+            st.info("Enable Comparison above.")
         else:
             date_b = pd.to_datetime(date_b_str)
             df_b = df[df['Date'] == date_b].copy()
