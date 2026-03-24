@@ -1,84 +1,113 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
+import plotly.graph_objects as go
 
 # --- PAGE CONFIG ---
-st.set_page_config(page_title="Volleyball Performance Lab", layout="wide")
+st.set_page_config(page_title="VB Performance Lab", layout="wide", initial_sidebar_state="collapsed")
 
-# --- 1. SECURITY BARRIER ---
-def check_password():
-    if "password_correct" not in st.session_state:
-        st.title("🏐 Coach Login")
-        pwd = st.text_input("Enter Access Key:", type="password")
-        if st.button("Unlock Dashboard"):
-            if pwd == st.secrets["COACH_PWD"]:
-                st.session_state["password_correct"] = True
-                st.rerun()
-            else:
-                st.error("Incorrect password")
-        return False
-    return True
+# Custom CSS for a "Pro" Look
+st.markdown("""
+    <style>
+    .main { background-color: #0e1117; }
+    div[data-testid="stMetricValue"] { font-size: 1.8rem; color: #00d4ff; }
+    label[data-testid="stMetricLabel"] { font-size: 1rem; }
+    </style>
+    """, unsafe_allow_state_set=True)
 
-if check_password():
-    # --- 2. DATA CONNECTION ---
-    SHEET_URL = st.secrets["GOOGLE_SHEET_URL"]
+# --- 1. SECURITY ---
+if "password_correct" not in st.session_state:
+    st.title("Coach Secure Access")
+    pwd = st.text_input("Access Key:", type="password")
+    if st.button("Unlock"):
+        if pwd == st.secrets["COACH_PWD"]:
+            st.session_state["password_correct"] = True
+            st.rerun()
+        else:
+            st.error("Denied")
+    st.stop()
 
-    @st.cache_data(ttl=300) 
-    def load_data():
-        data = pd.read_csv(SHEET_URL)
-        # Clean up any weird spaces in headers
-        data.columns = data.columns.str.strip()
-        return data
+# --- 2. DATA ---
+@st.cache_data(ttl=300)
+def load_data():
+    df = pd.read_csv(st.secrets["GOOGLE_SHEET_URL"])
+    df.columns = df.columns.str.strip()
+    return df
 
-    try:
-        df = load_data()
-        
-        st.title("🏐 Volleyball Performance Dashboard")
-        
-        # --- 3. DASHBOARD UI ---
-        # Using 'Name' instead of 'Player' based on your error message
-        all_dates = df['Date'].unique()
-        selected_date = st.sidebar.selectbox("Select Session Date", all_dates)
-        day_df = df[df['Date'] == selected_date]
+df = load_data()
+all_dates = df['Date'].unique()
+selected_date = st.sidebar.selectbox("Practice Date", all_dates)
+day_df = df[df['Date'] == selected_date].sort_values('Total Jumps', ascending=False)
 
-        # Top Metrics
-        m1, m2, m3, m4 = st.columns(4)
-        m1.metric("Total Jumps", int(day_df['Total Jumps'].sum()))
-        m2.metric("Avg Player Load", round(day_df['Total Player Load'].mean(), 1))
-        m3.metric("Explosive Efforts", int(day_df['Explosive Efforts'].sum()))
-        m4.metric("High Intensity Mov.", int(day_df['High Intensity Movement'].sum()))
+# --- 3. THE "PRACTICE AT A GLANCE" SECTION ---
+st.title(f"Practice Report: {selected_date}")
 
-        st.divider()
+# Instead of team totals, let's show the "High Load" outliers
+col1, col2, col3 = st.columns(3)
 
-        # Tabs for different views
-        tab1, tab2 = st.tabs(["Daily Session View", "Season Comparison"])
+with col1:
+    top_jumper = day_df.iloc[0]
+    st.metric("Highest Jump Volume", top_jumper['Name'], f"{int(top_jumper['Total Jumps'])} Jumps")
 
-        with tab1:
-            st.subheader(f"Intensity Profile for {selected_date}")
-            # Updated x="Name" to match your Google Sheet
-            fig_jumps = px.bar(
-                day_df, x="Name", 
-                y=["IMA Jump Count Low Band", "IMA Jump Count Med Band", "IMA Jump Count High Band"],
-                barmode="stack",
-                color_discrete_map={
-                    "IMA Jump Count High Band": "#e63946", 
-                    "IMA Jump Count Med Band": "#f4a261", 
-                    "IMA Jump Count Low Band": "#a8dadc"
-                }
-            )
-            # Remove the numbers next to names as you requested previously
-            fig_jumps.update_layout(yaxis_title="Jump Count", xaxis_title="")
-            st.plotly_chart(fig_jumps, use_container_width=True)
+with col2:
+    top_load = day_df.sort_values('Total Player Load', ascending=False).iloc[0]
+    st.metric("Highest Workload", top_load['Name'], f"{int(top_load['Total Player Load'])} Load")
 
-        with tab2:
-            st.subheader("Season Trends")
-            selected_player = st.selectbox("Select Player to Track", df['Name'].unique())
-            player_df = df[df['Name'] == selected_player].sort_values('Date')
-            
-            fig_trend = px.line(player_df, x='Date', y='Total Player Load', 
-                               title=f"Workload Trend: {selected_player}",
-                               markers=True)
-            st.plotly_chart(fig_trend, use_container_width=True)
+with col3:
+    # Identify someone who did a lot of high-intensity movement
+    top_intensity = day_df.sort_values('High Intensity Movement', ascending=False).iloc[0]
+    st.metric("Intensity Leader", top_intensity['Name'], f"{int(top_intensity['High Intensity Movement'])} Efforts")
 
-    except Exception as e:
-        st.error(f"Error: {e}")
+st.divider()
+
+# --- 4. THE VISUALS ---
+left_chart, right_chart = st.columns([2, 1])
+
+with left_chart:
+    st.subheader("Jump Distribution (Intensity Bands)")
+    # Stacked bar but cleaner
+    fig_jumps = px.bar(
+        day_df, x="Name", 
+        y=["IMA Jump Count Low Band", "IMA Jump Count Med Band", "IMA Jump Count High Band"],
+        barmode="stack",
+        color_discrete_map={
+            "IMA Jump Count High Band": "#FF4B4B", # Danger/High
+            "IMA Jump Count Med Band": "#FFAA00",  # Warning/Med
+            "IMA Jump Count Low Band": "#00D4FF"   # Safe/Low
+        },
+        template="plotly_dark"
+    )
+    fig_jumps.update_layout(
+        showlegend=True, 
+        legend_title="",
+        xaxis_title=None,
+        yaxis_title="Total Jumps",
+        margin=dict(l=20, r=20, t=30, b=20)
+    )
+    st.plotly_chart(fig_jumps, use_container_width=True)
+
+with right_chart:
+    st.subheader("Workload Balance")
+    # A Radar or Scatter showing who is working hardest vs jumping most
+    fig_balance = px.scatter(
+        day_df, x="Total Jumps", y="Total Player Load",
+        color="Explosive Efforts",
+        size="High Intensity Movement",
+        hover_name="Name",
+        text="Name",
+        template="plotly_dark"
+    )
+    fig_balance.update_traces(textposition='top center')
+    st.plotly_chart(fig_balance, use_container_width=True)
+
+st.divider()
+
+# --- 5. THE DATA TABLE ---
+st.subheader("Individual Practice Breakdown")
+# Create a cleaner table for the coach to scroll through
+display_columns = ['Name', 'Total Jumps', 'IMA Jump Count High Band', 'Total Player Load', 'Explosive Efforts', 'BMP Total Basketball Load']
+st.dataframe(
+    day_df[display_columns].style.background_gradient(subset=['Total Player Load', 'IMA Jump Count High Band'], cmap='Reds'),
+    use_container_width=True,
+    hide_index=True
+)
