@@ -5,15 +5,14 @@ import plotly.express as px
 # --- PAGE CONFIG ---
 st.set_page_config(page_title="Performance Lab", layout="wide")
 
-# Sleek White Styling with centered tables and "Practice Score" box
+# Sleek White Styling
 st.markdown("""
     <style>
     .stApp { background-color: #FFFFFF; color: #1D1D1F; }
-    [data-testid="stMetricValue"] { font-size: 1.8rem; color: #007AFF; font-weight: 700; }
     
     /* Centering Table Text */
     [data-testid="stDataTable"] th { text-align: center !important; background-color: #F5F5F7 !important; border-bottom: 2px solid #E5E5E7 !important; }
-    [data-testid="stDataTable"] td { text-align: center !important; border-bottom: 1px solid #F5F5F7 !important; }
+    [data-testid="stDataTable"] td { text-align: center !important; }
 
     /* Practice Score Box Styling */
     .practice-score-container {
@@ -22,15 +21,18 @@ st.markdown("""
         align-items: center;
         justify-content: center;
         height: 100%;
-        padding-top: 40px;
+        padding: 40px;
+        border: 1px solid #E5E5E7;
+        border-radius: 12px;
+        background-color: #FBFBFD;
     }
-    .score-label { font-size: 24px; font-weight: bold; margin-bottom: 10px; }
+    .score-label { font-size: 22px; font-weight: 700; margin-bottom: 10px; color: #1D1D1F; }
     .score-box {
         background-color: #F2994A;
         color: white;
-        padding: 30px 60px;
-        border-radius: 12px;
-        font-size: 48px;
+        padding: 20px 50px;
+        border-radius: 10px;
+        font-size: 42px;
         font-weight: 800;
     }
     </style>
@@ -70,16 +72,8 @@ try:
     day_df = df[df['Date'] == sel_date_dt].copy()
     day_phase_df = phase_df[phase_df['Date'] == sel_date_dt].copy()
 
-    # --- 3. THE SCORING LOGIC ---
-    # These are the specific columns from your screenshot
-    grading_metrics = [
-        'Total Jumps', 'IMA Jump Count Med Band', 'IMA Jump Count High Band', 
-        'BMP Jumping Load', 'Total Player Load', 'Estimated Distance (y)', 
-        'Explosive Efforts', 'High Intensity Movement'
-    ]
-    
-    # Map the internal names to the "Pretty Names" for the coach's card
-    pretty_names = {
+    # --- 3. THE SCORING LOGIC (Sheet 1) ---
+    grading_map = {
         'Total Jumps': 'Total Jumps',
         'IMA Jump Count Med Band': 'Moderate Jumps',
         'IMA Jump Count High Band': 'High Jumps',
@@ -90,20 +84,23 @@ try:
         'High Intensity Movement': 'High Intensity Movements'
     }
 
-    # Calculate Maxes and Individual Grades
     grade_cols = []
-    for metric in grading_metrics:
-        if metric in day_df.columns:
-            max_val = day_df[metric].max()
-            day_df[f'{metric}_Max'] = max_val
+    for internal_name, display_name in grading_map.items():
+        if internal_name in day_df.columns:
+            max_val = day_df[internal_name].max()
+            avg_val = day_df[internal_name].mean()
+            
+            day_df[f'{internal_name}_Max'] = max_val
+            day_df[f'{internal_name}_Avg'] = avg_val
+            
             # Grade = Roundup(Current / Max * 100)
             if max_val > 0:
-                day_df[f'{metric}_Grade'] = (day_df[metric] / max_val * 100).apply(lambda x: int(-(-x // 1)))
+                day_df[f'{internal_name}_Grade'] = (day_df[internal_name] / max_val * 100).apply(lambda x: int(-(-x // 1)))
             else:
-                day_df[f'{metric}_Grade'] = 0
-            grade_cols.append(f'{metric}_Grade')
+                day_df[f'{internal_name}_Grade'] = 0
+            grade_cols.append(f'{internal_name}_Grade')
 
-    # Practice Score = Average of all grades
+    # Final Practice Score
     day_df['Practice Score'] = day_df[grade_cols].mean(axis=1).round(0).astype(int)
 
     # --- 4. TABS ---
@@ -111,7 +108,6 @@ try:
 
     with tab1:
         st.subheader("Practice Intensity by Phase")
-        # Ensure Phase order from Google Sheet is respected
         phase_avg = day_phase_df.groupby('Phase', sort=False)[['Total Jumps', 'Total Player Load']].mean().reset_index()
         
         c1, c2 = st.columns(2)
@@ -128,24 +124,24 @@ try:
         selected_player = st.selectbox("Select Player", day_df['Name'].unique())
         p_data = day_df[day_df['Name'] == selected_player].iloc[0]
 
-        # Build the exact table from your screenshot
-        card_data = []
-        for m in grading_metrics:
-            if m in day_df.columns:
-                card_data.append({
-                    " ": pretty_names[m],
-                    "Current": int(p_data[m]) if 'Distance' not in m and 'Load' not in m else round(p_data[m], 1),
-                    "Max": int(p_data[f'{m}_Max']) if 'Distance' not in m and 'Load' not in m else round(p_data[f'{m}_Max'], 1),
-                    "Grade": int(p_data[f'{m}_Grade'])
+        # Build Card Table
+        card_rows = []
+        for internal, display in grading_map.items():
+            if internal in day_df.columns:
+                current = p_data[internal]
+                is_decimal = 'Distance' in display or 'Load' in display
+                
+                card_rows.append({
+                    "Metric": display,
+                    "Current": round(current, 1) if is_decimal else int(current),
+                    "Team Avg": round(p_data[f'{internal}_Avg'], 1) if is_decimal else int(p_data[f'{internal}_Avg']),
+                    "Max": round(p_data[f'{internal}_Max'], 1) if is_decimal else int(p_data[f'{internal}_Max']),
+                    "Grade": int(p_data[f'{internal}_Grade'])
                 })
         
-        card_df = pd.DataFrame(card_data)
-
-        col_card, col_score = st.columns([2, 1])
-        
-        with col_card:
-            st.dataframe(card_df, use_container_width=True, hide_index=True)
-            
+        col_table, col_score = st.columns([2, 1])
+        with col_table:
+            st.dataframe(pd.DataFrame(card_rows), use_container_width=True, hide_index=True)
         with col_score:
             st.markdown(f"""
                 <div class="practice-score-container">
