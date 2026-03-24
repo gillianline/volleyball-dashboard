@@ -3,20 +3,20 @@ import pandas as pd
 import plotly.express as px
 
 # --- PAGE CONFIG ---
-st.set_page_config(page_title="Performance Lab", layout="wide")
+st.set_page_config(page_title="VB Performance Lab", layout="wide")
 
 # Sleek White Styling
 st.markdown("""
     <style>
     .stApp { background-color: #FFFFFF; color: #1D1D1F; }
     div[data-testid="stMetricValue"] { font-size: 1.8rem; color: #007AFF; font-weight: 600; }
-    .stTable { border-radius: 10px; }
+    .stHeader { color: #1D1D1F; }
     </style>
     """, unsafe_allow_html=True)
 
 # --- 1. SECURITY ---
 if "password_correct" not in st.session_state:
-    st.title("🔒 Access Restricted")
+    st.title("🔒 Coach Secure Access")
     pwd = st.text_input("Enter Access Key:", type="password")
     if st.button("Unlock Dashboard"):
         if pwd == st.secrets["COACH_PWD"]:
@@ -26,71 +26,96 @@ if "password_correct" not in st.session_state:
             st.error("Invalid Key")
     st.stop()
 
-# --- 2. DATA LOADING & SORTING ---
+# --- 2. DATA LOADING ---
 @st.cache_data(ttl=300)
-def load_data():
+def load_all_data():
+    # Load Main Totals (Sheet 1)
     df = pd.read_csv(st.secrets["GOOGLE_SHEET_URL"])
-    df.columns = df.columns.str.strip()
-    # Ensure Date is actually a datetime object for sorting
     df['Date'] = pd.to_datetime(df['Date'])
-    return df
+    
+    # Load Phase Breakdown (Sheet 2)
+    phase_df = pd.read_csv(st.secrets["PHASE_SHEET_URL"])
+    phase_df['Date'] = pd.to_datetime(phase_df['Date'])
+    
+    return df, phase_df
 
 try:
-    df = load_data()
+    df, phase_df = load_all_data()
     
-    # Sort dates so the sidebar is always in order
+    # Sort dates for sidebar - ensuring chronological order
     sorted_dates = sorted(df['Date'].unique())
-    # Convert back to string for the selector display
     date_options = [d.strftime('%m/%d/%Y') for d in sorted_dates]
     
     st.sidebar.header("Session Filter")
-    selected_date_str = st.sidebar.selectbox("Select Date", date_options, index=len(date_options)-1)
+    selected_date_str = st.sidebar.selectbox("Select Practice Date", date_options, index=len(date_options)-1)
+    sel_date_dt = pd.to_datetime(selected_date_str)
     
-    # Filter data for the selected day
-    day_df = df[df['Date'] == pd.to_datetime(selected_date_str)].sort_values('Total Jumps', ascending=False)
+    # Filter both datasets for the day
+    day_df = df[df['Date'] == sel_date_dt].sort_values('Total Jumps', ascending=False)
+    day_phase_df = phase_df[phase_df['Date'] == sel_date_dt]
 
-    # --- 3. CLEAN DASHBOARD UI ---
-    st.title(f"Volleyball Session Report")
-    st.caption(f"Analysis for {selected_date_str}")
+    st.title(f"Volleyball Practice Analysis")
+    st.caption(f"Session data for {selected_date_str}")
 
-    # Top Performer Row (Clean metrics)
-    m1, m2, m3 = st.columns(3)
-    m1.metric("Jump Leader", day_df.iloc[0]['Name'], f"{int(day_df.iloc[0]['Total Jumps'])}")
+    # --- 3. DRILL / PHASE OVERVIEW ---
+    st.subheader("Practice Phase Volume")
     
-    highest_load = day_df.sort_values('Total Player Load', ascending=False).iloc[0]
-    m2.metric("Workload Leader", highest_load['Name'], f"{int(highest_load['Total Player Load'])}")
+    # Aggregate data by PhaseName
+    phase_summary = day_phase_df.groupby('PhaseName')[['Total Jumps', 'Explosive Efforts']].sum().reset_index()
     
-    highest_int = day_df.sort_values('High Intensity Movement', ascending=False).iloc[0]
-    m3.metric("Intensity Leader", highest_int['Name'], f"{int(highest_int['High Intensity Movement'])}")
+    col_left, col_right = st.columns(2)
+    
+    with col_left:
+        fig_phase_j = px.bar(
+            phase_summary, x="PhaseName", y="Total Jumps",
+            title="Total Jumps per Drill",
+            color_discrete_sequence=["#007AFF"],
+            template="plotly_white"
+        )
+        fig_phase_j.update_layout(xaxis_title=None, yaxis_title="Jumps")
+        st.plotly_chart(fig_phase_j, use_container_width=True)
+        
+    with col_right:
+        fig_phase_e = px.bar(
+            phase_summary, x="PhaseName", y="Explosive Efforts",
+            title="Explosive Efforts per Drill",
+            color_discrete_sequence=["#5856D6"],
+            template="plotly_white"
+        )
+        fig_phase_e.update_layout(xaxis_title=None, yaxis_title="Efforts")
+        st.plotly_chart(fig_phase_e, use_container_width=True)
 
     st.divider()
 
-    # --- 4. THE JUMP GRAPH ---
-    st.subheader("Jump Intensity Breakdown")
-    fig_jumps = px.bar(
-        day_df, x="Name", 
+    # --- 4. PLAYER-SPECIFIC DRILL MIX ---
+    st.subheader("Individual Drill Breakdown")
+    player_list = day_df['Name'].unique()
+    selected_player = st.selectbox("Select a Player to analyze their drill mix", player_list)
+    
+    player_phase = day_phase_df[day_phase_df['Name'] == selected_player]
+    
+    fig_player_mix = px.bar(
+        player_phase, x="PhaseName", 
         y=["IMA Jump Count Low Band", "IMA Jump Count Med Band", "IMA Jump Count High Band"],
+        title=f"Jump Intensity Mix by Drill: {selected_player}",
         barmode="stack",
         color_discrete_map={
-            "IMA Jump Count High Band": "#FF3B30", # Clean Apple Red
-            "IMA Jump Count Med Band": "#FF9500", # Clean Apple Orange
-            "IMA Jump Count Low Band": "#007AFF"  # Clean Apple Blue
+            "IMA Jump Count High Band": "#FF3B30", 
+            "IMA Jump Count Med Band": "#FF9500", 
+            "IMA Jump Count Low Band": "#007AFF"
         },
         template="plotly_white"
     )
-    fig_jumps.update_layout(
-        xaxis_title=None, 
-        yaxis_title="Jumps",
-        legend_title=None,
-        margin=dict(l=0, r=0, t=20, b=0)
-    )
-    st.plotly_chart(fig_jumps, use_container_width=True)
+    fig_player_mix.update_layout(xaxis_title=None, yaxis_title="Jump Intensity Count", legend_title=None)
+    st.plotly_chart(fig_player_mix, use_container_width=True)
 
-    # --- 5. SIMPLE DATA TABLE ---
-    st.subheader("Individual Performance Data")
-    # Using a simple dataframe to avoid the matplotlib gradient error
+    st.divider()
+
+    # --- 5. DATA TABLE ---
+    st.subheader("Daily Session Totals")
     cols = ['Name', 'Total Jumps', 'IMA Jump Count High Band', 'Total Player Load', 'Explosive Efforts']
     st.dataframe(day_df[cols], use_container_width=True, hide_index=True)
 
 except Exception as e:
-    st.error(f"Issue connecting to data: {e}")
+    st.error("Connecting to Google Sheets...")
+    st.info("If this persists, verify your Secret URLs end with '/export?format=csv&gid=...'")
