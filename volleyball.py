@@ -5,34 +5,33 @@ import plotly.express as px
 # --- PAGE CONFIG ---
 st.set_page_config(page_title="Performance Lab", layout="wide")
 
-# Sleek White Styling with Centered Tables and Card UI
+# Sleek White Styling with centered tables and "Practice Score" box
 st.markdown("""
     <style>
     .stApp { background-color: #FFFFFF; color: #1D1D1F; }
     [data-testid="stMetricValue"] { font-size: 1.8rem; color: #007AFF; font-weight: 700; }
-    .stTabs [data-baseweb="tab-list"] { gap: 24px; }
-    .stTabs [data-baseweb="tab"] { height: 50px; background-color: #F5F5F7; border-radius: 10px; padding: 10px 20px; }
-    .stTabs [aria-selected="true"] { background-color: #007AFF; color: white; }
     
     /* Centering Table Text */
-    [data-testid="stDataTable"] th { text-align: center !important; background-color: #F5F5F7 !important; }
-    [data-testid="stDataTable"] td { text-align: center !important; }
+    [data-testid="stDataTable"] th { text-align: center !important; background-color: #F5F5F7 !important; border-bottom: 2px solid #E5E5E7 !important; }
+    [data-testid="stDataTable"] td { text-align: center !important; border-bottom: 1px solid #F5F5F7 !important; }
 
-    /* Custom Grade Card Styling */
-    .grade-card {
-        padding: 20px;
-        border: 1px solid #E5E5E7;
-        border-radius: 12px;
-        background-color: #FBFBFD;
+    /* Practice Score Box Styling */
+    .practice-score-container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        height: 100%;
+        padding-top: 40px;
     }
-    .practice-score-box {
+    .score-label { font-size: 24px; font-weight: bold; margin-bottom: 10px; }
+    .score-box {
         background-color: #F2994A;
         color: white;
-        padding: 15px;
-        border-radius: 8px;
-        text-align: center;
-        font-size: 24px;
-        font-weight: bold;
+        padding: 30px 60px;
+        border-radius: 12px;
+        font-size: 48px;
+        font-weight: 800;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -71,31 +70,49 @@ try:
     day_df = df[df['Date'] == sel_date_dt].copy()
     day_phase_df = phase_df[phase_df['Date'] == sel_date_dt].copy()
 
-    # --- 3. CALCULATE GRADES (ALL COLUMNS) ---
-    # Identifying all numeric columns except Week, Day, and Year-related ones
-    exclude_cols = ['Week', 'Day', 'Date', 'Name']
-    numeric_cols = [c for c in day_df.columns if c not in exclude_cols and day_df[c].dtype in ['int64', 'float64']]
+    # --- 3. THE SCORING LOGIC ---
+    # These are the specific columns from your screenshot
+    grading_metrics = [
+        'Total Jumps', 'IMA Jump Count Med Band', 'IMA Jump Count High Band', 
+        'BMP Jumping Load', 'Total Player Load', 'Estimated Distance (y)', 
+        'Explosive Efforts', 'High Intensity Movement'
+    ]
     
-    grade_data = []
-    for col in numeric_cols:
-        max_val = day_df[col].max()
-        day_df[f'{col} Max'] = max_val
-        if max_val > 0:
-            day_df[f'{col} Grade'] = (day_df[col] / max_val * 100).round(0)
-        else:
-            day_df[f'{col} Grade'] = 0
+    # Map the internal names to the "Pretty Names" for the coach's card
+    pretty_names = {
+        'Total Jumps': 'Total Jumps',
+        'IMA Jump Count Med Band': 'Moderate Jumps',
+        'IMA Jump Count High Band': 'High Jumps',
+        'BMP Jumping Load': 'Jump Load',
+        'Total Player Load': 'Player Load',
+        'Estimated Distance (y)': 'Estimated Distance',
+        'Explosive Efforts': 'Explosive Efforts',
+        'High Intensity Movement': 'High Intensity Movements'
+    }
 
-    grade_col_names = [f'{c} Grade' for c in numeric_cols]
-    day_df['Practice Score'] = day_df[grade_col_names].mean(axis=1).round(0)
+    # Calculate Maxes and Individual Grades
+    grade_cols = []
+    for metric in grading_metrics:
+        if metric in day_df.columns:
+            max_val = day_df[metric].max()
+            day_df[f'{metric}_Max'] = max_val
+            # Grade = Roundup(Current / Max * 100)
+            if max_val > 0:
+                day_df[f'{metric}_Grade'] = (day_df[metric] / max_val * 100).apply(lambda x: int(-(-x // 1)))
+            else:
+                day_df[f'{metric}_Grade'] = 0
+            grade_cols.append(f'{metric}_Grade')
 
-    st.title(f"Performance Analysis: {selected_date_str}")
-    
-    tab1, tab2, tab3 = st.tabs(["Session Flow", "Player Deep Dive", "Data Leaderboard"])
+    # Practice Score = Average of all grades
+    day_df['Practice Score'] = day_df[grade_cols].mean(axis=1).round(0).astype(int)
+
+    # --- 4. TABS ---
+    tab1, tab2, tab3 = st.tabs(["Session Flow", "Player Profile", "Leaderboard"])
 
     with tab1:
         st.subheader("Practice Intensity by Phase")
-        phase_cols = ['Phase', 'Total Jumps', 'Total Player Load', 'Explosive Efforts']
-        phase_avg = day_phase_df[phase_cols].groupby('Phase', sort=False).mean().reset_index().round(0)
+        # Ensure Phase order from Google Sheet is respected
+        phase_avg = day_phase_df.groupby('Phase', sort=False)[['Total Jumps', 'Total Player Load']].mean().reset_index()
         
         c1, c2 = st.columns(2)
         with c1:
@@ -108,44 +125,40 @@ try:
             st.plotly_chart(fig2, use_container_width=True)
 
     with tab2:
-        st.subheader("Player Profile Grade Card")
         selected_player = st.selectbox("Select Player", day_df['Name'].unique())
         p_data = day_df[day_df['Name'] == selected_player].iloc[0]
 
-        # Constructing the Grade Card Table like your screenshot
-        card_rows = []
-        for col in numeric_cols:
-            card_rows.append({
-                "Metric": col,
-                "Current": p_data[col],
-                "Max": p_data[f'{col} Max'],
-                "Grade": int(p_data[f'{col} Grade'])
-            })
+        # Build the exact table from your screenshot
+        card_data = []
+        for m in grading_metrics:
+            if m in day_df.columns:
+                card_data.append({
+                    " ": pretty_names[m],
+                    "Current": int(p_data[m]) if 'Distance' not in m and 'Load' not in m else round(p_data[m], 1),
+                    "Max": int(p_data[f'{m}_Max']) if 'Distance' not in m and 'Load' not in m else round(p_data[f'{m}_Max'], 1),
+                    "Grade": int(p_data[f'{m}_Grade'])
+                })
         
-        grade_card_df = pd.DataFrame(card_rows)
+        card_df = pd.DataFrame(card_data)
 
-        col_left, col_right = st.columns([2, 1])
+        col_card, col_score = st.columns([2, 1])
         
-        with col_left:
-            # Displaying the Card Table
-            st.dataframe(grade_card_df, use_container_width=True, hide_index=True)
+        with col_card:
+            st.dataframe(card_df, use_container_width=True, hide_index=True)
             
-        with col_right:
+        with col_score:
             st.markdown(f"""
-                <div style="text-align: center; padding-top: 50px;">
-                    <p style="font-size: 20px; color: #1D1D1F; margin-bottom: 5px;">Practice Score</p>
-                    <div class="practice-score-box">
-                        {int(p_data['Practice Score'])}
-                    </div>
+                <div class="practice-score-container">
+                    <div class="score-label">Practice Score</div>
+                    <div class="score-box">{p_data['Practice Score']}</div>
                 </div>
             """, unsafe_allow_html=True)
 
         st.divider()
-        # Drill Breakdown below the card
-        p_phase_df = day_phase_df[day_phase_df['Name'] == selected_player]
-        fig_p = px.bar(p_phase_df, x="Phase", y=["IMA Jump Count Low Band", "IMA Jump Count Med Band", "IMA Jump Count High Band"],
-                       title=f"Jump Intensity Mix: {selected_player}",
-                       barmode="group",
+        st.subheader("Phase Breakdown")
+        p_phase = day_phase_df[day_phase_df['Name'] == selected_player]
+        fig_p = px.bar(p_phase, x="Phase", y=["IMA Jump Count Low Band", "IMA Jump Count Med Band", "IMA Jump Count High Band"],
+                       title=f"Jump Intensity Mix: {selected_player}", barmode="group",
                        color_discrete_map={"IMA Jump Count High Band": "#FF3B30", "IMA Jump Count Med Band": "#FF9500", "IMA Jump Count Low Band": "#007AFF"},
                        template="plotly_white")
         fig_p.update_layout(xaxis={'categoryorder':'trace'}, xaxis_title=None, legend_title=None)
@@ -153,8 +166,7 @@ try:
 
     with tab3:
         st.subheader("Leaderboard")
-        display_cols = ['Name', 'Total Jumps', 'Total Player Load', 'Practice Score']
-        st.dataframe(day_df[display_cols].astype(int, errors='ignore'), use_container_width=True, hide_index=True)
+        st.dataframe(day_df[['Name', 'Total Jumps', 'Total Player Load', 'Practice Score']].sort_values('Practice Score', ascending=False), use_container_width=True, hide_index=True)
 
 except Exception as e:
     st.error(f"Sync Error: {e}")
