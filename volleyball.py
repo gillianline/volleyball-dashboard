@@ -9,7 +9,7 @@ from datetime import timedelta
 # --- PAGE CONFIG ---
 st.set_page_config(page_title="Performance Lab", layout="wide")
 
-# --- CSS: TENNESSEE STYLE ---
+# --- CSS: ORIGINAL TENNESSEE STYLE ---
 st.markdown("""
     <style>
     .stApp { background-color: #FFFFFF; color: #1D1D1F; }
@@ -119,9 +119,10 @@ try:
     if not day_df.empty:
         day_df = day_df.apply(process_player, axis=1).sort_values('Name')
 
-    tab1, tab2 = st.tabs(["Individual Profile", "Team Gallery"])
+    # FIX: Renamed tab variables to match 'with' statements below
+    t_player, t_gallery = st.tabs(["Individual Profile", "Team Gallery"])
 
-    with tab1:
+    with t_player:
         if not day_df.empty:
             sel_p = st.selectbox("Select Athlete", day_df['Name'].unique())
             p = day_df[day_df['Name'] == sel_p].iloc[0]
@@ -157,7 +158,7 @@ try:
                     
                     perc_diff = ((latest['Jump Height (in)'] - baseline) / baseline) * 100
                     
-                    # Logic for Status Label
+                    # Readiness Logic
                     if latest['Jump Height (in)'] >= baseline and latest['RSI-modified [m/s]'] >= rsi_baseline:
                         status_label, color = "READY", "#00CC96"
                     elif latest['Jump Height (in)'] >= baseline and latest['RSI-modified [m/s]'] < rsi_baseline:
