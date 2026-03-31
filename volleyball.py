@@ -9,7 +9,7 @@ from datetime import timedelta
 # --- PAGE CONFIG ---
 st.set_page_config(page_title="Performance Lab", layout="wide")
 
-# --- CSS: ORIGINAL TENNESSEE STYLE ---
+# --- CSS: TENNESSEE STYLE ---
 st.markdown("""
     <style>
     .stApp { background-color: #FFFFFF; color: #1D1D1F; }
@@ -32,6 +32,20 @@ st.markdown("""
     
     /* Section Headers */
     .section-header { font-size: 14px; font-weight: 800; color: #FF8200; border-bottom: 2px solid #FF8200; margin-top: 25px; margin-bottom: 15px; padding-bottom: 5px; text-transform: uppercase; }
+    
+    /* Gallery Card */
+    .gallery-card { 
+        border: 1px solid #E5E5E7; 
+        padding: 15px; 
+        border-radius: 15px; 
+        background-color: #FFFFFF; 
+        margin-bottom: 12px; 
+        min-height: 320px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+    }
+    .gallery-photo { border-radius: 50%; width: 110px; height: 110px; object-fit: cover; border: 5px solid #FF8200; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -114,7 +128,7 @@ try:
             p_cmj_history = cmj_df[cmj_df['Athlete'] == sel_p].sort_values('Test Date')
             sync_cmj = p_cmj_history[(p_cmj_history['Test Date'] <= current_practice_date) & (p_cmj_history['Test Date'] > current_practice_date - timedelta(days=7))]
 
-            # TOP ROW: GPS DATA
+            # TOP ROW: ORIGINAL GPS LAYOUT
             c1, c2, c3 = st.columns([1.2, 2.5, 1.2])
             with c1:
                 st.markdown(f'<div style="text-align:center;"><img src="{p["PhotoURL"]}" class="player-photo-large"></div>', unsafe_allow_html=True)
@@ -132,7 +146,7 @@ try:
                 </div>
                 """, unsafe_allow_html=True)
 
-            # BOTTOM ROW: JUMP DATA
+            # BOTTOM ROW: JUMP DATA (Vertical Stack)
             st.markdown('<div class="section-header">Weekly Jump Readiness & History</div>', unsafe_allow_html=True)
             jc1, jc2 = st.columns([1.5, 3.5])
             with jc1:
@@ -173,5 +187,29 @@ try:
                     fig.update_layout(height=250, margin=dict(l=0, r=0, t=20, b=0), legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
                     st.plotly_chart(fig, use_container_width=True)
 
+    with t_gallery:
+        if not day_df.empty:
+            for i in range(0, len(day_df), 2):
+                cols = st.columns(2)
+                for j in range(2):
+                    if i + j < len(day_df):
+                        p_d = day_df.iloc[i + j]
+                        rows_html = "".join([f"<tr><td>{k}</td><td>{p_d[k]}</td><td>{int(p_d[f'{k}_Grade'])}</td></tr>" for k in all_metrics])
+                        with cols[j]:
+                            st.markdown(f"""
+                            <div class="gallery-card">
+                                <div style="display: flex; align-items: center; gap: 10px;">
+                                    <div style="flex: 1.2; text-align: center;">
+                                        <img src="{p_d['PhotoURL']}" class="gallery-photo">
+                                        <p style="font-weight:bold; font-size:15px; margin-top:8px;">{p_d['Name']}</p>
+                                    </div>
+                                    <div style="flex: 2.5;"><table class="scout-table"><thead><tr><th>Metric</th><th>Val</th><th>Grade</th></tr></thead><tbody>{rows_html}</tbody></table></div>
+                                    <div style="flex: 1; text-align: center;">
+                                        <div class="score-label" style="font-size:9px;">Practice</div>
+                                        <div style="background-color:{get_gradient(p_d['Practice Score'])}; padding:10px; border-radius:12px; font-size:32px; font-weight:900;">{int(p_d['Practice Score'])}</div>
+                                    </div>
+                                </div>
+                            </div>
+                            """, unsafe_allow_html=True)
 except Exception as e:
     st.error(f"Sync Error: {e}")
