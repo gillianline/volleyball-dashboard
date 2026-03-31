@@ -3,6 +3,7 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 import math 
+from datetime import timedelta
 
 # --- PAGE CONFIG ---
 st.set_page_config(page_title="Performance Lab", layout="wide")
@@ -57,7 +58,7 @@ def load_all_data():
     df = df.rename(columns=rename_map)
     df['Date'] = pd.to_datetime(df['Date'])
     
-    # 1. CLEANING: Match Excel rounding (1 decimal place)
+    # Cleaning & Numeric Conversion (Round to 1 decimal for Excel match)
     metric_cols = ['Total Jumps', 'Moderate Jumps', 'High Jumps', 'Jump Load', 'Player Load', 'Estimated Distance', 'Explosive Efforts', 'High Intensity Movements']
     df[metric_cols] = df[metric_cols].apply(pd.to_numeric, errors='coerce').fillna(0).round(1)
     
@@ -84,9 +85,8 @@ try:
     if pos_filter != "All Positions":
         day_df = day_df[day_df['Position'] == pos_filter]
 
-    # --- SCORE LOGIC ---
+    # --- SCORE LOGIC (30-DAY ROLLING MAX) ---
     all_metrics = ['Total Jumps', 'Moderate Jumps', 'High Jumps', 'Jump Load', 'Player Load', 'Estimated Distance', 'Explosive Efforts', 'High Intensity Movements']
-    overall_maxes = df.groupby('Name')[all_metrics].max().round(1)
     team_ath_maxes = cmj_df[['Jump Height (Imp-Mom) [cm]', 'Peak Power [W]', 'RSI-modified [m/s]']].max()
 
     def get_gradient(score):
@@ -96,13 +96,19 @@ try:
 
     def process_player(row):
         p_name = row['Name']
-        p_maxes = overall_maxes.loc[p_name]
+        current_date = row['Date']
+        start_date = current_date - timedelta(days=30)
+        
+        # Calculate Rolling Max: Filter master DF for this player within the last 30 days
+        lookback_df = df[(df['Name'] == p_name) & (df['Date'] >= start_date) & (df['Date'] <= current_date)]
+        rolling_maxes = lookback_df[all_metrics].max().round(1)
         
         grades = []
         for k in all_metrics:
             val = float(row[k])
-            mx = float(p_maxes[k])
-            # Grade = ROUNDUP(Current/Max*100, 0)
+            mx = float(rolling_maxes[k])
+            
+            # Grade = ROUNDUP(Current/RollingMax*100, 0)
             grade = math.ceil((val / mx) * 100) if mx > 0 else 0
             row[f'{k}_Grade'] = grade
             row[f'{k}_Max'] = mx
@@ -111,6 +117,7 @@ try:
         # Practice Score = ROUNDUP(AVERAGE(Grades), 0)
         row['Practice Score'] = math.ceil(sum(grades) / len(grades)) if grades else 0
         
+        # VALD Static Score remains the same
         p_cmj = cmj_df[cmj_df['Athlete'] == p_name].sort_values('Test Date', ascending=False)
         if not p_cmj.empty:
             v = p_cmj.iloc[0]
@@ -125,6 +132,7 @@ try:
     if not day_df.empty:
         day_df = day_df.apply(process_player, axis=1).sort_values('Name')
 
+    # --- TABS ---
     t_player, t_gallery = st.tabs(["Individual Profile", "Team Gallery"])
 
     with t_player:
@@ -136,7 +144,8 @@ try:
                 st.markdown(f'<div style="text-align:center;"><img src="{p["PhotoURL"]}" class="player-photo-large"></div>', unsafe_allow_html=True)
                 st.markdown(f'<h2 style="text-align:center; margin-top:10px;">{p["Name"]}</h2>', unsafe_allow_html=True)
             with c2:
-                html = '<table class="scout-table"><thead><tr><th>Metric</th><th>Today</th><th>Season Max</th><th>Grade</th></tr></thead><tbody>'
+                st.markdown(f"<p style='text-align:center; font-size:11px; color:gray;'>* Grades calculated against 30-day rolling max *</p>", unsafe_allow_html=True)
+                html = '<table class="scout-table"><thead><tr><th>Metric</th><th>Today</th><th>30d Max</th><th>Grade</th></tr></thead><tbody>'
                 for k in all_metrics:
                     html += f"<tr><td>{k}</td><td>{p[k]}</td><td>{p[f'{k}_Max']}</td><td>{int(p[f'{k}_Grade'])}</td></tr>"
                 st.markdown(html + '</tbody></table>', unsafe_allow_html=True)
