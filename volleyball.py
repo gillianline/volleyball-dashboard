@@ -43,13 +43,14 @@ if "password_correct" not in st.session_state:
 # --- DATA LOADING ---
 @st.cache_data(ttl=300)
 def load_all_data():
-    # Load Catapult Data
     df = pd.read_csv(st.secrets["GOOGLE_SHEET_URL"])
     df.columns = df.columns.str.strip()
     
-    # Load VALD / CMJ Data
     cmj_df = pd.read_csv(st.secrets["CMJ_SHEET_URL"])
     cmj_df.columns = cmj_df.columns.str.strip()
+    
+    # CONVERSION: CM to INCHES for VALD Data
+    cmj_df['Jump Height (in)'] = cmj_df['Jump Height (Imp-Mom) [cm]'] * 0.3937
     
     rename_map = {
         'Total Jumps': 'Total Jumps',
@@ -64,11 +65,9 @@ def load_all_data():
     df = df.rename(columns=rename_map)
     df['Date'] = pd.to_datetime(df['Date'])
     
-    # Clean and round numeric columns for exact Excel match
     metric_cols = ['Total Jumps', 'Moderate Jumps', 'High Jumps', 'Jump Load', 'Player Load', 'Estimated Distance', 'Explosive Efforts', 'High Intensity Movements']
     df[metric_cols] = df[metric_cols].apply(pd.to_numeric, errors='coerce').fillna(0).round(1)
     
-    # Selection logic: Prioritize Activity Name
     if 'Activity' not in df.columns:
         df['Activity'] = df['Date'].dt.strftime('%m/%d/%Y')
     else:
@@ -83,7 +82,6 @@ def load_all_data():
 try:
     df, cmj_df = load_all_data()
 
-    # Dropdown sorting: Chronological, most recent at top
     session_map = df[['Date', 'Activity']].drop_duplicates().sort_values('Date', ascending=False)
     session_options = session_map['Activity'].tolist()
 
@@ -95,7 +93,6 @@ try:
         pos_list = sorted([p for p in df['Position'].unique() if p != "N/A"])
         pos_filter = st.selectbox("Position Filter", ["All Positions"] + pos_list)
 
-    # Filter data for session
     day_df = df[df['Activity'] == selected_session].copy()
     current_practice_date = day_df['Date'].iloc[0]
     
@@ -115,8 +112,6 @@ try:
         p_name = row['Name']
         current_date = row['Date']
         start_date = current_date - timedelta(days=30)
-        
-        # 30-Day Rolling Max calculation
         lookback_df = df[(df['Name'] == p_name) & (df['Date'] >= start_date) & (df['Date'] <= current_date)]
         rolling_maxes = lookback_df[all_metrics].max().round(1)
         
@@ -124,13 +119,11 @@ try:
         for k in all_metrics:
             val = float(row[k])
             mx = float(rolling_maxes[k])
-            # Grade = ROUNDUP(Current/Max*100, 0)
             grade = math.ceil((val / mx) * 100) if mx > 0 else 0
             row[f'{k}_Grade'] = grade
             row[f'{k}_Max'] = mx
             grades.append(grade)
         
-        # Practice Score = ROUNDUP(AVERAGE(Grades), 0)
         row['Practice Score'] = math.ceil(sum(grades) / len(grades)) if grades else 0
         return row
 
@@ -144,10 +137,7 @@ try:
             sel_p = st.selectbox("Select Athlete", day_df['Name'].unique())
             p = day_df[day_df['Name'] == sel_p].iloc[0]
             
-            # VALD Progress History
             p_cmj_history = cmj_df[cmj_df['Athlete'] == sel_p].sort_values('Test Date', ascending=False)
-            
-            # Sync to current practice week
             sync_cmj = p_cmj_history[(p_cmj_history['Test Date'] <= current_practice_date) & 
                                      (p_cmj_history['Test Date'] > current_practice_date - timedelta(days=7))]
             
@@ -155,36 +145,37 @@ try:
             with c1:
                 st.markdown(f'<div style="text-align:center;"><img src="{p["PhotoURL"]}" class="player-photo-large"></div>', unsafe_allow_html=True)
                 st.markdown(f'<h2 style="text-align:center; margin-top:10px;">{p["Name"]}</h2>', unsafe_allow_html=True)
+            
             with c2:
-                # PROGRESS GRAPH
-                if not p_cmj_history.empty:
-                    fig = px.line(p_cmj_history.sort_values('Test Date'), 
-                                  x='Test Date', y='Jump Height (Imp-Mom) [cm]', 
-                                  title="Jump Height Progress", markers=True)
-                    fig.update_traces(line_color='#FF8200') # Tennessee Orange
-                    fig.update_layout(height=250, margin=dict(l=0, r=0, t=40, b=0), xaxis_title=None, yaxis_title="cm")
-                    st.plotly_chart(fig, use_container_width=True)
-
+                # CATAPULT DATA FIRST
                 html = '<table class="scout-table"><thead><tr><th>Metric</th><th>Today</th><th>30d Max</th><th>Grade</th></tr></thead><tbody>'
                 for k in all_metrics:
                     html += f"<tr><td>{k}</td><td>{p[k]}</td><td>{p[f'{k}_Max']}</td><td>{int(p[f'{k}_Grade'])}</td></tr>"
                 st.markdown(html + '</tbody></table>', unsafe_allow_html=True)
+
+                # JUMP PROGRESS GRAPH (Converted to Inches)
+                if not p_cmj_history.empty:
+                    fig = px.line(p_cmj_history.sort_values('Test Date'), 
+                                  x='Test Date', y='Jump Height (in)', 
+                                  title="Jump Height Progress (in)", markers=True)
+                    fig.update_traces(line_color='#FF8200') 
+                    fig.update_layout(height=230, margin=dict(l=0, r=0, t=40, b=0), xaxis_title=None, yaxis_title="in")
+                    st.plotly_chart(fig, use_container_width=True)
+
             with c3:
-                # SYSTEM STATUS (Readiness)
+                # WEEKLY READINESS
                 if not sync_cmj.empty:
                     latest = sync_cmj.iloc[0]
-                    # Calculate 4-test rolling average baseline
                     past_tests = p_cmj_history[p_cmj_history['Test Date'] <= latest['Test Date']]
                     baseline_count = min(len(past_tests), 4)
-                    baseline = past_tests.head(baseline_count)['Jump Height (Imp-Mom) [cm]'].mean()
+                    baseline = past_tests.head(baseline_count)['Jump Height (in)'].mean()
                     
-                    perc_diff = ((latest['Jump Height (Imp-Mom) [cm]'] - baseline) / baseline) * 100
-                    # Color Mapping: Ready, Caution, Fatigued
+                    perc_diff = ((latest['Jump Height (in)'] - baseline) / baseline) * 100
                     color = "#00CC96" if perc_diff > -5 else ("#FF8200" if perc_diff > -10 else "#FF4B4B")
                     
-                    st.markdown(f'<p class="score-label">SYSTEM STATUS</p>', unsafe_allow_html=True)
+                    st.markdown(f'<p class="score-label">WEEKLY READINESS</p>', unsafe_allow_html=True)
                     st.markdown(f'<div class="readiness-box" style="background-color:{color};"><div class="readiness-val">{perc_diff:+.1f}%</div><div class="readiness-sub">vs. Recent Avg</div></div>', unsafe_allow_html=True)
-                    st.markdown(f'<div style="text-align:center; margin-top:5px; font-size:11px;">Test Date: {latest["Test Date"].strftime("%m/%d")}</div>', unsafe_allow_html=True)
+                    st.markdown(f'<div style="text-align:center; margin-top:5px; font-size:11px;">Latest Test: {latest["Jump Height (in)"]:.1f}" ({latest["Test Date"].strftime("%m/%d")})</div>', unsafe_allow_html=True)
 
                 st.markdown(f'<p class="score-label" style="margin-top:20px;">PRACTICE SCORE</p>', unsafe_allow_html=True)
                 st.markdown(f'<div class="score-box" style="background-color:{get_gradient(p["Practice Score"])};">{int(p["Practice Score"])}</div>', unsafe_allow_html=True)
