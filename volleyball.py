@@ -18,8 +18,8 @@ st.markdown("""
 
     /* Table Styles */
     .scout-table { width: 100%; border-collapse: collapse; text-align: center; table-layout: auto; }
-    .scout-table th { background-color: #F5F5F7; padding: 4px; border-bottom: 2px solid #E5E5E7; font-weight: 700; font-size: 11px; }
-    .scout-table td { padding: 4px; border-bottom: 1px solid #F5F5F7; font-size: 11px; }
+    .scout-table th { background-color: #F5F5F7; padding: 4px; border-bottom: 2px solid #E5E5E7; font-weight: 700; font-size: 10px; }
+    .scout-table td { padding: 4px; border-bottom: 1px solid #F5F5F7; font-size: 10px; }
     
     /* Profile Photo */
     .player-photo-large { border-radius: 50%; width: 220px; height: 220px; object-fit: cover; border: 6px solid #FF8200; }
@@ -40,7 +40,7 @@ st.markdown("""
         border-radius: 15px; 
         background-color: #FFFFFF; 
         margin-bottom: 12px; 
-        min-height: 320px;
+        min-height: 380px;
         display: flex;
         flex-direction: column;
         justify-content: center;
@@ -112,7 +112,9 @@ try:
         rolling_maxes = lookback_df[all_metrics].max().round(1)
         grades = [math.ceil((float(row[k]) / float(rolling_maxes[k])) * 100) if float(rolling_maxes[k]) > 0 else 0 for k in all_metrics]
         row['Practice Score'] = math.ceil(sum(grades) / len(grades)) if grades else 0
-        for i, k in enumerate(all_metrics): row[f'{k}_Grade'] = grades[i]; row[f'{k}_Max'] = rolling_maxes[k]
+        for i, k in enumerate(all_metrics): 
+            row[f'{k}_Grade'] = grades[i]
+            row[f'{k}_Max'] = rolling_maxes[k]
         return row
 
     if not day_df.empty:
@@ -127,7 +129,7 @@ try:
             p_cmj_history = cmj_df[cmj_df['Athlete'] == sel_p].sort_values('Test Date')
             sync_cmj = p_cmj_history[(p_cmj_history['Test Date'] <= current_practice_date) & (p_cmj_history['Test Date'] > current_practice_date - timedelta(days=7))]
 
-            # TOP ROW: ORIGINAL GPS SCOUT CARD
+            # TOP ROW: GPS DATA
             c1, c2, c3 = st.columns([1.2, 2.5, 1.2])
             with c1:
                 st.markdown(f'<div style="text-align:center;"><img src="{p["PhotoURL"]}" class="player-photo-large"></div>', unsafe_allow_html=True)
@@ -140,7 +142,7 @@ try:
             with c3:
                 st.markdown(f'<div class="score-wrapper"><div class="score-label">Practice Score</div><div class="score-box" style="background-color:{get_gradient(p["Practice Score"])};">{int(p["Practice Score"])}</div></div>', unsafe_allow_html=True)
 
-            # BOTTOM ROW: JUMP STUFF
+            # BOTTOM ROW: JUMP DATA
             st.markdown('<div class="section-header">Weekly Jump Readiness & Diagnostic History</div>', unsafe_allow_html=True)
             jc1, jc2 = st.columns([1.5, 3.5])
             with jc1:
@@ -181,7 +183,8 @@ try:
                 for j in range(2):
                     if i + j < len(day_df):
                         pd_row = day_df.iloc[i + j]
-                        rows_html = "".join([f"<tr><td>{k}</td><td>{pd_row[k]}</td><td>{int(pd_row[f'{k}_Grade'])}</td></tr>" for k in all_metrics])
+                        # Gallery Table with Today, Max, and Grade
+                        rows_html = "".join([f"<tr><td>{k}</td><td>{pd_row[k]}</td><td>{pd_row[f'{k}_Max']}</td><td>{int(pd_row[f'{k}_Grade'])}</td></tr>" for k in all_metrics])
                         with cols[j]:
                             st.markdown(f"""
                             <div class="gallery-card">
@@ -190,7 +193,7 @@ try:
                                         <img src="{pd_row['PhotoURL']}" class="gallery-photo">
                                         <p style="font-weight:bold; font-size:15px; margin-top:8px;">{pd_row['Name']}</p>
                                     </div>
-                                    <div style="flex: 2.5;"><table class="scout-table"><thead><tr><th>Metric</th><th>Val</th><th>Grade</th></tr></thead><tbody>{rows_html}</tbody></table></div>
+                                    <div style="flex: 3;"><table class="scout-table"><thead><tr><th>Metric</th><th>Val</th><th>Max</th><th>Grade</th></tr></thead><tbody>{rows_html}</tbody></table></div>
                                     <div style="flex: 1; text-align: center;">
                                         <div class="score-label" style="font-size:9px;">Practice</div>
                                         <div style="background-color:{get_gradient(pd_row['Practice Score'])}; padding:10px; border-radius:12px; font-size:32px; font-weight:900;">{int(pd_row['Practice Score'])}</div>
