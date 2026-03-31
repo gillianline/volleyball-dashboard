@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 import math 
 from datetime import timedelta
 
@@ -17,12 +18,10 @@ st.markdown("""
     .scout-table { width: 100%; border-collapse: collapse; text-align: center; table-layout: auto; }
     .scout-table th { background-color: #F5F5F7; padding: 4px; border-bottom: 2px solid #E5E5E7; font-weight: 700; font-size: 11px; }
     .scout-table td { padding: 4px; border-bottom: 1px solid #F5F5F7; font-size: 11px; }
-    .player-photo-large { border-radius: 50%; width: 220px; height: 220px; object-fit: cover; border: 6px solid #FF8200; }
+    .player-photo-large { border-radius: 50%; width: 200px; height: 200px; object-fit: cover; border: 6px solid #FF8200; }
     .score-label { font-size: 10px; font-weight: 800; text-transform: uppercase; margin-bottom: 4px; color: #515154; text-align: center; }
     .score-box { padding: 10px 20px; border-radius: 12px; font-size: 32px; font-weight: 800; min-width: 100px; color: #1D1D1F; text-align: center; }
     
-    /* Combined Readiness & Jump Styling */
-    .jump-card { border: 1px solid #EEE; border-radius: 12px; padding: 12px; background-color: #FAFAFA; }
     .readiness-box { padding: 15px; border-radius: 12px; text-align: center; color: white; margin-bottom: 10px; }
     .readiness-val { font-size: 28px; font-weight: 900; }
     .readiness-sub { font-size: 10px; font-weight: 700; opacity: 0.9; }
@@ -92,7 +91,6 @@ try:
     if pos_filter != "All Positions":
         day_df = day_df[day_df['Position'] == pos_filter]
 
-    # --- SCORE LOGIC ---
     all_metrics = ['Total Jumps', 'Moderate Jumps', 'High Jumps', 'Jump Load', 'Player Load', 'Estimated Distance', 'Explosive Efforts', 'High Intensity Movements']
     overall_maxes = df.groupby('Name')[all_metrics].max().round(1)
 
@@ -121,54 +119,62 @@ try:
         if not day_df.empty:
             sel_p = st.selectbox("Select Athlete", day_df['Name'].unique())
             p = day_df[day_df['Name'] == sel_p].iloc[0]
-            
-            p_cmj_history = cmj_df[cmj_df['Athlete'] == sel_p].sort_values('Test Date', ascending=False)
+            p_cmj_history = cmj_df[cmj_df['Athlete'] == sel_p].sort_values('Test Date', ascending=True)
             sync_cmj = p_cmj_history[(p_cmj_history['Test Date'] <= current_practice_date) & 
                                      (p_cmj_history['Test Date'] > current_practice_date - timedelta(days=7))]
             
-            c1, c2, c3 = st.columns([1.2, 2.5, 1.2])
+            c1, c2, c3 = st.columns([1, 2.5, 1])
             with c1:
                 st.markdown(f'<div style="text-align:center;"><img src="{p["PhotoURL"]}" class="player-photo-large"></div>', unsafe_allow_html=True)
-                st.markdown(f'<h2 style="text-align:center; margin-top:10px;">{p["Name"]}</h2>', unsafe_allow_html=True)
-            
+                st.markdown(f'<h3 style="text-align:center; margin-top:10px;">{p["Name"]}</h3>', unsafe_allow_html=True)
+                
+                # Practice Score next to data
+                st.markdown(f'<p class="score-label" style="margin-top:20px;">PRACTICE SCORE</p>', unsafe_allow_html=True)
+                st.markdown(f'<div class="score-box" style="background-color:{get_gradient(p["Practice Score"])};">{int(p["Practice Score"])}</div>', unsafe_allow_html=True)
+
             with c2:
-                # CATAPULT DATA FIRST
+                # Catapult Table
                 html = '<table class="scout-table"><thead><tr><th>Metric</th><th>Today</th><th>30d Max</th><th>Grade</th></tr></thead><tbody>'
                 for k in all_metrics:
                     html += f"<tr><td>{k}</td><td>{p[k]}</td><td>{p[f'{k}_Max']}</td><td>{int(p[f'{k}_Grade'])}</td></tr>"
                 st.markdown(html + '</tbody></table>', unsafe_allow_html=True)
 
+                # DUAL AXIS GRAPH: Height and RSI-Mod
                 if not p_cmj_history.empty:
-                    fig = px.line(p_cmj_history.sort_values('Test Date'), x='Test Date', y='Jump Height (in)', title="Season Jump Progress", markers=True)
-                    fig.update_traces(line_color='#FF8200') 
-                    fig.update_layout(height=230, margin=dict(l=0, r=0, t=40, b=0), xaxis_title=None, yaxis_title="in")
+                    fig = make_subplots(specs=[[{"secondary_y": True}]])
+                    fig.add_trace(go.Scatter(x=p_cmj_history['Test Date'], y=p_cmj_history['Jump Height (in)'], 
+                                             name="Height (in)", line=dict(color='#FF8200', width=3), marker=dict(size=8)), secondary_y=False)
+                    fig.add_trace(go.Scatter(x=p_cmj_history['Test Date'], y=p_cmj_history['RSI-modified [m/s]'], 
+                                             name="RSI-Mod", line=dict(color='#1D1D1F', dash='dot'), marker=dict(size=8)), secondary_y=True)
+                    
+                    fig.update_layout(title="Neuromuscular Profile (Season History)", height=300, margin=dict(l=0, r=0, t=50, b=0), legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
+                    fig.update_yaxes(title_text="Height (in)", secondary_y=False)
+                    fig.update_yaxes(title_text="RSI-Modified", secondary_y=True)
                     st.plotly_chart(fig, use_container_width=True)
 
             with c3:
-                # WEEKLY JUMP READINESS SECTION
+                # WEEKLY READINESS
                 if not sync_cmj.empty:
-                    latest = sync_cmj.iloc[0]
+                    latest = sync_cmj.iloc[-1]
                     past_tests = p_cmj_history[p_cmj_history['Test Date'] <= latest['Test Date']]
-                    baseline = past_tests.head(min(len(past_tests), 4))['Jump Height (in)'].mean()
+                    baseline = past_tests.tail(min(len(past_tests), 4))['Jump Height (in)'].mean()
                     perc_diff = ((latest['Jump Height (in)'] - baseline) / baseline) * 100
                     color = "#00CC96" if perc_diff > -5 else ("#FF8200" if perc_diff > -10 else "#FF4B4B")
                     
-                    st.markdown('<div class="jump-card">', unsafe_allow_html=True)
                     st.markdown(f'<p class="score-label">WEEKLY READINESS</p>', unsafe_allow_html=True)
                     st.markdown(f'<div class="readiness-box" style="background-color:{color};"><div class="readiness-val">{perc_diff:+.1f}%</div><div class="readiness-sub">vs. Recent Avg</div></div>', unsafe_allow_html=True)
                     
+                    # Diagnostic Data
                     st.markdown(f"""
-                        <table style="width:100%; font-size:12px; border-collapse:collapse;">
-                            <tr><td style="color:gray;">Height:</td><td style="text-align:right; font-weight:700;">{latest['Jump Height (in)']:.1f}"</td></tr>
-                            <tr><td style="color:gray;">RSI-Mod:</td><td style="text-align:right; font-weight:700;">{latest['RSI-modified [m/s]']:.2f}</td></tr>
-                            <tr><td style="color:gray;">Power:</td><td style="text-align:right; font-weight:700;">{latest['Peak Power [W]']:.0f}W</td></tr>
-                        </table>
-                        <p style="text-align:center; font-size:10px; color:gray; margin-top:5px;">Tested: {latest['Test Date'].strftime('%m/%d')}</p>
+                        <div style="border:1px solid #EEE; padding:10px; border-radius:8px;">
+                            <p style="margin:0; font-size:10px; color:gray;">Diagnostic Metrics:</p>
+                            <p style="margin:0; font-size:12px;"><b>Jump:</b> {latest['Jump Height (in)']:.1f}"</p>
+                            <p style="margin:0; font-size:12px;"><b>RSI:</b> {latest['RSI-modified [m/s]']:.2f}</p>
+                            <p style="margin:0; font-size:12px;"><b>Power:</b> {latest['Peak Power [W]']:.0f}W</p>
+                        </div>
                     """, unsafe_allow_html=True)
-                    st.markdown('</div>', unsafe_allow_html=True)
-
-                st.markdown(f'<p class="score-label" style="margin-top:20px;">PRACTICE SCORE</p>', unsafe_allow_html=True)
-                st.markdown(f'<div class="score-box" style="background-color:{get_gradient(p["Practice Score"])};">{int(p["Practice Score"])}</div>', unsafe_allow_html=True)
+                else:
+                    st.info("No VALD test found for this week.")
 
 except Exception as e:
     st.error(f"Sync Error: {e}")
