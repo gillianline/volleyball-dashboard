@@ -7,13 +7,11 @@ import math
 # --- PAGE CONFIG ---
 st.set_page_config(page_title="Performance Lab", layout="wide")
 
-# --- CSS: TENNESSEE STYLE & TIGHT GALLERY ---
+# --- CSS: TENNESSEE STYLE ---
 st.markdown("""
     <style>
     .stApp { background-color: #FFFFFF; color: #1D1D1F; }
     hr { display: none !important; }
-    [data-testid="stVerticalBlock"] > div:empty { display: none !important; }
-    .st-emotion-cache-16idsys p { margin-bottom: 0px; }
     .block-container { padding-top: 1.5rem !important; }
 
     /* Table Styles */
@@ -66,8 +64,13 @@ if "password_correct" not in st.session_state:
 # --- DATA LOADING ---
 @st.cache_data(ttl=300)
 def load_all_data():
+    # Primary Catapult Sheet
     df = pd.read_csv(st.secrets["GOOGLE_SHEET_URL"])
     df.columns = df.columns.str.strip()
+    
+    # VALD / CMJ Sheet (Add this URL to secrets)
+    cmj_df = pd.read_csv(st.secrets["CMJ_SHEET_URL"])
+    cmj_df.columns = cmj_df.columns.str.strip()
     
     rename_map = {
         'Total Jumps': 'Total Jumps',
@@ -89,14 +92,19 @@ def load_all_data():
     metric_cols = ['Total Jumps', 'Moderate Jumps', 'High Jumps', 'Jump Load', 'Player Load', 'Estimated Distance', 'Explosive Efforts', 'High Intensity Movements']
     df[metric_cols] = df[metric_cols].apply(pd.to_numeric, errors='coerce').fillna(0)
     
+    # Phase Sheet (Sheet 2)
     p_df = pd.read_csv(st.secrets["PHASE_SHEET_URL"])
     p_df.columns = p_df.columns.str.strip()
     p_df = p_df.rename(columns=rename_map)
     p_df['Date'] = pd.to_datetime(p_df['Date'])
-    return df, p_df
+    
+    # CMJ Date Formatting
+    cmj_df['Test Date'] = pd.to_datetime(cmj_df['Test Date'])
+    
+    return df, p_df, cmj_df
 
 try:
-    df, phase_df = load_all_data()
+    df, phase_df, cmj_df = load_all_data()
     date_options = [d.strftime('%m/%d/%Y') for d in sorted(df['Date'].unique(), reverse=True)]
 
     # --- HEADER ---
@@ -116,7 +124,6 @@ try:
     # --- LOGIC ---
     all_metrics = ['Total Jumps', 'Moderate Jumps', 'High Jumps', 'Jump Load', 'Player Load', 'Estimated Distance', 'Explosive Efforts', 'High Intensity Movements']
     overall_maxes = df.groupby('Name')[all_metrics].max()
-    team_maxes = df[all_metrics].max()
 
     def get_gradient(score):
         score = max(0, min(100, float(score)))
@@ -136,7 +143,7 @@ try:
     if not day_df.empty:
         day_df = day_df.apply(process_player, axis=1).sort_values('Name')
 
-    t_flow, t_player, t_gallery, t_comp = st.tabs(["Session Flow", "Individual Profile", "Team Gallery", "Team Comparison"])
+    t_flow, t_player, t_gallery = st.tabs(["Session Flow", "Individual Profile", "Team Gallery"])
 
     with t_flow:
         current_names = day_df['Name'].unique()
@@ -154,10 +161,18 @@ try:
             selected_player = st.selectbox("Select Athlete", day_df['Name'].unique())
             p_data = day_df[day_df['Name'] == selected_player].iloc[0]
             
+            # CMJ Data Lookup for Reference
+            p_cmj = cmj_df[cmj_df['Athlete'] == selected_player].sort_values('Test Date', ascending=False)
+            
             c1, c2, c3 = st.columns([1.2, 2.5, 1.2])
             with c1:
                 st.markdown(f'<div style="text-align:center;"><img src="{p_data["PhotoURL"]}" class="player-photo-large"></div>', unsafe_allow_html=True)
                 st.markdown(f'<h2 style="text-align:center;">{p_data["Name"]} ({p_data["Position"]})</h2>', unsafe_allow_html=True)
+                
+                if not p_cmj.empty:
+                    v = p_cmj.iloc[0]
+                    st.info(f"**Morning Readiness (VALD)**\n\nJump: {v['Jump Height (Imp-Mom) [cm]']:.1f}cm\n\nRSI: {v['RSI-modified [m/s]']:.2f}")
+
             with c2:
                 html = '<table class="scout-table"><thead><tr><th>Metric</th><th>Today</th><th>Season Max</th><th>Grade</th></tr></thead><tbody>'
                 for k in all_metrics:
@@ -166,33 +181,6 @@ try:
             with c3:
                 st.markdown(f'<div style="text-align:center; font-weight:bold; font-size:18px; margin-top:15px;">Practice Score</div>', unsafe_allow_html=True)
                 st.markdown(f'<div class="score-box" style="background-color:{get_gradient(p_data["Practice Score"])};">{int(p_data["Practice Score"])}</div>', unsafe_allow_html=True)
-
-            st.divider()
-            g1, g2 = st.columns(2)
-            with g1:
-                # NEW BASELINE FILTER
-                radar_baseline = st.radio("Baseline Comparison:", ["Position", "Team"], horizontal=True)
-                radar_m = ['Total Jumps', 'Explosive Efforts', 'High Intensity Movements', 'Jump Load', 'Player Load']
-                r_vals = [math.ceil((float(p_data[m]) / float(overall_maxes.loc[selected_player][m])) * 100) if float(overall_maxes.loc[selected_player][m]) > 0 else 0 for m in radar_m]
-                
-                if radar_baseline == "Position":
-                    comp_vals = [math.ceil((float(df[df['Position'] == p_data['Position']][m].mean()) / float(team_maxes[m])) * 100) if team_maxes[m] > 0 else 0 for m in radar_m]
-                    label = f"{p_data['Position']} Avg"
-                else:
-                    comp_vals = [math.ceil((float(df[m].mean()) / float(team_maxes[m])) * 100) if team_maxes[m] > 0 else 0 for m in radar_m]
-                    label = "Team Avg"
-
-                fig_radar = go.Figure()
-                fig_radar.add_trace(go.Scatterpolar(r=r_vals, theta=radar_m, fill='toself', name=selected_player, line_color='#FF8200'))
-                fig_radar.add_trace(go.Scatterpolar(r=comp_vals, theta=radar_m, fill='toself', name=label, line_color='#1D1D1F', opacity=0.3))
-                fig_radar.update_layout(polar=dict(radialaxis=dict(visible=True, range=[0, 100])), height=400, title="Physical Profile")
-                st.plotly_chart(fig_radar, use_container_width=True)
-            with g2:
-                hist_m = st.selectbox("Season Trend", all_metrics)
-                p_hist = df[df['Name'] == selected_player].sort_values('Date')
-                fig_line = px.line(p_hist, x='Date', y=hist_m, markers=True)
-                fig_line.update_traces(line_color='#FF8200').update_layout(height=400)
-                st.plotly_chart(fig_line, use_container_width=True)
 
     with t_gallery:
         if not day_df.empty:
@@ -215,19 +203,6 @@ try:
                                 </div>
                             </div>
                             """, unsafe_allow_html=True)
-
-    with t_comp:
-        date_b_str = st.selectbox("Compare Date", [d for d in date_options if d != date_a_str])
-        if date_b_str:
-            avg_a = day_df[all_metrics].mean()
-            df_comp = df[df['Date'] == pd.to_datetime(date_b_str)]
-            if pos_filter != "All Positions": df_comp = df_comp[df_comp['Position'] == pos_filter]
-            avg_b = df_comp[all_metrics].mean()
-            html = '<table class="scout-table"><thead><tr><th>Metric</th><th>Today</th><th>Comparison</th><th>% Diff</th></tr></thead><tbody>'
-            for k in all_metrics:
-                diff = ((avg_a[k] - avg_b[k]) / avg_b[k] * 100) if avg_b[k] != 0 else 0
-                html += f"<tr><td>{k}</td><td>{int(avg_a[k])}</td><td>{int(avg_b[k])}</td><td>{int(diff)}%</td></tr>"
-            st.markdown(html + '</tbody></table>', unsafe_allow_html=True)
 
 except Exception as e:
     st.error(f"Sync Error: {e}")
