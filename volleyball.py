@@ -16,32 +16,30 @@ st.markdown("""
     hr { display: none !important; }
     .block-container { padding-top: 1.5rem !important; }
     
-    /* Global Elements */
+    /* Table & Gallery Styles */
     .scout-table { width: 100%; border-collapse: collapse; text-align: center; table-layout: auto; margin-bottom: 15px; }
     .scout-table th { background-color: #F5F5F7; padding: 6px; border-bottom: 2px solid #E5E5E7; font-weight: 700; font-size: 11px; }
     .scout-table td { padding: 6px; border-bottom: 1px solid #F5F5F7; font-size: 11px; }
+    
+    .gallery-card { 
+        border: 1px solid #E5E5E7; 
+        padding: 15px; 
+        border-radius: 15px; 
+        background-color: #FFFFFF; 
+        margin-bottom: 15px; 
+        display: flex;
+        align-items: center;
+        gap: 15px;
+    }
+    .player-photo-small { border-radius: 50%; width: 90px; height: 90px; object-fit: cover; border: 4px solid #FF8200; }
     .player-photo-large { border-radius: 50%; width: 180px; height: 180px; object-fit: cover; border: 6px solid #FF8200; }
     
-    /* Section Headers */
+    /* Headers & KPIs */
     .section-header { font-size: 14px; font-weight: 800; color: #FF8200; border-bottom: 2px solid #FF8200; margin-bottom: 15px; padding-bottom: 5px; text-transform: uppercase; }
-    
-    /* KPI Components */
-    .kpi-label { font-size: 10px; font-weight: 800; text-transform: uppercase; color: #515154; text-align: center; margin-bottom: 4px; }
     .kpi-box { padding: 15px; border-radius: 12px; text-align: center; font-weight: 800; border: 1px solid #EEE; background-color: #FAFAFA; }
     .status-tag { font-size: 16px; font-weight: 900; margin-bottom: 5px; }
-    .status-desc { font-size: 10px; font-weight: 400; color: #515154; line-height: 1.3; }
     </style>
     """, unsafe_allow_html=True)
-
-# --- SECURITY ---
-if "password_correct" not in st.session_state:
-    st.title("Access Restricted")
-    pwd = st.text_input("Access Key:", type="password")
-    if st.button("Unlock"):
-        if pwd == st.secrets["COACH_PWD"]:
-            st.session_state["password_correct"] = True
-            st.rerun()
-    st.stop()
 
 # --- DATA LOADING ---
 @st.cache_data(ttl=300)
@@ -79,18 +77,13 @@ try:
     session_options = session_map['Activity'].tolist()
 
     st.markdown("<h3 style='text-align: center; margin-bottom: 20px;'>Performance Lab</h3>", unsafe_allow_html=True)
-    c_main, c_pos = st.columns([2, 2])
-    with c_main:
-        selected_session = st.selectbox("Select Session", session_options, index=0)
-    with c_pos:
-        pos_list = sorted([p for p in df['Position'].unique() if p != "N/A"])
-        pos_filter = st.selectbox("Position Filter", ["All Positions"] + pos_list)
+    c1, c2 = st.columns(2)
+    with c1: selected_session = st.selectbox("Select Session", session_options)
+    with c2: pos_filter = st.selectbox("Position Filter", ["All Positions"] + sorted(list(df['Position'].unique())))
 
+    # Filtering
     day_df = df[df['Activity'] == selected_session].copy()
-    current_practice_date = day_df['Date'].iloc[0]
-    
-    if pos_filter != "All Positions":
-        day_df = day_df[day_df['Position'] == pos_filter]
+    if pos_filter != "All Positions": day_df = day_df[day_df['Position'] == pos_filter]
 
     all_metrics = ['Total Jumps', 'Moderate Jumps', 'High Jumps', 'Jump Load', 'Player Load', 'Estimated Distance', 'Explosive Efforts', 'High Intensity Movements']
 
@@ -101,88 +94,73 @@ try:
 
     def process_player(row):
         p_name = row['Name']
-        current_date = row['Date']
-        lookback_df = df[(df['Name'] == p_name) & (df['Date'] >= current_date - timedelta(days=30)) & (df['Date'] <= current_date)]
-        rolling_maxes = lookback_df[all_metrics].max().round(1)
-        grades = [math.ceil((float(row[k]) / float(rolling_maxes[k])) * 100) if float(rolling_maxes[k]) > 0 else 0 for k in all_metrics]
-        row['Practice Score'] = math.ceil(sum(grades) / len(grades)) if grades else 0
-        for i, k in enumerate(all_metrics): row[f'{k}_Max'] = rolling_maxes[k]; row[f'{k}_Grade'] = grades[i]
+        lookback = df[(df['Name'] == p_name) & (df['Date'] >= row['Date'] - timedelta(days=30)) & (df['Date'] <= row['Date'])]
+        rolling_maxes = lookback[all_metrics].max()
+        grades = [math.ceil((row[k] / rolling_maxes[k]) * 100) if rolling_maxes[k] > 0 else 0 for k in all_metrics]
+        row['Practice Score'] = math.ceil(sum(grades)/len(grades)) if grades else 0
+        for i, k in enumerate(all_metrics): row[f'{k}_Grade'] = grades[i]
         return row
 
     if not day_df.empty:
         day_df = day_df.apply(process_player, axis=1).sort_values('Name')
 
-    t_player, t_gallery = st.tabs(["Individual Profile", "Team Gallery"])
+    tab1, tab2 = st.tabs(["Individual Profile", "Team GPS Gallery"])
 
-    with t_player:
+    with tab1:
         if not day_df.empty:
-            sel_p = st.selectbox("Select Athlete", day_df['Name'].unique())
+            sel_p = st.selectbox("Athlete", day_df['Name'].unique())
             p = day_df[day_df['Name'] == sel_p].iloc[0]
-            p_cmj_history = cmj_df[cmj_df['Athlete'] == sel_p].sort_values('Test Date', ascending=True)
-            sync_cmj = p_cmj_history[(p_cmj_history['Test Date'] <= current_practice_date) & 
-                                     (p_cmj_history['Test Date'] > current_practice_date - timedelta(days=7))]
-            
-            # --- LAYOUT ZONE ---
-            col_id, col_gps, col_jump = st.columns([1, 2.2, 1.8])
-            
-            # 1. IDENTITY ZONE
-            with col_id:
-                st.markdown(f'<div style="text-align:center;"><img src="{p["PhotoURL"]}" class="player-photo-large"></div>', unsafe_allow_html=True)
-                st.markdown(f'<h3 style="text-align:center; margin-top:10px;">{p["Name"]}</h3>', unsafe_allow_html=True)
-                st.markdown(f'<p style="text-align:center; color:#FF8200; font-weight:700;">{p["Position"]}</p>', unsafe_allow_html=True)
+            p_cmj = cmj_df[cmj_df['Athlete'] == sel_p].sort_values('Test Date')
+            sync_cmj = p_cmj[(p_cmj['Test Date'] <= p['Date']) & (p_cmj['Test Date'] > p['Date'] - timedelta(days=7))]
 
-            # 2. GPS ZONE (Catapult Data)
-            with col_gps:
-                st.markdown('<div class="section-header">Daily GPS Workload</div>', unsafe_allow_html=True)
-                
-                gps_c1, gps_c2 = st.columns([2.5, 1])
-                with gps_c1:
-                    html = '<table class="scout-table"><thead><tr><th>Metric</th><th>Today</th><th>Grade</th></tr></thead><tbody>'
-                    for k in all_metrics:
-                        html += f"<tr><td>{k}</td><td>{p[k]}</td><td>{int(p[f'{k}_Grade'])}</td></tr>"
-                    st.markdown(html + '</tbody></table>', unsafe_allow_html=True)
-                
-                with gps_c2:
-                    st.markdown(f'<p class="kpi-label">Session Grade</p>', unsafe_allow_html=True)
-                    st.markdown(f'<div class="kpi-box" style="background-color:{get_gradient(p["Practice Score"])}; font-size:36px; height:120px; display:flex; align-items:center; justify-content:center;">{int(p["Practice Score"])}</div>', unsafe_allow_html=True)
-
-            # 3. JUMP ZONE (VALD Data)
-            with col_jump:
-                st.markdown('<div class="section-header">Weekly Jump Readiness</div>', unsafe_allow_html=True)
-                
-                if not p_cmj_history.empty:
-                    # Readiness Profile
-                    if not sync_cmj.empty:
-                        latest = sync_cmj.iloc[-1]
-                        baseline = p_cmj_history.tail(4)['Jump Height (in)'].mean()
-                        rsi_baseline = p_cmj_history.tail(4)['RSI-modified [m/s]'].mean()
-                        
-                        perc_diff = ((latest['Jump Height (in)'] - baseline) / baseline) * 100
-                        
-                        # Profiling Logic
-                        if latest['Jump Height (in)'] >= baseline and latest['RSI-modified [m/s]'] >= rsi_baseline:
-                            status, s_color, desc = "ELASTIC ⚡", "#00CC96", "System fresh and reactive."
-                        elif latest['Jump Height (in)'] >= baseline and latest['RSI-modified [m/s]'] < rsi_baseline:
-                            status, s_color, desc = "POWERED 🏋️", "#FF8200", "High output, slow speed (CNS Fatigue)."
-                        elif latest['Jump Height (in)'] < baseline and latest['RSI-modified [m/s]'] >= rsi_baseline:
-                            status, s_color, desc = "SPRINGY 📉", "#FF8200", "Fast but low height. Monitor load."
-                        else:
-                            status, s_color, desc = "FATIGUED 🚨", "#FF4B4B", "Height & Efficiency down."
-
-                        st.markdown(f"""
-                            <div class="kpi-box" style="background-color:{s_color}15; border-color:{s_color}; margin-bottom:15px;">
-                                <div class="status-tag" style="color:{s_color};">{status}</div>
-                                <div style="font-size:20px; font-weight:900;">{perc_diff:+.1f}% vs Avg</div>
-                                <div class="status-desc">{desc}</div>
-                            </div>
-                        """, unsafe_allow_html=True)
-
-                    # Graph
+            cid, cgps, cjmp = st.columns([1, 2.2, 1.8])
+            with cid:
+                st.markdown(f'<center><img src="{p["PhotoURL"]}" class="player-photo-large"><br><h3>{p["Name"]}</h3></center>', unsafe_allow_html=True)
+            with cgps:
+                st.markdown('<div class="section-header">GPS Workload</div>', unsafe_allow_html=True)
+                sc1, sc2 = st.columns([2, 1])
+                with sc1:
+                    tbl = '<table class="scout-table"><tr><th>Metric</th><th>Val</th><th>Grade</th></tr>'
+                    for k in all_metrics: tbl += f"<tr><td>{k}</td><td>{p[k]}</td><td>{int(p[f'{k}_Grade'])}</td></tr>"
+                    st.markdown(tbl + '</table>', unsafe_allow_html=True)
+                with sc2:
+                    st.markdown(f'<div class="kpi-box" style="background-color:{get_gradient(p["Practice Score"])}; font-size:36px; height:150px; display:flex; align-items:center; justify-content:center;">{int(p["Practice Score"])}</div>', unsafe_allow_html=True)
+            with cjmp:
+                st.markdown('<div class="section-header">Jump Readiness</div>', unsafe_allow_html=True)
+                if not sync_cmj.empty:
+                    latest = sync_cmj.iloc[-1]
+                    baseline = p_cmj.tail(4)['Jump Height (in)'].mean()
+                    perc = ((latest['Jump Height (in)'] - baseline) / baseline) * 100
+                    color = "#00CC96" if perc > -5 else ("#FF8200" if perc > -10 else "#FF4B4B")
+                    st.markdown(f'<div class="kpi-box" style="border-color:{color}; color:{color};"><div class="status-tag">{perc:+.1f}% vs Avg</div></div>', unsafe_allow_html=True)
+                if not p_cmj.empty:
                     fig = make_subplots(specs=[[{"secondary_y": True}]])
-                    fig.add_trace(go.Scatter(x=p_cmj_history['Test Date'], y=p_cmj_history['Jump Height (in)'], name="Height", line=dict(color='#FF8200', width=3)), secondary_y=False)
-                    fig.add_trace(go.Scatter(x=p_cmj_history['Test Date'], y=p_cmj_history['RSI-modified [m/s]'], name="RSI", line=dict(color='#1D1D1F', dash='dot')), secondary_y=True)
-                    fig.update_layout(height=200, margin=dict(l=0, r=0, t=10, b=0), showlegend=False, xaxis_title=None)
+                    fig.add_trace(go.Scatter(x=p_cmj['Test Date'], y=p_cmj['Jump Height (in)'], name="Height", line=dict(color='#FF8200')), secondary_y=False)
+                    fig.add_trace(go.Scatter(x=p_cmj['Test Date'], y=p_cmj['RSI-modified [m/s]'], name="RSI", line=dict(dash='dot', color='black')), secondary_y=True)
+                    fig.update_layout(height=180, margin=dict(l=0, r=0, t=0, b=0), showlegend=False)
                     st.plotly_chart(fig, use_container_width=True)
 
+    with tab2:
+        if not day_df.empty:
+            for _, row in day_df.iterrows():
+                st.markdown(f"""
+                <div class="gallery-card">
+                    <img src="{row['PhotoURL']}" class="player-photo-small">
+                    <div style="flex-grow: 1;">
+                        <h4 style="margin:0;">{row['Name']}</h4>
+                        <p style="margin:0; color:#FF8200; font-size:12px;">{row['Position']}</p>
+                    </div>
+                    <div style="width: 200px;">
+                        <table class="scout-table" style="margin:0;">
+                            <tr><td>Jumps</td><td><b>{row['Total Jumps']}</b></td></tr>
+                            <tr><td>Load</td><td><b>{row['Player Load']}</b></td></tr>
+                        </table>
+                    </div>
+                    <div style="background-color:{get_gradient(row['Practice Score'])}; padding:15px; border-radius:10px; font-size:24px; font-weight:900; width:70px; text-align:center;">
+                        {int(row['Practice Score'])}
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+
 except Exception as e:
-    st.error(f"Sync Error: {e}")
+    st.error(f"Error: {e}")
