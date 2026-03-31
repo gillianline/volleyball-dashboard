@@ -25,39 +25,15 @@ st.markdown("""
     .player-photo-large { border-radius: 50%; width: 220px; height: 220px; object-fit: cover; border: 6px solid #FF8200; }
     
     /* Score Boxes */
-    .score-container { display: flex; justify-content: center; gap: 15px; margin-top: 10px; }
     .score-wrapper { text-align: center; }
     .score-label { font-size: 10px; font-weight: 800; text-transform: uppercase; margin-bottom: 4px; color: #515154; }
     .score-box { padding: 10px 20px; border-radius: 12px; font-size: 32px; font-weight: 800; min-width: 100px; color: #1D1D1F; }
-    
-    /* Gallery Card */
-    .gallery-card { 
-        border: 1px solid #E5E5E7; 
-        padding: 15px; 
-        border-radius: 15px; 
-        background-color: #FFFFFF; 
-        margin-bottom: 12px; 
-        min-height: 320px;
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
-    }
-    .gallery-photo { border-radius: 50%; width: 110px; height: 110px; object-fit: cover; border: 5px solid #FF8200; }
+    .status-subtext { font-size: 12px; font-weight: 900; display: block; margin-top: -5px; }
     
     /* Section Headers */
     .section-header { font-size: 14px; font-weight: 800; color: #FF8200; border-bottom: 2px solid #FF8200; margin-top: 25px; margin-bottom: 15px; padding-bottom: 5px; text-transform: uppercase; }
     </style>
     """, unsafe_allow_html=True)
-
-# --- SECURITY ---
-if "password_correct" not in st.session_state:
-    st.title("Access Restricted")
-    pwd = st.text_input("Access Key:", type="password")
-    if st.button("Unlock"):
-        if pwd == st.secrets["COACH_PWD"]:
-            st.session_state["password_correct"] = True
-            st.rerun()
-    st.stop()
 
 # --- DATA LOADING ---
 @st.cache_data(ttl=300)
@@ -129,16 +105,16 @@ try:
     if not day_df.empty:
         day_df = day_df.apply(process_player, axis=1).sort_values('Name')
 
-    t_player, t_gallery = st.tabs(["Individual Profile", "Team Gallery"])
+    tab1, tab2 = st.tabs(["Individual Profile", "Team Gallery"])
 
-    with t_player:
+    with tab1:
         if not day_df.empty:
             sel_p = st.selectbox("Select Athlete", day_df['Name'].unique())
             p = day_df[day_df['Name'] == sel_p].iloc[0]
             p_cmj_history = cmj_df[cmj_df['Athlete'] == sel_p].sort_values('Test Date')
             sync_cmj = p_cmj_history[(p_cmj_history['Test Date'] <= current_practice_date) & (p_cmj_history['Test Date'] > current_practice_date - timedelta(days=7))]
 
-            # TOP ROW: ORIGINAL GPS LAYOUT
+            # TOP ROW: GPS DATA
             c1, c2, c3 = st.columns([1.2, 2.5, 1.2])
             with c1:
                 st.markdown(f'<div style="text-align:center;"><img src="{p["PhotoURL"]}" class="player-photo-large"></div>', unsafe_allow_html=True)
@@ -156,22 +132,39 @@ try:
                 </div>
                 """, unsafe_allow_html=True)
 
-            # BOTTOM ROW: JUMP DATA (MOVED BELOW)
+            # BOTTOM ROW: JUMP DATA
             st.markdown('<div class="section-header">Weekly Jump Readiness & History</div>', unsafe_allow_html=True)
             jc1, jc2 = st.columns([1.5, 3.5])
             with jc1:
                 if not sync_cmj.empty:
                     latest = sync_cmj.iloc[-1]
                     baseline = p_cmj_history.tail(4)['Jump Height (in)'].mean()
+                    rsi_baseline = p_cmj_history.tail(4)['RSI-modified [m/s]'].mean()
+                    
                     perc_diff = ((latest['Jump Height (in)'] - baseline) / baseline) * 100
-                    color = "#00CC96" if perc_diff > -5 else ("#FF8200" if perc_diff > -10 else "#FF4B4B")
+                    
+                    # Logic for Status Label
+                    if latest['Jump Height (in)'] >= baseline and latest['RSI-modified [m/s]'] >= rsi_baseline:
+                        status_label, color = "READY", "#00CC96"
+                    elif latest['Jump Height (in)'] >= baseline and latest['RSI-modified [m/s]'] < rsi_baseline:
+                        status_label, color = "GRINDING", "#FF8200"
+                    elif latest['Jump Height (in)'] < baseline and latest['RSI-modified [m/s]'] >= rsi_baseline:
+                        status_label, color = "SPRINGY", "#FF8200"
+                    else:
+                        status_label, color = "FATIGUED", "#FF4B4B"
+
                     st.markdown(f"""
                         <div class="score-wrapper">
                             <div class="score-label">Weekly Readiness</div>
-                            <div class="score-box" style="background-color:{color}; color:white;">{perc_diff:+.1f}%</div>
+                            <div class="score-box" style="background-color:{color}; color:white;">
+                                {perc_diff:+.1f}%
+                                <span class="status-subtext">{status_label}</span>
+                            </div>
                             <p style="font-size:11px; margin-top:10px;">Height: <b>{latest['Jump Height (in)']:.1f}"</b> | RSI: <b>{latest['RSI-modified [m/s]']:.2f}</b></p>
                         </div>
                     """, unsafe_allow_html=True)
+                else:
+                    st.info("No VALD test found for this week.")
             with jc2:
                 if not p_cmj_history.empty:
                     fig = make_subplots(specs=[[{"secondary_y": True}]])
@@ -180,29 +173,5 @@ try:
                     fig.update_layout(height=250, margin=dict(l=0, r=0, t=20, b=0), legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
                     st.plotly_chart(fig, use_container_width=True)
 
-    with t_gallery:
-        if not day_df.empty:
-            for i in range(0, len(day_df), 2):
-                cols = st.columns(2)
-                for j in range(2):
-                    if i + j < len(day_df):
-                        p_d = day_df.iloc[i + j]
-                        rows_html = "".join([f"<tr><td>{k}</td><td>{p_d[k]}</td><td>{int(p_d[f'{k}_Grade'])}</td></tr>" for k in all_metrics])
-                        with cols[j]:
-                            st.markdown(f"""
-                            <div class="gallery-card">
-                                <div style="display: flex; align-items: center; gap: 10px;">
-                                    <div style="flex: 1.2; text-align: center;">
-                                        <img src="{p_d['PhotoURL']}" class="gallery-photo">
-                                        <p style="font-weight:bold; font-size:15px; margin-top:8px;">{p_d['Name']}</p>
-                                    </div>
-                                    <div style="flex: 2.5;"><table class="scout-table"><thead><tr><th>Metric</th><th>Val</th><th>Grade</th></tr></thead><tbody>{rows_html}</tbody></table></div>
-                                    <div style="flex: 1; text-align: center;">
-                                        <div class="score-label" style="font-size:9px;">Practice</div>
-                                        <div style="background-color:{get_gradient(p_d['Practice Score'])}; padding:10px; border-radius:12px; font-size:32px; font-weight:900;">{int(p_d['Practice Score'])}</div>
-                                    </div>
-                                </div>
-                            </div>
-                            """, unsafe_allow_html=True)
 except Exception as e:
     st.error(f"Sync Error: {e}")
