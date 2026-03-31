@@ -13,33 +13,14 @@ st.markdown("""
     .stApp { background-color: #FFFFFF; color: #1D1D1F; }
     hr { display: none !important; }
     .block-container { padding-top: 1.5rem !important; }
-
-    /* Table Styles */
     .scout-table { width: 100%; border-collapse: collapse; text-align: center; table-layout: auto; }
     .scout-table th { background-color: #F5F5F7; padding: 4px; border-bottom: 2px solid #E5E5E7; font-weight: 700; font-size: 11px; }
     .scout-table td { padding: 4px; border-bottom: 1px solid #F5F5F7; font-size: 11px; }
-    
-    /* Profile Photo */
     .player-photo-large { border-radius: 50%; width: 220px; height: 220px; object-fit: cover; border: 6px solid #FF8200; }
-    
-    /* Score Boxes */
-    .score-container { display: flex; justify-content: center; gap: 15px; margin-top: 10px; }
     .score-wrapper { text-align: center; }
     .score-label { font-size: 10px; font-weight: 800; text-transform: uppercase; margin-bottom: 4px; color: #515154; }
     .score-box { padding: 10px 20px; border-radius: 12px; font-size: 32px; font-weight: 800; min-width: 100px; color: #1D1D1F; }
-    
-    /* Gallery Card */
-    .gallery-card { 
-        border: 1px solid #E5E5E7; 
-        padding: 15px; 
-        border-radius: 15px; 
-        background-color: #FFFFFF; 
-        margin-bottom: 12px; 
-        min-height: 320px;
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
-    }
+    .gallery-card { border: 1px solid #E5E5E7; padding: 15px; border-radius: 15px; background-color: #FFFFFF; margin-bottom: 12px; min-height: 320px; display: flex; flex-direction: column; justify-content: center; }
     .gallery-photo { border-radius: 50%; width: 110px; height: 110px; object-fit: cover; border: 5px solid #FF8200; }
     </style>
     """, unsafe_allow_html=True)
@@ -57,11 +38,9 @@ if "password_correct" not in st.session_state:
 # --- DATA LOADING ---
 @st.cache_data(ttl=300)
 def load_all_data():
-    # Primary Catapult Sheet
     df = pd.read_csv(st.secrets["GOOGLE_SHEET_URL"])
     df.columns = df.columns.str.strip()
     
-    # VALD / CMJ Sheet
     cmj_df = pd.read_csv(st.secrets["CMJ_SHEET_URL"])
     cmj_df.columns = cmj_df.columns.str.strip()
     
@@ -78,16 +57,12 @@ def load_all_data():
     df = df.rename(columns=rename_map)
     df['Date'] = pd.to_datetime(df['Date'])
     
-    # Standardize Metadata
-    df = df.sort_values(['Name', 'Date'])
+    # 1. CLEANING: Match Excel rounding (1 decimal place)
+    metric_cols = ['Total Jumps', 'Moderate Jumps', 'High Jumps', 'Jump Load', 'Player Load', 'Estimated Distance', 'Explosive Efforts', 'High Intensity Movements']
+    df[metric_cols] = df[metric_cols].apply(pd.to_numeric, errors='coerce').fillna(0).round(1)
+    
     df['Position'] = df.groupby('Name')['Position'].ffill().bfill().fillna("N/A")
     df['PhotoURL'] = df.groupby('Name')['PhotoURL'].ffill().bfill().fillna("https://www.w3schools.com/howto/img_avatar.png")
-    
-    # Ensure numeric types
-    metric_cols = ['Total Jumps', 'Moderate Jumps', 'High Jumps', 'Jump Load', 'Player Load', 'Estimated Distance', 'Explosive Efforts', 'High Intensity Movements']
-    df[metric_cols] = df[metric_cols].apply(pd.to_numeric, errors='coerce').fillna(0)
-    
-    # CMJ Date Formatting
     cmj_df['Test Date'] = pd.to_datetime(cmj_df['Test Date'])
     
     return df, cmj_df
@@ -96,7 +71,6 @@ try:
     df, cmj_df = load_all_data()
     date_options = [d.strftime('%m/%d/%Y') for d in sorted(df['Date'].unique(), reverse=True)]
 
-    # --- UI HEADER ---
     st.markdown("<h3 style='text-align: center; margin-bottom: 20px;'>Performance Lab</h3>", unsafe_allow_html=True)
     c_main, c_pos = st.columns([2, 2])
     with c_main:
@@ -112,7 +86,7 @@ try:
 
     # --- SCORE LOGIC ---
     all_metrics = ['Total Jumps', 'Moderate Jumps', 'High Jumps', 'Jump Load', 'Player Load', 'Estimated Distance', 'Explosive Efforts', 'High Intensity Movements']
-    overall_maxes = df.groupby('Name')[all_metrics].max()
+    overall_maxes = df.groupby('Name')[all_metrics].max().round(1)
     team_ath_maxes = cmj_df[['Jump Height (Imp-Mom) [cm]', 'Peak Power [W]', 'RSI-modified [m/s]']].max()
 
     def get_gradient(score):
@@ -124,21 +98,19 @@ try:
         p_name = row['Name']
         p_maxes = overall_maxes.loc[p_name]
         
-        # 1. PRACTICE SCORE LOGIC: ROUNDUP(Current/Max*100, 0)
         grades = []
         for k in all_metrics:
             val = float(row[k])
             mx = float(p_maxes[k])
-            # Calculate Grade
+            # Grade = ROUNDUP(Current/Max*100, 0)
             grade = math.ceil((val / mx) * 100) if mx > 0 else 0
             row[f'{k}_Grade'] = grade
             row[f'{k}_Max'] = mx
             grades.append(grade)
         
-        # Final Practice Score: ROUNDUP(AVERAGE(Grades), 0)
+        # Practice Score = ROUNDUP(AVERAGE(Grades), 0)
         row['Practice Score'] = math.ceil(sum(grades) / len(grades)) if grades else 0
         
-        # 2. ATHLETIC SCORE LOGIC: Static benchmark from VALD
         p_cmj = cmj_df[cmj_df['Athlete'] == p_name].sort_values('Test Date', ascending=False)
         if not p_cmj.empty:
             v = p_cmj.iloc[0]
@@ -148,7 +120,6 @@ try:
             row['Athletic Score'] = math.ceil((pw_s * 0.4) + (jh_s * 0.3) + (rs_s * 0.3))
         else:
             row['Athletic Score'] = 0
-            
         return row
 
     if not day_df.empty:
@@ -160,25 +131,20 @@ try:
         if not day_df.empty:
             sel_p = st.selectbox("Select Athlete", day_df['Name'].unique())
             p = day_df[day_df['Name'] == sel_p].iloc[0]
-            
             c1, c2, c3 = st.columns([1.2, 2.5, 1.2])
             with c1:
                 st.markdown(f'<div style="text-align:center;"><img src="{p["PhotoURL"]}" class="player-photo-large"></div>', unsafe_allow_html=True)
                 st.markdown(f'<h2 style="text-align:center; margin-top:10px;">{p["Name"]}</h2>', unsafe_allow_html=True)
-                st.markdown(f'<p style="text-align:center; color:#FF8200; font-weight:700;">{p["Position"]}</p>', unsafe_allow_html=True)
-            
             with c2:
                 html = '<table class="scout-table"><thead><tr><th>Metric</th><th>Today</th><th>Season Max</th><th>Grade</th></tr></thead><tbody>'
                 for k in all_metrics:
-                    html += f"<tr><td>{k}</td><td>{p[k]:.1f}</td><td>{p[f'{k}_Max']:.1f}</td><td>{int(p[f'{k}_Grade'])}</td></tr>"
+                    html += f"<tr><td>{k}</td><td>{p[k]}</td><td>{p[f'{k}_Max']}</td><td>{int(p[f'{k}_Grade'])}</td></tr>"
                 st.markdown(html + '</tbody></table>', unsafe_allow_html=True)
-            
             with c3:
                 st.markdown(f"""
                 <div class="score-wrapper">
                     <div class="score-label">Athletic Score</div>
                     <div class="score-box" style="background-color:{get_gradient(p['Athletic Score'])}; margin-bottom:20px;">{int(p['Athletic Score'])}</div>
-                    
                     <div class="score-label">Practice Score</div>
                     <div class="score-box" style="background-color:{get_gradient(p['Practice Score'])};">{int(p['Practice Score'])}</div>
                 </div>
@@ -191,14 +157,14 @@ try:
                 for j in range(2):
                     if i + j < len(day_df):
                         p_d = day_df.iloc[i + j]
-                        rows_html = "".join([f"<tr><td>{k}</td><td>{int(p_d[k])}</td><td>{int(p_d[f'{k}_Grade'])}</td></tr>" for k in all_metrics])
+                        rows_html = "".join([f"<tr><td>{k}</td><td>{p_d[k]}</td><td>{int(p_d[f'{k}_Grade'])}</td></tr>" for k in all_metrics])
                         with cols[j]:
                             st.markdown(f"""
                             <div class="gallery-card">
                                 <div style="display: flex; align-items: center; gap: 10px;">
                                     <div style="flex: 1.2; text-align: center;">
                                         <img src="{p_d['PhotoURL']}" class="gallery-photo">
-                                        <p style="font-weight:bold; font-size:15px; margin-top:8px;">{p_d['Name']}<br><small style="color:#FF8200;">{p_d['Position']}</small></p>
+                                        <p style="font-weight:bold; font-size:15px; margin-top:8px;">{p_d['Name']}</p>
                                     </div>
                                     <div style="flex: 2.5;"><table class="scout-table"><thead><tr><th>Metric</th><th>Val</th><th>Grade</th></tr></thead><tbody>{rows_html}</tbody></table></div>
                                     <div style="flex: 1; text-align: center;">
@@ -208,6 +174,5 @@ try:
                                 </div>
                             </div>
                             """, unsafe_allow_html=True)
-
 except Exception as e:
     st.error(f"Sync Error: {e}")
