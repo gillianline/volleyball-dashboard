@@ -39,9 +39,11 @@ if "password_correct" not in st.session_state:
 # --- DATA LOADING ---
 @st.cache_data(ttl=300)
 def load_all_data():
+    # Primary Catapult Sheet
     df = pd.read_csv(st.secrets["GOOGLE_SHEET_URL"])
     df.columns = df.columns.str.strip()
     
+    # VALD / CMJ Sheet
     cmj_df = pd.read_csv(st.secrets["CMJ_SHEET_URL"])
     cmj_df.columns = cmj_df.columns.str.strip()
     
@@ -58,10 +60,16 @@ def load_all_data():
     df = df.rename(columns=rename_map)
     df['Date'] = pd.to_datetime(df['Date'])
     
-    # Cleaning & Numeric Conversion (Round to 1 decimal for Excel match)
+    # Cleaning & Numeric Conversion (Round to 1 decimal)
     metric_cols = ['Total Jumps', 'Moderate Jumps', 'High Jumps', 'Jump Load', 'Player Load', 'Estimated Distance', 'Explosive Efforts', 'High Intensity Movements']
     df[metric_cols] = df[metric_cols].apply(pd.to_numeric, errors='coerce').fillna(0).round(1)
     
+    # Fill blank Activities with the Date
+    if 'Activity' in df.columns:
+        df['Activity'] = df['Activity'].fillna(df['Date'].dt.strftime('%m/%d/%Y'))
+    else:
+        df['Activity'] = df['Date'].dt.strftime('%m/%d/%Y')
+
     df['Position'] = df.groupby('Name')['Position'].ffill().bfill().fillna("N/A")
     df['PhotoURL'] = df.groupby('Name')['PhotoURL'].ffill().bfill().fillna("https://www.w3schools.com/howto/img_avatar.png")
     cmj_df['Test Date'] = pd.to_datetime(cmj_df['Test Date'])
@@ -70,18 +78,22 @@ def load_all_data():
 
 try:
     df, cmj_df = load_all_data()
-    date_options = [d.strftime('%m/%d/%Y') for d in sorted(df['Date'].unique(), reverse=True)]
+
+    # --- SELECTION LOGIC ---
+    # Combine Activity Name and Date for the dropdown
+    df['Session_Label'] = df['Activity'] + " (" + df['Date'].dt.strftime('%m/%d/%y') + ")"
+    session_options = sorted(df['Session_Label'].unique(), reverse=True)
 
     st.markdown("<h3 style='text-align: center; margin-bottom: 20px;'>Performance Lab</h3>", unsafe_allow_html=True)
     c_main, c_pos = st.columns([2, 2])
     with c_main:
-        date_a_str = st.selectbox("Current Practice", date_options, index=0)
+        selected_session = st.selectbox("Select Session", session_options, index=0)
     with c_pos:
         pos_list = sorted([p for p in df['Position'].unique() if p != "N/A"])
         pos_filter = st.selectbox("Position Filter", ["All Positions"] + pos_list)
 
-    date_a = pd.to_datetime(date_a_str)
-    day_df = df[df['Date'] == date_a].copy()
+    # Filter data for the specific session selected
+    day_df = df[df['Session_Label'] == selected_session].copy()
     if pos_filter != "All Positions":
         day_df = day_df[day_df['Position'] == pos_filter]
 
@@ -99,7 +111,7 @@ try:
         current_date = row['Date']
         start_date = current_date - timedelta(days=30)
         
-        # Calculate Rolling Max: Filter master DF for this player within the last 30 days
+        # Calculate Rolling Max (Last 30 days)
         lookback_df = df[(df['Name'] == p_name) & (df['Date'] >= start_date) & (df['Date'] <= current_date)]
         rolling_maxes = lookback_df[all_metrics].max().round(1)
         
@@ -107,7 +119,6 @@ try:
         for k in all_metrics:
             val = float(row[k])
             mx = float(rolling_maxes[k])
-            
             # Grade = ROUNDUP(Current/RollingMax*100, 0)
             grade = math.ceil((val / mx) * 100) if mx > 0 else 0
             row[f'{k}_Grade'] = grade
@@ -117,7 +128,7 @@ try:
         # Practice Score = ROUNDUP(AVERAGE(Grades), 0)
         row['Practice Score'] = math.ceil(sum(grades) / len(grades)) if grades else 0
         
-        # VALD Static Score remains the same
+        # VALD Static Score
         p_cmj = cmj_df[cmj_df['Athlete'] == p_name].sort_values('Test Date', ascending=False)
         if not p_cmj.empty:
             v = p_cmj.iloc[0]
@@ -132,7 +143,6 @@ try:
     if not day_df.empty:
         day_df = day_df.apply(process_player, axis=1).sort_values('Name')
 
-    # --- TABS ---
     t_player, t_gallery = st.tabs(["Individual Profile", "Team Gallery"])
 
     with t_player:
