@@ -58,14 +58,15 @@ def load_all_data():
     df = df.rename(columns=rename_map)
     df['Date'] = pd.to_datetime(df['Date'])
     
+    # 1 decimal rounding for Excel accuracy
     metric_cols = ['Total Jumps', 'Moderate Jumps', 'High Jumps', 'Jump Load', 'Player Load', 'Estimated Distance', 'Explosive Efforts', 'High Intensity Movements']
     df[metric_cols] = df[metric_cols].apply(pd.to_numeric, errors='coerce').fillna(0).round(1)
     
-    # Selection logic: Use Activity name, fallback to Date string if Activity is blank
-    if 'Activity' in df.columns:
-        df['Session_Name'] = df['Activity'].fillna(df['Date'].dt.strftime('%m/%d/%Y'))
+    # Selection logic: Populate Activity column if it doesn't exist
+    if 'Activity' not in df.columns:
+        df['Activity'] = df['Date'].dt.strftime('%m/%d/%Y')
     else:
-        df['Session_Name'] = df['Date'].dt.strftime('%m/%d/%Y')
+        df['Activity'] = df['Activity'].fillna(df['Date'].dt.strftime('%m/%d/%Y'))
 
     df['Position'] = df.groupby('Name')['Position'].ffill().bfill().fillna("N/A")
     df['PhotoURL'] = df.groupby('Name')['PhotoURL'].ffill().bfill().fillna("https://www.w3schools.com/howto/img_avatar.png")
@@ -76,8 +77,10 @@ def load_all_data():
 try:
     df, cmj_df = load_all_data()
 
-    # Dropdown Options
-    session_options = sorted(df['Session_Name'].unique(), reverse=True)
+    # --- CHRONOLOGICAL SORTING FOR DROPDOWN ---
+    # Create unique pairs of Date and Activity, sort by Date (Descending)
+    session_map = df[['Date', 'Activity']].drop_duplicates().sort_values('Date', ascending=False)
+    session_options = session_map['Activity'].tolist()
 
     st.markdown("<h3 style='text-align: center; margin-bottom: 20px;'>Performance Lab</h3>", unsafe_allow_html=True)
     c_main, c_pos = st.columns([2, 2])
@@ -87,8 +90,8 @@ try:
         pos_list = sorted([p for p in df['Position'].unique() if p != "N/A"])
         pos_filter = st.selectbox("Position Filter", ["All Positions"] + pos_list)
 
-    # Filter data
-    day_df = df[df['Session_Name'] == selected_session].copy()
+    # Filter based on the selected Activity name
+    day_df = df[df['Activity'] == selected_session].copy()
     if pos_filter != "All Positions":
         day_df = day_df[day_df['Position'] == pos_filter]
 
@@ -106,7 +109,7 @@ try:
         current_date = row['Date']
         start_date = current_date - timedelta(days=30)
         
-        # Calculate Rolling Max (30 days)
+        # Lookback for rolling 30-day max
         lookback_df = df[(df['Name'] == p_name) & (df['Date'] >= start_date) & (df['Date'] <= current_date)]
         rolling_maxes = lookback_df[all_metrics].max().round(1)
         
@@ -121,7 +124,7 @@ try:
         
         row['Practice Score'] = math.ceil(sum(grades) / len(grades)) if grades else 0
         
-        # VALD Static Score
+        # CMJ Benchmark (Independent)
         p_cmj = cmj_df[cmj_df['Athlete'] == p_name].sort_values('Test Date', ascending=False)
         if not p_cmj.empty:
             v = p_cmj.iloc[0]
