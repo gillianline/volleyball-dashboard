@@ -25,6 +25,8 @@ st.markdown("""
     .readiness-box { padding: 15px; border-radius: 12px; text-align: center; color: white; margin-bottom: 10px; }
     .readiness-val { font-size: 28px; font-weight: 900; }
     .readiness-sub { font-size: 10px; font-weight: 700; opacity: 0.9; }
+    
+    .jump-info-box { border: 1px solid #EEE; padding: 10px; border-radius: 8px; background-color: #FAFAFA; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -127,19 +129,16 @@ try:
             with c1:
                 st.markdown(f'<div style="text-align:center;"><img src="{p["PhotoURL"]}" class="player-photo-large"></div>', unsafe_allow_html=True)
                 st.markdown(f'<h3 style="text-align:center; margin-top:10px;">{p["Name"]}</h3>', unsafe_allow_html=True)
-                
-                # Practice Score next to data
-                st.markdown(f'<p class="score-label" style="margin-top:20px;">PRACTICE SCORE</p>', unsafe_allow_html=True)
-                st.markdown(f'<div class="score-box" style="background-color:{get_gradient(p["Practice Score"])};">{int(p["Practice Score"])}</div>', unsafe_allow_html=True)
+                st.markdown(f'<p style="text-align:center; color:#FF8200; font-weight:700;">{p["Position"]}</p>', unsafe_allow_html=True)
 
             with c2:
-                # Catapult Table
+                # 1. CATAPULT DATA TABLE
                 html = '<table class="scout-table"><thead><tr><th>Metric</th><th>Today</th><th>30d Max</th><th>Grade</th></tr></thead><tbody>'
                 for k in all_metrics:
                     html += f"<tr><td>{k}</td><td>{p[k]}</td><td>{p[f'{k}_Max']}</td><td>{int(p[f'{k}_Grade'])}</td></tr>"
                 st.markdown(html + '</tbody></table>', unsafe_allow_html=True)
 
-                # DUAL AXIS GRAPH: Height and RSI-Mod
+                # 2. DUAL AXIS GRAPH: Height and RSI-Mod
                 if not p_cmj_history.empty:
                     fig = make_subplots(specs=[[{"secondary_y": True}]])
                     fig.add_trace(go.Scatter(x=p_cmj_history['Test Date'], y=p_cmj_history['Jump Height (in)'], 
@@ -147,13 +146,17 @@ try:
                     fig.add_trace(go.Scatter(x=p_cmj_history['Test Date'], y=p_cmj_history['RSI-modified [m/s]'], 
                                              name="RSI-Mod", line=dict(color='#1D1D1F', dash='dot'), marker=dict(size=8)), secondary_y=True)
                     
-                    fig.update_layout(title="Neuromuscular Profile (Season History)", height=300, margin=dict(l=0, r=0, t=50, b=0), legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
+                    fig.update_layout(title="Neuromuscular Profile (Season History)", height=280, margin=dict(l=0, r=0, t=50, b=0), legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
                     fig.update_yaxes(title_text="Height (in)", secondary_y=False)
                     fig.update_yaxes(title_text="RSI-Modified", secondary_y=True)
                     st.plotly_chart(fig, use_container_width=True)
 
             with c3:
-                # WEEKLY READINESS
+                # 3. PRACTICE SCORE (Now at Top Right)
+                st.markdown(f'<p class="score-label">PRACTICE SCORE</p>', unsafe_allow_html=True)
+                st.markdown(f'<div class="score-box" style="background-color:{get_gradient(p["Practice Score"])}; margin-bottom:40px;">{int(p["Practice Score"])}</div>', unsafe_allow_html=True)
+
+                # 4. WEEKLY READINESS (Now Below Score)
                 if not sync_cmj.empty:
                     latest = sync_cmj.iloc[-1]
                     past_tests = p_cmj_history[p_cmj_history['Test Date'] <= latest['Test Date']]
@@ -164,13 +167,13 @@ try:
                     st.markdown(f'<p class="score-label">WEEKLY READINESS</p>', unsafe_allow_html=True)
                     st.markdown(f'<div class="readiness-box" style="background-color:{color};"><div class="readiness-val">{perc_diff:+.1f}%</div><div class="readiness-sub">vs. Recent Avg</div></div>', unsafe_allow_html=True)
                     
-                    # Diagnostic Data
+                    # Small Diagnostic Stats
                     st.markdown(f"""
-                        <div style="border:1px solid #EEE; padding:10px; border-radius:8px;">
-                            <p style="margin:0; font-size:10px; color:gray;">Diagnostic Metrics:</p>
+                        <div class="jump-info-box">
                             <p style="margin:0; font-size:12px;"><b>Jump:</b> {latest['Jump Height (in)']:.1f}"</p>
                             <p style="margin:0; font-size:12px;"><b>RSI:</b> {latest['RSI-modified [m/s]']:.2f}</p>
                             <p style="margin:0; font-size:12px;"><b>Power:</b> {latest['Peak Power [W]']:.0f}W</p>
+                            <p style="margin:0; font-size:9px; color:gray; margin-top:4px;">Tested: {latest['Test Date'].strftime('%m/%d')}</p>
                         </div>
                     """, unsafe_allow_html=True)
                 else:
