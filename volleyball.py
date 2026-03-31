@@ -23,6 +23,11 @@ st.markdown("""
     .score-box { padding: 10px 20px; border-radius: 12px; font-size: 32px; font-weight: 800; min-width: 100px; color: #1D1D1F; }
     .gallery-card { border: 1px solid #E5E5E7; padding: 15px; border-radius: 15px; background-color: #FFFFFF; margin-bottom: 12px; min-height: 320px; display: flex; flex-direction: column; justify-content: center; }
     .gallery-photo { border-radius: 50%; width: 110px; height: 110px; object-fit: cover; border: 5px solid #FF8200; }
+    
+    /* Readiness Widget */
+    .readiness-box { padding: 15px; border-radius: 12px; text-align: center; color: white; }
+    .readiness-val { font-size: 28px; font-weight: 900; }
+    .readiness-sub { font-size: 10px; font-weight: 700; opacity: 0.9; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -58,11 +63,11 @@ def load_all_data():
     df = df.rename(columns=rename_map)
     df['Date'] = pd.to_datetime(df['Date'])
     
-    # 1 decimal rounding for Excel accuracy
+    # 1 decimal rounding
     metric_cols = ['Total Jumps', 'Moderate Jumps', 'High Jumps', 'Jump Load', 'Player Load', 'Estimated Distance', 'Explosive Efforts', 'High Intensity Movements']
     df[metric_cols] = df[metric_cols].apply(pd.to_numeric, errors='coerce').fillna(0).round(1)
     
-    # Selection logic: Populate Activity column if it doesn't exist
+    # Selection logic
     if 'Activity' not in df.columns:
         df['Activity'] = df['Date'].dt.strftime('%m/%d/%Y')
     else:
@@ -77,8 +82,7 @@ def load_all_data():
 try:
     df, cmj_df = load_all_data()
 
-    # --- CHRONOLOGICAL SORTING FOR DROPDOWN ---
-    # Create unique pairs of Date and Activity, sort by Date (Descending)
+    # Chronological sort for dropdown
     session_map = df[['Date', 'Activity']].drop_duplicates().sort_values('Date', ascending=False)
     session_options = session_map['Activity'].tolist()
 
@@ -90,14 +94,13 @@ try:
         pos_list = sorted([p for p in df['Position'].unique() if p != "N/A"])
         pos_filter = st.selectbox("Position Filter", ["All Positions"] + pos_list)
 
-    # Filter based on the selected Activity name
     day_df = df[df['Activity'] == selected_session].copy()
     if pos_filter != "All Positions":
         day_df = day_df[day_df['Position'] == pos_filter]
 
-    # --- SCORE LOGIC (30-DAY ROLLING MAX) ---
+    # --- LOGIC ---
     all_metrics = ['Total Jumps', 'Moderate Jumps', 'High Jumps', 'Jump Load', 'Player Load', 'Estimated Distance', 'Explosive Efforts', 'High Intensity Movements']
-    team_ath_maxes = cmj_df[['Jump Height (Imp-Mom) [cm]', 'Peak Power [W]', 'RSI-modified [m/s]']].max()
+    overall_maxes = df.groupby('Name')[all_metrics].max().round(1)
 
     def get_gradient(score):
         score = max(0, min(100, float(score)))
@@ -109,7 +112,6 @@ try:
         current_date = row['Date']
         start_date = current_date - timedelta(days=30)
         
-        # Lookback for rolling 30-day max
         lookback_df = df[(df['Name'] == p_name) & (df['Date'] >= start_date) & (df['Date'] <= current_date)]
         rolling_maxes = lookback_df[all_metrics].max().round(1)
         
@@ -123,17 +125,6 @@ try:
             grades.append(grade)
         
         row['Practice Score'] = math.ceil(sum(grades) / len(grades)) if grades else 0
-        
-        # CMJ Benchmark (Independent)
-        p_cmj = cmj_df[cmj_df['Athlete'] == p_name].sort_values('Test Date', ascending=False)
-        if not p_cmj.empty:
-            v = p_cmj.iloc[0]
-            jh_s = (v['Jump Height (Imp-Mom) [cm]'] / team_ath_maxes['Jump Height (Imp-Mom) [cm]']) * 100
-            pw_s = (v['Peak Power [W]'] / team_ath_maxes['Peak Power [W]']) * 100
-            rs_s = (v['RSI-modified [m/s]'] / team_ath_maxes['RSI-modified [m/s]']) * 100
-            row['Athletic Score'] = math.ceil((pw_s * 0.4) + (jh_s * 0.3) + (rs_s * 0.3))
-        else:
-            row['Athletic Score'] = 0
         return row
 
     if not day_df.empty:
@@ -145,6 +136,10 @@ try:
         if not day_df.empty:
             sel_p = st.selectbox("Select Athlete", day_df['Name'].unique())
             p = day_df[day_df['Name'] == sel_p].iloc[0]
+            
+            # VALD Readiness Logic
+            p_cmj = cmj_df[cmj_df['Athlete'] == sel_p].sort_values('Test Date', ascending=False)
+            
             c1, c2, c3 = st.columns([1.2, 2.5, 1.2])
             with c1:
                 st.markdown(f'<div style="text-align:center;"><img src="{p["PhotoURL"]}" class="player-photo-large"></div>', unsafe_allow_html=True)
@@ -156,14 +151,34 @@ try:
                     html += f"<tr><td>{k}</td><td>{p[k]}</td><td>{p[f'{k}_Max']}</td><td>{int(p[f'{k}_Grade'])}</td></tr>"
                 st.markdown(html + '</tbody></table>', unsafe_allow_html=True)
             with c3:
-                st.markdown(f"""
-                <div class="score-wrapper">
-                    <div class="score-label">Athletic Score</div>
-                    <div class="score-box" style="background-color:{get_gradient(p['Athletic Score'])}; margin-bottom:20px;">{int(p['Athletic Score'])}</div>
-                    <div class="score-label">Practice Score</div>
-                    <div class="score-box" style="background-color:{get_gradient(p['Practice Score'])};">{int(p['Practice Score'])}</div>
-                </div>
-                """, unsafe_allow_html=True)
+                # READINESS DISPLAY
+                if not p_cmj.empty:
+                    latest = p_cmj.iloc[0]
+                    # Compare to 4-test baseline
+                    baseline = p_cmj.head(4)['Jump Height (Imp-Mom) [cm]'].mean()
+                    perc_diff = ((latest['Jump Height (Imp-Mom) [cm]'] - baseline) / baseline) * 100
+                    
+                    # Color Mapping
+                    color = "#00CC96" if perc_diff > -5 else ("#FFA15A" if perc_diff > -10 else "#FF4B4B")
+                    
+                    st.markdown(f'<p style="text-align:center; font-weight:800; font-size:12px;">WEEKLY JUMP STATUS</p>', unsafe_allow_html=True)
+                    st.markdown(f"""
+                        <div class="readiness-box" style="background-color:{color};">
+                            <div class="readiness-val">{perc_diff:+.1f}%</div>
+                            <div class="readiness-sub">vs. 4-Test Baseline</div>
+                        </div>
+                    """, unsafe_allow_html=True)
+                    
+                    st.markdown(f"""
+                        <div style="margin-top:10px; border:1px solid #EEE; border-radius:8px; padding:10px;">
+                            <p style="margin:0; font-size:11px; color:gray;">Latest Test Metrics:</p>
+                            <p style="margin:0; font-size:13px; font-weight:700;">Jump: {latest['Jump Height (Imp-Mom) [cm]']:.1f} cm</p>
+                            <p style="margin:0; font-size:13px; font-weight:700;">RSI-Mod: {latest['RSI-modified [m/s]']:.2f}</p>
+                        </div>
+                    """, unsafe_allow_html=True)
+
+                st.markdown(f'<p style="text-align:center; font-weight:800; font-size:12px; margin-top:20px;">PRACTICE SCORE</p>', unsafe_allow_html=True)
+                st.markdown(f'<div class="score-box" style="background-color:{get_gradient(p["Practice Score"])};">{int(p["Practice Score"])}</div>', unsafe_allow_html=True)
 
     with t_gallery:
         if not day_df.empty:
