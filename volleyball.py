@@ -21,10 +21,9 @@ st.markdown("""
     .score-label { font-size: 10px; font-weight: 800; text-transform: uppercase; margin-bottom: 4px; color: #515154; text-align: center; }
     .score-box { padding: 10px 20px; border-radius: 12px; font-size: 32px; font-weight: 800; min-width: 100px; color: #1D1D1F; text-align: center; }
     
-    .gallery-card { border: 1px solid #E5E5E7; padding: 15px; border-radius: 15px; background-color: #FFFFFF; margin-bottom: 12px; min-height: 320px; display: flex; flex-direction: column; justify-content: center; }
-    .gallery-photo { border-radius: 50%; width: 110px; height: 110px; object-fit: cover; border: 5px solid #FF8200; }
-    
-    .readiness-box { padding: 15px; border-radius: 12px; text-align: center; color: white; }
+    /* Combined Readiness & Jump Styling */
+    .jump-card { border: 1px solid #EEE; border-radius: 12px; padding: 12px; background-color: #FAFAFA; }
+    .readiness-box { padding: 15px; border-radius: 12px; text-align: center; color: white; margin-bottom: 10px; }
     .readiness-val { font-size: 28px; font-weight: 900; }
     .readiness-sub { font-size: 10px; font-weight: 700; opacity: 0.9; }
     </style>
@@ -45,22 +44,17 @@ if "password_correct" not in st.session_state:
 def load_all_data():
     df = pd.read_csv(st.secrets["GOOGLE_SHEET_URL"])
     df.columns = df.columns.str.strip()
-    
     cmj_df = pd.read_csv(st.secrets["CMJ_SHEET_URL"])
     cmj_df.columns = cmj_df.columns.str.strip()
     
-    # CONVERSION: CM to INCHES for VALD Data
+    # Conversion: cm to in
     cmj_df['Jump Height (in)'] = cmj_df['Jump Height (Imp-Mom) [cm]'] * 0.3937
     
     rename_map = {
-        'Total Jumps': 'Total Jumps',
-        'IMA Jump Count Med Band': 'Moderate Jumps',
-        'IMA Jump Count High Band': 'High Jumps',
-        'BMP Jumping Load': 'Jump Load',
-        'Total Player Load': 'Player Load',
-        'Estimated Distance (y)': 'Estimated Distance',
-        'Explosive Efforts': 'Explosive Efforts',
-        'High Intensity Movement': 'High Intensity Movements'
+        'Total Jumps': 'Total Jumps', 'IMA Jump Count Med Band': 'Moderate Jumps',
+        'IMA Jump Count High Band': 'High Jumps', 'BMP Jumping Load': 'Jump Load',
+        'Total Player Load': 'Player Load', 'Estimated Distance (y)': 'Estimated Distance',
+        'Explosive Efforts': 'Explosive Efforts', 'High Intensity Movement': 'High Intensity Movements'
     }
     df = df.rename(columns=rename_map)
     df['Date'] = pd.to_datetime(df['Date'])
@@ -81,7 +75,6 @@ def load_all_data():
 
 try:
     df, cmj_df = load_all_data()
-
     session_map = df[['Date', 'Activity']].drop_duplicates().sort_values('Date', ascending=False)
     session_options = session_map['Activity'].tolist()
 
@@ -114,17 +107,9 @@ try:
         start_date = current_date - timedelta(days=30)
         lookback_df = df[(df['Name'] == p_name) & (df['Date'] >= start_date) & (df['Date'] <= current_date)]
         rolling_maxes = lookback_df[all_metrics].max().round(1)
-        
-        grades = []
-        for k in all_metrics:
-            val = float(row[k])
-            mx = float(rolling_maxes[k])
-            grade = math.ceil((val / mx) * 100) if mx > 0 else 0
-            row[f'{k}_Grade'] = grade
-            row[f'{k}_Max'] = mx
-            grades.append(grade)
-        
+        grades = [math.ceil((float(row[k]) / float(rolling_maxes[k])) * 100) if float(rolling_maxes[k]) > 0 else 0 for k in all_metrics]
         row['Practice Score'] = math.ceil(sum(grades) / len(grades)) if grades else 0
+        for i, k in enumerate(all_metrics): row[f'{k}_Max'] = rolling_maxes[k]; row[f'{k}_Grade'] = grades[i]
         return row
 
     if not day_df.empty:
@@ -153,56 +138,37 @@ try:
                     html += f"<tr><td>{k}</td><td>{p[k]}</td><td>{p[f'{k}_Max']}</td><td>{int(p[f'{k}_Grade'])}</td></tr>"
                 st.markdown(html + '</tbody></table>', unsafe_allow_html=True)
 
-                # JUMP PROGRESS GRAPH (Converted to Inches)
                 if not p_cmj_history.empty:
-                    fig = px.line(p_cmj_history.sort_values('Test Date'), 
-                                  x='Test Date', y='Jump Height (in)', 
-                                  title="Jump Height Progress (in)", markers=True)
+                    fig = px.line(p_cmj_history.sort_values('Test Date'), x='Test Date', y='Jump Height (in)', title="Season Jump Progress", markers=True)
                     fig.update_traces(line_color='#FF8200') 
                     fig.update_layout(height=230, margin=dict(l=0, r=0, t=40, b=0), xaxis_title=None, yaxis_title="in")
                     st.plotly_chart(fig, use_container_width=True)
 
             with c3:
-                # WEEKLY READINESS
+                # WEEKLY JUMP READINESS SECTION
                 if not sync_cmj.empty:
                     latest = sync_cmj.iloc[0]
                     past_tests = p_cmj_history[p_cmj_history['Test Date'] <= latest['Test Date']]
-                    baseline_count = min(len(past_tests), 4)
-                    baseline = past_tests.head(baseline_count)['Jump Height (in)'].mean()
-                    
+                    baseline = past_tests.head(min(len(past_tests), 4))['Jump Height (in)'].mean()
                     perc_diff = ((latest['Jump Height (in)'] - baseline) / baseline) * 100
                     color = "#00CC96" if perc_diff > -5 else ("#FF8200" if perc_diff > -10 else "#FF4B4B")
                     
+                    st.markdown('<div class="jump-card">', unsafe_allow_html=True)
                     st.markdown(f'<p class="score-label">WEEKLY READINESS</p>', unsafe_allow_html=True)
                     st.markdown(f'<div class="readiness-box" style="background-color:{color};"><div class="readiness-val">{perc_diff:+.1f}%</div><div class="readiness-sub">vs. Recent Avg</div></div>', unsafe_allow_html=True)
-                    st.markdown(f'<div style="text-align:center; margin-top:5px; font-size:11px;">Latest Test: {latest["Jump Height (in)"]:.1f}" ({latest["Test Date"].strftime("%m/%d")})</div>', unsafe_allow_html=True)
+                    
+                    st.markdown(f"""
+                        <table style="width:100%; font-size:12px; border-collapse:collapse;">
+                            <tr><td style="color:gray;">Height:</td><td style="text-align:right; font-weight:700;">{latest['Jump Height (in)']:.1f}"</td></tr>
+                            <tr><td style="color:gray;">RSI-Mod:</td><td style="text-align:right; font-weight:700;">{latest['RSI-modified [m/s]']:.2f}</td></tr>
+                            <tr><td style="color:gray;">Power:</td><td style="text-align:right; font-weight:700;">{latest['Peak Power [W]']:.0f}W</td></tr>
+                        </table>
+                        <p style="text-align:center; font-size:10px; color:gray; margin-top:5px;">Tested: {latest['Test Date'].strftime('%m/%d')}</p>
+                    """, unsafe_allow_html=True)
+                    st.markdown('</div>', unsafe_allow_html=True)
 
                 st.markdown(f'<p class="score-label" style="margin-top:20px;">PRACTICE SCORE</p>', unsafe_allow_html=True)
                 st.markdown(f'<div class="score-box" style="background-color:{get_gradient(p["Practice Score"])};">{int(p["Practice Score"])}</div>', unsafe_allow_html=True)
 
-    with t_gallery:
-        if not day_df.empty:
-            for i in range(0, len(day_df), 2):
-                cols = st.columns(2)
-                for j in range(2):
-                    if i + j < len(day_df):
-                        p_d = day_df.iloc[i + j]
-                        rows_html = "".join([f"<tr><td>{k}</td><td>{p_d[k]}</td><td>{int(p_d[f'{k}_Grade'])}</td></tr>" for k in all_metrics])
-                        with cols[j]:
-                            st.markdown(f"""
-                            <div class="gallery-card">
-                                <div style="display: flex; align-items: center; gap: 10px;">
-                                    <div style="flex: 1.2; text-align: center;">
-                                        <img src="{p_d['PhotoURL']}" class="gallery-photo">
-                                        <p style="font-weight:bold; font-size:15px; margin-top:8px;">{p_d['Name']}</p>
-                                    </div>
-                                    <div style="flex: 2.5;"><table class="scout-table"><thead><tr><th>Metric</th><th>Val</th><th>Grade</th></tr></thead><tbody>{rows_html}</tbody></table></div>
-                                    <div style="flex: 1; text-align: center;">
-                                        <div class="score-label" style="font-size:9px;">Practice</div>
-                                        <div style="background-color:{get_gradient(p_d['Practice Score'])}; padding:10px; border-radius:12px; font-size:32px; font-weight:900;">{int(p_d['Practice Score'])}</div>
-                                    </div>
-                                </div>
-                            </div>
-                            """, unsafe_allow_html=True)
 except Exception as e:
     st.error(f"Sync Error: {e}")
