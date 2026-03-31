@@ -15,16 +15,21 @@ st.markdown("""
     .stApp { background-color: #FFFFFF; color: #1D1D1F; }
     hr { display: none !important; }
     .block-container { padding-top: 1.5rem !important; }
-    .scout-table { width: 100%; border-collapse: collapse; text-align: center; table-layout: auto; }
-    .scout-table th { background-color: #F5F5F7; padding: 4px; border-bottom: 2px solid #E5E5E7; font-weight: 700; font-size: 11px; }
-    .scout-table td { padding: 4px; border-bottom: 1px solid #F5F5F7; font-size: 11px; }
+    
+    /* Global Elements */
+    .scout-table { width: 100%; border-collapse: collapse; text-align: center; table-layout: auto; margin-bottom: 15px; }
+    .scout-table th { background-color: #F5F5F7; padding: 6px; border-bottom: 2px solid #E5E5E7; font-weight: 700; font-size: 11px; }
+    .scout-table td { padding: 6px; border-bottom: 1px solid #F5F5F7; font-size: 11px; }
     .player-photo-large { border-radius: 50%; width: 180px; height: 180px; object-fit: cover; border: 6px solid #FF8200; }
     
-    /* KPI Boxes */
-    .kpi-label { font-size: 10px; font-weight: 800; text-transform: uppercase; color: #515154; text-align: center; margin-bottom: 2px; }
-    .kpi-box { padding: 10px; border-radius: 10px; text-align: center; font-weight: 800; border: 1px solid #EEE; }
-    .status-tag { font-size: 14px; font-weight: 900; margin-bottom: 4px; }
-    .status-desc { font-size: 10px; font-weight: 400; color: #515154; line-height: 1.2; }
+    /* Section Headers */
+    .section-header { font-size: 14px; font-weight: 800; color: #FF8200; border-bottom: 2px solid #FF8200; margin-bottom: 15px; padding-bottom: 5px; text-transform: uppercase; }
+    
+    /* KPI Components */
+    .kpi-label { font-size: 10px; font-weight: 800; text-transform: uppercase; color: #515154; text-align: center; margin-bottom: 4px; }
+    .kpi-box { padding: 15px; border-radius: 12px; text-align: center; font-weight: 800; border: 1px solid #EEE; background-color: #FAFAFA; }
+    .status-tag { font-size: 16px; font-weight: 900; margin-bottom: 5px; }
+    .status-desc { font-size: 10px; font-weight: 400; color: #515154; line-height: 1.3; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -45,8 +50,6 @@ def load_all_data():
     df.columns = df.columns.str.strip()
     cmj_df = pd.read_csv(st.secrets["CMJ_SHEET_URL"])
     cmj_df.columns = cmj_df.columns.str.strip()
-    
-    # Conv: cm to in
     cmj_df['Jump Height (in)'] = cmj_df['Jump Height (Imp-Mom) [cm]'] * 0.3937
     
     rename_map = {
@@ -68,7 +71,6 @@ def load_all_data():
     df['Position'] = df.groupby('Name')['Position'].ffill().bfill().fillna("N/A")
     df['PhotoURL'] = df.groupby('Name')['PhotoURL'].ffill().bfill().fillna("https://www.w3schools.com/howto/img_avatar.png")
     cmj_df['Test Date'] = pd.to_datetime(cmj_df['Test Date'])
-    
     return df, cmj_df
 
 try:
@@ -91,7 +93,6 @@ try:
         day_df = day_df[day_df['Position'] == pos_filter]
 
     all_metrics = ['Total Jumps', 'Moderate Jumps', 'High Jumps', 'Jump Load', 'Player Load', 'Estimated Distance', 'Explosive Efforts', 'High Intensity Movements']
-    overall_maxes = df.groupby('Name')[all_metrics].max().round(1)
 
     def get_gradient(score):
         score = max(0, min(100, float(score)))
@@ -121,32 +122,36 @@ try:
             sync_cmj = p_cmj_history[(p_cmj_history['Test Date'] <= current_practice_date) & 
                                      (p_cmj_history['Test Date'] > current_practice_date - timedelta(days=7))]
             
-            c1, c2, c3 = st.columns([1, 2.8, 1.2])
+            # --- LAYOUT ZONE ---
+            col_id, col_gps, col_jump = st.columns([1, 2.2, 1.8])
             
-            with c1:
+            # 1. IDENTITY ZONE
+            with col_id:
                 st.markdown(f'<div style="text-align:center;"><img src="{p["PhotoURL"]}" class="player-photo-large"></div>', unsafe_allow_html=True)
                 st.markdown(f'<h3 style="text-align:center; margin-top:10px;">{p["Name"]}</h3>', unsafe_allow_html=True)
-                st.markdown(f'<p class="kpi-label" style="margin-top:20px;">Workload Grade</p>', unsafe_allow_html=True)
-                st.markdown(f'<div class="kpi-box" style="background-color:{get_gradient(p["Practice Score"])}; font-size:32px;">{int(p["Practice Score"])}</div>', unsafe_allow_html=True)
+                st.markdown(f'<p style="text-align:center; color:#FF8200; font-weight:700;">{p["Position"]}</p>', unsafe_allow_html=True)
 
-            with c2:
-                # Catapult Table
-                html = '<table class="scout-table"><thead><tr><th>Metric</th><th>Today</th><th>30d Max</th><th>Grade</th></tr></thead><tbody>'
-                for k in all_metrics:
-                    html += f"<tr><td>{k}</td><td>{p[k]}</td><td>{p[f'{k}_Max']}</td><td>{int(p[f'{k}_Grade'])}</td></tr>"
-                st.markdown(html + '</tbody></table>', unsafe_allow_html=True)
-
-                # Jump Graph + Readiness side-by-side
-                g_col, r_col = st.columns([2.5, 1.5])
-                with g_col:
-                    if not p_cmj_history.empty:
-                        fig = make_subplots(specs=[[{"secondary_y": True}]])
-                        fig.add_trace(go.Scatter(x=p_cmj_history['Test Date'], y=p_cmj_history['Jump Height (in)'], name="Height", line=dict(color='#FF8200', width=3)), secondary_y=False)
-                        fig.add_trace(go.Scatter(x=p_cmj_history['Test Date'], y=p_cmj_history['RSI-modified [m/s]'], name="RSI", line=dict(color='#1D1D1F', dash='dot')), secondary_y=True)
-                        fig.update_layout(height=220, margin=dict(l=0, r=0, t=10, b=0), showlegend=False)
-                        st.plotly_chart(fig, use_container_width=True)
+            # 2. GPS ZONE (Catapult Data)
+            with col_gps:
+                st.markdown('<div class="section-header">Daily GPS Workload</div>', unsafe_allow_html=True)
                 
-                with r_col:
+                gps_c1, gps_c2 = st.columns([2.5, 1])
+                with gps_c1:
+                    html = '<table class="scout-table"><thead><tr><th>Metric</th><th>Today</th><th>Grade</th></tr></thead><tbody>'
+                    for k in all_metrics:
+                        html += f"<tr><td>{k}</td><td>{p[k]}</td><td>{int(p[f'{k}_Grade'])}</td></tr>"
+                    st.markdown(html + '</tbody></table>', unsafe_allow_html=True)
+                
+                with gps_c2:
+                    st.markdown(f'<p class="kpi-label">Session Grade</p>', unsafe_allow_html=True)
+                    st.markdown(f'<div class="kpi-box" style="background-color:{get_gradient(p["Practice Score"])}; font-size:36px; height:120px; display:flex; align-items:center; justify-content:center;">{int(p["Practice Score"])}</div>', unsafe_allow_html=True)
+
+            # 3. JUMP ZONE (VALD Data)
+            with col_jump:
+                st.markdown('<div class="section-header">Weekly Jump Readiness</div>', unsafe_allow_html=True)
+                
+                if not p_cmj_history.empty:
+                    # Readiness Profile
                     if not sync_cmj.empty:
                         latest = sync_cmj.iloc[-1]
                         baseline = p_cmj_history.tail(4)['Jump Height (in)'].mean()
@@ -156,42 +161,28 @@ try:
                         
                         # Profiling Logic
                         if latest['Jump Height (in)'] >= baseline and latest['RSI-modified [m/s]'] >= rsi_baseline:
-                            status, s_color, desc = "ELASTIC ⚡", "#00CC96", "System is fresh and reactive."
+                            status, s_color, desc = "ELASTIC ⚡", "#00CC96", "System fresh and reactive."
                         elif latest['Jump Height (in)'] >= baseline and latest['RSI-modified [m/s]'] < rsi_baseline:
-                            status, s_color, desc = "POWERED 🏋️", "#FF8200", "Muscling jumps. CNS fatigue."
+                            status, s_color, desc = "POWERED 🏋️", "#FF8200", "High output, slow speed (CNS Fatigue)."
                         elif latest['Jump Height (in)'] < baseline and latest['RSI-modified [m/s]'] >= rsi_baseline:
-                            status, s_color, desc = "SPRINGY 📉", "#FF8200", "Fast but low output. Monitor."
+                            status, s_color, desc = "SPRINGY 📉", "#FF8200", "Fast but low height. Monitor load."
                         else:
                             status, s_color, desc = "FATIGUED 🚨", "#FF4B4B", "Height & Efficiency down."
 
                         st.markdown(f"""
-                            <div class="kpi-box" style="background-color:{s_color}15; border-color:{s_color}; margin-top:20px;">
+                            <div class="kpi-box" style="background-color:{s_color}15; border-color:{s_color}; margin-bottom:15px;">
                                 <div class="status-tag" style="color:{s_color};">{status}</div>
-                                <div style="font-size:18px; font-weight:900;">{perc_diff:+.1f}%</div>
+                                <div style="font-size:20px; font-weight:900;">{perc_diff:+.1f}% vs Avg</div>
                                 <div class="status-desc">{desc}</div>
                             </div>
                         """, unsafe_allow_html=True)
 
-            with c3:
-                # Metrics at a Glance
-                if not sync_cmj.empty:
-                    st.markdown(f'<p class="kpi-label">Weekly Jumps</p>', unsafe_allow_html=True)
-                    st.markdown(f"""
-                        <div style="border:1px solid #EEE; padding:10px; border-radius:8px;">
-                            <div style="display:flex; justify-content:space-between; font-size:12px;"><span>Height:</span><b>{latest['Jump Height (in)']:.1f}"</b></div>
-                            <div style="display:flex; justify-content:space-between; font-size:12px;"><span>RSI:</span><b>{latest['RSI-modified [m/s]']:.2f}</b></div>
-                            <div style="display:flex; justify-content:space-between; font-size:12px;"><span>Power:</span><b>{latest['Peak Power [W]']:.0f}W</b></div>
-                        </div>
-                    """, unsafe_allow_html=True)
-                
-                # Simple explanation of the profile
-                st.markdown("""
-                    <div style="margin-top:15px; font-size:10px; color:gray; font-style:italic;">
-                    <b>Elastic:</b> High height + High speed.<br>
-                    <b>Powered:</b> High height but slow speed.<br>
-                    <b>Fatigued:</b> Low height + Low speed.
-                    </div>
-                """, unsafe_allow_html=True)
+                    # Graph
+                    fig = make_subplots(specs=[[{"secondary_y": True}]])
+                    fig.add_trace(go.Scatter(x=p_cmj_history['Test Date'], y=p_cmj_history['Jump Height (in)'], name="Height", line=dict(color='#FF8200', width=3)), secondary_y=False)
+                    fig.add_trace(go.Scatter(x=p_cmj_history['Test Date'], y=p_cmj_history['RSI-modified [m/s]'], name="RSI", line=dict(color='#1D1D1F', dash='dot')), secondary_y=True)
+                    fig.update_layout(height=200, margin=dict(l=0, r=0, t=10, b=0), showlegend=False, xaxis_title=None)
+                    st.plotly_chart(fig, use_container_width=True)
 
 except Exception as e:
     st.error(f"Sync Error: {e}")
