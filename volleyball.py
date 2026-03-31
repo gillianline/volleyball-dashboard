@@ -46,6 +46,9 @@ st.markdown("""
         justify-content: center;
     }
     .gallery-photo { border-radius: 50%; width: 110px; height: 110px; object-fit: cover; border: 5px solid #FF8200; }
+    
+    /* Explanation Box */
+    .info-box { background-color: #F8F9FA; border-left: 5px solid #FF8200; padding: 10px; margin-top: 10px; font-size: 11px; color: #515154; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -56,8 +59,6 @@ def load_all_data():
     df.columns = df.columns.str.strip()
     cmj_df = pd.read_csv(st.secrets["CMJ_SHEET_URL"])
     cmj_df.columns = cmj_df.columns.str.strip()
-    
-    # Conversion: cm to in
     cmj_df['Jump Height (in)'] = cmj_df['Jump Height (Imp-Mom) [cm]'] * 0.3937
     
     rename_map = {
@@ -68,7 +69,6 @@ def load_all_data():
     }
     df = df.rename(columns=rename_map)
     df['Date'] = pd.to_datetime(df['Date'])
-    
     metric_cols = ['Total Jumps', 'Moderate Jumps', 'High Jumps', 'Jump Load', 'Player Load', 'Estimated Distance', 'Explosive Efforts', 'High Intensity Movements']
     df[metric_cols] = df[metric_cols].apply(pd.to_numeric, errors='coerce').fillna(0).round(1)
     
@@ -80,7 +80,6 @@ def load_all_data():
     df['Position'] = df.groupby('Name')['Position'].ffill().bfill().fillna("N/A")
     df['PhotoURL'] = df.groupby('Name')['PhotoURL'].ffill().bfill().fillna("https://www.w3schools.com/howto/img_avatar.png")
     cmj_df['Test Date'] = pd.to_datetime(cmj_df['Test Date'])
-    
     return df, cmj_df
 
 try:
@@ -119,7 +118,6 @@ try:
     if not day_df.empty:
         day_df = day_df.apply(process_player, axis=1).sort_values('Name')
 
-    # FIX: Renamed tab variables to match 'with' statements below
     t_player, t_gallery = st.tabs(["Individual Profile", "Team Gallery"])
 
     with t_player:
@@ -129,7 +127,7 @@ try:
             p_cmj_history = cmj_df[cmj_df['Athlete'] == sel_p].sort_values('Test Date')
             sync_cmj = p_cmj_history[(p_cmj_history['Test Date'] <= current_practice_date) & (p_cmj_history['Test Date'] > current_practice_date - timedelta(days=7))]
 
-            # TOP ROW: ORIGINAL GPS LAYOUT
+            # TOP ROW: ORIGINAL GPS SCOUT CARD
             c1, c2, c3 = st.columns([1.2, 2.5, 1.2])
             with c1:
                 st.markdown(f'<div style="text-align:center;"><img src="{p["PhotoURL"]}" class="player-photo-large"></div>', unsafe_allow_html=True)
@@ -140,52 +138,40 @@ try:
                     html += f"<tr><td>{k}</td><td>{p[k]}</td><td>{p[f'{k}_Max']}</td><td>{int(p[f'{k}_Grade'])}</td></tr>"
                 st.markdown(html + '</tbody></table>', unsafe_allow_html=True)
             with c3:
-                st.markdown(f"""
-                <div class="score-wrapper">
-                    <div class="score-label">Practice Score</div>
-                    <div class="score-box" style="background-color:{get_gradient(p['Practice Score'])};">{int(p['Practice Score'])}</div>
-                </div>
-                """, unsafe_allow_html=True)
+                st.markdown(f'<div class="score-wrapper"><div class="score-label">Practice Score</div><div class="score-box" style="background-color:{get_gradient(p["Practice Score"])};">{int(p["Practice Score"])}</div></div>', unsafe_allow_html=True)
 
-            # BOTTOM ROW: JUMP DATA (Vertical Stack)
-            st.markdown('<div class="section-header">Weekly Jump Readiness & History</div>', unsafe_allow_html=True)
+            # BOTTOM ROW: JUMP STUFF
+            st.markdown('<div class="section-header">Weekly Jump Readiness & Diagnostic History</div>', unsafe_allow_html=True)
             jc1, jc2 = st.columns([1.5, 3.5])
             with jc1:
                 if not sync_cmj.empty:
                     latest = sync_cmj.iloc[-1]
                     baseline = p_cmj_history.tail(4)['Jump Height (in)'].mean()
                     rsi_baseline = p_cmj_history.tail(4)['RSI-modified [m/s]'].mean()
-                    
                     perc_diff = ((latest['Jump Height (in)'] - baseline) / baseline) * 100
                     
-                    # Readiness Logic
                     if latest['Jump Height (in)'] >= baseline and latest['RSI-modified [m/s]'] >= rsi_baseline:
-                        status_label, color = "READY", "#00CC96"
+                        label, color, desc = "ELITE", "#00CC96", "⚡ Height & Pop are both peaking. Green light."
                     elif latest['Jump Height (in)'] >= baseline and latest['RSI-modified [m/s]'] < rsi_baseline:
-                        status_label, color = "GRINDING", "#FF8200"
+                        label, color, desc = "GRINDER", "#FF8200", "🏋️ High height but slow speed. CNS fatigue."
                     elif latest['Jump Height (in)'] < baseline and latest['RSI-modified [m/s]'] >= rsi_baseline:
-                        status_label, color = "SPRINGY", "#FF8200"
+                        label, color, desc = "SPRINGY", "#FF8200", "📉 Fast but low height. Monitor load."
                     else:
-                        status_label, color = "FATIGUED", "#FF4B4B"
+                        label, color, desc = "FATIGUED", "#FF4B4B", "🚨 Height & Efficiency down. Recovery needed."
 
                     st.markdown(f"""
                         <div class="score-wrapper">
                             <div class="score-label">Weekly Readiness</div>
-                            <div class="score-box" style="background-color:{color}; color:white;">
-                                {perc_diff:+.1f}%
-                                <span class="status-subtext">{status_label}</span>
-                            </div>
-                            <p style="font-size:11px; margin-top:10px;">Height: <b>{latest['Jump Height (in)']:.1f}"</b> | RSI: <b>{latest['RSI-modified [m/s]']:.2f}</b></p>
+                            <div class="score-box" style="background-color:{color}; color:white;">{perc_diff:+.1f}%<span class="status-subtext">{label}</span></div>
                         </div>
+                        <div class="info-box"><b>{label} Status:</b> {desc}</div>
                     """, unsafe_allow_html=True)
-                else:
-                    st.info("No VALD test found for this week.")
             with jc2:
                 if not p_cmj_history.empty:
                     fig = make_subplots(specs=[[{"secondary_y": True}]])
-                    fig.add_trace(go.Scatter(x=p_cmj_history['Test Date'], y=p_cmj_history['Jump Height (in)'], name="Height", line=dict(color='#FF8200', width=3)), secondary_y=False)
-                    fig.add_trace(go.Scatter(x=p_cmj_history['Test Date'], y=p_cmj_history['RSI-modified [m/s]'], name="RSI", line=dict(color='#1D1D1F', dash='dot')), secondary_y=True)
-                    fig.update_layout(height=250, margin=dict(l=0, r=0, t=20, b=0), legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
+                    fig.add_trace(go.Scatter(x=p_cmj_history['Test Date'], y=p_cmj_history['Jump Height (in)'], name="Height (in)", line=dict(color='#FF8200', width=3)), secondary_y=False)
+                    fig.add_trace(go.Scatter(x=p_cmj_history['Test Date'], y=p_cmj_history['RSI-modified [m/s]'], name="RSI-Mod", line=dict(color='#1D1D1F', dash='dot')), secondary_y=True)
+                    fig.update_layout(height=280, margin=dict(l=0, r=0, t=20, b=0), legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
                     st.plotly_chart(fig, use_container_width=True)
 
     with t_gallery:
@@ -194,20 +180,20 @@ try:
                 cols = st.columns(2)
                 for j in range(2):
                     if i + j < len(day_df):
-                        p_d = day_df.iloc[i + j]
-                        rows_html = "".join([f"<tr><td>{k}</td><td>{p_d[k]}</td><td>{int(p_d[f'{k}_Grade'])}</td></tr>" for k in all_metrics])
+                        pd_row = day_df.iloc[i + j]
+                        rows_html = "".join([f"<tr><td>{k}</td><td>{pd_row[k]}</td><td>{int(pd_row[f'{k}_Grade'])}</td></tr>" for k in all_metrics])
                         with cols[j]:
                             st.markdown(f"""
                             <div class="gallery-card">
                                 <div style="display: flex; align-items: center; gap: 10px;">
                                     <div style="flex: 1.2; text-align: center;">
-                                        <img src="{p_d['PhotoURL']}" class="gallery-photo">
-                                        <p style="font-weight:bold; font-size:15px; margin-top:8px;">{p_d['Name']}</p>
+                                        <img src="{pd_row['PhotoURL']}" class="gallery-photo">
+                                        <p style="font-weight:bold; font-size:15px; margin-top:8px;">{pd_row['Name']}</p>
                                     </div>
                                     <div style="flex: 2.5;"><table class="scout-table"><thead><tr><th>Metric</th><th>Val</th><th>Grade</th></tr></thead><tbody>{rows_html}</tbody></table></div>
                                     <div style="flex: 1; text-align: center;">
                                         <div class="score-label" style="font-size:9px;">Practice</div>
-                                        <div style="background-color:{get_gradient(p_d['Practice Score'])}; padding:10px; border-radius:12px; font-size:32px; font-weight:900;">{int(p_d['Practice Score'])}</div>
+                                        <div style="background-color:{get_gradient(pd_row['Practice Score'])}; padding:10px; border-radius:12px; font-size:32px; font-weight:900;">{int(pd_row['Practice Score'])}</div>
                                     </div>
                                 </div>
                             </div>
