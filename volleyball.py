@@ -19,14 +19,11 @@ st.markdown("""
     .scout-table th { background-color: #F5F5F7; padding: 4px; border-bottom: 2px solid #E5E5E7; font-weight: 700; font-size: 11px; }
     .scout-table td { padding: 4px; border-bottom: 1px solid #F5F5F7; font-size: 11px; }
     .player-photo-large { border-radius: 50%; width: 200px; height: 200px; object-fit: cover; border: 6px solid #FF8200; }
-    .score-label { font-size: 10px; font-weight: 800; text-transform: uppercase; margin-bottom: 4px; color: #515154; text-align: center; }
-    .score-box { padding: 10px 20px; border-radius: 12px; font-size: 32px; font-weight: 800; min-width: 100px; color: #1D1D1F; text-align: center; }
     
-    .readiness-box { padding: 15px; border-radius: 12px; text-align: center; color: white; margin-bottom: 10px; }
-    .readiness-val { font-size: 28px; font-weight: 900; }
-    .readiness-sub { font-size: 10px; font-weight: 700; opacity: 0.9; }
-    
-    .jump-info-box { border: 1px solid #EEE; padding: 10px; border-radius: 8px; background-color: #FAFAFA; }
+    /* Flags & Cards */
+    .flag-box { padding: 12px; border-radius: 10px; text-align: center; font-weight: 800; margin-bottom: 10px; border: 2px solid #EEE; }
+    .score-box { padding: 10px 20px; border-radius: 12px; font-size: 36px; font-weight: 900; color: #1D1D1F; text-align: center; border: 1px solid #E5E5E7; }
+    .readiness-box { padding: 15px; border-radius: 12px; text-align: center; color: white; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -47,8 +44,6 @@ def load_all_data():
     df.columns = df.columns.str.strip()
     cmj_df = pd.read_csv(st.secrets["CMJ_SHEET_URL"])
     cmj_df.columns = cmj_df.columns.str.strip()
-    
-    # Conversion: cm to in
     cmj_df['Jump Height (in)'] = cmj_df['Jump Height (Imp-Mom) [cm]'] * 0.3937
     
     rename_map = {
@@ -59,7 +54,6 @@ def load_all_data():
     }
     df = df.rename(columns=rename_map)
     df['Date'] = pd.to_datetime(df['Date'])
-    
     metric_cols = ['Total Jumps', 'Moderate Jumps', 'High Jumps', 'Jump Load', 'Player Load', 'Estimated Distance', 'Explosive Efforts', 'High Intensity Movements']
     df[metric_cols] = df[metric_cols].apply(pd.to_numeric, errors='coerce').fillna(0).round(1)
     
@@ -71,7 +65,6 @@ def load_all_data():
     df['Position'] = df.groupby('Name')['Position'].ffill().bfill().fillna("N/A")
     df['PhotoURL'] = df.groupby('Name')['PhotoURL'].ffill().bfill().fillna("https://www.w3schools.com/howto/img_avatar.png")
     cmj_df['Test Date'] = pd.to_datetime(cmj_df['Test Date'])
-    
     return df, cmj_df
 
 try:
@@ -104,8 +97,7 @@ try:
     def process_player(row):
         p_name = row['Name']
         current_date = row['Date']
-        start_date = current_date - timedelta(days=30)
-        lookback_df = df[(df['Name'] == p_name) & (df['Date'] >= start_date) & (df['Date'] <= current_date)]
+        lookback_df = df[(df['Name'] == p_name) & (df['Date'] >= current_date - timedelta(days=30)) & (df['Date'] <= current_date)]
         rolling_maxes = lookback_df[all_metrics].max().round(1)
         grades = [math.ceil((float(row[k]) / float(rolling_maxes[k])) * 100) if float(rolling_maxes[k]) > 0 else 0 for k in all_metrics]
         row['Practice Score'] = math.ceil(sum(grades) / len(grades)) if grades else 0
@@ -129,55 +121,53 @@ try:
             with c1:
                 st.markdown(f'<div style="text-align:center;"><img src="{p["PhotoURL"]}" class="player-photo-large"></div>', unsafe_allow_html=True)
                 st.markdown(f'<h3 style="text-align:center; margin-top:10px;">{p["Name"]}</h3>', unsafe_allow_html=True)
-                st.markdown(f'<p style="text-align:center; color:#FF8200; font-weight:700;">{p["Position"]}</p>', unsafe_allow_html=True)
+                
+                # JUMP FLAG LOGIC
+                if not sync_cmj.empty:
+                    v = sync_cmj.iloc[-1]
+                    hist = p_cmj_history.tail(5)
+                    h_avg, r_avg = hist['Jump Height (in)'].mean(), hist['RSI-modified [m/s]'].mean()
+                    
+                    # Flag Definitions
+                    if v['Jump Height (in)'] >= h_avg and v['RSI-modified [m/s]'] >= r_avg:
+                        flag, color, msg = "⚡ SUPERNOVA", "#00CC96", "Elite firing; ready for max load."
+                    elif v['Jump Height (in)'] >= h_avg and v['RSI-modified [m/s]'] < r_avg:
+                        flag, color, msg = "🐢 THE GRINDER", "#FF8200", "Hitting height but slow. CNS Fatigue."
+                    elif v['Jump Height (in)'] < h_avg and v['RSI-modified [m/s]'] >= r_avg:
+                        flag, color, msg = "📉 FADING", "#FF8200", "Springy but low output. Monitor recovery."
+                    else:
+                        flag, color, msg = "🚨 RED ALERT", "#FF4B4B", "Height & Pop down. High risk."
+                    
+                    st.markdown(f"""
+                        <div class="flag-box" style="color:{color}; border-color:{color}; background-color:{color}10;">
+                            <div style="font-size:16px;">{flag}</div>
+                            <div style="font-size:10px; font-weight:400; color:#515154;">{msg}</div>
+                        </div>
+                    """, unsafe_allow_html=True)
 
             with c2:
-                # 1. CATAPULT DATA TABLE
                 html = '<table class="scout-table"><thead><tr><th>Metric</th><th>Today</th><th>30d Max</th><th>Grade</th></tr></thead><tbody>'
-                for k in all_metrics:
-                    html += f"<tr><td>{k}</td><td>{p[k]}</td><td>{p[f'{k}_Max']}</td><td>{int(p[f'{k}_Grade'])}</td></tr>"
+                for k in all_metrics: html += f"<tr><td>{k}</td><td>{p[k]}</td><td>{p[f'{k}_Max']}</td><td>{int(p[f'{k}_Grade'])}</td></tr>"
                 st.markdown(html + '</tbody></table>', unsafe_allow_html=True)
 
-                # 2. DUAL AXIS GRAPH: Height and RSI-Mod
                 if not p_cmj_history.empty:
                     fig = make_subplots(specs=[[{"secondary_y": True}]])
-                    fig.add_trace(go.Scatter(x=p_cmj_history['Test Date'], y=p_cmj_history['Jump Height (in)'], 
-                                             name="Height (in)", line=dict(color='#FF8200', width=3), marker=dict(size=8)), secondary_y=False)
-                    fig.add_trace(go.Scatter(x=p_cmj_history['Test Date'], y=p_cmj_history['RSI-modified [m/s]'], 
-                                             name="RSI-Mod", line=dict(color='#1D1D1F', dash='dot'), marker=dict(size=8)), secondary_y=True)
-                    
-                    fig.update_layout(title="Neuromuscular Profile (Season History)", height=280, margin=dict(l=0, r=0, t=50, b=0), legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
-                    fig.update_yaxes(title_text="Height (in)", secondary_y=False)
-                    fig.update_yaxes(title_text="RSI-Modified", secondary_y=True)
+                    fig.add_trace(go.Scatter(x=p_cmj_history['Test Date'], y=p_cmj_history['Jump Height (in)'], name="Height (in)", line=dict(color='#FF8200', width=3)), secondary_y=False)
+                    fig.add_trace(go.Scatter(x=p_cmj_history['Test Date'], y=p_cmj_history['RSI-modified [m/s]'], name="RSI-Mod", line=dict(color='#1D1D1F', dash='dot')), secondary_y=True)
+                    fig.update_layout(height=280, margin=dict(l=0, r=0, t=20, b=0), legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
                     st.plotly_chart(fig, use_container_width=True)
 
             with c3:
-                # 3. PRACTICE SCORE (Now at Top Right)
-                st.markdown(f'<p class="score-label">PRACTICE SCORE</p>', unsafe_allow_html=True)
-                st.markdown(f'<div class="score-box" style="background-color:{get_gradient(p["Practice Score"])}; margin-bottom:40px;">{int(p["Practice Score"])}</div>', unsafe_allow_html=True)
+                st.markdown(f'<div style="font-size:10px; font-weight:800; text-align:center;">PRACTICE SCORE</div>', unsafe_allow_html=True)
+                st.markdown(f'<div class="score-box" style="background-color:{get_gradient(p["Practice Score"])}; margin-bottom:20px;">{int(p["Practice Score"])}</div>', unsafe_allow_html=True)
 
-                # 4. WEEKLY READINESS (Now Below Score)
                 if not sync_cmj.empty:
                     latest = sync_cmj.iloc[-1]
-                    past_tests = p_cmj_history[p_cmj_history['Test Date'] <= latest['Test Date']]
-                    baseline = past_tests.tail(min(len(past_tests), 4))['Jump Height (in)'].mean()
+                    baseline = p_cmj_history.tail(4)['Jump Height (in)'].mean()
                     perc_diff = ((latest['Jump Height (in)'] - baseline) / baseline) * 100
-                    color = "#00CC96" if perc_diff > -5 else ("#FF8200" if perc_diff > -10 else "#FF4B4B")
-                    
-                    st.markdown(f'<p class="score-label">WEEKLY READINESS</p>', unsafe_allow_html=True)
-                    st.markdown(f'<div class="readiness-box" style="background-color:{color};"><div class="readiness-val">{perc_diff:+.1f}%</div><div class="readiness-sub">vs. Recent Avg</div></div>', unsafe_allow_html=True)
-                    
-                    # Small Diagnostic Stats
-                    st.markdown(f"""
-                        <div class="jump-info-box">
-                            <p style="margin:0; font-size:12px;"><b>Jump:</b> {latest['Jump Height (in)']:.1f}"</p>
-                            <p style="margin:0; font-size:12px;"><b>RSI:</b> {latest['RSI-modified [m/s]']:.2f}</p>
-                            <p style="margin:0; font-size:12px;"><b>Power:</b> {latest['Peak Power [W]']:.0f}W</p>
-                            <p style="margin:0; font-size:9px; color:gray; margin-top:4px;">Tested: {latest['Test Date'].strftime('%m/%d')}</p>
-                        </div>
-                    """, unsafe_allow_html=True)
-                else:
-                    st.info("No VALD test found for this week.")
+                    r_color = "#00CC96" if perc_diff > -5 else ("#FF8200" if perc_diff > -10 else "#FF4B4B")
+                    st.markdown(f'<div style="font-size:10px; font-weight:800; text-align:center;">WEEKLY READINESS</div>', unsafe_allow_html=True)
+                    st.markdown(f'<div class="readiness-box" style="background-color:{r_color};"><div class="readiness-val">{perc_diff:+.1f}%</div><div class="readiness-sub">vs. Recent Avg</div></div>', unsafe_allow_html=True)
 
 except Exception as e:
     st.error(f"Sync Error: {e}")
