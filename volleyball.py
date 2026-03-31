@@ -68,7 +68,7 @@ def load_all_data():
     df = pd.read_csv(st.secrets["GOOGLE_SHEET_URL"])
     df.columns = df.columns.str.strip()
     
-    # VALD / CMJ Sheet (Add this URL to secrets)
+    # VALD / CMJ Sheet
     cmj_df = pd.read_csv(st.secrets["CMJ_SHEET_URL"])
     cmj_df.columns = cmj_df.columns.str.strip()
     
@@ -85,26 +85,22 @@ def load_all_data():
     df = df.rename(columns=rename_map)
     df['Date'] = pd.to_datetime(df['Date'])
     
+    # Fill in Metadata
     df = df.sort_values(['Name', 'Date'])
     df['Position'] = df.groupby('Name')['Position'].ffill().bfill().fillna("N/A")
     df['PhotoURL'] = df.groupby('Name')['PhotoURL'].ffill().bfill().fillna("https://www.w3schools.com/howto/img_avatar.png")
     
+    # Numeric conversion
     metric_cols = ['Total Jumps', 'Moderate Jumps', 'High Jumps', 'Jump Load', 'Player Load', 'Estimated Distance', 'Explosive Efforts', 'High Intensity Movements']
     df[metric_cols] = df[metric_cols].apply(pd.to_numeric, errors='coerce').fillna(0)
     
-    # Phase Sheet (Sheet 2)
-    p_df = pd.read_csv(st.secrets["PHASE_SHEET_URL"])
-    p_df.columns = p_df.columns.str.strip()
-    p_df = p_df.rename(columns=rename_map)
-    p_df['Date'] = pd.to_datetime(p_df['Date'])
-    
-    # CMJ Date Formatting
+    # CMJ Processing
     cmj_df['Test Date'] = pd.to_datetime(cmj_df['Test Date'])
     
-    return df, p_df, cmj_df
+    return df, cmj_df
 
 try:
-    df, phase_df, cmj_df = load_all_data()
+    df, cmj_df = load_all_data()
     date_options = [d.strftime('%m/%d/%Y') for d in sorted(df['Date'].unique(), reverse=True)]
 
     # --- HEADER ---
@@ -121,7 +117,7 @@ try:
     if pos_filter != "All Positions":
         day_df = day_df[day_df['Position'] == pos_filter]
 
-    # --- LOGIC ---
+    # --- SCORING LOGIC ---
     all_metrics = ['Total Jumps', 'Moderate Jumps', 'High Jumps', 'Jump Load', 'Player Load', 'Estimated Distance', 'Explosive Efforts', 'High Intensity Movements']
     overall_maxes = df.groupby('Name')[all_metrics].max()
 
@@ -143,25 +139,15 @@ try:
     if not day_df.empty:
         day_df = day_df.apply(process_player, axis=1).sort_values('Name')
 
-    t_flow, t_player, t_gallery = st.tabs(["Session Flow", "Individual Profile", "Team Gallery"])
-
-    with t_flow:
-        current_names = day_df['Name'].unique()
-        day_phase_df = phase_df[(phase_df['Date'] == date_a) & (phase_df['Name'].isin(current_names))].copy()
-        if not day_phase_df.empty:
-            phase_stats = day_phase_df.groupby('Phase', sort=False).agg({'Player Load': 'mean', 'Explosive Efforts': 'mean', 'Total Jumps': 'mean'}).reset_index()
-            st.plotly_chart(px.bar(phase_stats, x='Phase', y='Player Load', color='Explosive Efforts', color_continuous_scale='Oranges').update_layout(height=380), use_container_width=True)
-            html = '<table class="scout-table"><thead><tr><th>Phase</th><th>Player Load</th><th>Explosive Efforts</th><th>Total Jumps</th></tr></thead><tbody>'
-            for _, r in phase_stats.iterrows():
-                html += f"<tr><td>{r['Phase']}</td><td>{int(r['Player Load'])}</td><td>{int(r['Explosive Efforts'])}</td><td>{int(r['Total Jumps'])}</td></tr>"
-            st.markdown(html + '</tbody></table>', unsafe_allow_html=True)
+    # Tabs (Removed Session Flow)
+    t_player, t_gallery = st.tabs(["Individual Profile", "Team Gallery"])
 
     with t_player:
         if not day_df.empty:
             selected_player = st.selectbox("Select Athlete", day_df['Name'].unique())
             p_data = day_df[day_df['Name'] == selected_player].iloc[0]
             
-            # CMJ Data Lookup for Reference
+            # CMJ Reference
             p_cmj = cmj_df[cmj_df['Athlete'] == selected_player].sort_values('Test Date', ascending=False)
             
             c1, c2, c3 = st.columns([1.2, 2.5, 1.2])
