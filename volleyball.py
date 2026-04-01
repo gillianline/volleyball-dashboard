@@ -120,28 +120,24 @@ try:
             with jc1:
                 if not sync_cmj.empty:
                     latest = sync_cmj.iloc[-1]; base_h = p_cmj_history.tail(4)['Jump Height (in)'].mean(); base_rsi = p_cmj_history.tail(4)['RSI-modified [m/s]'].mean()
-                    cur_h = latest['Jump Height (in)']; cur_rsi = latest['RSI-modified [m/s]']
+                    cur_h = latest['Jump Height (in)']; cur_rsi = latest['RSI-modified [m/s]']; perc_diff = ((cur_h - base_h) / base_h) * 100
                     
-                    if cur_h >= base_h and cur_rsi >= base_rsi:
-                        label, color, why = "ELITE", "#4895DB", "Height and RSI are both peaking above baseline. Player is primed."
-                    elif cur_h >= base_h and cur_rsi < base_rsi:
-                        label, color, why = "GRINDER", "#FF8200", "Height is maintained, but RSI is low. Effort is high, but CNS is slow."
-                    elif cur_h < base_h and cur_rsi >= base_rsi:
-                        label, color, why = "SPRINGY", "#FF8200", "Fast ground contact (high RSI) but low total height. Explosive but lacking power."
-                    else:
-                        label, color, why = "FATIGUED", "#515154", "Both height and RSI have dropped below baseline. High risk of overtraining."
+                    if cur_h >= base_h and cur_rsi >= base_rsi: label, color, why = "ELITE", "#4895DB", "Height and RSI are both above baseline. Primed for high intensity."
+                    elif cur_h >= base_h and cur_rsi < base_rsi: label, color, why = "GRINDER", "#FF8200", "Maintained height but low RSI. CNS fatigue; player is working harder for same result."
+                    elif cur_h < base_h and cur_rsi >= base_rsi: label, color, why = "SPRINGY", "#FF8200", "High RSI (fast) but low total height. Explosive ground contact but lacking peak power."
+                    else: label, color, why = "FATIGUED", "#515154", "Both height and RSI dropped below baseline. High risk of overtraining/injury."
                     
                     st.markdown(f"""
                         <div class="score-wrapper">
                             <div class="score-label">Readiness</div>
                             <div class="score-box" style="background-color:{color};">
-                                {cur_h:.1f}" | {cur_rsi:.2f}
+                                {perc_diff:+.1f}%
                                 <span class="status-subtext">{label}</span>
                             </div>
                         </div>
                         <div class="info-box">
-                            <b>Diagnostic:</b> {why}<br>
-                            <span style="color:#515154; font-size:10px;">(Baseline: {base_h:.1f}" H | {base_rsi:.2f} RSI)</span>
+                            <b>Status:</b> {why}<br>
+                            <span style="color:#515154; font-size:10px;">(Today: {cur_h:.1f}" | {cur_rsi:.2f} RSI)</span>
                         </div>
                     """, unsafe_allow_html=True)
             with jc2:
@@ -180,6 +176,7 @@ try:
 
         if 'Week' in df.columns:
             crit_mets = ['Total Jumps', 'Player Load', 'High Intensity Movements', 'Explosive Efforts']
+            # EXCLUDING GAME DATA FROM WEEKLY PRACTICE AVG
             week_data = df[(df['Name'] == gp_ath_sel) & (df['Session_Type'] == 'Practice') & (df['Week'] == gp_week_id)]
             game_data = df[(df['Name'] == gp_ath_sel) & (df['Session_Name'] == gp_game_target)].iloc[0]
             if not week_data.empty:
@@ -189,7 +186,8 @@ try:
                     for m in crit_mets:
                         g_v, w_v = game_data[m], week_avg[m]
                         pct = (w_v / g_v * 100) if g_v > 0 else 0
-                        st.metric(label=m, value=f"{pct:.1f}%", delta=f"{w_v - g_v:+.1f} diff", delta_color="inverse" if pct > 100 else "normal")
+                        # LABELS: % of Game Demand
+                        st.metric(label=f"{m} (% of Game Demand)", value=f"{pct:.1f}%", delta=f"{w_v - g_v:+.1f} volume gap", delta_color="inverse" if pct > 100 else "normal")
                 with cg2:
                     plot_df = pd.DataFrame({'Metric': crit_mets, 'Weekly Practice Avg': week_avg.values, 'Game Demand': [game_data[m] for m in crit_mets]}).melt(id_vars='Metric', var_name='Type', value_name='Value')
                     st.plotly_chart(px.bar(plot_df, x='Metric', y='Value', color='Type', barmode='group', color_discrete_map={'Weekly Practice Avg': '#FF8200', 'Game Demand': '#4895DB'}).update_layout(height=400, xaxis_title=None, legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)), use_container_width=True)
