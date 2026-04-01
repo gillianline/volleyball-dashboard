@@ -7,7 +7,7 @@ import math
 from datetime import timedelta
 
 # --- PAGE CONFIG ---
-st.set_page_config(page_title="Performance Lab", layout="wide")
+st.set_page_config(page_title="Tennessee Lady Vols Volleyball", layout="wide")
 
 # --- CSS: ORIGINAL TENNESSEE STYLE ---
 st.markdown("""
@@ -119,7 +119,7 @@ try:
     if not day_df.empty:
         day_df = day_df.apply(process_player, axis=1).sort_values('Name')
 
-    tab_ind, tab_gal, tab_comp = st.tabs(["Individual Profile", "Team Gallery", "Comparison Lab"])
+    tab_ind, tab_gal, tab_comp = st.tabs(["Individual Profile", "Team Gallery", "Comparison"])
 
     with tab_ind:
         if not day_df.empty:
