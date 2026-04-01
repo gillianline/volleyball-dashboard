@@ -63,12 +63,12 @@ try:
     df, cmj_df, phase_df = load_all_data()
     all_metrics = ['Total Jumps', 'Moderate Jumps', 'High Jumps', 'Jump Load', 'Player Load', 'Estimated Distance', 'Explosive Efforts', 'High Intensity Movements']
     
-    # --- NATURAL GRADIENT (Muted Forrest, Amber, Brick) ---
-    def get_natural_gradient(score):
+    # --- FLIPPED GRADIENT (Lower = Green, Higher = Red) ---
+    def get_flipped_gradient(score):
         score = float(score)
-        if score >= 85: return "#2D5A27" # Muted Forrest Green
-        if score >= 65: return "#D4A017" # Muted Amber/Gold
-        return "#A52A2A" # Muted Brick Red
+        if score <= 40: return "#2D5A27" # Muted Forrest Green (Low Load = Good)
+        if score <= 70: return "#D4A017" # Muted Amber/Gold (Moderate)
+        return "#A52A2A" # Muted Brick Red (High Load = Fatigue Risk)
 
     tab_ind, tab_gal, tab_comp, tab_gp = st.tabs(["Individual Profile", "Team Gallery", "Comparison Lab", "Game v. Practice"])
 
@@ -102,7 +102,7 @@ try:
                 for i, k in enumerate(all_metrics): html += f"<tr><td>{k}</td><td>{p[k]}</td><td>{rolling_maxes[k]}</td><td>{grades[i]}</td></tr>"
                 st.markdown(html + '</tbody></table>', unsafe_allow_html=True)
             with c3:
-                st.markdown(f'<div class="score-wrapper"><div class="score-label">Practice Score</div><div class="score-box" style="background-color:{get_natural_gradient(practice_score)};">{practice_score}</div></div>', unsafe_allow_html=True)
+                st.markdown(f'<div class="score-wrapper"><div class="score-label">Practice Score</div><div class="score-box" style="background-color:{get_flipped_gradient(practice_score)};">{practice_score}</div></div>', unsafe_allow_html=True)
 
             st.markdown('<div class="section-header">Weekly Readiness Profile</div>', unsafe_allow_html=True)
             jc1, jc2 = st.columns([1.5, 3.5])
@@ -125,7 +125,6 @@ try:
                 if not p_cmj_hist.empty:
                     fig = make_subplots(specs=[[{"secondary_y": True}]]); fig.add_trace(go.Scatter(x=p_cmj_hist['Test Date'], y=p_cmj_hist['Jump Height (in)'], name="Height", line=dict(color='#FF8200', width=3)), secondary_y=False); fig.add_trace(go.Scatter(x=p_cmj_hist['Test Date'], y=p_cmj_hist['RSI-modified [m/s]'], name="RSI", line=dict(color='#4895DB', dash='dot')), secondary_y=True); fig.update_layout(height=280, margin=dict(l=0, r=0, t=20, b=0), showlegend=False); st.plotly_chart(fig, use_container_width=True)
 
-            # RESTORED: INDIVIDUAL PRACTICE PHASE BREAKDOWN
             st.markdown('<div class="section-header">Practice Phase Breakdown</div>', unsafe_allow_html=True)
             p_phases = phase_df[(phase_df['Name'] == sel_p) & (phase_df['Date'] == curr_date)].copy()
             if not p_phases.empty:
@@ -150,7 +149,7 @@ try:
                     gr = [math.ceil((float(pd_row[k]) / float(rm[k])) * 100) if float(rm[k]) > 0 else 0 for k in all_metrics]
                     sc = math.ceil(sum(gr) / len(gr)) if gr else 0
                     r_html = "".join([f"<tr><td>{k}</td><td>{pd_row[k]}</td><td>{rm[k]}</td><td>{gr[idx]}</td></tr>" for idx, k in enumerate(all_metrics)])
-                    with cols[j]: st.markdown(f'<div class="gallery-card"><div style="display:flex; align-items:center; gap:10px;"><div style="flex:1.2; text-align:center;"><img src="{pd_row["PhotoURL"]}" class="gallery-photo"><p style="font-weight:bold; font-size:15px; margin-top:8px;">{pd_row["Name"]}</p></div><div style="flex:3;"><table class="scout-table"><thead><tr><th>Metric</th><th>Val</th><th>Max</th><th>Grade</th></tr></thead><tbody>{r_html}</tbody></table></div><div style="flex:1; text-align:center;"><div style="background-color:{get_natural_gradient(sc)}; color:white; padding:10px; border-radius:12px; font-size:32px; font-weight:900;">{sc}</div></div></div></div>', unsafe_allow_html=True)
+                    with cols[j]: st.markdown(f'<div class="gallery-card"><div style="display:flex; align-items:center; gap:10px;"><div style="flex:1.2; text-align:center;"><img src="{pd_row["PhotoURL"]}" class="gallery-photo"><p style="font-weight:bold; font-size:15px; margin-top:8px;">{pd_row["Name"]}</p></div><div style="flex:3;"><table class="scout-table"><thead><tr><th>Metric</th><th>Val</th><th>Max</th><th>Grade</th></tr></thead><tbody>{r_html}</tbody></table></div><div style="flex:1; text-align:center;"><div style="background-color:{get_flipped_gradient(sc)}; color:white; padding:10px; border-radius:12px; font-size:32px; font-weight:900;">{sc}</div></div></div></div>', unsafe_allow_html=True)
 
     with tab_comp:
         day_df_comp = df[df['Session_Name'] == selected_session].copy()
@@ -159,7 +158,8 @@ try:
         with c_met: c_m_sel = st.selectbox("Select Metric", all_metrics, key="c_m_sel")
         p_val = day_df_comp[day_df_comp['Name'] == c_ath][c_m_sel].values[0]
         pos_avg = df[df['Position'] == day_df_comp[day_df_comp['Name'] == c_ath]['Position'].values[0]][c_m_sel].mean()
-        st.metric(label=f"{c_ath} vs Pos Avg", value=f"{p_val}", delta=f"{((p_val - pos_avg) / pos_avg * 100):+.1f}%")
+        # Metric delta flipped: higher than average is now "red/inverse" 
+        st.metric(label=f"{c_ath} vs Pos Avg", value=f"{p_val}", delta=f"{((p_val - pos_avg) / pos_avg * 100):+.1f}%", delta_color="inverse")
         pos_avg_df = day_df_comp.groupby('Position')[c_m_sel].mean().reset_index()
         fig_p = px.bar(pos_avg_df, x='Position', y=c_m_sel, color_discrete_sequence=['#4895DB']).add_trace(go.Bar(x=[day_df_comp[day_df_comp['Name'] == c_ath]['Position'].values[0]], y=[p_val], marker_color='#FF8200'))
         st.plotly_chart(fig_p.update_layout(showlegend=False, height=300), use_container_width=True)
@@ -184,7 +184,8 @@ try:
             with cg1:
                 for m in crit:
                     pct = (w_avg[m] / g_data[m] * 100) if g_data[m] > 0 else 0
-                    st.metric(label=f"{m} (% of Game Demand)", value=f"{pct:.1f}%", delta=f"{w_avg[m] - g_data[m]:+.1f} vs Game Load", delta_color="inverse" if pct > 100 else "normal")
+                    # delta_color="normal" because lower is better, so a negative delta is green
+                    st.metric(label=f"{m} (% of Game Demand)", value=f"{pct:.1f}%", delta=f"{w_avg[m] - g_data[m]:+.1f} vs Game Load", delta_color="normal")
             with cg2:
                 plot = pd.DataFrame({'Metric': crit, 'Weekly Avg': w_avg.values, 'Game Demand': [g_data[m] for m in crit]}).melt(id_vars='Metric')
                 st.plotly_chart(px.bar(plot, x='Metric', y='value', color='variable', barmode='group', color_discrete_map={'Weekly Avg': '#FF8200', 'Game Demand': '#4895DB'}).update_layout(height=400, xaxis_title=None, legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)), use_container_width=True)
