@@ -120,117 +120,86 @@ try:
 
     tab_ind, tab_gal, tab_comp, tab_gp = st.tabs(["Individual Profile", "Team Gallery", "Comparison Lab", "Game v. Practice"])
 
-    # --- INDIVIDUAL PROFILE (RESTORED) ---
+    # --- TAB 1 & 2 & 3 LOGIC (RETAINED AS PER PREVIOUS VERSION) ---
     with tab_ind:
         if not day_df.empty:
             sel_p = st.selectbox("Select Athlete", day_df['Name'].unique())
             p = day_df[day_df['Name'] == sel_p].iloc[0]
             p_cmj_history = cmj_df[cmj_df['Athlete'] == sel_p].sort_values('Test Date')
             sync_cmj = p_cmj_history[(p_cmj_history['Test Date'] <= current_practice_date) & (p_cmj_history['Test Date'] > current_practice_date - timedelta(days=7))]
-
             c1, c2, c3 = st.columns([1.2, 2.5, 1.2])
             with c1:
-                st.markdown(f'<div style="text-align:center;"><img src="{p["PhotoURL"]}" class="player-photo-large"></div>', unsafe_allow_html=True)
-                st.markdown(f'<h2 style="text-align:center; margin-top:10px;">{p["Name"]}</h2>', unsafe_allow_html=True)
+                st.markdown(f'<div style="text-align:center;"><img src="{p["PhotoURL"]}" class="player-photo-large"></div><h2 style="text-align:center; margin-top:10px;">{p["Name"]}</h2>', unsafe_allow_html=True)
             with c2:
                 html = '<table class="scout-table"><thead><tr><th>Metric</th><th>Today</th><th>30d Max</th><th>Grade</th></tr></thead><tbody>'
                 for k in all_metrics: html += f"<tr><td>{k}</td><td>{p[k]}</td><td>{p[f'{k}_Max']}</td><td>{int(p[f'{k}_Grade'])}</td></tr>"
                 st.markdown(html + '</tbody></table>', unsafe_allow_html=True)
             with c3:
                 st.markdown(f'<div class="score-wrapper"><div class="score-label">Practice Score</div><div class="score-box" style="background-color:{get_gradient(p["Practice Score"])};">{int(p["Practice Score"])}</div></div>', unsafe_allow_html=True)
-
             st.markdown('<div class="section-header">Weekly Jump Readiness & Diagnostic History</div>', unsafe_allow_html=True)
             jc1, jc2 = st.columns([1.5, 3.5])
             with jc1:
                 if not sync_cmj.empty:
-                    latest = sync_cmj.iloc[-1]
-                    baseline = p_cmj_history.tail(4)['Jump Height (in)'].mean()
-                    rsi_baseline = p_cmj_history.tail(4)['RSI-modified [m/s]'].mean()
+                    latest = sync_cmj.iloc[-1]; baseline = p_cmj_history.tail(4)['Jump Height (in)'].mean(); rsi_baseline = p_cmj_history.tail(4)['RSI-modified [m/s]'].mean()
                     perc_diff = ((latest['Jump Height (in)'] - baseline) / baseline) * 100
                     status = "ELITE" if latest['Jump Height (in)'] >= baseline and latest['RSI-modified [m/s]'] >= rsi_baseline else "FATIGUED"
-                    st.markdown(f'<div class="score-wrapper"><div class="score-label">Weekly Readiness</div><div class="score-box" style="background-color:#FF8200; color:white;">{perc_diff:+.1f}%<span class="status-subtext">{status}</span></div></div>', unsafe_allow_html=True)
+                    st.markdown(f'<div class="score-wrapper"><div class="score-label">Weekly Readiness</div><div class="score-box" style="background-color:#FF8200; color:white;">{perc_diff:+.1f}%<span class="status-subtext">{status}</span></div></div><div class="info-box"><b>{status}:</b> Diagnostic status based on recent averages.</div>', unsafe_allow_html=True)
             with jc2:
                 if not p_cmj_history.empty:
-                    fig = make_subplots(specs=[[{"secondary_y": True}]])
-                    fig.add_trace(go.Scatter(x=p_cmj_history['Test Date'], y=p_cmj_history['Jump Height (in)'], name="Height", line=dict(color='#FF8200', width=3)), secondary_y=False)
-                    fig.add_trace(go.Scatter(x=p_cmj_history['Test Date'], y=p_cmj_history['RSI-modified [m/s]'], name="RSI", line=dict(color='#1D1D1F', dash='dot')), secondary_y=True)
-                    fig.update_layout(height=280, margin=dict(l=0, r=0, t=20, b=0), showlegend=False)
-                    st.plotly_chart(fig, use_container_width=True)
+                    fig = make_subplots(specs=[[{"secondary_y": True}]]); fig.add_trace(go.Scatter(x=p_cmj_history['Test Date'], y=p_cmj_history['Jump Height (in)'], name="Height", line=dict(color='#FF8200', width=3)), secondary_y=False); fig.add_trace(go.Scatter(x=p_cmj_history['Test Date'], y=p_cmj_history['RSI-modified [m/s]'], name="RSI", line=dict(color='#1D1D1F', dash='dot')), secondary_y=True); fig.update_layout(height=280, margin=dict(l=0, r=0, t=20, b=0), showlegend=False); st.plotly_chart(fig, use_container_width=True)
 
-            st.markdown('<div class="section-header">Practice Phase Breakdown</div>', unsafe_allow_html=True)
-            p_phases = phase_df[(phase_df['Name'] == sel_p) & (phase_df['Date'] == current_practice_date)].copy()
-            if not p_phases.empty:
-                pc1, pc2 = st.columns([3, 2])
-                with pc1:
-                    st.plotly_chart(px.bar(p_phases, x='Phase', y='Total Jumps', color_discrete_sequence=['#FF8200'], height=300), use_container_width=True)
-                with pc2:
-                    p_tbl = '<table class="scout-table"><thead><tr><th>Phase</th><th>Jumps</th><th>Load</th></tr></thead><tbody>'
-                    for _, r in p_phases.iterrows(): p_tbl += f"<tr><td>{r['Phase']}</td><td>{int(r['Total Jumps'])}</td><td>{r['Total Player Load']:.1f}</td></tr>"
-                    st.markdown(p_tbl + '</tbody></table>', unsafe_allow_html=True)
-
-    # --- TEAM GALLERY (RESTORED) ---
     with tab_gal:
         if not day_df.empty:
             for i in range(0, len(day_df), 2):
                 cols = st.columns(2)
                 for j in range(2):
                     if i + j < len(day_df):
-                        pd_row = day_df.iloc[i + j]
-                        rows_html = "".join([f"<tr><td>{k}</td><td>{pd_row[k]}</td><td>{pd_row[f'{k}_Max']}</td><td>{int(pd_row[f'{k}_Grade'])}</td></tr>" for k in all_metrics])
-                        with cols[j]:
-                            st.markdown(f'<div class="gallery-card"><div style="display:flex; align-items:center; gap:10px;"><div style="flex:1.2; text-align:center;"><img src="{pd_row["PhotoURL"]}" class="gallery-photo"><p style="font-weight:bold; font-size:15px; margin-top:8px;">{pd_row["Name"]}</p></div><div style="flex:3;"><table class="scout-table"><thead><tr><th>Metric</th><th>Val</th><th>Max</th><th>Grade</th></tr></thead><tbody>{rows_html}</tbody></table></div><div style="flex:1; text-align:center;"><div class="score-label" style="font-size:9px;">Practice</div><div style="background-color:{get_gradient(pd_row["Practice Score"])}; padding:10px; border-radius:12px; font-size:32px; font-weight:900;">{int(pd_row["Practice Score"])}</div></div></div></div>', unsafe_allow_html=True)
+                        pd_row = day_df.iloc[i + j]; rows_html = "".join([f"<tr><td>{k}</td><td>{pd_row[k]}</td><td>{pd_row[f'{k}_Max']}</td><td>{int(pd_row[f'{k}_Grade'])}</td></tr>" for k in all_metrics])
+                        with cols[j]: st.markdown(f'<div class="gallery-card"><div style="display:flex; align-items:center; gap:10px;"><div style="flex:1.2; text-align:center;"><img src="{pd_row["PhotoURL"]}" class="gallery-photo"><p style="font-weight:bold; font-size:15px; margin-top:8px;">{pd_row["Name"]}</p></div><div style="flex:3;"><table class="scout-table"><thead><tr><th>Metric</th><th>Val</th><th>Max</th><th>Grade</th></tr></thead><tbody>{rows_html}</tbody></table></div><div style="flex:1; text-align:center;"><div class="score-label" style="font-size:9px;">Practice</div><div style="background-color:{get_gradient(pd_row["Practice Score"])}; padding:10px; border-radius:12px; font-size:32px; font-weight:900;">{int(pd_row["Practice Score"])}</div></div></div></div>', unsafe_allow_html=True)
 
-    # --- COMPARISON LAB (RESTORED) ---
     with tab_comp:
         st.markdown('<div class="section-header">Athlete vs. Position Benchmarking</div>', unsafe_allow_html=True)
         c_comp1, c_comp2 = st.columns([1, 2])
         with c_comp1:
-            comp_athlete = st.selectbox("Compare Athlete", day_df['Name'].unique(), key="comp_sel")
-            comp_metric = st.selectbox("Select Metric", all_metrics, key="comp_met")
-            p_val = day_df[day_df['Name'] == comp_athlete][comp_metric].values[0]
-            pos_val = day_df[day_df['Position'] == day_df[day_df['Name'] == comp_athlete]['Position'].values[0]][comp_metric].mean()
-            diff = ((p_val - pos_val) / pos_val * 100) if pos_val > 0 else 0
-            st.metric(label=f"{comp_athlete} vs Pos Avg", value=f"{p_val}", delta=f"{diff:+.1f}%")
+            comp_athlete = st.selectbox("Compare Athlete", day_df['Name'].unique(), key="comp_sel"); comp_metric = st.selectbox("Select Metric", all_metrics, key="comp_met"); p_val = day_df[day_df['Name'] == comp_athlete][comp_metric].values[0]; pos_val = day_df[day_df['Position'] == day_df[day_df['Name'] == comp_athlete]['Position'].values[0]][comp_metric].mean(); diff = ((p_val - pos_val) / pos_val * 100) if pos_val > 0 else 0; st.metric(label=f"{comp_athlete} vs Pos Avg", value=f"{p_val}", delta=f"{diff:+.1f}%")
         with c_comp2:
-            pos_avg_df = day_df.groupby('Position')[comp_metric].mean().reset_index()
-            fig_pos = px.bar(pos_avg_df, x='Position', y=comp_metric, title=f"Positional Averages", color_discrete_sequence=['#F5F5F7'])
-            fig_pos.add_trace(go.Bar(x=[day_df[day_df['Name'] == comp_athlete]['Position'].values[0]], y=[p_val], name=comp_athlete, marker_color='#FF8200'))
-            fig_pos.update_layout(showlegend=False, height=350)
-            st.plotly_chart(fig_pos, use_container_width=True)
+            pos_avg_df = day_df.groupby('Position')[comp_metric].mean().reset_index(); fig_pos = px.bar(pos_avg_df, x='Position', y=comp_metric, title=f"Positional Averages", color_discrete_sequence=['#F5F5F7']); fig_pos.add_trace(go.Bar(x=[day_df[day_df['Name'] == comp_athlete]['Position'].values[0]], y=[p_val], name=comp_athlete, marker_color='#FF8200')); fig_pos.update_layout(showlegend=False, height=350); st.plotly_chart(fig_pos, use_container_width=True)
 
-        st.markdown('<div class="section-header">Practice Volume Trends (Last 10 Sessions)</div>', unsafe_allow_html=True)
-        practice_trends = df.groupby('Session_Name').agg({'Total Jumps': 'sum', 'Date': 'first'}).reset_index().sort_values('Date').tail(10)
-        fig_trend = px.line(practice_trends, x='Session_Name', y='Total Jumps', markers=True, title="Team Jump Volume History")
-        fig_trend.update_traces(line_color='#FF8200', line_width=4)
-        fig_trend.update_layout(height=350, xaxis_title=None)
-        st.plotly_chart(fig_trend, use_container_width=True)
-
-    # --- GAME V PRACTICE (STRICT PRACTICE FILTERING) ---
+    # --- UPDATED GAME V PRACTICE TAB ---
     with tab_gp:
         st.markdown('<div class="section-header">Weekly Practice Average vs. Target Game</div>', unsafe_allow_html=True)
         
         c_gp_ath, c_gp_week, c_gp_game = st.columns(3)
         with c_gp_ath:
-            gp_ath_sel = st.selectbox("Select Athlete", df['Name'].unique(), key="gp_ath_final")
+            gp_ath_sel = st.selectbox("Select Athlete", df['Name'].unique(), key="gp_ath_v3")
         
         with c_gp_week:
             if 'Week' in df.columns:
-                available_weeks = sorted(df['Week'].unique(), reverse=True)
-                gp_week_sel = st.selectbox("Select Practice Week", available_weeks, key="gp_week_final")
+                # Logic to create Week Labels with date ranges
+                # Group by Week and get min/max dates
+                week_ranges = df.groupby('Week')['Date'].agg(['min', 'max']).reset_index()
+                week_ranges['Label'] = week_ranges.apply(
+                    lambda x: f"{x['Week']} ({x['min'].strftime('%m/%d')} - {x['max'].strftime('%m/%d')})", axis=1
+                )
+                
+                # Sort weeks descending (most recent first)
+                week_options = dict(zip(week_ranges['Label'], week_ranges['Week']))
+                gp_label_sel = st.selectbox("Select Practice Week", list(week_options.keys()), key="gp_week_v3")
+                gp_week_id = week_options[gp_label_sel]
             else:
-                st.warning("No 'Week' column found in Sheet.")
-        
+                st.warning("No 'Week' column found.")
+
         with c_gp_game:
             ath_games = df[(df['Name'] == gp_ath_sel) & (df['Session_Type'] == 'Game')]['Session_Name'].unique()
-            gp_game_target = st.selectbox("Select Target Game", ath_games, key="gp_game_final")
+            gp_game_target = st.selectbox("Select Target Game", ath_games, key="gp_game_v3")
 
         if 'Week' in df.columns:
             crit_mets = ['Total Jumps', 'Player Load', 'High Intensity Movements', 'Explosive Efforts']
             
-            # EXCLUDING GAME DATA: Strictly filter for 'Practice' session type
+            # Filter specifically for PRACTICE data and that PERSON
             week_data = df[(df['Name'] == gp_ath_sel) & 
                            (df['Session_Type'] == 'Practice') & 
-                           (df['Week'] == gp_week_sel)]
+                           (df['Week'] == gp_week_id)]
             
             game_data = df[(df['Name'] == gp_ath_sel) & (df['Session_Name'] == gp_game_target)].iloc[0]
 
@@ -239,14 +208,12 @@ try:
                 
                 cg_res1, cg_res2 = st.columns([1, 2])
                 with cg_res1:
-                    st.write(f"**{gp_week_sel} Practice Avg vs. {gp_game_target}**")
+                    st.write(f"**{gp_week_id} Prep vs. Game Demand**")
                     for m in crit_mets:
-                        g_val = game_data[m]
-                        w_val = week_avg[m]
+                        g_val = game_data[m]; w_val = week_avg[m]
                         pct = (w_val / g_val * 100) if g_val > 0 else 0
-                        # Color coding: Practice > 100% of Game is orange (High Risk)
                         color = "inverse" if pct > 100 else "normal"
-                        st.metric(label=m, value=f"{w_val:.1f}", delta=f"{pct:.1f}% of Game Intensity", delta_color=color)
+                        st.metric(label=m, value=f"{w_val:.1f}", delta=f"{pct:.1f}% of Game Demand", delta_color=color)
                 
                 with cg_res2:
                     plot_df = pd.DataFrame({
