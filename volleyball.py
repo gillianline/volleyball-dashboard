@@ -157,7 +157,7 @@ try:
                     elif latest['Jump Height (in)'] < baseline and latest['RSI-modified [m/s]'] >= rsi_baseline:
                         label, color, desc = "SPRINGY", "#FF8200", "Fast but low height."
                     else:
-                        label, color, desc = "FATIGUED", "#FF4B4B", "🚨 Red Flag status."
+                        label, color, desc = "FATIGUED", "#FF4B4B", "Red Flag status."
                     st.markdown(f'<div class="score-wrapper"><div class="score-label">Weekly Readiness</div><div class="score-box" style="background-color:{color}; color:white;">{perc_diff:+.1f}%<span class="status-subtext">{label}</span></div></div><div class="info-box"><b>{label}:</b> {desc}</div>', unsafe_allow_html=True)
             with jc2:
                 if not p_cmj_history.empty:
