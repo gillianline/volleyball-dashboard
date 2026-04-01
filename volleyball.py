@@ -9,45 +9,29 @@ from datetime import timedelta
 # --- PAGE CONFIG ---
 st.set_page_config(page_title="Performance Lab", layout="wide")
 
-# --- CSS: ORIGINAL TENNESSEE STYLE ---
+# --- CSS: TENNESSEE STYLE ---
 st.markdown("""
     <style>
     .stApp { background-color: #FFFFFF; color: #1D1D1F; }
     hr { display: none !important; }
     .block-container { padding-top: 1.5rem !important; }
 
-    /* Table Styles */
     .scout-table { width: 100%; border-collapse: collapse; text-align: center; table-layout: auto; }
-    .scout-table th { background-color: #F5F5F7; padding: 4px; border-bottom: 2px solid #E5E5E7; font-weight: 700; font-size: 10px; }
-    .scout-table td { padding: 4px; border-bottom: 1px solid #F5F5F7; font-size: 10px; }
+    .scout-table th { background-color: #F5F5F7; padding: 4px; border-bottom: 2px solid #E5E5E7; font-weight: 700; font-size: 11px; }
+    .scout-table td { padding: 4px; border-bottom: 1px solid #F5F5F7; font-size: 11px; }
     
-    /* Profile Photo */
     .player-photo-large { border-radius: 50%; width: 220px; height: 220px; object-fit: cover; border: 6px solid #FF8200; }
     
-    /* Score Boxes */
     .score-wrapper { text-align: center; }
     .score-label { font-size: 10px; font-weight: 800; text-transform: uppercase; margin-bottom: 4px; color: #515154; }
     .score-box { padding: 10px 20px; border-radius: 12px; font-size: 32px; font-weight: 800; min-width: 100px; color: #1D1D1F; }
     .status-subtext { font-size: 12px; font-weight: 900; display: block; margin-top: -5px; }
     
-    /* Section Headers */
     .section-header { font-size: 14px; font-weight: 800; color: #FF8200; border-bottom: 2px solid #FF8200; margin-top: 25px; margin-bottom: 15px; padding-bottom: 5px; text-transform: uppercase; }
     
-    /* Gallery Card */
-    .gallery-card { 
-        border: 1px solid #E5E5E7; 
-        padding: 15px; 
-        border-radius: 15px; 
-        background-color: #FFFFFF; 
-        margin-bottom: 12px; 
-        min-height: 380px;
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
-    }
+    .gallery-card { border: 1px solid #E5E5E7; padding: 15px; border-radius: 15px; background-color: #FFFFFF; margin-bottom: 12px; min-height: 380px; display: flex; flex-direction: column; justify-content: center; }
     .gallery-photo { border-radius: 50%; width: 110px; height: 110px; object-fit: cover; border: 5px solid #FF8200; }
     
-    /* Explanation Box */
     .info-box { background-color: #F8F9FA; border-left: 5px solid #FF8200; padding: 10px; margin-top: 10px; font-size: 11px; color: #515154; }
     </style>
     """, unsafe_allow_html=True)
@@ -57,9 +41,15 @@ st.markdown("""
 def load_all_data():
     df = pd.read_csv(st.secrets["GOOGLE_SHEET_URL"])
     df.columns = df.columns.str.strip()
+    
     cmj_df = pd.read_csv(st.secrets["CMJ_SHEET_URL"])
     cmj_df.columns = cmj_df.columns.str.strip()
     cmj_df['Jump Height (in)'] = cmj_df['Jump Height (Imp-Mom) [cm]'] * 0.3937
+    
+    # NEW: Load Phase Data
+    phase_df = pd.read_csv(st.secrets["PHASES_SHEET_URL"])
+    phase_df.columns = phase_df.columns.str.strip()
+    phase_df['Date'] = pd.to_datetime(phase_df['Date'])
     
     rename_map = {
         'Total Jumps': 'Total Jumps', 'IMA Jump Count Med Band': 'Moderate Jumps',
@@ -80,10 +70,10 @@ def load_all_data():
     df['Position'] = df.groupby('Name')['Position'].ffill().bfill().fillna("N/A")
     df['PhotoURL'] = df.groupby('Name')['PhotoURL'].ffill().bfill().fillna("https://www.w3schools.com/howto/img_avatar.png")
     cmj_df['Test Date'] = pd.to_datetime(cmj_df['Test Date'])
-    return df, cmj_df
+    return df, cmj_df, phase_df
 
 try:
-    df, cmj_df = load_all_data()
+    df, cmj_df, phase_df = load_all_data()
     session_map = df[['Date', 'Session_Name']].drop_duplicates().sort_values('Date', ascending=False)
     session_options = session_map['Session_Name'].tolist()
 
@@ -126,6 +116,7 @@ try:
         if not day_df.empty:
             sel_p = st.selectbox("Select Athlete", day_df['Name'].unique())
             p = day_df[day_df['Name'] == sel_p].iloc[0]
+            
             p_cmj_history = cmj_df[cmj_df['Athlete'] == sel_p].sort_values('Test Date')
             sync_cmj = p_cmj_history[(p_cmj_history['Test Date'] <= current_practice_date) & (p_cmj_history['Test Date'] > current_practice_date - timedelta(days=7))]
 
@@ -142,7 +133,7 @@ try:
             with c3:
                 st.markdown(f'<div class="score-wrapper"><div class="score-label">Practice Score</div><div class="score-box" style="background-color:{get_gradient(p["Practice Score"])};">{int(p["Practice Score"])}</div></div>', unsafe_allow_html=True)
 
-            # BOTTOM ROW: JUMP DATA
+            # MIDDLE ROW: JUMP DATA
             st.markdown('<div class="section-header">Weekly Jump Readiness & Diagnostic History</div>', unsafe_allow_html=True)
             jc1, jc2 = st.columns([1.5, 3.5])
             with jc1:
@@ -153,28 +144,48 @@ try:
                     perc_diff = ((latest['Jump Height (in)'] - baseline) / baseline) * 100
                     
                     if latest['Jump Height (in)'] >= baseline and latest['RSI-modified [m/s]'] >= rsi_baseline:
-                        label, color, desc = "ELITE", "#00CC96", "⚡ Height & Pop are both peaking. Green light."
+                        label, color, desc = "ELITE", "#00CC96", "⚡ Height & Pop peaking."
                     elif latest['Jump Height (in)'] >= baseline and latest['RSI-modified [m/s]'] < rsi_baseline:
-                        label, color, desc = "GRINDER", "#FF8200", "🏋️ High height but slow speed. CNS fatigue."
+                        label, color, desc = "GRINDER", "#FF8200", "🏋️ High output, slow speed (CNS Fatigue)."
                     elif latest['Jump Height (in)'] < baseline and latest['RSI-modified [m/s]'] >= rsi_baseline:
-                        label, color, desc = "SPRINGY", "#FF8200", "📉 Fast but low height. Monitor load."
+                        label, color, desc = "SPRINGY", "#FF8200", "📉 Fast but low height."
                     else:
-                        label, color, desc = "FATIGUED", "#FF4B4B", "🚨 Height & Efficiency down. Recovery needed."
+                        label, color, desc = "FATIGUED", "#FF4B4B", "🚨 Red Flag status."
 
                     st.markdown(f"""
                         <div class="score-wrapper">
                             <div class="score-label">Weekly Readiness</div>
                             <div class="score-box" style="background-color:{color}; color:white;">{perc_diff:+.1f}%<span class="status-subtext">{label}</span></div>
                         </div>
-                        <div class="info-box"><b>{label} Status:</b> {desc}</div>
+                        <div class="info-box"><b>{label}:</b> {desc}</div>
                     """, unsafe_allow_html=True)
             with jc2:
                 if not p_cmj_history.empty:
                     fig = make_subplots(specs=[[{"secondary_y": True}]])
-                    fig.add_trace(go.Scatter(x=p_cmj_history['Test Date'], y=p_cmj_history['Jump Height (in)'], name="Height (in)", line=dict(color='#FF8200', width=3)), secondary_y=False)
-                    fig.add_trace(go.Scatter(x=p_cmj_history['Test Date'], y=p_cmj_history['RSI-modified [m/s]'], name="RSI-Mod", line=dict(color='#1D1D1F', dash='dot')), secondary_y=True)
-                    fig.update_layout(height=280, margin=dict(l=0, r=0, t=20, b=0), legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
+                    fig.add_trace(go.Scatter(x=p_cmj_history['Test Date'], y=p_cmj_history['Jump Height (in)'], name="Height", line=dict(color='#FF8200', width=3)), secondary_y=False)
+                    fig.add_trace(go.Scatter(x=p_cmj_history['Test Date'], y=p_cmj_history['RSI-modified [m/s]'], name="RSI", line=dict(color='#1D1D1F', dash='dot')), secondary_y=True)
+                    fig.update_layout(height=240, margin=dict(l=0, r=0, t=10, b=0), showlegend=False)
                     st.plotly_chart(fig, use_container_width=True)
+
+            # NEW BOTTOM ROW: PHASE BREAKDOWN
+            st.markdown('<div class="section-header">Practice Phase Breakdown</div>', unsafe_allow_html=True)
+            p_phases = phase_df[(phase_df['Name'] == sel_p) & (phase_df['Date'] == current_practice_date)].copy()
+            if not p_phases.empty:
+                pc1, pc2 = st.columns([3, 2])
+                with pc1:
+                    # Bar chart of jumps per phase
+                    fig_phase = px.bar(p_phases, x='Phases', y='Total Jumps', 
+                                       title="Jumps by Practice Phase", color_discrete_sequence=['#FF8200'])
+                    fig_phase.update_layout(height=300, margin=dict(l=0, r=0, t=40, b=0), xaxis_title=None)
+                    st.plotly_chart(fig_phase, use_container_width=True)
+                with pc2:
+                    # Table of Player Load per Phase
+                    phase_tbl = '<table class="scout-table"><thead><tr><th>Phase</th><th>Jumps</th><th>Load</th></tr></thead><tbody>'
+                    for _, r in p_phases.iterrows():
+                        phase_tbl += f"<tr><td>{r['Phases']}</td><td>{int(r['Total Jumps'])}</td><td>{r['Total Player Load']:.1f}</td></tr>"
+                    st.markdown(phase_tbl + '</tbody></table>', unsafe_allow_html=True)
+            else:
+                st.info("No phase-specific data found for this session.")
 
     with t_gallery:
         if not day_df.empty:
@@ -183,7 +194,6 @@ try:
                 for j in range(2):
                     if i + j < len(day_df):
                         pd_row = day_df.iloc[i + j]
-                        # Gallery Table with Today, Max, and Grade
                         rows_html = "".join([f"<tr><td>{k}</td><td>{pd_row[k]}</td><td>{pd_row[f'{k}_Max']}</td><td>{int(pd_row[f'{k}_Grade'])}</td></tr>" for k in all_metrics])
                         with cols[j]:
                             st.markdown(f"""
