@@ -24,14 +24,14 @@ st.markdown("""
     
     .score-wrapper { text-align: center; }
     .score-label { font-size: 10px; font-weight: 800; text-transform: uppercase; margin-bottom: 4px; color: #515154; }
-    .score-box { padding: 12px 20px; border-radius: 12px; font-size: 32px; font-weight: 800; min-width: 100px; color: #1D1D1F; }
-    .status-subtext { font-size: 12px; font-weight: 900; display: block; margin-top: -5px; }
+    .score-box { padding: 12px 20px; border-radius: 12px; font-size: 28px; font-weight: 800; min-width: 100px; color: #FFFFFF; line-height: 1.2; }
+    .status-subtext { font-size: 11px; font-weight: 900; display: block; margin-top: 2px; text-transform: uppercase; }
     
     .section-header { font-size: 14px; font-weight: 800; color: #4895DB; border-bottom: 2px solid #FF8200; margin-top: 25px; margin-bottom: 15px; padding-bottom: 5px; text-transform: uppercase; }
     
     .gallery-card { border: 1px solid #E5E5E7; padding: 15px; border-radius: 15px; background-color: #FFFFFF; margin-bottom: 12px; min-height: 380px; display: flex; flex-direction: column; justify-content: center; }
     .gallery-photo { border-radius: 50%; width: 110px; height: 110px; object-fit: cover; border: 4px solid #FF8200; }
-    .info-box { background-color: #f8f9fa; border-left: 5px solid #4895DB; padding: 10px; margin-top: 10px; font-size: 11px; color: #515154; }
+    .info-box { background-color: #f8f9fa; border-left: 5px solid #4895DB; padding: 12px; margin-top: 10px; font-size: 11px; color: #1D1D1F; line-height: 1.4; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -80,7 +80,6 @@ try:
 
     all_metrics = ['Total Jumps', 'Moderate Jumps', 'High Jumps', 'Jump Load', 'Player Load', 'Estimated Distance', 'Explosive Efforts', 'High Intensity Movements']
 
-    # --- RESTORED GRADIENT (YELLOW-GREEN-ORANGE) ---
     def get_gradient(score):
         score = max(0, min(100, float(score)))
         r, g = (int(255*(score/50)), 255) if score < 50 else (255, int(255*(1-(score-50)/50)))
@@ -120,12 +119,31 @@ try:
             jc1, jc2 = st.columns([1.5, 3.5])
             with jc1:
                 if not sync_cmj.empty:
-                    latest = sync_cmj.iloc[-1]; base = p_cmj_history.tail(4)['Jump Height (in)'].mean(); rsi_b = p_cmj_history.tail(4)['RSI-modified [m/s]'].mean()
-                    perc_diff = ((latest['Jump Height (in)'] - base) / base) * 100
-                    if latest['Jump Height (in)'] >= base and latest['RSI-modified [m/s]'] >= rsi_b: label, color = "ELITE (GOOD)", "#4895DB"
-                    elif latest['Jump Height (in)'] < base and latest['RSI-modified [m/s]'] < rsi_b: label, color = "FATIGUED (BAD)", "#515154"
-                    else: label, color = "CAUTION", "#FF8200"
-                    st.markdown(f'<div class="score-wrapper"><div class="score-label">Jump Status</div><div class="score-box" style="background-color:{color}; color:white;">{perc_diff:+.1f}%<span class="status-subtext">{label}</span></div></div>', unsafe_allow_html=True)
+                    latest = sync_cmj.iloc[-1]; base_h = p_cmj_history.tail(4)['Jump Height (in)'].mean(); base_rsi = p_cmj_history.tail(4)['RSI-modified [m/s]'].mean()
+                    cur_h = latest['Jump Height (in)']; cur_rsi = latest['RSI-modified [m/s]']
+                    
+                    if cur_h >= base_h and cur_rsi >= base_rsi:
+                        label, color, why = "ELITE", "#4895DB", "Height and RSI are both peaking above baseline. Player is primed."
+                    elif cur_h >= base_h and cur_rsi < base_rsi:
+                        label, color, why = "GRINDER", "#FF8200", "Height is maintained, but RSI is low. Effort is high, but CNS is slow."
+                    elif cur_h < base_h and cur_rsi >= base_rsi:
+                        label, color, why = "SPRINGY", "#FF8200", "Fast ground contact (high RSI) but low total height. Explosive but lacking power."
+                    else:
+                        label, color, why = "FATIGUED", "#515154", "Both height and RSI have dropped below baseline. High risk of overtraining."
+                    
+                    st.markdown(f"""
+                        <div class="score-wrapper">
+                            <div class="score-label">Readiness</div>
+                            <div class="score-box" style="background-color:{color};">
+                                {cur_h:.1f}" | {cur_rsi:.2f}
+                                <span class="status-subtext">{label}</span>
+                            </div>
+                        </div>
+                        <div class="info-box">
+                            <b>Diagnostic:</b> {why}<br>
+                            <span style="color:#515154; font-size:10px;">(Baseline: {base_h:.1f}" H | {base_rsi:.2f} RSI)</span>
+                        </div>
+                    """, unsafe_allow_html=True)
             with jc2:
                 if not p_cmj_history.empty:
                     fig = make_subplots(specs=[[{"secondary_y": True}]]); fig.add_trace(go.Scatter(x=p_cmj_history['Test Date'], y=p_cmj_history['Jump Height (in)'], name="Height", line=dict(color='#FF8200', width=3)), secondary_y=False); fig.add_trace(go.Scatter(x=p_cmj_history['Test Date'], y=p_cmj_history['RSI-modified [m/s]'], name="RSI", line=dict(color='#4895DB', dash='dot')), secondary_y=True); fig.update_layout(height=280, margin=dict(l=0, r=0, t=20, b=0), showlegend=False); st.plotly_chart(fig, use_container_width=True)
@@ -170,7 +188,6 @@ try:
                     st.write(f"**Prep vs Game Intensity**")
                     for m in crit_mets:
                         g_v, w_v = game_data[m], week_avg[m]
-                        # Show percentage of game in the primary value, and the difference in delta
                         pct = (w_v / g_v * 100) if g_v > 0 else 0
                         st.metric(label=m, value=f"{pct:.1f}%", delta=f"{w_v - g_v:+.1f} diff", delta_color="inverse" if pct > 100 else "normal")
                 with cg2:
