@@ -9,31 +9,38 @@ from datetime import timedelta
 # --- PAGE CONFIG ---
 st.set_page_config(page_title="Performance Lab", layout="wide")
 
-# --- CSS: TENNESSEE STYLE ---
+# --- CSS: ORIGINAL TENNESSEE STYLE ---
 st.markdown("""
     <style>
     .stApp { background-color: #FFFFFF; color: #1D1D1F; }
     hr { display: none !important; }
     .block-container { padding-top: 1.5rem !important; }
 
+    /* Table Styles */
     .scout-table { width: 100%; border-collapse: collapse; text-align: center; table-layout: auto; }
     .scout-table th { background-color: #F5F5F7; padding: 4px; border-bottom: 2px solid #E5E5E7; font-weight: 700; font-size: 11px; }
     .scout-table td { padding: 4px; border-bottom: 1px solid #F5F5F7; font-size: 11px; }
     
+    /* Profile Photo */
     .player-photo-large { border-radius: 50%; width: 220px; height: 220px; object-fit: cover; border: 6px solid #FF8200; }
     
+    /* Score Boxes */
     .score-wrapper { text-align: center; }
     .score-label { font-size: 10px; font-weight: 800; text-transform: uppercase; margin-bottom: 4px; color: #515154; }
     .score-box { padding: 10px 20px; border-radius: 12px; font-size: 32px; font-weight: 800; min-width: 100px; color: #1D1D1F; }
     .status-subtext { font-size: 12px; font-weight: 900; display: block; margin-top: -5px; }
     
+    /* Section Headers */
     .section-header { font-size: 14px; font-weight: 800; color: #FF8200; border-bottom: 2px solid #FF8200; margin-top: 25px; margin-bottom: 15px; padding-bottom: 5px; text-transform: uppercase; }
     
+    /* Gallery Card */
     .gallery-card { 
         border: 1px solid #E5E5E7; padding: 15px; border-radius: 15px; background-color: #FFFFFF; margin-bottom: 12px; min-height: 380px;
         display: flex; flex-direction: column; justify-content: center;
     }
     .gallery-photo { border-radius: 50%; width: 110px; height: 110px; object-fit: cover; border: 5px solid #FF8200; }
+    
+    /* Info Box */
     .info-box { background-color: #F8F9FA; border-left: 5px solid #FF8200; padding: 10px; margin-top: 10px; font-size: 11px; color: #515154; }
     </style>
     """, unsafe_allow_html=True)
@@ -44,8 +51,8 @@ def load_all_data():
     df = pd.read_csv(st.secrets["GOOGLE_SHEET_URL"])
     df.columns = df.columns.str.strip()
     
-    # Auto-categorize Games vs Practices
-    df['Session Type'] = df['Activity'].apply(lambda x: 'Game' if any(w in str(x).lower() for w in ['game', 'match', 'v.']) else 'Practice')
+    # Auto-detect Session Type
+    df['Session_Type'] = df['Activity'].apply(lambda x: 'Game' if any(w in str(x).lower() for w in ['game', 'match', 'v.']) else 'Practice')
     
     cmj_df = pd.read_csv(st.secrets["CMJ_SHEET_URL"])
     cmj_df.columns = cmj_df.columns.str.strip()
@@ -64,12 +71,14 @@ def load_all_data():
     }
     df = df.rename(columns=rename_map)
     df['Date'] = pd.to_datetime(df['Date'])
+    metric_cols = ['Total Jumps', 'Moderate Jumps', 'High Jumps', 'Jump Load', 'Player Load', 'Estimated Distance', 'Explosive Efforts', 'High Intensity Movements']
+    df[metric_cols] = df[metric_cols].apply(pd.to_numeric, errors='coerce').fillna(0).round(1)
     
-    # Big 4 Critical Metrics
-    important_metrics = ['Total Jumps', 'Player Load', 'High Intensity Movements', 'Explosive Efforts']
-    df[important_metrics] = df[important_metrics].apply(pd.to_numeric, errors='coerce').fillna(0).round(1)
-    
-    df['Session_Name'] = df['Activity'].fillna(df['Date'].dt.strftime('%m/%d/%Y'))
+    if 'Activity' in df.columns:
+        df['Session_Name'] = df['Activity'].fillna(df['Date'].dt.strftime('%m/%d/%Y'))
+    else:
+        df['Session_Name'] = df['Date'].dt.strftime('%m/%d/%Y')
+
     df['Position'] = df.groupby('Name')['Position'].ffill().bfill().fillna("N/A")
     df['PhotoURL'] = df.groupby('Name')['PhotoURL'].ffill().bfill().fillna("https://www.w3schools.com/howto/img_avatar.png")
     cmj_df['Test Date'] = pd.to_datetime(cmj_df['Test Date'])
@@ -92,8 +101,7 @@ try:
     current_practice_date = day_df['Date'].iloc[0]
     if pos_filter != "All Positions": day_df = day_df[day_df['Position'] == pos_filter]
 
-    # Simplified Big 4 list
-    core_metrics = ['Total Jumps', 'Player Load', 'High Intensity Movements', 'Explosive Efforts']
+    all_metrics = ['Total Jumps', 'Moderate Jumps', 'High Jumps', 'Jump Load', 'Player Load', 'Estimated Distance', 'Explosive Efforts', 'High Intensity Movements']
 
     def get_gradient(score):
         score = max(0, min(100, float(score)))
@@ -103,10 +111,10 @@ try:
     def process_player(row):
         p_name = row['Name']
         lookback_df = df[(df['Name'] == p_name) & (df['Date'] >= row['Date'] - timedelta(days=30)) & (df['Date'] <= row['Date'])]
-        rolling_maxes = lookback_df[core_metrics].max().round(1)
-        grades = [math.ceil((float(row[k]) / float(rolling_maxes[k])) * 100) if float(rolling_maxes[k]) > 0 else 0 for k in core_metrics]
+        rolling_maxes = lookback_df[all_metrics].max().round(1)
+        grades = [math.ceil((float(row[k]) / float(rolling_maxes[k])) * 100) if float(rolling_maxes[k]) > 0 else 0 for k in all_metrics]
         row['Practice Score'] = math.ceil(sum(grades) / len(grades)) if grades else 0
-        for i, k in enumerate(core_metrics): 
+        for i, k in enumerate(all_metrics): 
             row[f'{k}_Grade'] = grades[i]
             row[f'{k}_Max'] = rolling_maxes[k]
         return row
@@ -114,30 +122,29 @@ try:
     if not day_df.empty:
         day_df = day_df.apply(process_player, axis=1).sort_values('Name')
 
-    tabs = st.tabs(["Individual Profile", "Team Gallery", "Game v. Practice Benchmark"])
+    tab_ind, tab_gal, tab_comp, tab_gp = st.tabs(["Individual Profile", "Team Gallery", "Comparison Lab", "Game v. Practice"])
 
-    with tabs[0]:
+    with tab_ind:
         if not day_df.empty:
             sel_p = st.selectbox("Select Athlete", day_df['Name'].unique())
             p = day_df[day_df['Name'] == sel_p].iloc[0]
             p_cmj_history = cmj_df[cmj_df['Athlete'] == sel_p].sort_values('Test Date')
             sync_cmj = p_cmj_history[(p_cmj_history['Test Date'] <= current_practice_date) & (p_cmj_history['Test Date'] > current_practice_date - timedelta(days=7))]
 
-            # GPS Top Row
+            # GPS Section
             c1, c2, c3 = st.columns([1.2, 2.5, 1.2])
             with c1:
                 st.markdown(f'<div style="text-align:center;"><img src="{p["PhotoURL"]}" class="player-photo-large"></div>', unsafe_allow_html=True)
                 st.markdown(f'<h2 style="text-align:center; margin-top:10px;">{p["Name"]}</h2>', unsafe_allow_html=True)
             with c2:
                 html = '<table class="scout-table"><thead><tr><th>Metric</th><th>Today</th><th>30d Max</th><th>Grade</th></tr></thead><tbody>'
-                for k in core_metrics:
-                    html += f"<tr><td>{k}</td><td>{p[k]}</td><td>{p[f'{k}_Max']}</td><td>{int(p[f'{k}_Grade'])}</td></tr>"
+                for k in all_metrics: html += f"<tr><td>{k}</td><td>{p[k]}</td><td>{p[f'{k}_Max']}</td><td>{int(p[f'{k}_Grade'])}</td></tr>"
                 st.markdown(html + '</tbody></table>', unsafe_allow_html=True)
             with c3:
                 st.markdown(f'<div class="score-wrapper"><div class="score-label">Practice Score</div><div class="score-box" style="background-color:{get_gradient(p["Practice Score"])};">{int(p["Practice Score"])}</div></div>', unsafe_allow_html=True)
 
-            # Jump Middle Row
-            st.markdown('<div class="section-header">Weekly Jump Readiness</div>', unsafe_allow_html=True)
+            # Jump Section
+            st.markdown('<div class="section-header">Weekly Jump Readiness & Diagnostic History</div>', unsafe_allow_html=True)
             jc1, jc2 = st.columns([1.5, 3.5])
             with jc1:
                 if not sync_cmj.empty:
@@ -145,14 +152,15 @@ try:
                     baseline = p_cmj_history.tail(4)['Jump Height (in)'].mean()
                     rsi_baseline = p_cmj_history.tail(4)['RSI-modified [m/s]'].mean()
                     perc_diff = ((latest['Jump Height (in)'] - baseline) / baseline) * 100
+                    
                     if latest['Jump Height (in)'] >= baseline and latest['RSI-modified [m/s]'] >= rsi_baseline:
-                        label, color, desc = "ELITE", "#00CC96", "⚡ Peaking status."
+                        label, color, desc = "ELITE", "#00CC96", "⚡ Height & Pop peaking."
                     elif latest['Jump Height (in)'] >= baseline and latest['RSI-modified [m/s]'] < rsi_baseline:
-                        label, color, desc = "GRINDER", "#FF8200", "🏋️ CNS fatigue detected."
+                        label, color, desc = "GRINDER", "#FF8200", "🏋️ High height, slow speed."
                     elif latest['Jump Height (in)'] < baseline and latest['RSI-modified [m/s]'] >= rsi_baseline:
-                        label, color, desc = "SPRINGY", "#FF8200", "📉 Low power output."
+                        label, color, desc = "SPRINGY", "#FF8200", "📉 Fast but low height."
                     else:
-                        label, color, desc = "FATIGUED", "#FF4B4B", "🚨 Recovery mandatory."
+                        label, color, desc = "FATIGUED", "#FF4B4B", "🚨 Red Flag status."
                     st.markdown(f'<div class="score-wrapper"><div class="score-label">Weekly Readiness</div><div class="score-box" style="background-color:{color}; color:white;">{perc_diff:+.1f}%<span class="status-subtext">{label}</span></div></div><div class="info-box"><b>{label}:</b> {desc}</div>', unsafe_allow_html=True)
             with jc2:
                 if not p_cmj_history.empty:
@@ -162,7 +170,7 @@ try:
                     fig.update_layout(height=280, margin=dict(l=0, r=0, t=20, b=0), showlegend=False)
                     st.plotly_chart(fig, use_container_width=True)
 
-            # Phase Bottom Row
+            # Phase Section
             st.markdown('<div class="section-header">Practice Phase Breakdown</div>', unsafe_allow_html=True)
             p_phases = phase_df[(phase_df['Name'] == sel_p) & (phase_df['Date'] == current_practice_date)].copy()
             if not p_phases.empty:
@@ -174,52 +182,76 @@ try:
                     for _, r in p_phases.iterrows(): p_tbl += f"<tr><td>{r['Phase']}</td><td>{int(r['Total Jumps'])}</td><td>{r['Total Player Load']:.1f}</td></tr>"
                     st.markdown(p_tbl + '</tbody></table>', unsafe_allow_html=True)
 
-    with tabs[1]:
+    with tab_gal:
         if not day_df.empty:
             for i in range(0, len(day_df), 2):
                 cols = st.columns(2)
                 for j in range(2):
                     if i + j < len(day_df):
                         pd_row = day_df.iloc[i + j]
-                        rows_html = "".join([f"<tr><td>{k}</td><td>{pd_row[k]}</td><td>{pd_row[f'{k}_Max']}</td><td>{int(pd_row[f'{k}_Grade'])}</td></tr>" for k in core_metrics])
+                        rows_html = "".join([f"<tr><td>{k}</td><td>{pd_row[k]}</td><td>{pd_row[f'{k}_Max']}</td><td>{int(pd_row[f'{k}_Grade'])}</td></tr>" for k in all_metrics])
                         with cols[j]:
                             st.markdown(f'<div class="gallery-card"><div style="display:flex; align-items:center; gap:10px;"><div style="flex:1.2; text-align:center;"><img src="{pd_row["PhotoURL"]}" class="gallery-photo"><p style="font-weight:bold; font-size:15px; margin-top:8px;">{pd_row["Name"]}</p></div><div style="flex:3;"><table class="scout-table"><thead><tr><th>Metric</th><th>Val</th><th>Max</th><th>Grade</th></tr></thead><tbody>{rows_html}</tbody></table></div><div style="flex:1; text-align:center;"><div class="score-label" style="font-size:9px;">Practice</div><div style="background-color:{get_gradient(pd_row["Practice Score"])}; padding:10px; border-radius:12px; font-size:32px; font-weight:900;">{int(pd_row["Practice Score"])}</div></div></div></div>', unsafe_allow_html=True)
 
-    with tabs[2]:
-        if not day_df.empty:
-            st.markdown(f'<div class="section-header">Game Intensity Comparison: {sel_p}</div>', unsafe_allow_html=True)
+    with tab_comp:
+        st.markdown('<div class="section-header">Athlete vs. Position Benchmarking</div>', unsafe_allow_html=True)
+        c_comp1, c_comp2 = st.columns([1, 2])
+        with c_comp1:
+            comp_athlete = st.selectbox("Compare Athlete", day_df['Name'].unique(), key="comp_sel")
+            comp_metric = st.selectbox("Select Metric", all_metrics, key="comp_met")
+            p_val = day_df[day_df['Name'] == comp_athlete][comp_metric].values[0]
+            pos_val = day_df[day_df['Position'] == day_df[day_df['Name'] == comp_athlete]['Position'].values[0]][comp_metric].mean()
+            diff = ((p_val - pos_val) / pos_val * 100) if pos_val > 0 else 0
+            st.metric(label=f"{comp_athlete} vs Pos Avg", value=f"{p_val}", delta=f"{diff:+.1f}%")
+        with c_comp2:
+            pos_avg_df = day_df.groupby('Position')[comp_metric].mean().reset_index()
+            fig_pos = px.bar(pos_avg_df, x='Position', y=comp_metric, title=f"Positional Averages", color_discrete_sequence=['#F5F5F7'])
+            fig_pos.add_trace(go.Bar(x=[day_df[day_df['Name'] == comp_athlete]['Position'].values[0]], y=[p_val], name=comp_athlete, marker_color='#FF8200'))
+            fig_pos.update_layout(showlegend=False, height=350)
+            st.plotly_chart(fig_pos, use_container_width=True)
+
+        st.markdown('<div class="section-header">Practice Volume Trends (Last 10 Sessions)</div>', unsafe_allow_html=True)
+        practice_trends = df.groupby('Session_Name').agg({'Total Jumps': 'sum', 'Date': 'first'}).reset_index().sort_values('Date').tail(10)
+        fig_trend = px.line(practice_trends, x='Session_Name', y='Total Jumps', markers=True, title="Team Jump Volume History")
+        fig_trend.update_traces(line_color='#FF8200', line_width=4)
+        fig_trend.update_layout(height=350, xaxis_title=None)
+        st.plotly_chart(fig_trend, use_container_width=True)
+
+    with tab_gp:
+        # Automated Benchmark for the selected player (sel_p)
+        st.markdown(f'<div class="section-header">Game Intensity Benchmark: {sel_p}</div>', unsafe_allow_html=True)
+        
+        # Only focusing on most important metrics to keep it clear
+        key_metrics = ['Total Jumps', 'Player Load', 'High Intensity Movements', 'Explosive Efforts']
+        
+        player_games = df[(df['Name'] == sel_p) & (df['Session_Type'] == 'Game')]
+        
+        if not player_games.empty:
+            game_summary = player_games[key_metrics].mean()
+            prac_vals = day_df[day_df['Name'] == sel_p][key_metrics].iloc[0]
             
-            # Auto-calculate Game Avg for THIS player
-            player_games = df[(df['Name'] == sel_p) & (df['Session Type'] == 'Game')]
+            cg1, cg2 = st.columns([1.5, 3])
+            with cg1:
+                st.write("**Today's Load vs. Game Avg**")
+                for m in key_metrics:
+                    g_avg = game_summary[m]
+                    p_val = prac_vals[m]
+                    pct = (p_val / g_avg * 100) if g_avg > 0 else 0
+                    st.metric(label=m, value=f"{p_val}", delta=f"{pct:.1f}% of Game", delta_color="inverse" if pct > 100 else "normal")
             
-            c_auto1, c_auto2 = st.columns([2, 3])
-            with c_auto1:
-                if not player_games.empty:
-                    game_summary = player_games[core_metrics].mean()
-                    prac_vals = day_df[day_df['Name'] == sel_p][core_metrics].iloc[0]
-                    
-                    st.write("**Today's Load vs. Game Average**")
-                    for m in core_metrics:
-                        g_avg = game_summary[m]
-                        p_val = prac_vals[m]
-                        pct = (p_val / g_avg * 100) if g_avg > 0 else 0
-                        color = "normal" if pct < 100 else "inverse"
-                        st.metric(label=m, value=f"{p_val}", delta=f"{pct:.1f}% of Game", delta_color=color)
-                else:
-                    st.warning("No Game data found for this player yet.")
-            
-            with c_auto2:
-                if not player_games.empty:
-                    # Visual gap chart
-                    comp_df = pd.DataFrame({
-                        'Metric': core_metrics,
-                        'Today': prac_vals.values,
-                        'Game Avg': game_summary.values
-                    }).melt(id_vars='Metric', var_name='Type', value_name='Value')
-                    
-                    fig_gp = px.bar(comp_df, x='Metric', y='Value', color='Type', barmode='group',
-                                    color_discrete_map={'Today': '#FF8200', 'Game Avg': '#1D1D1F'})
-                    st.plotly_chart(fig_gp, use_container_width=True)
+            with cg2:
+                comp_df = pd.DataFrame({
+                    'Metric': key_metrics,
+                    'Today': prac_vals.values,
+                    'Game Avg': game_summary.values
+                }).melt(id_vars='Metric', var_name='Type', value_name='Value')
+                
+                fig_gp = px.bar(comp_df, x='Metric', y='Value', color='Type', barmode='group',
+                                color_discrete_map={'Today': '#FF8200', 'Game Avg': '#1D1D1F'})
+                fig_gp.update_layout(height=400, xaxis_title=None)
+                st.plotly_chart(fig_gp, use_container_width=True)
+        else:
+            st.warning(f"No game data found for {sel_p} to generate a benchmark.")
 
 except Exception as e:
     st.error(f"Sync Error: {e}")
