@@ -51,7 +51,7 @@ def load_all_data():
     df = pd.read_csv(st.secrets["GOOGLE_SHEET_URL"])
     df.columns = df.columns.str.strip()
     
-    # Detect Session Type
+    # Session Type Logic
     df['Session_Type'] = df['Activity'].apply(lambda x: 'Game' if any(w in str(x).lower() for w in ['game', 'match', 'v.']) else 'Practice')
     
     cmj_df = pd.read_csv(st.secrets["CMJ_SHEET_URL"])
@@ -71,6 +71,8 @@ def load_all_data():
     }
     df = df.rename(columns=rename_map)
     df['Date'] = pd.to_datetime(df['Date'])
+    
+    # FIXED: Added 's' to Movements here to match rename_map
     metric_cols = ['Total Jumps', 'Moderate Jumps', 'High Jumps', 'Jump Load', 'Player Load', 'Estimated Distance', 'Explosive Efforts', 'High Intensity Movements']
     df[metric_cols] = df[metric_cols].apply(pd.to_numeric, errors='coerce').fillna(0).round(1)
     
@@ -127,7 +129,6 @@ try:
             p_cmj_history = cmj_df[cmj_df['Athlete'] == sel_p].sort_values('Test Date')
             sync_cmj = p_cmj_history[(p_cmj_history['Test Date'] <= current_practice_date) & (p_cmj_history['Test Date'] > current_practice_date - timedelta(days=7))]
 
-            # GPS Section
             c1, c2, c3 = st.columns([1.2, 2.5, 1.2])
             with c1:
                 st.markdown(f'<div style="text-align:center;"><img src="{p["PhotoURL"]}" class="player-photo-large"></div>', unsafe_allow_html=True)
@@ -139,7 +140,6 @@ try:
             with c3:
                 st.markdown(f'<div class="score-wrapper"><div class="score-label">Practice Score</div><div class="score-box" style="background-color:{get_gradient(p["Practice Score"])};">{int(p["Practice Score"])}</div></div>', unsafe_allow_html=True)
 
-            # Jump Section
             st.markdown('<div class="section-header">Weekly Jump Readiness & Diagnostic History</div>', unsafe_allow_html=True)
             jc1, jc2 = st.columns([1.5, 3.5])
             with jc1:
@@ -166,7 +166,6 @@ try:
                     fig.update_layout(height=280, margin=dict(l=0, r=0, t=20, b=0), showlegend=False)
                     st.plotly_chart(fig, use_container_width=True)
 
-            # Phase Section
             st.markdown('<div class="section-header">Practice Phase Breakdown</div>', unsafe_allow_html=True)
             p_phases = phase_df[(phase_df['Name'] == sel_p) & (phase_df['Date'] == current_practice_date)].copy()
             if not p_phases.empty:
@@ -214,57 +213,52 @@ try:
         st.plotly_chart(fig_trend, use_container_width=True)
 
     with tab_gp:
-        # 1. Independent Selectors for Comparison Tab
         st.markdown('<div class="section-header">Game Intensity Comparison</div>', unsafe_allow_html=True)
         
-        c_set1, c_set2 = st.columns([2, 1])
-        with c_set1:
-            gp_ath = st.selectbox("Select Athlete", df['Name'].unique(), key="gp_ath_sel")
-        with c_set2:
-            comp_mode = st.radio("Comparison Basis", ["Most Recent Game", "Season Game Avg"])
-
-        # 2. Key metrics for volleyball performance
-        key_metrics = ['Total Jumps', 'Player Load', 'High Intensity Movement', 'Explosive Efforts']
+        # User selection for athlete on this tab
+        comp_ath = st.selectbox("Athlete to Analyze", df['Name'].unique(), key="gp_tab_ath")
+        comp_mode = st.radio("Benchmark Source", ["Most Recent Game", "Season Game Avg"], horizontal=True)
         
-        # 3. Filter Data
-        p_data = df[df['Name'] == gp_ath]
-        p_games = p_data[p_data['Session_Type'] == 'Game'].sort_values('Date', ascending=False)
-        p_prac = p_data[(p_data['Session_Type'] == 'Practice') & (p_data['Session_Name'] == selected_session)]
+        # Filter data for this player
+        p_all = df[df['Name'] == comp_ath]
+        p_games = p_all[p_all['Session_Type'] == 'Game'].sort_values('Date', ascending=False)
+        p_today = p_all[p_all['Session_Name'] == selected_session]
         
-        if not p_prac.empty and not p_games.empty:
-            # Determine which game data to use
+        if not p_today.empty and not p_games.empty:
+            today_vals = p_today.iloc[0]
+            
             if comp_mode == "Most Recent Game":
                 baseline = p_games.iloc[0]
-                baseline_label = f"Game on {baseline['Date'].strftime('%m/%d')}"
+                bl_label = f"Game on {baseline['Date'].strftime('%m/%d')}"
             else:
-                baseline = p_games[key_metrics].mean()
-                baseline_label = "Season Game Avg"
+                baseline = p_games[all_metrics].mean()
+                bl_label = "Season Game Avg"
             
-            today = p_prac.iloc[0]
-            
-            cg1, cg2 = st.columns([1.5, 3])
+            cg1, cg2 = st.columns([1, 2])
             with cg1:
-                st.write(f"**Today vs. {baseline_label}**")
-                for m in key_metrics:
+                st.write(f"**Today vs. {bl_label}**")
+                # Showing the 4 most critical metrics for space
+                crit_mets = ['Total Jumps', 'Player Load', 'High Intensity Movements', 'Explosive Efforts']
+                for m in crit_mets:
                     b_val = baseline[m]
-                    t_val = today[m]
-                    pct = (t_val / b_val * 100) if b_val > 0 else 0
-                    st.metric(label=m, value=f"{t_val}", delta=f"{pct:.1f}% of Game", delta_color="inverse" if pct > 100 else "normal")
+                    t_val = today_vals[m]
+                    p_of_game = (t_val / b_val * 100) if b_val > 0 else 0
+                    st.metric(label=m, value=f"{t_val}", delta=f"{p_of_game:.1f}% of Game")
             
             with cg2:
-                # Grouped bar chart for visual
-                comp_plot_df = pd.DataFrame({
-                    'Metric': key_metrics,
-                    'Today (Practice)': [today[m] for m in key_metrics],
-                    baseline_label: [baseline[m] for m in key_metrics]
-                }).melt(id_vars='Metric', var_name='Session', value_name='Value')
+                # Grouped bar chart
+                plot_df = pd.DataFrame({
+                    'Metric': crit_mets,
+                    'Today (Practice)': [today_vals[m] for m in crit_mets],
+                    bl_label: [baseline[m] for m in crit_mets]
+                }).melt(id_vars='Metric', var_name='Type', value_name='Value')
                 
-                fig_gp = px.bar(comp_plot_df, x='Metric', y='Value', color='Session', barmode='group',
-                                color_discrete_map={'Today (Practice)': '#FF8200', baseline_label: '#1D1D1F'})
+                fig_gp = px.bar(plot_df, x='Metric', y='Value', color='Type', barmode='group',
+                                color_discrete_map={'Today (Practice)': '#FF8200', bl_label: '#1D1D1F'})
                 fig_gp.update_layout(height=400, xaxis_title=None, legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
                 st.plotly_chart(fig_gp, use_container_width=True)
         else:
-            st.warning("Insufficient data. Ensure the athlete has at least one 'Game' and one 'Practice' session recorded.")
+            st.warning("Insufficient data. Ensure the athlete has both a 'Practice' session and at least one 'Game' session.")
 
 except Exception as e:
     st.error(f"Sync Error: {e}")
