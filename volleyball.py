@@ -9,14 +9,14 @@ from datetime import timedelta
 # --- PAGE CONFIG ---
 st.set_page_config(page_title="Performance Lab", layout="wide")
 
-# --- CSS: TENNESSEE STYLE ---
+# --- CSS: ORIGINAL TENNESSEE STYLE ---
 st.markdown("""
     <style>
     .stApp { background-color: #FFFFFF; color: #1D1D1F; }
     hr { display: none !important; }
     .block-container { padding-top: 1.5rem !important; }
 
-    /* Tables */
+    /* Table Styles */
     .scout-table { width: 100%; border-collapse: collapse; text-align: center; table-layout: auto; }
     .scout-table th { background-color: #F5F5F7; padding: 4px; border-bottom: 2px solid #E5E5E7; font-weight: 700; font-size: 11px; }
     .scout-table td { padding: 4px; border-bottom: 1px solid #F5F5F7; font-size: 11px; }
@@ -39,6 +39,9 @@ st.markdown("""
         display: flex; flex-direction: column; justify-content: center;
     }
     .gallery-photo { border-radius: 50%; width: 110px; height: 110px; object-fit: cover; border: 5px solid #FF8200; }
+    
+    /* Info Box */
+    .info-box { background-color: #F8F9FA; border-left: 5px solid #FF8200; padding: 10px; margin-top: 10px; font-size: 11px; color: #515154; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -122,45 +125,92 @@ try:
         if not day_df.empty:
             sel_p = st.selectbox("Select Athlete", day_df['Name'].unique())
             p = day_df[day_df['Name'] == sel_p].iloc[0]
-            
-            # --- Individual Content (GPS, Jumps, Phases) ---
-            # [Previous logic remains here...]
-            st.markdown(f"**Viewing:** {p['Name']}")
+            p_cmj_history = cmj_df[cmj_df['Athlete'] == sel_p].sort_values('Test Date')
+            sync_cmj = p_cmj_history[(p_cmj_history['Test Date'] <= current_practice_date) & (p_cmj_history['Test Date'] > current_practice_date - timedelta(days=7))]
+
+            # GPS Section
+            c1, c2, c3 = st.columns([1.2, 2.5, 1.2])
+            with c1:
+                st.markdown(f'<div style="text-align:center;"><img src="{p["PhotoURL"]}" class="player-photo-large"></div>', unsafe_allow_html=True)
+                st.markdown(f'<h2 style="text-align:center; margin-top:10px;">{p["Name"]}</h2>', unsafe_allow_html=True)
+            with c2:
+                html = '<table class="scout-table"><thead><tr><th>Metric</th><th>Today</th><th>30d Max</th><th>Grade</th></tr></thead><tbody>'
+                for k in all_metrics: html += f"<tr><td>{k}</td><td>{p[k]}</td><td>{p[f'{k}_Max']}</td><td>{int(p[f'{k}_Grade'])}</td></tr>"
+                st.markdown(html + '</tbody></table>', unsafe_allow_html=True)
+            with c3:
+                st.markdown(f'<div class="score-wrapper"><div class="score-label">Practice Score</div><div class="score-box" style="background-color:{get_gradient(p["Practice Score"])};">{int(p["Practice Score"])}</div></div>', unsafe_allow_html=True)
+
+            # Jump Section
+            st.markdown('<div class="section-header">Weekly Jump Readiness & Diagnostic History</div>', unsafe_allow_html=True)
+            jc1, jc2 = st.columns([1.5, 3.5])
+            with jc1:
+                if not sync_cmj.empty:
+                    latest = sync_cmj.iloc[-1]
+                    baseline = p_cmj_history.tail(4)['Jump Height (in)'].mean()
+                    rsi_baseline = p_cmj_history.tail(4)['RSI-modified [m/s]'].mean()
+                    perc_diff = ((latest['Jump Height (in)'] - baseline) / baseline) * 100
+                    
+                    if latest['Jump Height (in)'] >= baseline and latest['RSI-modified [m/s]'] >= rsi_baseline:
+                        label, color, desc = "ELITE", "#00CC96", "⚡ Height & Pop peaking."
+                    elif latest['Jump Height (in)'] >= baseline and latest['RSI-modified [m/s]'] < rsi_baseline:
+                        label, color, desc = "GRINDER", "#FF8200", "🏋️ High height, slow speed."
+                    elif latest['Jump Height (in)'] < baseline and latest['RSI-modified [m/s]'] >= rsi_baseline:
+                        label, color, desc = "SPRINGY", "#FF8200", "📉 Fast but low height."
+                    else:
+                        label, color, desc = "FATIGUED", "#FF4B4B", "🚨 Red Flag status."
+                    st.markdown(f'<div class="score-wrapper"><div class="score-label">Weekly Readiness</div><div class="score-box" style="background-color:{color}; color:white;">{perc_diff:+.1f}%<span class="status-subtext">{label}</span></div></div><div class="info-box"><b>{label}:</b> {desc}</div>', unsafe_allow_html=True)
+            with jc2:
+                if not p_cmj_history.empty:
+                    fig = make_subplots(specs=[[{"secondary_y": True}]])
+                    fig.add_trace(go.Scatter(x=p_cmj_history['Test Date'], y=p_cmj_history['Jump Height (in)'], name="Height", line=dict(color='#FF8200', width=3)), secondary_y=False)
+                    fig.add_trace(go.Scatter(x=p_cmj_history['Test Date'], y=p_cmj_history['RSI-modified [m/s]'], name="RSI", line=dict(color='#1D1D1F', dash='dot')), secondary_y=True)
+                    fig.update_layout(height=280, margin=dict(l=0, r=0, t=20, b=0), showlegend=False)
+                    st.plotly_chart(fig, use_container_width=True)
+
+            # Phase Section
+            st.markdown('<div class="section-header">Practice Phase Breakdown</div>', unsafe_allow_html=True)
+            p_phases = phase_df[(phase_df['Name'] == sel_p) & (phase_df['Date'] == current_practice_date)].copy()
+            if not p_phases.empty:
+                pc1, pc2 = st.columns([3, 2])
+                with pc1:
+                    st.plotly_chart(px.bar(p_phases, x='Phase', y='Total Jumps', color_discrete_sequence=['#FF8200'], height=300), use_container_width=True)
+                with pc2:
+                    p_tbl = '<table class="scout-table"><thead><tr><th>Phase</th><th>Jumps</th><th>Load</th></tr></thead><tbody>'
+                    for _, r in p_phases.iterrows(): p_tbl += f"<tr><td>{r['Phase']}</td><td>{int(r['Total Jumps'])}</td><td>{r['Total Player Load']:.1f}</td></tr>"
+                    st.markdown(p_tbl + '</tbody></table>', unsafe_allow_html=True)
 
     with tab_gal:
         if not day_df.empty:
-            # --- Gallery Logic ---
-            # [Previous logic remains here...]
-            st.markdown("**Team Scouting Cards**")
+            for i in range(0, len(day_df), 2):
+                cols = st.columns(2)
+                for j in range(2):
+                    if i + j < len(day_df):
+                        pd_row = day_df.iloc[i + j]
+                        rows_html = "".join([f"<tr><td>{k}</td><td>{pd_row[k]}</td><td>{pd_row[f'{k}_Max']}</td><td>{int(pd_row[f'{k}_Grade'])}</td></tr>" for k in all_metrics])
+                        with cols[j]:
+                            st.markdown(f'<div class="gallery-card"><div style="display:flex; align-items:center; gap:10px;"><div style="flex:1.2; text-align:center;"><img src="{pd_row["PhotoURL"]}" class="gallery-photo"><p style="font-weight:bold; font-size:15px; margin-top:8px;">{pd_row["Name"]}</p></div><div style="flex:3;"><table class="scout-table"><thead><tr><th>Metric</th><th>Val</th><th>Max</th><th>Grade</th></tr></thead><tbody>{rows_html}</tbody></table></div><div style="flex:1; text-align:center;"><div class="score-label" style="font-size:9px;">Practice</div><div style="background-color:{get_gradient(pd_row["Practice Score"])}; padding:10px; border-radius:12px; font-size:32px; font-weight:900;">{int(pd_row["Practice Score"])}</div></div></div></div>', unsafe_allow_html=True)
 
     with tab_comp:
         st.markdown('<div class="section-header">Athlete vs. Position Benchmarking</div>', unsafe_allow_html=True)
-        
         c_comp1, c_comp2 = st.columns([1, 2])
         with c_comp1:
-            comp_athlete = st.selectbox("Select Athlete to Compare", day_df['Name'].unique(), key="comp_ath")
-            comp_metric = st.selectbox("Select Metric", all_metrics, key="comp_met")
-            
+            comp_athlete = st.selectbox("Compare Athlete", day_df['Name'].unique())
+            comp_metric = st.selectbox("Select Metric", all_metrics)
             p_val = day_df[day_df['Name'] == comp_athlete][comp_metric].values[0]
             pos_val = day_df[day_df['Position'] == day_df[day_df['Name'] == comp_athlete]['Position'].values[0]][comp_metric].mean()
-            
             diff = ((p_val - pos_val) / pos_val * 100) if pos_val > 0 else 0
             st.metric(label=f"{comp_athlete} vs Pos Avg", value=f"{p_val}", delta=f"{diff:+.1f}%")
-
         with c_comp2:
             pos_avg_df = day_df.groupby('Position')[comp_metric].mean().reset_index()
-            fig_pos = px.bar(pos_avg_df, x='Position', y=comp_metric, title=f"Positional Averages: {comp_metric}", color_discrete_sequence=['#F5F5F7'])
+            fig_pos = px.bar(pos_avg_df, x='Position', y=comp_metric, title=f"Positional Averages", color_discrete_sequence=['#F5F5F7'])
             fig_pos.add_trace(go.Bar(x=[day_df[day_df['Name'] == comp_athlete]['Position'].values[0]], y=[p_val], name=comp_athlete, marker_color='#FF8200'))
             fig_pos.update_layout(showlegend=False, height=350)
             st.plotly_chart(fig_pos, use_container_width=True)
 
         st.markdown('<div class="section-header">Practice Volume Trends (Last 10 Sessions)</div>', unsafe_allow_html=True)
-        # Aggregate total jump volume per practice
-        practice_trends = df.groupby('Session_Name').agg({'Total Jumps': 'sum', 'Date': 'first'}).sort_values('Date').tail(10)
-        
-        fig_trend = px.line(practice_trends, x='Session_Name', y='Total Jumps', markers=True, title="Total Team Jump Volume")
+        practice_trends = df.groupby('Session_Name').agg({'Total Jumps': 'sum', 'Date': 'first'}).reset_index().sort_values('Date').tail(10)
+        fig_trend = px.line(practice_trends, x='Session_Name', y='Total Jumps', markers=True, title="Team Jump Volume History")
         fig_trend.update_traces(line_color='#FF8200', line_width=4)
-        fig_trend.add_hline(y=practice_trends['Total Jumps'].mean(), line_dash="dot", annotation_text="Avg Volume")
         fig_trend.update_layout(height=350, xaxis_title=None)
         st.plotly_chart(fig_trend, use_container_width=True)
 
