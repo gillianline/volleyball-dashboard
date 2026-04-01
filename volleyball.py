@@ -9,13 +9,11 @@ from datetime import timedelta
 # --- PAGE CONFIG ---
 st.set_page_config(page_title="Lady Vols Performance Lab", layout="wide")
 
-# --- CSS: FIXED PADDING FOR TAB VISIBILITY ---
+# --- CSS: FIXED PADDING & LADY VOLS THEMING ---
 st.markdown("""
     <style>
     .stApp { background-color: #FFFFFF; color: #1D1D1F; }
     hr { display: none !important; }
-    
-    /* ADJUSTED PADDING: Prevents tabs from being covered by the header */
     .block-container { padding-top: 5rem !important; }
 
     .scout-table { width: 100%; border-collapse: collapse; text-align: center; table-layout: auto; }
@@ -73,9 +71,9 @@ try:
 
     st.markdown("<h2 style='text-align: center; color: #FF8200; font-weight: 900; margin-top: -40px;'>LADY VOLS PERFORMANCE LAB</h2>", unsafe_allow_html=True)
     
-    tab_ind, tab_gal, tab_comp, tab_gp = st.tabs(["Individual Profile", "Team Gallery", "Comparison Lab", "Game v. Practice"])
+    tabs = st.tabs(["Individual Profile", "Team Gallery", "Comparison Lab", "Game v. Practice"])
 
-    with tab_ind:
+    with tabs[0]:
         session_map = df[['Date', 'Session_Name']].drop_duplicates().sort_values('Date', ascending=False)
         c_m, c_p = st.columns(2)
         with c_m: selected_session = st.selectbox("Select Session", session_map['Session_Name'].tolist(), index=0, key="ind_sess")
@@ -90,6 +88,7 @@ try:
             p = day_df[day_df['Name'] == sel_p].iloc[0]
             p_cmj_hist = cmj_df[(cmj_df['Athlete'] == sel_p) & (cmj_df['Test Date'] <= curr_date)].sort_values('Test Date')
             sync_cmj = p_cmj_hist[(p_cmj_hist['Test Date'] > curr_date - timedelta(days=7))]
+
             lookback = df[(df['Name'] == sel_p) & (df['Date'] >= curr_date - timedelta(days=30)) & (df['Date'] <= curr_date)]
             rolling_maxes = lookback[all_metrics].max().round(1)
             grades = [math.ceil((float(p[k]) / float(rolling_maxes[k])) * 100) if float(rolling_maxes[k]) > 0 else 0 for k in all_metrics]
@@ -110,14 +109,18 @@ try:
             with jc1:
                 if not sync_cmj.empty:
                     latest = sync_cmj.iloc[-1]; base_h = p_cmj_hist.tail(5).iloc[:-1]['Jump Height (in)'].mean(); base_rsi = p_cmj_hist.tail(5).iloc[:-1]['RSI-modified [m/s]'].mean()
-                    cur_h = latest['Jump Height (in)']; cur_rsi = latest['RSI-modified [m/s]']; p_diff = ((cur_h - base_h) / base_h) * 100
+                    cur_h, cur_rsi = latest['Jump Height (in)'], latest['RSI-modified [m/s]']
+                    p_diff = ((cur_h - base_h) / base_h) * 100
+                    
                     if cur_h >= base_h and cur_rsi >= base_rsi: label, color, profile = "ELITE", "#28a745", "Jump Height and RSI are both High."
                     elif cur_h >= base_h and cur_rsi < base_rsi: label, color, profile = "GRINDER", "#ffc107", "Jump Height is High | RSI is Low."
                     elif cur_h < base_h and cur_rsi >= base_rsi: label, color, profile = "SPRINGY", "#ffc107", "Jump Height is Low | RSI is High."
                     else: label, color, profile = "FATIGUED", "#dc3545", "Jump Height and RSI are both Low."
+                    
                     prev_h, prev_rsi = "N/A", "N/A"
                     if len(p_cmj_hist) > 1:
                         prev = p_cmj_hist.iloc[-2]; prev_h, prev_rsi = f"{prev['Jump Height (in)']:.1f}\"", f"{prev['RSI-modified [m/s]']:.2f}"
+
                     st.markdown(f'<div class="score-wrapper"><div class="score-label">Readiness</div><div class="score-box" style="background-color:{color};">{p_diff:+.1f}%<span class="status-subtext">{label}</span></div></div><div class="info-box"><b>Today:</b> {cur_h:.1f}" | {cur_rsi:.2f} RSI<br><b>Previous:</b> {prev_h} | {prev_rsi} RSI<br><b>Profile:</b> {profile}</div>', unsafe_allow_html=True)
             with jc2:
                 if not p_cmj_hist.empty:
@@ -133,7 +136,7 @@ try:
                     for _, r in p_phases.iterrows(): p_tbl += f"<tr><td>{r['Phase']}</td><td>{int(r['Total Jumps'])}</td><td>{r['Total Player Load']:.1f}</td></tr>"
                     st.markdown(p_tbl + '</tbody></table>', unsafe_allow_html=True)
 
-    with tab_gal:
+    with tabs[1]:
         day_df_gal = df[df['Session_Name'] == selected_session].copy()
         if pos_f != "All Positions": day_df_gal = day_df_gal[day_df_gal['Position'] == pos_f]
         for i in range(0, len(day_df_gal), 2):
@@ -143,39 +146,22 @@ try:
                     pd_row = day_df_gal.iloc[i + j]; lb = df[(df['Name'] == pd_row['Name']) & (df['Date'] >= curr_date - timedelta(days=30)) & (df['Date'] <= curr_date)]; rm = lb[all_metrics].max().round(1); gr = [math.ceil((float(pd_row[k]) / float(rm[k])) * 100) if float(rm[k]) > 0 else 0 for k in all_metrics]; sc = math.ceil(sum(gr) / len(gr)) if gr else 0; r_html = "".join([f"<tr><td>{k}</td><td>{pd_row[k]}</td><td>{rm[k]}</td><td>{gr[idx]}</td></tr>" for idx, k in enumerate(all_metrics)])
                     with cols[j]: st.markdown(f'<div class="gallery-card"><div style="display:flex; align-items:center; gap:10px;"><div style="flex:1.2; text-align:center;"><img src="{pd_row["PhotoURL"]}" class="gallery-photo"><p style="font-weight:bold; font-size:15px; margin-top:8px;">{pd_row["Name"]}</p></div><div style="flex:3;"><table class="scout-table"><thead><tr><th>Metric</th><th>Val</th><th>Max</th><th>Grade</th></tr></thead><tbody>{r_html}</tbody></table></div><div style="flex:1; text-align:center;"><div style="background-color:{get_flipped_gradient(sc)}; color:white; padding:10px; border-radius:12px; font-size:32px; font-weight:900;">{sc}</div></div></div></div>', unsafe_allow_html=True)
 
-    with tab_comp:
+    with tabs[2]:
         day_df_comp = df[df['Session_Name'] == selected_session].copy()
         c_sel, c_met = st.columns(2)
         with c_sel: c_ath = st.selectbox("Compare Athlete", sorted(day_df_comp['Name'].unique()), key="c_ath")
         with c_met: c_m_sel = st.selectbox("Select Metric", all_metrics, key="c_m_sel")
-        
         p_val = day_df_comp[day_df_comp['Name'] == c_ath][c_m_sel].values[0]
         pos_avg = day_df_comp[day_df_comp['Position'] == day_df_comp[day_df_comp['Name'] == c_ath]['Position'].values[0]][c_m_sel].mean()
-        team_avg = day_df_comp[c_m_sel].mean()
-        
-        # Calculate Percentile Rank within the roster for the session
-        roster_values = day_df_comp[c_m_sel].sort_values()
-        rank = (roster_values < p_val).sum() / len(roster_values) * 100
-
-        col_m1, col_m2 = st.columns(2)
-        with col_m1:
-            st.metric(label=f"{c_ath} vs Pos Avg", value=f"{p_val}", delta=f"{((p_val - pos_avg) / pos_avg * 100):+.1f}%", delta_color="inverse")
-        with col_m2:
-            st.metric(label="Roster Percentile", value=f"{rank:.0f}th", delta="Rank in Session")
-
-        # Enhanced Chart with Team Average Line
-        fig_p = px.bar(day_df_comp.sort_values(c_m_sel, ascending=False), x='Name', y=c_m_sel, color_discrete_sequence=['#F5F5F7'])
-        fig_p.add_trace(go.Bar(x=[c_ath], y=[p_val], marker_color='#FF8200', name=c_ath))
-        fig_p.add_shape(type='line', x0=-0.5, x1=len(day_df_comp)-0.5, y0=team_avg, y1=team_avg, line=dict(color='#4895DB', width=3, dash='dash'))
-        fig_p.add_annotation(x=len(day_df_comp)-1, y=team_avg, text="Team Avg", showarrow=False, yshift=10, font=dict(color="#4895DB", weight="bold"))
-        
-        st.plotly_chart(fig_p.update_layout(showlegend=False, height=400, xaxis_title=None, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)'), use_container_width=True)
-        
+        st.metric(label=f"{c_ath} vs Pos Avg", value=f"{p_val}", delta=f"{((p_val - pos_avg) / pos_avg * 100):+.1f}%", delta_color="inverse")
+        pos_avg_df = day_df_comp.groupby('Position')[c_m_sel].mean().reset_index()
+        fig_p = px.bar(pos_avg_df, x='Position', y=c_m_sel, color_discrete_sequence=['#4895DB']).add_trace(go.Bar(x=[day_df_comp[day_df_comp['Name'] == c_ath]['Position'].values[0]], y=[p_val], marker_color='#FF8200'))
+        st.plotly_chart(fig_p.update_layout(showlegend=False, height=300), use_container_width=True)
         st.markdown('<div class="section-header">Team Jump Volume History</div>', unsafe_allow_html=True)
         trends = df.groupby('Session_Name').agg({'Total Jumps': 'sum', 'Date': 'first'}).reset_index().sort_values('Date').tail(10)
         st.plotly_chart(px.line(trends, x='Session_Name', y='Total Jumps', markers=True).update_traces(line_color='#FF8200', line_width=4).update_layout(height=350, xaxis_title=None), use_container_width=True)
 
-    with tab_gp:
+    with tabs[3]:
         st.markdown('<div class="section-header">Weekly Prep Intensity vs. Game Demands</div>', unsafe_allow_html=True)
         c_a, c_w, c_g = st.columns(3)
         with c_a: gp_p = st.selectbox("Athlete", sorted(df['Name'].unique()), key="gp_p")
@@ -183,13 +169,13 @@ try:
             w_r = df.groupby('Week')['Date'].agg(['min', 'max']).reset_index(); w_r['L'] = w_r.apply(lambda x: f"{x['Week']} ({x['min'].strftime('%m/%d')} - {x['max'].strftime('%m/%d')})", axis=1); gp_w = st.selectbox("Week", w_r['L'].tolist(), key="gp_w"); sel_w = w_r[w_r['L'] == gp_w]['Week'].values[0]
         with c_g: gp_g = st.selectbox("Target Game", df[(df['Name'] == gp_p) & (df['Session_Type'] == 'Game')]['Session_Name'].unique(), key="gp_g")
         crit = ['Total Jumps', 'Player Load', 'High Intensity Movements', 'Explosive Efforts']
-        w_data = df[(df['Name'] == gp_p) & (df['Session_Type'] == 'Practice') & (df['Week'] == sel_w)]; g_data_list = df[(df['Name'] == gp_p) & (df['Session_Name'] == gp_g)]
-        if not w_data.empty and not g_data_list.empty:
-            w_avg = w_data[crit].mean(); g_data = g_data_list.iloc[0]; cg1, cg2 = st.columns([1, 2])
+        w_data = df[(df['Name'] == gp_p) & (df['Session_Type'] == 'Practice') & (df['Week'] == sel_w)]; g_data_l = df[(df['Name'] == gp_p) & (df['Session_Name'] == gp_g)]
+        if not w_data.empty and not g_data_l.empty:
+            w_avg = w_data[crit].mean(); g_data = g_data_l.iloc[0]; cg1, cg2 = st.columns([1, 2])
             with cg1:
                 for m in crit:
                     pct = (w_avg[m] / g_data[m] * 100) if g_data[m] > 0 else 0
-                    st.metric(label=f"{m} (% of Game Demand)", value=f"{pct:.1f}%", delta=f"{w_avg[m] - g_data[m]:+.1f} vs Game Load", delta_color="normal")
+                    st.metric(label=f"{m} (% of Game Demand)", value=f"{pct:.1f}%", delta=f"{w_avg[m] - g_data[m]:+.1f} vs Game Load")
             with cg2:
                 plot = pd.DataFrame({'Metric': crit, 'Weekly Avg': w_avg.values, 'Game Demand': [g_data[m] for m in crit]}).melt(id_vars='Metric')
                 st.plotly_chart(px.bar(plot, x='Metric', y='value', color='variable', barmode='group', color_discrete_map={'Weekly Avg': '#FF8200', 'Game Demand': '#4895DB'}).update_layout(height=400, xaxis_title=None, legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)), use_container_width=True)
