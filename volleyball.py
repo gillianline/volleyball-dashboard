@@ -9,12 +9,14 @@ from datetime import timedelta
 # --- PAGE CONFIG ---
 st.set_page_config(page_title="Lady Vols Performance Lab", layout="wide")
 
-# --- CSS: NATURAL LADY VOLS PALETTE ---
+# --- CSS: FIXED PADDING FOR TAB VISIBILITY ---
 st.markdown("""
     <style>
     .stApp { background-color: #FFFFFF; color: #1D1D1F; }
     hr { display: none !important; }
-    .block-container { padding-top: 1.5rem !important; }
+    
+    /* ADJUSTED PADDING: Prevents tabs from being covered by the header */
+    .block-container { padding-top: 5rem !important; }
 
     .scout-table { width: 100%; border-collapse: collapse; text-align: center; table-layout: auto; }
     .scout-table th { background-color: #4895DB; color: white; padding: 6px; border-bottom: 2px solid #FF8200; font-weight: 700; font-size: 11px; text-transform: uppercase; }
@@ -66,10 +68,13 @@ try:
     # --- FLIPPED GRADIENT (Lower = Green, Higher = Red) ---
     def get_flipped_gradient(score):
         score = float(score)
-        if score <= 40: return "#2D5A27" # Muted Forrest Green (Low Load = Good)
-        if score <= 70: return "#D4A017" # Muted Amber/Gold (Moderate)
-        return "#A52A2A" # Muted Brick Red (High Load = Fatigue Risk)
+        if score <= 40: return "#2D5A27" # Muted Forrest Green
+        if score <= 70: return "#D4A017" # Muted Amber/Gold
+        return "#A52A2A" # Muted Brick Red
 
+    # Static Title at the very top
+    st.markdown("<h2 style='text-align: center; color: #FF8200; font-weight: 900; margin-top: -40px;'>LADY VOLS PERFORMANCE LAB</h2>", unsafe_allow_html=True)
+    
     tab_ind, tab_gal, tab_comp, tab_gp = st.tabs(["Individual Profile", "Team Gallery", "Comparison Lab", "Game v. Practice"])
 
     with tab_ind:
@@ -86,6 +91,7 @@ try:
             sel_p = st.selectbox("Select Athlete", sorted(day_df['Name'].unique()))
             p = day_df[day_df['Name'] == sel_p].iloc[0]
             
+            # CMJ Logic up to selected date
             p_cmj_hist = cmj_df[(cmj_df['Athlete'] == sel_p) & (cmj_df['Test Date'] <= curr_date)].sort_values('Test Date')
             sync_cmj = p_cmj_hist[(p_cmj_hist['Test Date'] > curr_date - timedelta(days=7))]
 
@@ -136,6 +142,7 @@ try:
                     st.markdown(p_tbl + '</tbody></table>', unsafe_allow_html=True)
 
     with tab_gal:
+        # Re-using the selections from the first tab
         day_df_gal = df[df['Session_Name'] == selected_session].copy()
         if pos_f != "All Positions": day_df_gal = day_df_gal[day_df_gal['Position'] == pos_f]
         
@@ -158,7 +165,6 @@ try:
         with c_met: c_m_sel = st.selectbox("Select Metric", all_metrics, key="c_m_sel")
         p_val = day_df_comp[day_df_comp['Name'] == c_ath][c_m_sel].values[0]
         pos_avg = df[df['Position'] == day_df_comp[day_df_comp['Name'] == c_ath]['Position'].values[0]][c_m_sel].mean()
-        # Metric delta flipped: higher than average is now "red/inverse" 
         st.metric(label=f"{c_ath} vs Pos Avg", value=f"{p_val}", delta=f"{((p_val - pos_avg) / pos_avg * 100):+.1f}%", delta_color="inverse")
         pos_avg_df = day_df_comp.groupby('Position')[c_m_sel].mean().reset_index()
         fig_p = px.bar(pos_avg_df, x='Position', y=c_m_sel, color_discrete_sequence=['#4895DB']).add_trace(go.Bar(x=[day_df_comp[day_df_comp['Name'] == c_ath]['Position'].values[0]], y=[p_val], marker_color='#FF8200'))
@@ -184,8 +190,7 @@ try:
             with cg1:
                 for m in crit:
                     pct = (w_avg[m] / g_data[m] * 100) if g_data[m] > 0 else 0
-                    # delta_color="normal" because lower is better, so a negative delta is green
-                    st.metric(label=f"{m} (% of Game Demand)", value=f"{pct:.1f}%", delta=f"{w_avg[m] - g_data[m]:+.1f} vs Game Load", delta_color="normal")
+                    st.metric(label=f"{m} (% of Game Demand)", value=f"{pct:.1f}%", delta=f"{w_avg[m] - g_data[m]:+.1f} vs Game Load")
             with cg2:
                 plot = pd.DataFrame({'Metric': crit, 'Weekly Avg': w_avg.values, 'Game Demand': [g_data[m] for m in crit]}).melt(id_vars='Metric')
                 st.plotly_chart(px.bar(plot, x='Metric', y='value', color='variable', barmode='group', color_discrete_map={'Weekly Avg': '#FF8200', 'Game Demand': '#4895DB'}).update_layout(height=400, xaxis_title=None, legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)), use_container_width=True)
