@@ -18,7 +18,7 @@ st.markdown("""
 
     .scout-table { width: 100%; border-collapse: collapse; text-align: center; table-layout: auto; }
     .scout-table th { background-color: #4895DB; color: white; padding: 6px; border-bottom: 2px solid #FF8200; font-weight: 700; font-size: 11px; text-transform: uppercase; }
-    .scout-table td { padding: 4px; border-bottom: 1px solid #F5F5F7; font-size: 11px; }
+    .scout-table td { padding: 6px; border-bottom: 1px solid #F5F5F7; font-size: 11px; }
     
     .player-photo-large { border-radius: 50%; width: 220px; height: 220px; object-fit: cover; border: 6px solid #FF8200; }
     
@@ -122,22 +122,29 @@ try:
                     latest = sync_cmj.iloc[-1]; base_h = p_cmj_history.tail(4)['Jump Height (in)'].mean(); base_rsi = p_cmj_history.tail(4)['RSI-modified [m/s]'].mean()
                     cur_h = latest['Jump Height (in)']; cur_rsi = latest['RSI-modified [m/s]']; perc_diff = ((cur_h - base_h) / base_h) * 100
                     
-                    if cur_h >= base_h and cur_rsi >= base_rsi: label, color, why = "ELITE", "#4895DB", "Height and RSI are both above baseline. Primed for high intensity."
-                    elif cur_h >= base_h and cur_rsi < base_rsi: label, color, why = "GRINDER", "#FF8200", "Maintained height but low RSI. CNS fatigue; player is working harder for same result."
-                    elif cur_h < base_h and cur_rsi >= base_rsi: label, color, why = "SPRINGY", "#FF8200", "High RSI (fast) but low total height. Explosive ground contact but lacking peak power."
-                    else: label, color, why = "FATIGUED", "#515154", "Both height and RSI dropped below baseline. High risk of overtraining/injury."
+                    # Get previous testing data
+                    prev_h, prev_rsi = "N/A", "N/A"
+                    if len(p_cmj_history) > 1:
+                        prev = p_cmj_history.iloc[-2]
+                        prev_h, prev_rsi = f"{prev['Jump Height (in)']:.1f}\"", f"{prev['RSI-modified [m/s]']:.2f}"
+
+                    if cur_h >= base_h and cur_rsi >= base_rsi: label, color, why = "ELITE", "#4895DB", "Primed status. Output and efficiency are both high."
+                    elif cur_h >= base_h and cur_rsi < base_rsi: label, color, why = "GRINDER", "#FF8200", "Fatigue masking. Maintaining height but moving slower."
+                    elif cur_h < base_h and cur_rsi >= base_rsi: label, color, why = "SPRINGY", "#FF8200", "Fast but low power. Low peak height today."
+                    else: label, color, why = "FATIGUED", "#515154", "Overtrained status. Recovery required."
                     
                     st.markdown(f"""
                         <div class="score-wrapper">
-                            <div class="score-label">Readiness</div>
+                            <div class="score-label">Jump Readiness</div>
                             <div class="score-box" style="background-color:{color};">
                                 {perc_diff:+.1f}%
                                 <span class="status-subtext">{label}</span>
                             </div>
                         </div>
                         <div class="info-box">
-                            <b>Status:</b> {why}<br>
-                            <span style="color:#515154; font-size:10px;">(Today: {cur_h:.1f}" | {cur_rsi:.2f} RSI)</span>
+                            <b>Today:</b> {cur_h:.1f}" | {cur_rsi:.2f} RSI<br>
+                            <b>Previous:</b> {prev_h} | {prev_rsi} RSI<br>
+                            <b>Diagnostic:</b> {why}
                         </div>
                     """, unsafe_allow_html=True)
             with jc2:
@@ -161,7 +168,7 @@ try:
         with c_comp2:
             pos_avg_df = day_df.groupby('Position')[comp_metric].mean().reset_index(); fig_pos = px.bar(pos_avg_df, x='Position', y=comp_metric, color_discrete_sequence=['#4895DB']); fig_pos.add_trace(go.Bar(x=[day_df[day_df['Name'] == comp_athlete]['Position'].values[0]], y=[p_val], name=comp_athlete, marker_color='#FF8200')); fig_pos.update_layout(showlegend=False, height=350); st.plotly_chart(fig_pos, use_container_width=True)
         
-        st.markdown('<div class="section-header">Team Jump Volume History (Last 10 Sessions)</div>', unsafe_allow_html=True)
+        st.markdown('<div class="section-header">Team Jump Volume History</div>', unsafe_allow_html=True)
         trends = df.groupby('Session_Name').agg({'Total Jumps': 'sum', 'Date': 'first'}).reset_index().sort_values('Date').tail(10)
         st.plotly_chart(px.line(trends, x='Session_Name', y='Total Jumps', markers=True).update_traces(line_color='#FF8200', line_width=4).update_layout(height=350, xaxis_title=None), use_container_width=True)
 
@@ -176,7 +183,6 @@ try:
 
         if 'Week' in df.columns:
             crit_mets = ['Total Jumps', 'Player Load', 'High Intensity Movements', 'Explosive Efforts']
-            # EXCLUDING GAME DATA FROM WEEKLY PRACTICE AVG
             week_data = df[(df['Name'] == gp_ath_sel) & (df['Session_Type'] == 'Practice') & (df['Week'] == gp_week_id)]
             game_data = df[(df['Name'] == gp_ath_sel) & (df['Session_Name'] == gp_game_target)].iloc[0]
             if not week_data.empty:
@@ -186,8 +192,8 @@ try:
                     for m in crit_mets:
                         g_v, w_v = game_data[m], week_avg[m]
                         pct = (w_v / g_v * 100) if g_v > 0 else 0
-                        # LABELS: % of Game Demand
-                        st.metric(label=f"{m} (% of Game Demand)", value=f"{pct:.1f}%", delta=f"{w_v - g_v:+.1f} volume gap", delta_color="inverse" if pct > 100 else "normal")
+                        # LABEL UPDATED: vs Game Load
+                        st.metric(label=f"{m} (% of Game Demand)", value=f"{pct:.1f}%", delta=f"{w_v - g_v:+.1f} vs Game Load", delta_color="inverse" if pct > 100 else "normal")
                 with cg2:
                     plot_df = pd.DataFrame({'Metric': crit_mets, 'Weekly Practice Avg': week_avg.values, 'Game Demand': [game_data[m] for m in crit_mets]}).melt(id_vars='Metric', var_name='Type', value_name='Value')
                     st.plotly_chart(px.bar(plot_df, x='Metric', y='Value', color='Type', barmode='group', color_discrete_map={'Weekly Practice Avg': '#FF8200', 'Game Demand': '#4895DB'}).update_layout(height=400, xaxis_title=None, legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)), use_container_width=True)
