@@ -31,7 +31,7 @@ st.markdown("""
     
     .gallery-card { border: 1px solid #E5E5E7; padding: 15px; border-radius: 15px; background-color: #FFFFFF; margin-bottom: 12px; min-height: 380px; display: flex; flex-direction: column; justify-content: center; }
     .gallery-photo { border-radius: 50%; width: 110px; height: 110px; object-fit: cover; border: 4px solid #FF8200; }
-    .info-box { background-color: #f8f9fa; border-left: 5px solid #4895DB; padding: 12px; margin-top: 10px; font-size: 11px; color: #1D1D1F; line-height: 1.4; }
+    .info-box { background-color: #f8f9fa; border-left: 5px solid #FF8200; padding: 12px; margin-top: 10px; font-size: 11px; color: #1D1D1F; line-height: 1.4; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -122,16 +122,20 @@ try:
                     latest = sync_cmj.iloc[-1]; base_h = p_cmj_history.tail(4)['Jump Height (in)'].mean(); base_rsi = p_cmj_history.tail(4)['RSI-modified [m/s]'].mean()
                     cur_h = latest['Jump Height (in)']; cur_rsi = latest['RSI-modified [m/s]']; perc_diff = ((cur_h - base_h) / base_h) * 100
                     
-                    # Get previous testing data
                     prev_h, prev_rsi = "N/A", "N/A"
                     if len(p_cmj_history) > 1:
                         prev = p_cmj_history.iloc[-2]
                         prev_h, prev_rsi = f"{prev['Jump Height (in)']:.1f}\"", f"{prev['RSI-modified [m/s]']:.2f}"
 
-                    if cur_h >= base_h and cur_rsi >= base_rsi: label, color, why = "ELITE", "#4895DB", "Primed status. Output and efficiency are both high."
-                    elif cur_h >= base_h and cur_rsi < base_rsi: label, color, why = "GRINDER", "#FF8200", "Fatigue masking. Maintaining height but moving slower."
-                    elif cur_h < base_h and cur_rsi >= base_rsi: label, color, why = "SPRINGY", "#FF8200", "Fast but low power. Low peak height today."
-                    else: label, color, why = "FATIGUED", "#515154", "Overtrained status. Recovery required."
+                    # TRAFFIC LIGHT LOGIC
+                    if cur_h >= base_h and cur_rsi >= base_rsi: 
+                        label, color, diag = "ELITE", "#28a745", "Height and Pop are both peaking. Primed for high intensity."
+                    elif cur_h >= base_h and cur_rsi < base_rsi: 
+                        label, color, diag = "GRINDER", "#ffc107", "Height is maintained, but RSI is low. CNS fatigue detected."
+                    elif cur_h < base_h and cur_rsi >= base_rsi: 
+                        label, color, diag = "SPRINGY", "#ffc107", "Fast ground contact but low peak height. Explosive but lacking peak power."
+                    else: 
+                        label, color, diag = "FATIGUED", "#dc3545", "Overtrained status. Recovery required."
                     
                     st.markdown(f"""
                         <div class="score-wrapper">
@@ -144,12 +148,22 @@ try:
                         <div class="info-box">
                             <b>Today:</b> {cur_h:.1f}" | {cur_rsi:.2f} RSI<br>
                             <b>Previous:</b> {prev_h} | {prev_rsi} RSI<br>
-                            <b>Diagnostic:</b> {why}
+                            <b>Diagnostic:</b> {diag}
                         </div>
                     """, unsafe_allow_html=True)
             with jc2:
                 if not p_cmj_history.empty:
                     fig = make_subplots(specs=[[{"secondary_y": True}]]); fig.add_trace(go.Scatter(x=p_cmj_history['Test Date'], y=p_cmj_history['Jump Height (in)'], name="Height", line=dict(color='#FF8200', width=3)), secondary_y=False); fig.add_trace(go.Scatter(x=p_cmj_history['Test Date'], y=p_cmj_history['RSI-modified [m/s]'], name="RSI", line=dict(color='#4895DB', dash='dot')), secondary_y=True); fig.update_layout(height=280, margin=dict(l=0, r=0, t=20, b=0), showlegend=False); st.plotly_chart(fig, use_container_width=True)
+
+            st.markdown('<div class="section-header">Practice Phase Breakdown</div>', unsafe_allow_html=True)
+            p_phases = phase_df[(phase_df['Name'] == sel_p) & (phase_df['Date'] == current_practice_date)].copy()
+            if not p_phases.empty:
+                pc1, pc2 = st.columns([3, 2])
+                with pc1: st.plotly_chart(px.bar(p_phases, x='Phase', y='Total Jumps', color_discrete_sequence=['#FF8200'], height=300).update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)'), use_container_width=True)
+                with pc2:
+                    p_tbl = '<table class="scout-table"><thead><tr><th>Phase</th><th>Jumps</th><th>Load</th></tr></thead><tbody>'
+                    for _, r in p_phases.iterrows(): p_tbl += f"<tr><td>{r['Phase']}</td><td>{int(r['Total Jumps'])}</td><td>{r['Total Player Load']:.1f}</td></tr>"
+                    st.markdown(p_tbl + '</tbody></table>', unsafe_allow_html=True)
 
     with tab_gal:
         if not day_df.empty:
@@ -158,7 +172,7 @@ try:
                 for j in range(2):
                     if i + j < len(day_df):
                         pd_row = day_df.iloc[i + j]; rows_html = "".join([f"<tr><td>{k}</td><td>{pd_row[k]}</td><td>{pd_row[f'{k}_Max']}</td><td>{int(pd_row[f'{k}_Grade'])}</td></tr>" for k in all_metrics])
-                        with cols[j]: st.markdown(f'<div class="gallery-card"><div style="display:flex; align-items:center; gap:10px;"><div style="flex:1.2; text-align:center;"><img src="{pd_row["PhotoURL"]}" class="gallery-photo"><p style="font-weight:bold; font-size:15px; margin-top:8px;">{pd_row["Name"]}</p></div><div style="flex:3;"><table class="scout-table"><thead><tr><th>Metric</th><th>Val</th><th>Max</th><th>Grade</th></tr></thead><tbody>{rows_html}</tbody></table></div><div style="flex:1; text-align:center;"><div style="background-color:{get_gradient(pd_row["Practice Score"])}; padding:10px; border-radius:12px; font-size:32px; font-weight:900;">{int(pd_row["Practice Score"])}</div></div></div></div>', unsafe_allow_html=True)
+                        with cols[j]: st.markdown(f'<div class="gallery-card"><div style="display:flex; align-items:center; gap:10px;"><div style="flex:1.2; text-align:center;"><img src="{pd_row["PhotoURL"]}" class="gallery-photo"><p style="font-weight:bold; font-size:15px; margin-top:8px;">{pd_row["Name"]}</p></div><div style="flex:3;"><table class="scout-table"><thead><tr><th>Metric</th><th>Val</th><th>Max</th><th>Grade</th></tr></thead><tbody>{rows_html}</tbody></table></div><div style="flex:1; text-align:center;"><div style="background-color:{get_gradient(pd_row["Practice Score"])}; color:white; padding:10px; border-radius:12px; font-size:32px; font-weight:900;">{int(pd_row["Practice Score"])}</div></div></div></div>', unsafe_allow_html=True)
 
     with tab_comp:
         st.markdown('<div class="section-header">Athlete vs. Position Benchmarking</div>', unsafe_allow_html=True)
@@ -192,7 +206,6 @@ try:
                     for m in crit_mets:
                         g_v, w_v = game_data[m], week_avg[m]
                         pct = (w_v / g_v * 100) if g_v > 0 else 0
-                        # LABEL UPDATED: vs Game Load
                         st.metric(label=f"{m} (% of Game Demand)", value=f"{pct:.1f}%", delta=f"{w_v - g_v:+.1f} vs Game Load", delta_color="inverse" if pct > 100 else "normal")
                 with cg2:
                     plot_df = pd.DataFrame({'Metric': crit_mets, 'Weekly Practice Avg': week_avg.values, 'Game Demand': [game_data[m] for m in crit_mets]}).melt(id_vars='Metric', var_name='Type', value_name='Value')
