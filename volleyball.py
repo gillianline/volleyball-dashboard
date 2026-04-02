@@ -71,6 +71,7 @@ try:
 
     st.markdown("<h2 style='text-align: center; color: #FF8200; font-weight: 900; margin-top: -40px;'>LADY VOLS PERFORMANCE LAB</h2>", unsafe_allow_html=True)
     
+    # GLOBAL FILTERS
     session_map = df[['Date', 'Session_Name']].drop_duplicates().sort_values('Date', ascending=False)
     col_f1, col_f2 = st.columns(2)
     with col_f1: selected_session = st.selectbox("Global Session Selection", session_map['Session_Name'].tolist(), index=0)
@@ -82,6 +83,7 @@ try:
 
     tabs = st.tabs(["Individual Profile", "Team Gallery", "Comparison Lab", "Game v. Practice"])
 
+    # --- TAB 0, 1, 2 REMAIN CONSISTENT WITH YOUR PREVIOUS FEEDBACK ---
     with tabs[0]:
         if not day_df.empty:
             sel_p = st.selectbox("Select Athlete", sorted(day_df['Name'].unique()))
@@ -115,19 +117,6 @@ try:
             with jc2:
                 if not p_cmj_hist.empty:
                     fig = make_subplots(specs=[[{"secondary_y": True}]]); fig.add_trace(go.Scatter(x=p_cmj_hist['Test Date'], y=p_cmj_hist['Jump Height (in)'], name="Height", line=dict(color='#FF8200', width=3)), secondary_y=False); fig.add_trace(go.Scatter(x=p_cmj_hist['Test Date'], y=p_cmj_hist['RSI-modified [m/s]'], name="RSI", line=dict(color='#4895DB', dash='dot')), secondary_y=True); fig.update_layout(height=280, margin=dict(l=0, r=0, t=20, b=0), showlegend=False); st.plotly_chart(fig, use_container_width=True)
-            st.markdown('<div class="section-header">Practice Phase Breakdown</div>', unsafe_allow_html=True)
-            p_phases = phase_df[(phase_df['Name'] == sel_p) & (phase_df['Date'] == curr_date)].copy()
-            if not p_phases.empty:
-                pc1, pc2 = st.columns([3, 2])
-                with pc1:
-                    fig_p = make_subplots(specs=[[{"secondary_y": True}]])
-                    fig_p.add_trace(go.Bar(x=p_phases['Phase'], y=p_phases['Total Jumps'], name="Jumps", marker_color='#FF8200'), secondary_y=False)
-                    fig_p.add_trace(go.Scatter(x=p_phases['Phase'], y=p_phases['Total Player Load'], name="Load", line=dict(color='#4895DB', width=4)), secondary_y=True)
-                    st.plotly_chart(fig_p.update_layout(height=350, showlegend=False), use_container_width=True)
-                with pc2:
-                    p_tbl = '<table class="scout-table"><thead><tr><th>Phase</th><th>Jumps</th><th>Load</th></tr></thead><tbody>'
-                    for _, r in p_phases.iterrows(): p_tbl += f"<tr><td>{r['Phase']}</td><td>{int(r['Total Jumps'])}</td><td>{r['Total Player Load']:.1f}</td></tr>"
-                    st.markdown(p_tbl + '</tbody></table>', unsafe_allow_html=True)
 
     with tabs[1]:
         day_df_gal = df[df['Session_Name'] == selected_session].copy()
@@ -150,6 +139,7 @@ try:
             fig_s.add_hline(y=day_df[y_m].mean(), line_dash="dash", line_color="#515154", opacity=0.5)
             st.plotly_chart(fig_s.update_traces(marker=dict(size=12), textposition='top center').update_layout(height=500), use_container_width=True)
 
+    # --- TAB 3: GAME V PRACTICE (PERCENTAGE COMPARISON) ---
     with tabs[3]:
         st.markdown('<div class="section-header">Weekly Prep Intensity vs. Game Demands</div>', unsafe_allow_html=True)
         c_ga, c_gw, c_gg = st.columns(3)
@@ -166,30 +156,30 @@ try:
         if not w_data.empty and not g_data_l.empty:
             w_avg = w_data[crit].mean(); g_data = g_data_l.iloc[0]; cg1, cg2 = st.columns([1, 2])
             with cg1:
+                st.write("**Load Comparison vs. Game**")
                 for m in crit:
-                    pct = (w_avg[m] / g_data[m] * 100) if g_data[m] > 0 else 0
-                    st.metric(label=f"{m} (% of Game Demand)", value=f"{pct:.1f}%", delta=f"{w_avg[m] - g_data[m]:+.1f} vs Game Load")
+                    # Calculations for percentage-only view
+                    pct_of_game = (w_avg[m] / g_data[m] * 100) if g_data[m] > 0 else 0
+                    diff_pct = pct_of_game - 100
+                    
+                    st.metric(
+                        label=m, 
+                        value=f"{pct_of_game:.1f}%", 
+                        delta=f"{diff_pct:+.1f}% vs Game Load"
+                    )
             with cg2:
                 plot = pd.DataFrame({'Metric': crit, 'Weekly Avg': w_avg.values, 'Game Demand': [g_data[m] for m in crit]}).melt(id_vars='Metric')
                 st.plotly_chart(px.bar(plot, x='Metric', y='value', color='variable', barmode='group', color_discrete_map={'Weekly Avg': '#FF8200', 'Game Demand': '#4895DB'}).update_layout(height=400, xaxis_title=None, legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)), use_container_width=True)
 
-            # TEAM LOAD GRAPH - INCLUDES GAME DATA
             st.markdown(f'<div class="section-header">Average Training Load Context (Inc. Game): {sel_w}</div>', unsafe_allow_html=True)
-            # Include BOTH Practice and Game for this week
             week_team_trends = df[df['Week'] == sel_w].groupby(['Date', 'Session_Type']).agg({'Player Load': 'mean'}).reset_index().sort_values('Date')
             week_team_trends['Day_Label'] = week_team_trends['Date'].dt.strftime('%a %m/%d')
-            
             fig_trend = go.Figure()
-            # The line connecting all points
             fig_trend.add_trace(go.Scatter(x=week_team_trends['Day_Label'], y=week_team_trends['Player Load'], mode='lines', line=dict(color='#4895DB', width=3), showlegend=False))
-            # Individual markers for Practice vs Game
             for s_type, color in [('Practice', '#4895DB'), ('Game', '#FF8200')]:
                 subset = week_team_trends[week_team_trends['Session_Type'] == s_type]
                 fig_trend.add_trace(go.Scatter(x=subset['Day_Label'], y=subset['Player Load'], name=s_type, mode='markers', marker=dict(color=color, size=12, line=dict(width=2, color='white'))))
-            
-            fig_trend.update_layout(height=350, margin=dict(l=0, r=0, t=20, b=0), showlegend=True, legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
-            fig_trend.update_yaxes(title_text="Average Player Load")
-            st.plotly_chart(fig_trend, use_container_width=True)
+            st.plotly_chart(fig_trend.update_layout(height=350, margin=dict(l=0, r=0, t=20, b=0), yaxis_title="Average Player Load"), use_container_width=True)
 
 except Exception as e:
     st.error(f"Sync Error: {e}")
