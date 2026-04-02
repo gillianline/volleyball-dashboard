@@ -14,7 +14,7 @@ st.markdown("""
     <style>
     .stApp { background-color: #FFFFFF; color: #1D1D1F; }
     hr { display: none !important; }
-    .block-container { padding-top: 5rem !important; }
+    .block-container { padding-top: 2rem !important; }
 
     .scout-table { width: 100%; border-collapse: collapse; text-align: center; table-layout: auto; }
     .scout-table th { background-color: #4895DB; color: white; padding: 6px; border-bottom: 2px solid #FF8200; font-weight: 700; font-size: 11px; text-transform: uppercase; }
@@ -33,7 +33,7 @@ st.markdown("""
     .gallery-photo { border-radius: 50%; width: 110px; height: 110px; object-fit: cover; border: 4px solid #FF8200; }
     .info-box { background-color: #f8f9fa; border-left: 5px solid #FF8200; padding: 12px; margin-top: 10px; font-size: 12px; color: #1D1D1F; font-weight: 600; line-height: 1.4; }
     
-    /* DISBALE CLICKS ON GRAPHS */
+    /* DISABLE CLICKS ON GRAPHS */
     .js-plotly-plot { pointer-events: none; }
     </style>
     """, unsafe_allow_html=True)
@@ -75,7 +75,13 @@ try:
         if score <= 70: return "#D4A017"
         return "#A52A2A"
 
-    st.markdown("<h2 style='text-align: center; color: #FF8200; font-weight: 900; margin-top: -40px;'>LADY VOLS VOLLEYBALL PERFORMANCE</h2>", unsafe_allow_html=True)
+    # --- HEADER WITH LOGO ---
+    st.markdown("""
+        <div style="text-align: center; margin-bottom: 10px;">
+            <img src="https://upload.wikimedia.org/wikipedia/commons/e/e2/Tennessee_Lady_Volunteers_logo.svg" width="100">
+        </div>
+    """, unsafe_allow_html=True)
+    st.markdown("<h2 style='text-align: center; color: #FF8200; font-weight: 900; margin-top: -10px;'>LADY VOLS VOLLEYBALL PERFORMANCE</h2>", unsafe_allow_html=True)
     
     session_map = df[['Date', 'Session_Name']].drop_duplicates().sort_values('Date', ascending=False)
     col_f1, col_f2 = st.columns(2)
