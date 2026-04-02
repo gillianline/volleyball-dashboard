@@ -71,7 +71,6 @@ try:
 
     st.markdown("<h2 style='text-align: center; color: #FF8200; font-weight: 900; margin-top: -40px;'>LADY VOLS PERFORMANCE LAB</h2>", unsafe_allow_html=True)
     
-    # --- GLOBAL FILTERS ---
     session_map = df[['Date', 'Session_Name']].drop_duplicates().sort_values('Date', ascending=False)
     col_f1, col_f2 = st.columns(2)
     with col_f1: selected_session = st.selectbox("Global Session Selection", session_map['Session_Name'].tolist(), index=0)
@@ -83,7 +82,6 @@ try:
 
     tabs = st.tabs(["Individual Profile", "Team Gallery", "Comparison Lab", "Game v. Practice"])
 
-    # --- TAB 0: INDIVIDUAL PROFILE ---
     with tabs[0]:
         if not day_df.empty:
             sel_p = st.selectbox("Select Athlete", sorted(day_df['Name'].unique()))
@@ -131,7 +129,6 @@ try:
                     for _, r in p_phases.iterrows(): p_tbl += f"<tr><td>{r['Phase']}</td><td>{int(r['Total Jumps'])}</td><td>{r['Total Player Load']:.1f}</td></tr>"
                     st.markdown(p_tbl + '</tbody></table>', unsafe_allow_html=True)
 
-    # --- TAB 1: TEAM GALLERY ---
     with tabs[1]:
         day_df_gal = df[df['Session_Name'] == selected_session].copy()
         if pos_f != "All Positions": day_df_gal = day_df_gal[day_df_gal['Position'] == pos_f]
@@ -142,7 +139,6 @@ try:
                     pd_row = day_df_gal.iloc[i + j]; lb = df[(df['Name'] == pd_row['Name']) & (df['Date'] >= curr_date - timedelta(days=30)) & (df['Date'] <= curr_date)]; rm = lb[all_metrics].max().round(1); gr = [math.ceil((float(pd_row[k]) / float(rm[k])) * 100) if float(rm[k]) > 0 else 0 for k in all_metrics]; sc = math.ceil(sum(gr) / len(gr)) if gr else 0; r_html = "".join([f"<tr><td>{k}</td><td>{pd_row[k]}</td><td>{rm[k]}</td><td>{gr[idx]}</td></tr>" for idx, k in enumerate(all_metrics)])
                     with cols[j]: st.markdown(f'<div class="gallery-card"><div style="display:flex; align-items:center; gap:10px;"><div style="flex:1.2; text-align:center;"><img src="{pd_row["PhotoURL"]}" class="gallery-photo"><p style="font-weight:bold; font-size:15px; margin-top:8px;">{pd_row["Name"]}</p></div><div style="flex:3;"><table class="scout-table"><thead><tr><th>Metric</th><th>Val</th><th>Max</th><th>Grade</th></tr></thead><tbody>{r_html}</tbody></table></div><div style="flex:1; text-align:center;"><div style="background-color:{get_flipped_gradient(sc)}; color:white; padding:10px; border-radius:12px; font-size:32px; font-weight:900;">{sc}</div></div></div></div>', unsafe_allow_html=True)
 
-    # --- TAB 2: COMPARISON LAB ---
     with tabs[2]:
         if not day_df.empty:
             st.markdown('<div class="section-header">Athlete Efficiency Mapping</div>', unsafe_allow_html=True)
@@ -154,7 +150,6 @@ try:
             fig_s.add_hline(y=day_df[y_m].mean(), line_dash="dash", line_color="#515154", opacity=0.5)
             st.plotly_chart(fig_s.update_traces(marker=dict(size=12), textposition='top center').update_layout(height=500), use_container_width=True)
 
-    # --- TAB 3: GAME V PRACTICE (DYNAMIC TEAM TREND) ---
     with tabs[3]:
         st.markdown('<div class="section-header">Weekly Prep Intensity vs. Game Demands</div>', unsafe_allow_html=True)
         c_ga, c_gw, c_gg = st.columns(3)
@@ -178,15 +173,14 @@ try:
                 plot = pd.DataFrame({'Metric': crit, 'Weekly Avg': w_avg.values, 'Game Demand': [g_data[m] for m in crit]}).melt(id_vars='Metric')
                 st.plotly_chart(px.bar(plot, x='Metric', y='value', color='variable', barmode='group', color_discrete_map={'Weekly Avg': '#FF8200', 'Game Demand': '#4895DB'}).update_layout(height=400, xaxis_title=None, legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)), use_container_width=True)
 
-            # DYNAMIC TEAM VOLUME GRAPH (FILTERED BY SELECTED WEEK)
-            st.markdown(f'<div class="section-header">Team Training Volume Context: {sel_w}</div>', unsafe_allow_html=True)
-            # Filter the main dataframe for ALL players in that week
-            week_team_trends = df[(df['Week'] == sel_w) & (df['Session_Type'] == 'Practice')].groupby('Date').agg({'Total Jumps': 'sum', 'Player Load': 'sum'}).reset_index().sort_values('Date')
+            # TEAM VOLUME GRAPH - REMOVED JUMPS AS REQUESTED
+            st.markdown(f'<div class="section-header">Team Training Load Context: {sel_w}</div>', unsafe_allow_html=True)
+            week_team_trends = df[(df['Week'] == sel_w) & (df['Session_Type'] == 'Practice')].groupby('Date').agg({'Player Load': 'sum'}).reset_index().sort_values('Date')
             
-            fig_trend = make_subplots(specs=[[{"secondary_y": True}]])
-            fig_trend.add_trace(go.Scatter(x=week_team_trends['Date'], y=week_team_trends['Total Jumps'], name="Team Jumps", line=dict(color='#FF8200', width=4)), secondary_y=False)
-            fig_trend.add_trace(go.Scatter(x=week_team_trends['Date'], y=week_team_trends['Player Load'], name="Team Load", line=dict(color='#4895DB', width=4, dash='dot')), secondary_y=True)
-            fig_trend.update_layout(height=350, margin=dict(l=0, r=0, t=20, b=0), showlegend=True, legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
+            fig_trend = go.Figure()
+            fig_trend.add_trace(go.Scatter(x=week_team_trends['Date'], y=week_team_trends['Player Load'], name="Team Load", line=dict(color='#4895DB', width=5), mode='lines+markers'))
+            fig_trend.update_layout(height=350, margin=dict(l=0, r=0, t=20, b=0), showlegend=False, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
+            fig_trend.update_yaxes(title_text="Total Team Load")
             st.plotly_chart(fig_trend, use_container_width=True)
 
 except Exception as e:
