@@ -173,18 +173,22 @@ try:
                 plot = pd.DataFrame({'Metric': crit, 'Weekly Avg': w_avg.values, 'Game Demand': [g_data[m] for m in crit]}).melt(id_vars='Metric')
                 st.plotly_chart(px.bar(plot, x='Metric', y='value', color='variable', barmode='group', color_discrete_map={'Weekly Avg': '#FF8200', 'Game Demand': '#4895DB'}).update_layout(height=400, xaxis_title=None, legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)), use_container_width=True)
 
-            # TEAM VOLUME GRAPH - UPDATED AXIS FORMATTING
-            st.markdown(f'<div class="section-header">Team Training Load Context: {sel_w}</div>', unsafe_allow_html=True)
-            week_team_trends = df[(df['Week'] == sel_w) & (df['Session_Type'] == 'Practice')].groupby('Date').agg({'Player Load': 'sum'}).reset_index().sort_values('Date')
-            
-            # Create a label for Day of Week + Date
+            # TEAM LOAD GRAPH - INCLUDES GAME DATA
+            st.markdown(f'<div class="section-header">Average Training Load Context (Inc. Game): {sel_w}</div>', unsafe_allow_html=True)
+            # Include BOTH Practice and Game for this week
+            week_team_trends = df[df['Week'] == sel_w].groupby(['Date', 'Session_Type']).agg({'Player Load': 'mean'}).reset_index().sort_values('Date')
             week_team_trends['Day_Label'] = week_team_trends['Date'].dt.strftime('%a %m/%d')
             
             fig_trend = go.Figure()
-            fig_trend.add_trace(go.Scatter(x=week_team_trends['Day_Label'], y=week_team_trends['Player Load'], name="Team Load", line=dict(color='#4895DB', width=5), mode='lines+markers'))
-            fig_trend.update_layout(height=350, margin=dict(l=0, r=0, t=20, b=0), showlegend=False, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
-            fig_trend.update_yaxes(title_text="Total Team Load")
-            fig_trend.update_xaxes(title_text=None)
+            # The line connecting all points
+            fig_trend.add_trace(go.Scatter(x=week_team_trends['Day_Label'], y=week_team_trends['Player Load'], mode='lines', line=dict(color='#4895DB', width=3), showlegend=False))
+            # Individual markers for Practice vs Game
+            for s_type, color in [('Practice', '#4895DB'), ('Game', '#FF8200')]:
+                subset = week_team_trends[week_team_trends['Session_Type'] == s_type]
+                fig_trend.add_trace(go.Scatter(x=subset['Day_Label'], y=subset['Player Load'], name=s_type, mode='markers', marker=dict(color=color, size=12, line=dict(width=2, color='white'))))
+            
+            fig_trend.update_layout(height=350, margin=dict(l=0, r=0, t=20, b=0), showlegend=True, legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
+            fig_trend.update_yaxes(title_text="Average Player Load")
             st.plotly_chart(fig_trend, use_container_width=True)
 
 except Exception as e:
