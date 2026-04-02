@@ -75,7 +75,7 @@ try:
         if score <= 70: return "#D4A017"
         return "#A52A2A"
 
-    st.markdown("<h2 style='text-align: center; color: #FF8200; font-weight: 900; margin-top: -40px;'>LADY VOLS PERFORMANCE LAB</h2>", unsafe_allow_html=True)
+    st.markdown("<h2 style='text-align: center; color: #FF8200; font-weight: 900; margin-top: -40px;'>LADY VOLS VOLLEYBALL PERFORMANCE</h2>", unsafe_allow_html=True)
     
     session_map = df[['Date', 'Session_Name']].drop_duplicates().sort_values('Date', ascending=False)
     col_f1, col_f2 = st.columns(2)
@@ -155,7 +155,7 @@ try:
         with c_gw:
             w_r = df.groupby('Week')['Date'].agg(['min', 'max']).reset_index(); w_r['L'] = w_r.apply(lambda x: f"{x['Week']} ({x['min'].strftime('%m/%d')} - {x['max'].strftime('%m/%d')})", axis=1)
             gp_w = st.selectbox("Week", w_r['L'].tolist(), key="gp_w_final"); sel_w = w_r[w_r['L'] == gp_w]['Week'].values[0]
-        with c_gg: gp_g = st.selectbox("Target Game", df[(df['Name'] == gp_p) & (df['Session_Type'] == 'Game')]['Session_Name'].unique(), key="gp_g_final")
+        with c_gg: gp_g = st.selectbox("Game", df[(df['Name'] == gp_p) & (df['Session_Type'] == 'Game')]['Session_Name'].unique(), key="gp_g_final")
         
         crit = ['Total Jumps', 'Player Load', 'High Intensity Movements', 'Explosive Efforts']
         w_data = df[(df['Name'] == gp_p) & (df['Session_Type'] == 'Practice') & (df['Week'] == sel_w)]
