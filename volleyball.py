@@ -7,7 +7,7 @@ import math
 from datetime import timedelta
 
 # --- PAGE CONFIG ---
-st.set_page_config(page_title="Lady Vols Volleyball Performance", layout="wide")
+st.set_page_config(page_title="", layout="wide")
 
 # --- CSS: FIXED PADDING & LADY VOLS THEMING ---
 st.markdown("""
@@ -16,7 +16,7 @@ st.markdown("""
     hr { display: none !important; }
     
     /* Pushing the main content down further to clear the nav bar */
-    .block-container { padding-top: 6rem !important; }
+    .block-container { padding-top: 2rem !important; }
 
     .scout-table { width: 100%; border-collapse: collapse; text-align: center; table-layout: auto; }
     .scout-table th { background-color: #4895DB; color: white; padding: 6px; border-bottom: 2px solid #FF8200; font-weight: 700; font-size: 11px; text-transform: uppercase; }
@@ -81,9 +81,9 @@ try:
     st.markdown("""
         <div style="text-align: center; margin-top: 10px; margin-bottom: 15px;">
             <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/f/fc/Tennessee_Lady_Volunteers_logo.svg/1280px-Tennessee_Lady_Volunteers_logo.svg.png" width="120">
+            <h2 style='color: #FF8200; font-weight: 900; margin-top: 10px;'>LADY VOLS VOLLEYBALL PERFORMANCE</h2>
         </div>
     """, unsafe_allow_html=True)
-    st.markdown("<h2 style='text-align: center; color: #FF8200; font-weight: 900;'>LADY VOLS VOLLEYBALL PERFORMANCE</h2>", unsafe_allow_html=True)
     
     session_map = df[['Date', 'Session_Name']].drop_duplicates().sort_values('Date', ascending=False)
     col_f1, col_f2 = st.columns(2)
