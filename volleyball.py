@@ -83,7 +83,7 @@ try:
 
     tabs = st.tabs(["Individual Profile", "Team Gallery", "Comparison Lab", "Game v. Practice"])
 
-    # --- TAB 0, 1, 2 REMAIN CONSISTENT WITH YOUR PREVIOUS FEEDBACK ---
+    # --- TAB 0, 1, 2 ---
     with tabs[0]:
         if not day_df.empty:
             sel_p = st.selectbox("Select Athlete", sorted(day_df['Name'].unique()))
@@ -139,7 +139,7 @@ try:
             fig_s.add_hline(y=day_df[y_m].mean(), line_dash="dash", line_color="#515154", opacity=0.5)
             st.plotly_chart(fig_s.update_traces(marker=dict(size=12), textposition='top center').update_layout(height=500), use_container_width=True)
 
-    # --- TAB 3: GAME V PRACTICE (PERCENTAGE COMPARISON) ---
+    # --- TAB 3: GAME V PRACTICE (CLEAN DIFFERENCE VIEW) ---
     with tabs[3]:
         st.markdown('<div class="section-header">Weekly Prep Intensity vs. Game Demands</div>', unsafe_allow_html=True)
         c_ga, c_gw, c_gg = st.columns(3)
@@ -156,16 +156,15 @@ try:
         if not w_data.empty and not g_data_l.empty:
             w_avg = w_data[crit].mean(); g_data = g_data_l.iloc[0]; cg1, cg2 = st.columns([1, 2])
             with cg1:
-                st.write("**Load Comparison vs. Game**")
                 for m in crit:
-                    # Calculations for percentage-only view
-                    pct_of_game = (w_avg[m] / g_data[m] * 100) if g_data[m] > 0 else 0
-                    diff_pct = pct_of_game - 100
+                    # Logic for purely showing "+X% vs Game Load"
+                    pct_diff = ((w_avg[m] - g_data[m]) / g_data[m] * 100) if g_data[m] > 0 else 0
                     
+                    # We set value to an empty space to force the focus on the delta label
                     st.metric(
                         label=m, 
-                        value=f"{pct_of_game:.1f}%", 
-                        delta=f"{diff_pct:+.1f}% vs Game Load"
+                        value=" ", 
+                        delta=f"{pct_diff:+.1f}% vs Game Load"
                     )
             with cg2:
                 plot = pd.DataFrame({'Metric': crit, 'Weekly Avg': w_avg.values, 'Game Demand': [g_data[m] for m in crit]}).melt(id_vars='Metric')
