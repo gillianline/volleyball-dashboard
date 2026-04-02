@@ -14,7 +14,9 @@ st.markdown("""
     <style>
     .stApp { background-color: #FFFFFF; color: #1D1D1F; }
     hr { display: none !important; }
-    .block-container { padding-top: 2rem !important; }
+    
+    /* Pushing the main content down further to clear the nav bar */
+    .block-container { padding-top: 6rem !important; }
 
     .scout-table { width: 100%; border-collapse: collapse; text-align: center; table-layout: auto; }
     .scout-table th { background-color: #4895DB; color: white; padding: 6px; border-bottom: 2px solid #FF8200; font-weight: 700; font-size: 11px; text-transform: uppercase; }
@@ -75,13 +77,13 @@ try:
         if score <= 70: return "#D4A017"
         return "#A52A2A"
 
-    # --- HEADER WITH LOGO ---
+    # --- HEADER WITH REPOSITIONED LOGO ---
     st.markdown("""
-        <div style="text-align: center; margin-bottom: 10px;">
-            <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/f/fc/Tennessee_Lady_Volunteers_logo.svg/1280px-Tennessee_Lady_Volunteers_logo.svg.png" width="100">
+        <div style="text-align: center; margin-top: 10px; margin-bottom: 15px;">
+            <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/f/fc/Tennessee_Lady_Volunteers_logo.svg/1280px-Tennessee_Lady_Volunteers_logo.svg.png" width="120">
         </div>
     """, unsafe_allow_html=True)
-    st.markdown("<h2 style='text-align: center; color: #FF8200; font-weight: 900; margin-top: -10px;'>LADY VOLS VOLLEYBALL PERFORMANCE</h2>", unsafe_allow_html=True)
+    st.markdown("<h2 style='text-align: center; color: #FF8200; font-weight: 900;'>LADY VOLS VOLLEYBALL PERFORMANCE</h2>", unsafe_allow_html=True)
     
     session_map = df[['Date', 'Session_Name']].drop_duplicates().sort_values('Date', ascending=False)
     col_f1, col_f2 = st.columns(2)
