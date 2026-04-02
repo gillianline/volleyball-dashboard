@@ -9,14 +9,20 @@ from datetime import timedelta
 # --- PAGE CONFIG ---
 st.set_page_config(page_title="", layout="wide")
 
-# --- CSS: FIXED PADDING & LADY VOLS THEMING ---
+# --- CSS: FIXED PADDING, LADY VOLS THEMING & HIDING ANCHORS ---
 st.markdown("""
     <style>
     .stApp { background-color: #FFFFFF; color: #1D1D1F; }
     hr { display: none !important; }
     
-    /* Pushing the main content down further to clear the nav bar */
+    /* Pushing the main content down */
     .block-container { padding-top: 2rem !important; }
+
+    /* HIDE THE LINK SYMBOL (ANCHOR) NEXT TO HEADERS */
+    .viewerBadge_link__1S137, .main_heading_anchor__m6v0K, a.header-anchor {
+        display: none !important;
+    }
+    header a { display: none !important; }
 
     .scout-table { width: 100%; border-collapse: collapse; text-align: center; table-layout: auto; }
     .scout-table th { background-color: #4895DB; color: white; padding: 6px; border-bottom: 2px solid #FF8200; font-weight: 700; font-size: 11px; text-transform: uppercase; }
@@ -77,11 +83,11 @@ try:
         if score <= 70: return "#D4A017"
         return "#A52A2A"
 
-    # --- HEADER WITH REPOSITIONED LOGO ---
+    # --- HEADER WITH LOGO (Using Div to avoid anchors) ---
     st.markdown("""
         <div style="text-align: center; margin-top: 10px; margin-bottom: 15px;">
             <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/f/fc/Tennessee_Lady_Volunteers_logo.svg/1280px-Tennessee_Lady_Volunteers_logo.svg.png" width="120">
-            <h2 style='color: #FF8200; font-weight: 900; margin-top: 10px;'>LADY VOLS VOLLEYBALL PERFORMANCE</h2>
+            <div style='color: #FF8200; font-size: 2rem; font-weight: 900; margin-top: 10px;'>LADY VOLS VOLLEYBALL PERFORMANCE</div>
         </div>
     """, unsafe_allow_html=True)
     
