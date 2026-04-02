@@ -9,7 +9,7 @@ from datetime import timedelta
 # --- PAGE CONFIG ---
 st.set_page_config(page_title="Lady Vols Performance Lab", layout="wide")
 
-# --- CSS: FIXED PADDING & LADY VOLS THEMING ---
+# --- CSS ---
 st.markdown("""
     <style>
     .stApp { background-color: #FFFFFF; color: #1D1D1F; }
@@ -71,6 +71,7 @@ try:
 
     st.markdown("<h2 style='text-align: center; color: #FF8200; font-weight: 900; margin-top: -40px;'>LADY VOLS PERFORMANCE LAB</h2>", unsafe_allow_html=True)
     
+    # GLOBAL FILTERS
     session_map = df[['Date', 'Session_Name']].drop_duplicates().sort_values('Date', ascending=False)
     col_f1, col_f2 = st.columns(2)
     with col_f1: selected_session = st.selectbox("Global Session Selection", session_map['Session_Name'].tolist(), index=0)
@@ -82,6 +83,7 @@ try:
 
     tabs = st.tabs(["Individual Profile", "Team Gallery", "Comparison Lab", "Game v. Practice"])
 
+    # --- INDIVIDUAL PROFILE (SAME) ---
     with tabs[0]:
         if not day_df.empty:
             sel_p = st.selectbox("Select Athlete", sorted(day_df['Name'].unique()))
@@ -92,7 +94,6 @@ try:
             rolling_maxes = lookback[all_metrics].max().round(1)
             grades = [math.ceil((float(p[k]) / float(rolling_maxes[k])) * 100) if float(rolling_maxes[k]) > 0 else 0 for k in all_metrics]
             practice_score = math.ceil(sum(grades) / len(grades)) if grades else 0
-
             c1, c2, c3 = st.columns([1.2, 2.5, 1.2])
             with c1: st.markdown(f'<div style="text-align:center;"><img src="{p["PhotoURL"]}" class="player-photo-large"></div><h3 style="text-align:center;">{p["Name"]}</h3>', unsafe_allow_html=True)
             with c2:
@@ -100,7 +101,6 @@ try:
                 for i, k in enumerate(all_metrics): html += f"<tr><td>{k}</td><td>{p[k]}</td><td>{rolling_maxes[k]}</td><td>{grades[i]}</td></tr>"
                 st.markdown(html + '</tbody></table>', unsafe_allow_html=True)
             with c3: st.markdown(f'<div class="score-wrapper"><div class="score-label">Practice Score</div><div class="score-box" style="background-color:{get_flipped_gradient(practice_score)};">{practice_score}</div></div>', unsafe_allow_html=True)
-
             st.markdown('<div class="section-header">Weekly Readiness Profile</div>', unsafe_allow_html=True)
             jc1, jc2 = st.columns([1.5, 3.5])
             with jc1:
@@ -118,24 +118,7 @@ try:
                 if not p_cmj_hist.empty:
                     fig = make_subplots(specs=[[{"secondary_y": True}]]); fig.add_trace(go.Scatter(x=p_cmj_hist['Test Date'], y=p_cmj_hist['Jump Height (in)'], name="Height", line=dict(color='#FF8200', width=3)), secondary_y=False); fig.add_trace(go.Scatter(x=p_cmj_hist['Test Date'], y=p_cmj_hist['RSI-modified [m/s]'], name="RSI", line=dict(color='#4895DB', dash='dot')), secondary_y=True); fig.update_layout(height=280, margin=dict(l=0, r=0, t=20, b=0), showlegend=False); st.plotly_chart(fig, use_container_width=True)
 
-            # --- DUAL AXIS PHASE BREAKDOWN ---
-            st.markdown('<div class="section-header">Practice Phase Breakdown: Jumps & Load</div>', unsafe_allow_html=True)
-            p_phases = phase_df[(phase_df['Name'] == sel_p) & (phase_df['Date'] == curr_date)].copy()
-            if not p_phases.empty:
-                pc1, pc2 = st.columns([3, 2])
-                with pc1:
-                    fig_phase = make_subplots(specs=[[{"secondary_y": True}]])
-                    fig_phase.add_trace(go.Bar(x=p_phases['Phase'], y=p_phases['Total Jumps'], name="Jumps", marker_color='#FF8200'), secondary_y=False)
-                    fig_phase.add_trace(go.Scatter(x=p_phases['Phase'], y=p_phases['Total Player Load'], name="Load", line=dict(color='#4895DB', width=4), mode='lines+markers'), secondary_y=True)
-                    fig_phase.update_layout(height=350, margin=dict(l=0, r=0, t=20, b=0), showlegend=False, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
-                    fig_phase.update_yaxes(title_text="Total Jumps", secondary_y=False)
-                    fig_phase.update_yaxes(title_text="Player Load", secondary_y=True)
-                    st.plotly_chart(fig_phase, use_container_width=True)
-                with pc2:
-                    p_tbl = '<table class="scout-table"><thead><tr><th>Phase</th><th>Jumps</th><th>Load</th></tr></thead><tbody>'
-                    for _, r in p_phases.iterrows(): p_tbl += f"<tr><td>{r['Phase']}</td><td>{int(r['Total Jumps'])}</td><td>{r['Total Player Load']:.1f}</td></tr>"
-                    st.markdown(p_tbl + '</tbody></table>', unsafe_allow_html=True)
-
+    # --- TAB 1: GALLERY (SAME) ---
     with tabs[1]:
         day_df_gal = df[df['Session_Name'] == selected_session].copy()
         if pos_f != "All Positions": day_df_gal = day_df_gal[day_df_gal['Position'] == pos_f]
@@ -146,27 +129,53 @@ try:
                     pd_row = day_df_gal.iloc[i + j]; lb = df[(df['Name'] == pd_row['Name']) & (df['Date'] >= curr_date - timedelta(days=30)) & (df['Date'] <= curr_date)]; rm = lb[all_metrics].max().round(1); gr = [math.ceil((float(pd_row[k]) / float(rm[k])) * 100) if float(rm[k]) > 0 else 0 for k in all_metrics]; sc = math.ceil(sum(gr) / len(gr)) if gr else 0; r_html = "".join([f"<tr><td>{k}</td><td>{pd_row[k]}</td><td>{rm[k]}</td><td>{gr[idx]}</td></tr>" for idx, k in enumerate(all_metrics)])
                     with cols[j]: st.markdown(f'<div class="gallery-card"><div style="display:flex; align-items:center; gap:10px;"><div style="flex:1.2; text-align:center;"><img src="{pd_row["PhotoURL"]}" class="gallery-photo"><p style="font-weight:bold; font-size:15px; margin-top:8px;">{pd_row["Name"]}</p></div><div style="flex:3;"><table class="scout-table"><thead><tr><th>Metric</th><th>Val</th><th>Max</th><th>Grade</th></tr></thead><tbody>{r_html}</tbody></table></div><div style="flex:1; text-align:center;"><div style="background-color:{get_flipped_gradient(sc)}; color:white; padding:10px; border-radius:12px; font-size:32px; font-weight:900;">{sc}</div></div></div></div>', unsafe_allow_html=True)
 
+    # --- TAB 2: NEW SCATTER COMPARISON ---
     with tabs[2]:
         if not day_df.empty:
-            st.markdown('<div class="section-header">Performance Benchmarking</div>', unsafe_allow_html=True)
-            col_c1, col_c2 = st.columns([1, 2])
-            with col_c1:
-                c_ath = st.selectbox("Select Athlete", sorted(day_df['Name'].unique()), key="c_ath_v2")
-                c_m_sel = st.selectbox("Select Metric", all_metrics, key="c_m_v2")
-                p_val = day_df[day_df['Name'] == c_ath][c_m_sel].values[0]
-                team_avg = day_df[c_m_sel].mean()
-                st.metric(label=f"{c_ath} vs Team Avg", value=f"{p_val}", delta=f"{((p_val - team_avg) / team_avg * 100):+.1f}% vs Team", delta_color="inverse")
-            with col_c2:
-                comp_plot_df = day_df.sort_values('Name')
-                fig_p = px.bar(comp_plot_df, x='Name', y=c_m_sel, color_discrete_sequence=['#F5F5F7'])
-                fig_p.add_trace(go.Bar(x=[c_ath], y=[p_val], marker_color='#FF8200', name="Selected"))
-                fig_p.add_shape(type='line', x0=-0.5, x1=len(comp_plot_df)-0.5, y0=team_avg, y1=team_avg, line=dict(color='#4895DB', width=3, dash='dash'))
-                fig_p.update_layout(showlegend=False, height=350, xaxis_title=None, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
-                st.plotly_chart(fig_p, use_container_width=True)
-            st.markdown('<div class="section-header">Team Jump Volume History</div>', unsafe_allow_html=True)
+            st.markdown('<div class="section-header">Athlete Efficiency Mapping</div>', unsafe_allow_html=True)
+            
+            c_y, c_x = st.columns(2)
+            with c_y: y_met = st.selectbox("Vertical Axis (Output)", ['Total Jumps', 'High Intensity Movements', 'Explosive Efforts'], index=0)
+            with c_x: x_met = st.selectbox("Horizontal Axis (Effort)", ['Player Load', 'Estimated Distance', 'Jump Load'], index=0)
+            
+            # Scatter Plot
+            fig_scatter = px.scatter(
+                day_df, x=x_met, y=y_met, text='Name', 
+                color_discrete_sequence=['#4895DB'],
+                hover_data=['Position']
+            )
+            
+            # Highlight Quadrants
+            x_avg = day_df[x_met].mean()
+            y_avg = day_df[y_met].mean()
+            
+            fig_scatter.add_vline(x=x_avg, line_dash="dash", line_color="#515154", opacity=0.5)
+            fig_scatter.add_hline(y=y_avg, line_dash="dash", line_color="#515154", opacity=0.5)
+            
+            fig_scatter.update_traces(marker=dict(size=12, line=dict(width=2, color='DarkSlateGrey')), textposition='top center')
+            fig_scatter.update_layout(
+                height=550, margin=dict(l=0, r=0, t=20, b=0),
+                paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)'
+            )
+            
+            st.plotly_chart(fig_scatter, use_container_width=True)
+            
+            st.markdown(f"""
+            <div style="display: flex; justify-content: space-around; font-size: 11px; font-weight: bold; color: #515154; text-transform: uppercase;">
+                <span>Top Left: High Output / Low Effort (Efficient)</span>
+                <span>Top Right: High Output / High Effort (Engine)</span>
+            </div>
+            <div style="display: flex; justify-content: space-around; font-size: 11px; font-weight: bold; color: #515154; text-transform: uppercase; margin-top: 5px;">
+                <span>Bottom Left: Low Output / Low Effort (Managed)</span>
+                <span>Bottom Right: Low Output / High Effort (Grinding)</span>
+            </div>
+            """, unsafe_allow_html=True)
+
+            st.markdown('<div class="section-header">Team Volume History</div>', unsafe_allow_html=True)
             trends = df.groupby('Session_Name').agg({'Total Jumps': 'sum', 'Date': 'first'}).reset_index().sort_values('Date').tail(10)
             st.plotly_chart(px.line(trends, x='Session_Name', y='Total Jumps', markers=True).update_traces(line_color='#FF8200', line_width=4).update_layout(height=300, xaxis_title=None), use_container_width=True)
 
+    # --- TAB 3: GAME V PRACTICE (SAME) ---
     with tabs[3]:
         st.markdown('<div class="section-header">Weekly Prep Intensity vs. Game Demands</div>', unsafe_allow_html=True)
         c_ga, c_gw, c_gg = st.columns(3)
