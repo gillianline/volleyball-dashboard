@@ -78,7 +78,7 @@ try:
     # --- HEADER WITH LOGO ---
     st.markdown("""
         <div style="text-align: center; margin-bottom: 10px;">
-            <img src="https://upload.wikimedia.org/wikipedia/commons/e/e2/Tennessee_Lady_Volunteers_logo.svg" width="100">
+            <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/f/fc/Tennessee_Lady_Volunteers_logo.svg/1280px-Tennessee_Lady_Volunteers_logo.svg.png" width="100">
         </div>
     """, unsafe_allow_html=True)
     st.markdown("<h2 style='text-align: center; color: #FF8200; font-weight: 900; margin-top: -10px;'>LADY VOLS VOLLEYBALL PERFORMANCE</h2>", unsafe_allow_html=True)
