@@ -16,13 +16,16 @@ st.markdown("""
     hr { display: none !important; }
     .block-container { padding-top: 2rem !important; }
 
+    /* HIDE ANCHORS */
     .viewerBadge_link__1S137, .main_heading_anchor__m6v0K, a.header-anchor { display: none !important; }
     header a { display: none !important; }
 
+    /* TABLE STYLING */
     .scout-table { width: 100%; border-collapse: collapse; text-align: center; table-layout: auto; }
     .scout-table th { background-color: #4895DB; color: white; padding: 6px; border-bottom: 2px solid #FF8200; font-weight: 700; font-size: 11px; text-transform: uppercase; }
     .scout-table td { padding: 6px; border-bottom: 1px solid #F5F5F7; font-size: 11px; }
     
+    /* HIGHLIGHT LOGIC */
     .bg-highlight-red { background-color: #ffcccc !important; font-weight: 900; }
     .arrow-red { color: #b30000 !important; font-weight: 900; margin-left: 4px; }
 
@@ -88,6 +91,7 @@ try:
     
     tabs = st.tabs(["Individual Profile", "Team Practice Grade Profiles", "Game v. Practice"])
 
+    # --- TAB 0: INDIVIDUAL PROFILE ---
     with tabs[0]:
         session_map = df[['Date', 'Session_Name']].drop_duplicates().sort_values('Date', ascending=False)
         c_f1, c_f2 = st.columns(2)
@@ -143,8 +147,12 @@ try:
             if not p_phases.empty:
                 st.markdown('<div class="section-header">Practice Phase Breakdown</div>', unsafe_allow_html=True)
                 fig_ph = make_subplots(specs=[[{"secondary_y": True}]])
-                fig_ph.add_trace(go.Bar(x=p_phases['Phase'], y=p_phases['Total Jumps'], name="Total Jumps", marker_color='#FF8200'), secondary_y=False)
-                fig_ph.add_trace(go.Scatter(x=p_phases['Phase'], y=p_phases['Total Player Load'], name="Player Load", line=dict(color='#4895DB', width=4)), secondary_y=True)
+                fig_ph.add_trace(go.Bar(x=p_phases['Phase'], y=p_phases['Total Jumps'], name="Jumps", marker_color='#FF8200'), secondary_y=False)
+                fig_ph.add_trace(go.Scatter(x=p_phases['Phase'], y=p_phases['Total Player Load'], name="Load", line=dict(color='#4895DB', width=4)), secondary_y=True)
+                # Adding Distance as a third series on Secondary Y
+                if 'Estimated Distance' in p_phases.columns:
+                    fig_ph.add_trace(go.Scatter(x=p_phases['Phase'], y=p_phases['Estimated Distance'], name="Distance (y)", line=dict(color='#515154', width=2, dash='dash')), secondary_y=True)
+                
                 fig_ph.update_layout(height=350, showlegend=True, legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1), hovermode=False)
                 st.plotly_chart(fig_ph, use_container_width=True, config=LOCKED_CONFIG)
                 
@@ -155,6 +163,7 @@ try:
                     p_tbl += f"<tr><td>{r['Phase']}</td><td>{int(r['Total Jumps'])}</td><td>{r['Total Player Load']:.1f}</td>{d_val}</tr>"
                 st.markdown(p_tbl + '</tbody></table>', unsafe_allow_html=True)
 
+    # --- TAB 1: TEAM GALLERY ---
     with tabs[1]:
         if not day_df.empty:
             for i in range(0, len(day_df), 2):
@@ -176,6 +185,7 @@ try:
                         sc_g = math.ceil(t_grade / c_metrics) if c_metrics > 0 else 0
                         with cols[j]: st.markdown(f'<div class="gallery-card"><div style="display:flex; align-items:center; gap:10px;"><div style="flex:1.2; text-align:center;"><img src="{pd_row["PhotoURL"]}" class="gallery-photo"><p style="font-weight:bold; font-size:15px; margin-top:8px;">{pd_row["Name"]}</p></div><div style="flex:3;"><table class="scout-table"><thead><tr><th>Metric</th><th>Val</th><th>Max</th><th>Grade</th></tr></thead><tbody>{r_html}</tbody></table></div><div style="flex:1; text-align:center;"><div style="background-color:{get_flipped_gradient(sc_g)}; color:white; padding:10px; border-radius:12px; font-size:32px; font-weight:900;">{sc_g}</div></div></div></div>', unsafe_allow_html=True)
 
+    # --- TAB 2: GAME V PRACTICE ---
     with tabs[2]:
         st.markdown('<div class="section-header">Weekly Prep Intensity vs. Game Demands</div>', unsafe_allow_html=True)
         c_ga, c_gw, c_gg = st.columns(3)
