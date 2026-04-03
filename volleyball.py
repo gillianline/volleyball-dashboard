@@ -9,7 +9,7 @@ from datetime import timedelta
 # --- PAGE CONFIG ---
 st.set_page_config(page_title="", layout="wide")
 
-# --- CSS: FORMATTING & HIGHLIGHTING ---
+# --- CSS: FIXED PADDING, THEMING & HIGHLIGHTS ---
 st.markdown("""
     <style>
     .stApp { background-color: #FFFFFF; color: #1D1D1F; }
@@ -25,7 +25,7 @@ st.markdown("""
     .scout-table th { background-color: #4895DB; color: white; padding: 6px; border-bottom: 2px solid #FF8200; font-weight: 700; font-size: 11px; text-transform: uppercase; }
     .scout-table td { padding: 6px; border-bottom: 1px solid #F5F5F7; font-size: 11px; }
     
-    /* HIGHLIGHT LOGIC */
+    /* HIGHLIGHT BOXES */
     .bg-highlight-red { background-color: #ffcccc !important; font-weight: 900; }
     .arrow-red { color: #b30000 !important; font-weight: 900; margin-left: 4px; }
 
@@ -55,10 +55,11 @@ def load_all_data():
     if 'Phases' in phase_df.columns: phase_df = phase_df.rename(columns={'Phases': 'Phase'})
     phase_df['Date'] = pd.to_datetime(phase_df['Date'])
     
+    # EXACT MAPPING FOR ESTIMATED DISTANCE (Y)
     rename_map = {
         'Total Jumps': 'Total Jumps', 'IMA Jump Count Med Band': 'Moderate Jumps', 'IMA Jump Count High Band': 'High Jumps', 
-        'BMP Jumping Load': 'Jump Load', 'Total Player Load': 'Player Load', 'Estimated Distance (y)': 'Estimated Distance', 
-        'Explosive Efforts': 'Explosive Efforts', 'High Intensity Movement': 'High Intensity Movements'
+        'BMP Jumping Load': 'Jump Load', 'Total Player Load': 'Player Load', 'Estimated Distance (y)': 'Estimated Distance (y)', 
+        'Explosive Efforts': 'Explosive Efforts', 'High Intensity Movement': 'High Intensity Movement'
     }
     df = df.rename(columns=rename_map)
     df['Date'] = pd.to_datetime(df['Date'])
@@ -74,7 +75,7 @@ LOCKED_CONFIG = {'staticPlot': True, 'displayModeBar': False}
 
 try:
     df, cmj_df, phase_df = load_all_data()
-    all_metrics = ['Total Jumps', 'Moderate Jumps', 'High Jumps', 'Jump Load', 'Player Load', 'Estimated Distance', 'Explosive Efforts', 'High Intensity Movements']
+    all_metrics = ['Total Jumps', 'Moderate Jumps', 'High Jumps', 'Jump Load', 'Player Load', 'Estimated Distance (y)', 'Explosive Efforts', 'High Intensity Movement']
     
     def get_flipped_gradient(score):
         score = float(score)
@@ -148,16 +149,17 @@ try:
                 fig_ph = make_subplots(specs=[[{"secondary_y": True}]])
                 fig_ph.add_trace(go.Bar(x=p_phases['Phase'], y=p_phases['Total Jumps'], name="Jumps", marker_color='#FF8200'), secondary_y=False)
                 fig_ph.add_trace(go.Scatter(x=p_phases['Phase'], y=p_phases['Total Player Load'], name="Load", line=dict(color='#4895DB', width=4)), secondary_y=False)
-                # ADDING DISTANCE ON SECONDARY Y-AXIS
-                if 'Estimated Distance' in p_phases.columns:
-                    fig_ph.add_trace(go.Scatter(x=p_phases['Phase'], y=p_phases['Estimated Distance'], name="Distance (y)", line=dict(color='#515154', width=2, dash='dash')), secondary_y=True)
+                if 'Estimated Distance (y)' in p_phases.columns:
+                    fig_ph.add_trace(go.Scatter(x=p_phases['Phase'], y=p_phases['Estimated Distance (y)'], name="Distance (y)", line=dict(color='#515154', width=2, dash='dash')), secondary_y=True)
                 
                 fig_ph.update_layout(height=350, showlegend=True, legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1), hovermode=False)
                 st.plotly_chart(fig_ph, use_container_width=True, config=LOCKED_CONFIG)
                 
-                p_tbl = f'<table class="scout-table"><thead><tr><th>Phase</th><th>Jumps</th><th>Load</th><th>Estimated Distance (y)</th></tr></thead><tbody>'
+                dist_th = "<th>Distance (y)</th>" if "Estimated Distance (y)" in p_phases.columns else ""
+                p_tbl = f'<table class="scout-table"><thead><tr><th>Phase</th><th>Jumps</th><th>Load</th>{dist_th}</tr></thead><tbody>'
                 for _, r in p_phases.iterrows(): 
-                    p_tbl += f"<tr><td>{r['Phase']}</td><td>{int(r['Total Jumps'])}</td><td>{r['Total Player Load']:.1f}</td><td>{r['Estimated Distance']:.1f}</td></tr>"
+                    dist_td = f"<td>{r['Estimated Distance (y)']:.1f}</td>" if "Estimated Distance (y)" in p_phases.columns else ""
+                    p_tbl += f"<tr><td>{r['Phase']}</td><td>{int(r['Total Jumps'])}</td><td>{r['Total Player Load']:.1f}</td>{dist_td}</tr>"
                 st.markdown(p_tbl + '</tbody></table>', unsafe_allow_html=True)
 
     # --- TAB 1: TEAM GALLERY ---
@@ -177,7 +179,7 @@ try:
                                 t_grade += g; c_metrics += 1
                                 dv = (v - a) / a if a != 0 else 0
                                 h_c = "class='bg-highlight-red'" if abs(dv) > 0.10 else ""
-                                arr_g = f"<span class='arrow-red'>{'↑' if diff > 0.10 else '↓'}</span>" if abs(dv) > 0.10 else ""
+                                arr_g = f"<span class='arrow-red'>{'↑' if dv > 0.10 else '↓'}</span>" if abs(dv) > 0.10 else ""
                                 r_html += f"<tr><td>{k}</td><td {h_c}>{v} {arr_g}</td><td>{m}</td><td>{g}</td></tr>"
                         sc_g = math.ceil(t_grade / c_metrics) if c_metrics > 0 else 0
                         with cols[j]: st.markdown(f'<div class="gallery-card"><div style="display:flex; align-items:center; gap:10px;"><div style="flex:1.2; text-align:center;"><img src="{pd_row["PhotoURL"]}" class="gallery-photo"><p style="font-weight:bold; font-size:15px; margin-top:8px;">{pd_row["Name"]}</p></div><div style="flex:3;"><table class="scout-table"><thead><tr><th>Metric</th><th>Val</th><th>Max</th><th>Grade</th></tr></thead><tbody>{r_html}</tbody></table></div><div style="flex:1; text-align:center;"><div style="background-color:{get_flipped_gradient(sc_g)}; color:white; padding:10px; border-radius:12px; font-size:32px; font-weight:900;">{sc_g}</div></div></div></div>', unsafe_allow_html=True)
@@ -192,7 +194,7 @@ try:
             gp_w = st.selectbox("Week", w_r['L'].tolist(), key="gp_w_vf"); sel_w = w_r[w_r['L'] == gp_w]['Week'].values[0]
         with c_gg: gp_g = st.selectbox("Game", df[(df['Name'] == gp_p) & (df['Session_Type'] == 'Game')]['Session_Name'].unique(), key="gp_g_vf")
         
-        crit = [m for m in ['Total Jumps', 'Player Load', 'Estimated Distance', 'Explosive Efforts'] if m in df.columns]
+        crit = [m for m in ['Total Jumps', 'Player Load', 'Estimated Distance (y)', 'Explosive Efforts'] if m in df.columns]
         w_data = df[(df['Name'] == gp_p) & (df['Session_Type'] == 'Practice') & (df['Week'] == sel_w)]
         g_data_l = df[(df['Name'] == gp_p) & (df['Session_Name'] == gp_g)]
         
@@ -203,6 +205,7 @@ try:
                     pdif = ((w_avg[m] - g_d[m]) / g_d[m] * 100) if g_d[m] > 0 else 0
                     st.metric(label=m, value=" ", delta=f"{pdif:+.1f}% vs Game Load")
             with cg2:
+                # Grouped Bar handles scaling internally for visibility
                 plot = pd.DataFrame({'Metric': crit, 'Weekly Avg': w_avg.values, 'Game Demand': [g_d[m] for m in crit]}).melt(id_vars='Metric')
                 fig_bar = px.bar(plot, x='Metric', y='value', color='variable', barmode='group', color_discrete_map={'Weekly Avg': '#FF8200', 'Game Demand': '#4895DB'})
                 st.plotly_chart(fig_bar.update_layout(height=400, showlegend=True, legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1), hovermode=False), use_container_width=True, config=LOCKED_CONFIG)
