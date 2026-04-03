@@ -16,16 +16,13 @@ st.markdown("""
     hr { display: none !important; }
     .block-container { padding-top: 2rem !important; }
 
-    /* HIDE ANCHORS */
     .viewerBadge_link__1S137, .main_heading_anchor__m6v0K, a.header-anchor { display: none !important; }
     header a { display: none !important; }
 
-    /* TABLE STYLING */
     .scout-table { width: 100%; border-collapse: collapse; text-align: center; table-layout: auto; }
     .scout-table th { background-color: #4895DB; color: white; padding: 6px; border-bottom: 2px solid #FF8200; font-weight: 700; font-size: 11px; text-transform: uppercase; }
     .scout-table td { padding: 6px; border-bottom: 1px solid #F5F5F7; font-size: 11px; }
     
-    /* HIGHLIGHT LOGIC */
     .bg-highlight-red { background-color: #ffcccc !important; font-weight: 900; }
     .arrow-red { color: #b30000 !important; font-weight: 900; margin-left: 4px; }
 
@@ -34,7 +31,6 @@ st.markdown("""
     .gallery-card { border: 1px solid #E5E5E7; padding: 15px; border-radius: 15px; background-color: #FFFFFF; margin-bottom: 12px; min-height: 380px; display: flex; flex-direction: column; justify-content: center; }
     .gallery-photo { border-radius: 50%; width: 110px; height: 110px; object-fit: cover; border: 4px solid #FF8200; }
     .section-header { font-size: 14px; font-weight: 800; color: #4895DB; border-bottom: 2px solid #FF8200; margin-top: 25px; margin-bottom: 15px; padding-bottom: 5px; text-transform: uppercase; }
-    .info-box { background-color: #f8f9fa; border-left: 5px solid #FF8200; padding: 12px; margin-top: 10px; font-size: 12px; color: #1D1D1F; font-weight: 600; line-height: 1.4; }
     
     .js-plotly-plot { pointer-events: none; }
     </style>
@@ -49,30 +45,20 @@ def load_all_data():
     cmj_df = pd.read_csv(st.secrets["CMJ_SHEET_URL"])
     cmj_df.columns = cmj_df.columns.str.strip()
     cmj_df['Jump Height (in)'] = cmj_df['Jump Height (Imp-Mom) [cm]'] * 0.3937
-    
     phase_df = pd.read_csv(st.secrets["PHASES_SHEET_URL"])
     phase_df.columns = phase_df.columns.str.strip()
     if 'Phases' in phase_df.columns: phase_df = phase_df.rename(columns={'Phases': 'Phase'})
     phase_df['Date'] = pd.to_datetime(phase_df['Date'])
     
-    # REVISED RENAME MAP TO MATCH YOUR INPUT
     rename_map = {
-        'Total Jumps': 'Total Jumps', 
-        'IMA Jump Count Med Band': 'Moderate Jumps', 
-        'IMA Jump Count High Band': 'High Jumps', 
-        'BMP Jumping Load': 'Jump Load', 
-        'Total Player Load': 'Player Load', 
-        'Estimated Distance (y)': 'Estimated Distance', 
-        'Explosive Efforts': 'Explosive Efforts', 
-        'High Intensity Movement': 'High Intensity Movements'
+        'Total Jumps': 'Total Jumps', 'IMA Jump Count Med Band': 'Moderate Jumps', 'IMA Jump Count High Band': 'High Jumps', 
+        'BMP Jumping Load': 'Jump Load', 'Total Player Load': 'Player Load', 'Estimated Distance (y)': 'Estimated Distance', 
+        'Explosive Efforts': 'Explosive Efforts', 'High Intensity Movement': 'High Intensity Movements'
     }
     df = df.rename(columns=rename_map)
     df['Date'] = pd.to_datetime(df['Date'])
-    
-    # Identify available metrics from the renamed columns
     avail = [c for c in rename_map.values() if c in df.columns]
     df[avail] = df[avail].apply(pd.to_numeric, errors='coerce').fillna(0).round(1)
-    
     df['Session_Name'] = df['Activity'].fillna(df['Date'].dt.strftime('%m/%d/%Y'))
     df['Position'] = df.groupby('Name')['Position'].ffill().bfill().fillna("N/A")
     df['PhotoURL'] = df.groupby('Name')['PhotoURL'].ffill().bfill().fillna("https://www.w3schools.com/howto/img_avatar.png")
@@ -83,7 +69,6 @@ LOCKED_CONFIG = {'staticPlot': True, 'displayModeBar': False}
 
 try:
     df, cmj_df, phase_df = load_all_data()
-    # Updated list of metrics to check for cards
     all_metrics = ['Total Jumps', 'Moderate Jumps', 'High Jumps', 'Jump Load', 'Player Load', 'Estimated Distance', 'Explosive Efforts', 'High Intensity Movements']
     
     def get_flipped_gradient(score):
@@ -92,7 +77,7 @@ try:
         if score <= 70: return "#D4A017"
         return "#A52A2A"
 
-    st.markdown("""
+    st.markdown(f"""
         <div style="text-align: center; margin-top: 10px; margin-bottom: 15px;">
             <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/f/fc/Tennessee_Lady_Volunteers_logo.svg/1280px-Tennessee_Lady_Volunteers_logo.svg.png" width="120">
             <div style='color: #FF8200; font-size: 2rem; font-weight: 900; margin-top: 10px;'>LADY VOLS VOLLEYBALL PERFORMANCE</div>
@@ -101,7 +86,6 @@ try:
     
     tabs = st.tabs(["Individual Profile", "Team Practice Grade Profiles", "Game v. Practice"])
 
-    # --- TAB 0: INDIVIDUAL PROFILE ---
     with tabs[0]:
         session_map = df[['Date', 'Session_Name']].drop_duplicates().sort_values('Date', ascending=False)
         c_f1, c_f2 = st.columns(2)
@@ -116,9 +100,7 @@ try:
             sel_p = st.selectbox("Select Athlete", sorted(day_df['Name'].unique()))
             p = day_df[day_df['Name'] == sel_p].iloc[0]
             lb = df[(df['Name'] == sel_p) & (df['Date'] >= curr_date - timedelta(days=30)) & (df['Date'] <= curr_date)]
-            p_cmj_hist = cmj_df[(cmj_df['Athlete'] == sel_p) & (cmj_df['Test Date'] <= curr_date)].sort_values('Test Date')
-            sync_cmj = p_cmj_hist[(p_cmj_hist['Test Date'] > curr_date - timedelta(days=7))]
-
+            
             m_rows = ""; total_grade = 0; count = 0
             for k in all_metrics:
                 if k in p:
@@ -136,30 +118,15 @@ try:
             with c2: st.markdown(f'<table class="scout-table"><thead><tr><th>Metric</th><th>Today</th><th>30d Max</th><th>Grade</th></tr></thead><tbody>{m_rows}</tbody></table>', unsafe_allow_html=True)
             with c3: st.markdown(f'<div style="display:flex; justify-content:center;"><div class="score-box" style="background-color:{get_flipped_gradient(score)};">{score}</div></div>', unsafe_allow_html=True)
             
-            st.markdown('<div class="section-header">Weekly Readiness Profile</div>', unsafe_allow_html=True)
-            jc1, jc2 = st.columns([1.5, 3.5])
-            with jc1:
-                if not sync_cmj.empty:
-                    latest = sync_cmj.iloc[-1]; base_h = p_cmj_hist.tail(5).iloc[:-1]['Jump Height (in)'].mean(); base_rsi = p_cmj_hist.tail(5).iloc[:-1]['RSI-modified [m/s]'].mean()
-                    cur_h, cur_rsi = latest['Jump Height (in)'], latest['RSI-modified [m/s]']; p_diff = ((cur_h - base_h) / base_h) * 100
-                    if cur_h >= base_h and cur_rsi >= base_rsi: label, color = "ELITE", "#28a745"
-                    elif cur_h >= base_h and cur_rsi < base_rsi: label, color = "GRINDER", "#ffc107"
-                    elif cur_h < base_h and cur_rsi >= base_rsi: label, color = "SPRINGY", "#ffc107"
-                    else: label, color = "FATIGUED", "#dc3545"
-                    st.markdown(f'<div style="text-align:center;"><div class="score-box" style="background-color:{color};">{p_diff:+.1f}%<span style="font-size:10px; display:block;">{label}</span></div></div>', unsafe_allow_html=True)
-            with jc2:
-                if not p_cmj_hist.empty:
-                    fig = make_subplots(specs=[[{"secondary_y": True}]]); fig.add_trace(go.Scatter(x=p_cmj_hist['Test Date'], y=p_cmj_hist['Jump Height (in)'], name="Height", line=dict(color='#FF8200', width=3)), secondary_y=False); fig.add_trace(go.Scatter(x=p_cmj_hist['Test Date'], y=p_cmj_hist['RSI-modified [m/s]'], name="RSI", line=dict(color='#4895DB', dash='dot')), secondary_y=True); fig.update_layout(height=280, margin=dict(l=0, r=0, t=20, b=0), showlegend=False, hovermode=False); st.plotly_chart(fig, use_container_width=True, config=LOCKED_CONFIG)
-
+            # Phase Breakdown: Multi-Axis for Distance
             p_phases = phase_df[(phase_df['Name'] == sel_p) & (phase_df['Date'] == curr_date)].copy()
             if not p_phases.empty:
                 st.markdown('<div class="section-header">Practice Phase Breakdown</div>', unsafe_allow_html=True)
                 fig_ph = make_subplots(specs=[[{"secondary_y": True}]])
-                fig_ph.add_trace(go.Bar(x=p_phases['Phase'], y=p_phases['Total Jumps'], name="Total Jumps", marker_color='#FF8200'), secondary_y=False)
-                fig_ph.add_trace(go.Scatter(x=p_phases['Phase'], y=p_phases['Total Player Load'], name="Player Load", line=dict(color='#4895DB', width=4)), secondary_y=True)
+                fig_ph.add_trace(go.Bar(x=p_phases['Phase'], y=p_phases['Total Jumps'], name="Jumps", marker_color='#FF8200'), secondary_y=False)
+                fig_ph.add_trace(go.Scatter(x=p_phases['Phase'], y=p_phases['Total Player Load'], name="Load", line=dict(color='#4895DB', width=4)), secondary_y=True)
                 st.plotly_chart(fig_ph.update_layout(height=350, showlegend=True, legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1), hovermode=False), use_container_width=True, config=LOCKED_CONFIG)
                 
-                # Table logic: only show Distance if column exists in the PHASE csv
                 dist_th = "<th>Distance (y)</th>" if "Estimated Distance (y)" in p_phases.columns else ""
                 p_tbl = f'<table class="scout-table"><thead><tr><th>Phase</th><th>Jumps</th><th>Load</th>{dist_th}</tr></thead><tbody>'
                 for _, r in p_phases.iterrows(): 
@@ -167,7 +134,6 @@ try:
                     p_tbl += f"<tr><td>{r['Phase']}</td><td>{int(r['Total Jumps'])}</td><td>{r['Total Player Load']:.1f}</td>{dist_td}</tr>"
                 st.markdown(p_tbl + '</tbody></table>', unsafe_allow_html=True)
 
-    # --- TAB 1: TEAM GALLERY ---
     with tabs[1]:
         if not day_df.empty:
             for i in range(0, len(day_df), 2):
@@ -182,14 +148,13 @@ try:
                                 v, m, a = pd_row[k], lb_g[k].max(), lb_g[k].mean()
                                 g = math.ceil((v / m) * 100) if m > 0 else 0
                                 t_grade += g; c_metrics += 1
-                                df_val = (v - a) / a if a != 0 else 0
-                                h_c = "class='bg-highlight-red'" if abs(df_val) > 0.10 else ""
-                                arr = f"<span class='arrow-red'>{'↑' if df_val > 0.10 else '↓'}</span>" if abs(df_val) > 0.10 else ""
+                                diff_val = (v - a) / a if a != 0 else 0
+                                h_c = "class='bg-highlight-red'" if abs(diff_val) > 0.10 else ""
+                                arr = f"<span class='arrow-red'>{'↑' if diff_val > 0.10 else '↓'}</span>" if abs(diff_val) > 0.10 else ""
                                 r_html += f"<tr><td>{k}</td><td {h_c}>{v} {arr}</td><td>{m}</td><td>{g}</td></tr>"
                         sc_g = math.ceil(t_grade / c_metrics) if c_metrics > 0 else 0
                         with cols[j]: st.markdown(f'<div class="gallery-card"><div style="display:flex; align-items:center; gap:10px;"><div style="flex:1.2; text-align:center;"><img src="{pd_row["PhotoURL"]}" class="gallery-photo"><p style="font-weight:bold; font-size:15px; margin-top:8px;">{pd_row["Name"]}</p></div><div style="flex:3;"><table class="scout-table"><thead><tr><th>Metric</th><th>Val</th><th>Max</th><th>Grade</th></tr></thead><tbody>{r_html}</tbody></table></div><div style="flex:1; text-align:center;"><div style="background-color:{get_flipped_gradient(sc_g)}; color:white; padding:10px; border-radius:12px; font-size:32px; font-weight:900;">{sc_g}</div></div></div></div>', unsafe_allow_html=True)
 
-    # --- TAB 2: GAME V PRACTICE ---
     with tabs[2]:
         st.markdown('<div class="section-header">Weekly Prep Intensity vs. Game Demands</div>', unsafe_allow_html=True)
         c_ga, c_gw, c_gg = st.columns(3)
@@ -199,33 +164,38 @@ try:
             gp_w = st.selectbox("Week", w_r['L'].tolist(), key="gp_w_vf"); sel_w = w_r[w_r['L'] == gp_w]['Week'].values[0]
         with c_gg: gp_g = st.selectbox("Game", df[(df['Name'] == gp_p) & (df['Session_Type'] == 'Game')]['Session_Name'].unique(), key="gp_g_vf")
         
-        # Include Estimated Distance in the comparison logic
-        compare_metrics = [m for m in ['Total Jumps', 'Player Load', 'Estimated Distance', 'Explosive Efforts'] if m in df.columns]
+        # Split metrics: High value (Distance) vs Low value (Jumps/Efforts/Load)
+        low_val_metrics = [m for m in ['Total Jumps', 'Player Load', 'Explosive Efforts'] if m in df.columns]
+        high_val_metrics = ['Estimated Distance'] if 'Estimated Distance' in df.columns else []
+        all_comp_metrics = low_val_metrics + high_val_metrics
+        
         w_data = df[(df['Name'] == gp_p) & (df['Session_Type'] == 'Practice') & (df['Week'] == sel_w)]
         g_data_l = df[(df['Name'] == gp_p) & (df['Session_Name'] == gp_g)]
         
         if not w_data.empty and not g_data_l.empty:
-            w_avg = w_data[compare_metrics].mean(); g_d = g_data_l.iloc[0]; cg1, cg2 = st.columns([1, 2])
+            w_avg = w_data[all_comp_metrics].mean(); g_d = g_data_l.iloc[0]; cg1, cg2 = st.columns([1, 2])
             with cg1:
-                for m in compare_metrics:
+                for m in all_comp_metrics:
                     pdif = ((w_avg[m] - g_d[m]) / g_d[m] * 100) if g_d[m] > 0 else 0
                     st.metric(label=m, value=" ", delta=f"{pdif:+.1f}% vs Game Load")
             with cg2:
-                plot = pd.DataFrame({'Metric': compare_metrics, 'Weekly Avg': w_avg.values, 'Game Demand': [g_d[m] for m in compare_metrics]}).melt(id_vars='Metric')
-                fig_b = px.bar(plot, x='Metric', y='value', color='variable', barmode='group', color_discrete_map={'Weekly Avg': '#FF8200', 'Game Demand': '#4895DB'})
-                fig_b.update_layout(height=400, showlegend=True, legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1), hovermode=False)
-                st.plotly_chart(fig_b, use_container_width=True, config=LOCKED_CONFIG)
-
-            st.markdown(f'<div class="section-header">Average Weekly Load Context: {sel_w}</div>', unsafe_allow_html=True)
-            week_team_trends = df[df['Week'] == sel_w].groupby(['Date', 'Session_Type']).agg({'Player Load': 'mean'}).reset_index().sort_values('Date')
-            week_team_trends['Day_Label'] = week_team_trends['Date'].dt.strftime('%a %m/%d')
-            fig_tr = go.Figure()
-            fig_tr.add_trace(go.Scatter(x=week_team_trends['Day_Label'], y=week_team_trends['Player Load'], mode='lines', line=dict(color='#4895DB', width=3), showlegend=False))
-            for s_type, color in [('Practice', '#4895DB'), ('Game', '#FF8200')]:
-                subset = week_team_trends[week_team_trends['Session_Type'] == s_type]
-                fig_tr.add_trace(go.Scatter(x=subset['Day_Label'], y=subset['Player Load'], name=s_type, mode='markers', marker=dict(color=color, size=12, line=dict(width=2, color='white'))))
-            fig_tr.update_layout(height=350, margin=dict(l=0, r=0, t=20, b=0), yaxis_title="Average Player Load", hovermode=False)
-            st.plotly_chart(fig_tr, use_container_width=True, config=LOCKED_CONFIG)
+                # DUAL AXIS BAR CHART to handle high-value Distance
+                fig_dual = make_subplots(specs=[[{"secondary_y": True}]])
+                plot_data = pd.DataFrame({'Metric': all_comp_metrics, 'Weekly Avg': w_avg.values, 'Game Demand': [g_d[m] for m in all_comp_metrics]})
+                
+                # Plot low-value metrics on Primary Y
+                low_df = plot_data[plot_data['Metric'].isin(low_val_metrics)]
+                fig_dual.add_trace(go.Bar(x=low_df['Metric'], y=low_df['Weekly Avg'], name="Weekly Avg", marker_color='#FF8200'), secondary_y=False)
+                fig_dual.add_trace(go.Bar(x=low_df['Metric'], y=low_df['Game Demand'], name="Game Demand", marker_color='#4895DB'), secondary_y=False)
+                
+                # Plot high-value Distance on Secondary Y
+                if not high_df.empty:
+                    high_df = plot_data[plot_data['Metric'] == 'Estimated Distance']
+                    fig_dual.add_trace(go.Bar(x=high_df['Metric'], y=high_df['Weekly Avg'], name="Weekly Distance", marker_color='#FF8200', opacity=0.8), secondary_y=True)
+                    fig_dual.add_trace(go.Bar(x=high_df['Metric'], y=high_df['Game Demand'], name="Game Distance", marker_color='#4895DB', opacity=0.8), secondary_y=True)
+                
+                fig_dual.update_layout(height=400, barmode='group', showlegend=True, legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1), hovermode=False)
+                st.plotly_chart(fig_dual, use_container_width=True, config=LOCKED_CONFIG)
 
 except Exception as e:
     st.error(f"Sync Error: {e}")
