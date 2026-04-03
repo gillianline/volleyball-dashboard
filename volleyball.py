@@ -9,7 +9,7 @@ from datetime import timedelta
 # --- PAGE CONFIG ---
 st.set_page_config(page_title="", layout="wide")
 
-# --- CSS: FORMATTING & HIGHLIGHTING ---
+# --- CSS: FIXED PADDING & LADY VOLS THEMING ---
 st.markdown("""
     <style>
     .stApp { background-color: #FFFFFF; color: #1D1D1F; }
@@ -82,7 +82,6 @@ try:
         if score <= 70: return "#D4A017"
         return "#A52A2A"
 
-    # --- HEADER ---
     st.markdown("""
         <div style="text-align: center; margin-top: 10px; margin-bottom: 15px;">
             <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/f/fc/Tennessee_Lady_Volunteers_logo.svg/1280px-Tennessee_Lady_Volunteers_logo.svg.png" width="120">
@@ -147,8 +146,11 @@ try:
                 st.markdown('<div class="section-header">Practice Phase Breakdown</div>', unsafe_allow_html=True)
                 fig_ph = make_subplots(specs=[[{"secondary_y": True}]])
                 fig_ph.add_trace(go.Bar(x=p_phases['Phase'], y=p_phases['Total Jumps'], name="Jumps", marker_color='#FF8200'), secondary_y=False)
-                fig_ph.add_trace(go.Scatter(x=p_phases['Phase'], y=p_phases['Total Player Load'], name="Load", line=dict(color='#4895DB', width=4)), secondary_y=True)
-                fig_ph.update_layout(height=350, showlegend=False, hovermode=False)
+                fig_ph.add_trace(go.Scatter(x=p_phases['Phase'], y=p_phases['Total Player Load'], name="Load", line=dict(color='#4895DB', width=4)), secondary_y=False)
+                if 'Estimated Distance (y)' in p_phases.columns:
+                    fig_ph.add_trace(go.Scatter(x=p_phases['Phase'], y=p_phases['Estimated Distance (y)'], name="Distance (y)", line=dict(color='#515154', width=2, dash='dash')), secondary_y=True)
+                
+                fig_ph.update_layout(height=350, showlegend=True, legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1), hovermode=False)
                 st.plotly_chart(fig_ph, use_container_width=True, config=LOCKED_CONFIG)
                 
                 dist_th = "<th>Estimated Distance (y)</th>" if "Estimated Distance (y)" in p_phases.columns else ""
@@ -180,7 +182,7 @@ try:
                         sc_g = math.ceil(t_grade / c_metrics) if c_metrics > 0 else 0
                         with cols[j]: st.markdown(f'<div class="gallery-card"><div style="display:flex; align-items:center; gap:10px;"><div style="flex:1.2; text-align:center;"><img src="{pd_row["PhotoURL"]}" class="gallery-photo"><p style="font-weight:bold; font-size:15px; margin-top:8px;">{pd_row["Name"]}</p></div><div style="flex:3;"><table class="scout-table"><thead><tr><th>Metric</th><th>Val</th><th>Max</th><th>Grade</th></tr></thead><tbody>{r_html}</tbody></table></div><div style="flex:1; text-align:center;"><div style="background-color:{get_flipped_gradient(sc_g)}; color:white; padding:10px; border-radius:12px; font-size:32px; font-weight:900;">{sc_g}</div></div></div></div>', unsafe_allow_html=True)
 
-    # --- TAB 2: GAME V PRACTICE (FIXED SCALING) ---
+    # --- TAB 2: GAME V PRACTICE ---
     with tabs[2]:
         st.markdown('<div class="section-header">Weekly Prep Intensity vs. Game Demands</div>', unsafe_allow_html=True)
         c_ga, c_gw, c_gg = st.columns(3)
@@ -204,20 +206,15 @@ try:
                     pdif = ((w_avg[m] - g_d[m]) / g_d[m] * 100) if g_d[m] > 0 else 0
                     st.metric(label=m, value=" ", delta=f"{pdif:+.1f}% vs Game Load")
             with cg2:
-                # DUAL AXIS BAR CHART
                 fig_dual = make_subplots(specs=[[{"secondary_y": True}]])
-                # Plot low-value metrics
                 fig_dual.add_trace(go.Bar(x=low_val_metrics, y=[w_avg[m] for m in low_val_metrics], name="Weekly Avg", marker_color='#FF8200'), secondary_y=False)
                 fig_dual.add_trace(go.Bar(x=low_val_metrics, y=[g_d[m] for m in low_val_metrics], name="Game Demand", marker_color='#4895DB'), secondary_y=False)
-                # Plot high-value Distance
                 if high_val_metric:
-                    fig_dual.add_trace(go.Bar(x=[high_val_metric], y=[w_avg[high_val_metric]], name="Weekly Distance", marker_color='#FF8200', opacity=0.8), secondary_y=True)
-                    fig_dual.add_trace(go.Bar(x=[high_val_metric], y=[g_d[high_val_metric]], name="Game Distance", marker_color='#4895DB', opacity=0.8), secondary_y=True)
-                
+                    fig_dual.add_trace(go.Bar(x=[high_val_metric], y=[w_avg[high_val_metric]], name="Weekly Dist", marker_color='#FF8200', opacity=0.8), secondary_y=True)
+                    fig_dual.add_trace(go.Bar(x=[high_val_metric], y=[g_d[high_val_metric]], name="Game Dist", marker_color='#4895DB', opacity=0.8), secondary_y=True)
                 fig_dual.update_layout(height=400, barmode='group', showlegend=True, legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1), hovermode=False)
                 st.plotly_chart(fig_dual, use_container_width=True, config=LOCKED_CONFIG)
 
-            # Average Weekly Load Graph
             st.markdown(f'<div class="section-header">Average Weekly Load Context: {sel_w}</div>', unsafe_allow_html=True)
             week_team_trends = df[df['Week'] == sel_w].groupby(['Date', 'Session_Type']).agg({'Player Load': 'mean'}).reset_index().sort_values('Date')
             week_team_trends['Day_Label'] = week_team_trends['Date'].dt.strftime('%a %m/%d')
