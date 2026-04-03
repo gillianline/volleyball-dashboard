@@ -82,7 +82,8 @@ try:
         if score <= 70: return "#D4A017"
         return "#A52A2A"
 
-    st.markdown(f"""
+    # --- HEADER ---
+    st.markdown("""
         <div style="text-align: center; margin-top: 10px; margin-bottom: 15px;">
             <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/f/fc/Tennessee_Lady_Volunteers_logo.svg/1280px-Tennessee_Lady_Volunteers_logo.svg.png" width="120">
             <div style='color: #FF8200; font-size: 2rem; font-weight: 900; margin-top: 10px;'>LADY VOLS VOLLEYBALL PERFORMANCE</div>
@@ -115,8 +116,8 @@ try:
                     total_grade += grade; count += 1
                     diff = (val - avg) / avg if avg != 0 else 0
                     h_class = "class='bg-highlight-red'" if abs(diff) > 0.10 else ""
-                    arr = f"<span class='arrow-red'>{'↑' if diff > 0.10 else '↓'}</span>" if abs(diff) > 0.10 else ""
-                    m_rows += f"<tr><td>{k}</td><td {h_class}>{val} {arrow}</td><td>{mx}</td><td>{grade}</td></tr>"
+                    arrow_val = f"<span class='arrow-red'>{'↑' if diff > 0.10 else '↓'}</span>" if abs(diff) > 0.10 else ""
+                    m_rows += f"<tr><td>{k}</td><td {h_class}>{val} {arrow_val}</td><td>{mx}</td><td>{grade}</td></tr>"
             
             score = math.ceil(total_grade / count) if count > 0 else 0
             c1, c2, c3 = st.columns([1.2, 2.5, 1.2])
@@ -147,12 +148,15 @@ try:
                 fig_ph = make_subplots(specs=[[{"secondary_y": True}]])
                 fig_ph.add_trace(go.Bar(x=p_phases['Phase'], y=p_phases['Total Jumps'], name="Jumps", marker_color='#FF8200'), secondary_y=False)
                 fig_ph.add_trace(go.Scatter(x=p_phases['Phase'], y=p_phases['Total Player Load'], name="Load", line=dict(color='#4895DB', width=4)), secondary_y=True)
-                st.plotly_chart(fig_ph.update_layout(height=350, showlegend=False, hovermode=False), use_container_width=True, config=LOCKED_CONFIG)
+                fig_ph.update_layout(height=350, showlegend=False, hovermode=False)
+                st.plotly_chart(fig_ph, use_container_width=True, config=LOCKED_CONFIG)
                 
-                # ADDING ESTIMATED DISTANCE AS A PLAIN COLUMN IN THE TABLE
-                p_tbl = f'<table class="scout-table"><thead><tr><th>Phase</th><th>Jumps</th><th>Load</th><th>Estimated Distance (y)</th></tr></thead><tbody>'
+                # Safe table with Distance
+                dist_th = "<th>Estimated Distance (y)</th>" if "Estimated Distance" in p_phases.columns else ""
+                p_tbl = f'<table class="scout-table"><thead><tr><th>Phase</th><th>Jumps</th><th>Load</th>{dist_th}</tr></thead><tbody>'
                 for _, r in p_phases.iterrows(): 
-                    p_tbl += f"<tr><td>{r['Phase']}</td><td>{int(r['Total Jumps'])}</td><td>{r['Total Player Load']:.1f}</td><td>{r['Estimated Distance']:.1f}</td></tr>"
+                    dist_td = f"<td>{r['Estimated Distance']:.1f}</td>" if "Estimated Distance" in p_phases.columns else ""
+                    p_tbl += f"<tr><td>{r['Phase']}</td><td>{int(r['Total Jumps'])}</td><td>{r['Total Player Load']:.1f}</td>{dist_td}</tr>"
                 st.markdown(p_tbl + '</tbody></table>', unsafe_allow_html=True)
 
     # --- TAB 1: TEAM GALLERY ---
@@ -170,10 +174,10 @@ try:
                                 v, m, a = pd_row[k], lb_g[k].max(), lb_g[k].mean()
                                 g = math.ceil((v / m) * 100) if m > 0 else 0
                                 t_grade += g; c_metrics += 1
-                                diff_val = (v - a) / a if a != 0 else 0
-                                h_c = "class='bg-highlight-red'" if abs(diff_val) > 0.10 else ""
-                                arr = f"<span class='arrow-red'>{'↑' if diff_val > 0.10 else '↓'}</span>" if abs(diff_val) > 0.10 else ""
-                                r_html += f"<tr><td>{k}</td><td {h_c}>{v} {arr}</td><td>{m}</td><td>{g}</td></tr>"
+                                dv = (v - a) / a if a != 0 else 0
+                                h_c = "class='bg-highlight-red'" if abs(dv) > 0.10 else ""
+                                arr_g = f"<span class='arrow-red'>{'↑' if dv > 0.10 else '↓'}</span>" if abs(dv) > 0.10 else ""
+                                r_html += f"<tr><td>{k}</td><td {h_c}>{v} {arr_g}</td><td>{m}</td><td>{g}</td></tr>"
                         sc_g = math.ceil(t_grade / c_metrics) if c_metrics > 0 else 0
                         with cols[j]: st.markdown(f'<div class="gallery-card"><div style="display:flex; align-items:center; gap:10px;"><div style="flex:1.2; text-align:center;"><img src="{pd_row["PhotoURL"]}" class="gallery-photo"><p style="font-weight:bold; font-size:15px; margin-top:8px;">{pd_row["Name"]}</p></div><div style="flex:3;"><table class="scout-table"><thead><tr><th>Metric</th><th>Val</th><th>Max</th><th>Grade</th></tr></thead><tbody>{r_html}</tbody></table></div><div style="flex:1; text-align:center;"><div style="background-color:{get_flipped_gradient(sc_g)}; color:white; padding:10px; border-radius:12px; font-size:32px; font-weight:900;">{sc_g}</div></div></div></div>', unsafe_allow_html=True)
 
