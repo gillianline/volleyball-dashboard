@@ -9,14 +9,14 @@ from datetime import timedelta
 # --- PAGE CONFIG ---
 st.set_page_config(page_title="", layout="wide")
 
-# --- CSS: FIXED PADDING & LADY VOLS THEMING ---
+# --- CSS: FIXED PADDING, LADY VOLS THEMING & HIGHLIGHTS ---
 st.markdown("""
     <style>
     .stApp { background-color: #FFFFFF; color: #1D1D1F; }
     hr { display: none !important; }
     .block-container { padding-top: 2rem !important; }
 
-    /* HIDE ANCHORS */
+    /* HIDE ANCHORS & STREAMLIT LINKS */
     .viewerBadge_link__1S137, .main_heading_anchor__m6v0K, a.header-anchor { display: none !important; }
     header a { display: none !important; }
 
@@ -36,6 +36,7 @@ st.markdown("""
     .section-header { font-size: 14px; font-weight: 800; color: #4895DB; border-bottom: 2px solid #FF8200; margin-top: 25px; margin-bottom: 15px; padding-bottom: 5px; text-transform: uppercase; }
     .info-box { background-color: #f8f9fa; border-left: 5px solid #FF8200; padding: 12px; margin-top: 10px; font-size: 12px; color: #1D1D1F; font-weight: 600; line-height: 1.4; }
     
+    /* DISABLE CLICKS ON GRAPHS */
     .js-plotly-plot { pointer-events: none; }
     </style>
     """, unsafe_allow_html=True)
@@ -43,18 +44,23 @@ st.markdown("""
 # --- DATA LOADING ---
 @st.cache_data(ttl=300)
 def load_all_data():
+    # Performance Data
     df = pd.read_csv(st.secrets["GOOGLE_SHEET_URL"])
     df.columns = df.columns.str.strip()
     df['Session_Type'] = df['Activity'].apply(lambda x: 'Game' if any(w in str(x).lower() for w in ['game', 'match', 'v.']) else 'Practice')
+    
+    # CMJ Data
     cmj_df = pd.read_csv(st.secrets["CMJ_SHEET_URL"])
     cmj_df.columns = cmj_df.columns.str.strip()
     cmj_df['Jump Height (in)'] = cmj_df['Jump Height (Imp-Mom) [cm]'] * 0.3937
     
+    # Phase Data
     phase_df = pd.read_csv(st.secrets["PHASES_SHEET_URL"])
     phase_df.columns = phase_df.columns.str.strip()
     if 'Phases' in phase_df.columns: phase_df = phase_df.rename(columns={'Phases': 'Phase'})
     phase_df['Date'] = pd.to_datetime(phase_df['Date'])
     
+    # Mapping
     rename_map = {
         'Total Jumps': 'Total Jumps', 'IMA Jump Count Med Band': 'Moderate Jumps', 'IMA Jump Count High Band': 'High Jumps', 
         'BMP Jumping Load': 'Jump Load', 'Total Player Load': 'Player Load', 'Estimated Distance (y)': 'Estimated Distance (y)', 
@@ -64,6 +70,7 @@ def load_all_data():
     df['Date'] = pd.to_datetime(df['Date'])
     avail = [c for c in rename_map.values() if c in df.columns]
     df[avail] = df[avail].apply(pd.to_numeric, errors='coerce').fillna(0).round(1)
+    
     df['Session_Name'] = df['Activity'].fillna(df['Date'].dt.strftime('%m/%d/%Y'))
     df['Position'] = df.groupby('Name')['Position'].ffill().bfill().fillna("N/A")
     df['PhotoURL'] = df.groupby('Name')['PhotoURL'].ffill().bfill().fillna("https://www.w3schools.com/howto/img_avatar.png")
@@ -82,6 +89,7 @@ try:
         if score <= 70: return "#D4A017"
         return "#A52A2A"
 
+    # --- CENTERED LOGO HEADER ---
     st.markdown("""
         <div style="text-align: center; margin-top: 10px; margin-bottom: 15px;">
             <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/f/fc/Tennessee_Lady_Volunteers_logo.svg/1280px-Tennessee_Lady_Volunteers_logo.svg.png" width="120">
@@ -89,14 +97,17 @@ try:
         </div>
     """, unsafe_allow_html=True)
     
-    tabs = st.tabs(["Individual Profile", "Team Practice Grade Profiles", "Game v. Practice"])
+    tabs = st.tabs(["Individual Profile", "Team Practice Grade Profiles", "Game v. Practice", "Position Analysis"])
 
+    # --- INDIVIDUAL PROFILE (T0) & TEAM GALLERY (T1) SHARED FILTERS ---
+    # These only show on the first two tabs to keep the UI clean
+    session_map = df[['Date', 'Session_Name']].drop_duplicates().sort_values('Date', ascending=False)
+    
     # --- TAB 0: INDIVIDUAL PROFILE ---
     with tabs[0]:
-        session_map = df[['Date', 'Session_Name']].drop_duplicates().sort_values('Date', ascending=False)
         c_f1, c_f2 = st.columns(2)
-        with c_f1: selected_session = st.selectbox("Practice Selection", session_map['Session_Name'].tolist(), index=0, key="ind_sess")
-        with c_f2: pos_f = st.selectbox("Position Filter", ["All Positions"] + sorted([p for p in df['Position'].unique() if p != "N/A"]), key="ind_pos")
+        with c_f1: selected_session = st.selectbox("Practice Selection", session_map['Session_Name'].tolist(), index=0, key="nav_sel")
+        with c_f2: pos_f = st.selectbox("Position Filter", ["All Positions"] + sorted([p for p in df['Position'].unique() if p != "N/A"]), key="nav_pos")
 
         day_df = df[df['Session_Name'] == selected_session].copy()
         curr_date = day_df['Date'].iloc[0]
@@ -115,8 +126,8 @@ try:
                     total_grade += grade; count += 1
                     diff = (val - avg) / avg if avg != 0 else 0
                     h_class = "class='bg-highlight-red'" if abs(diff) > 0.10 else ""
-                    arrow_val = f"<span class='arrow-red'>{'↑' if diff > 0.10 else '↓'}</span>" if abs(diff) > 0.10 else ""
-                    m_rows += f"<tr><td>{k}</td><td {h_class}>{val} {arrow_val}</td><td>{mx}</td><td>{grade}</td></tr>"
+                    arr = f"<span class='arrow-red'>{'↑' if diff > 0.10 else '↓'}</span>" if abs(diff) > 0.10 else ""
+                    m_rows += f"<tr><td>{k}</td><td {h_class}>{val} {arr}</td><td>{mx}</td><td>{grade}</td></tr>"
             
             score = math.ceil(total_grade / count) if count > 0 else 0
             c1, c2, c3 = st.columns([1.2, 2.5, 1.2])
@@ -124,6 +135,7 @@ try:
             with c2: st.markdown(f'<table class="scout-table"><thead><tr><th>Metric</th><th>Today</th><th>30d Max</th><th>Grade</th></tr></thead><tbody>{m_rows}</tbody></table>', unsafe_allow_html=True)
             with c3: st.markdown(f'<div style="display:flex; justify-content:center;"><div class="score-box" style="background-color:{get_flipped_gradient(score)};">{score}</div></div>', unsafe_allow_html=True)
             
+            # Readiness Profile (Restore descriptions)
             st.markdown('<div class="section-header">Weekly Readiness Profile</div>', unsafe_allow_html=True)
             jc1, jc2 = st.columns([1.5, 3.5])
             with jc1:
@@ -141,6 +153,7 @@ try:
                 if not p_cmj_hist.empty:
                     fig = make_subplots(specs=[[{"secondary_y": True}]]); fig.add_trace(go.Scatter(x=p_cmj_hist['Test Date'], y=p_cmj_hist['Jump Height (in)'], name="Height", line=dict(color='#FF8200', width=3)), secondary_y=False); fig.add_trace(go.Scatter(x=p_cmj_hist['Test Date'], y=p_cmj_hist['RSI-modified [m/s]'], name="RSI", line=dict(color='#4895DB', dash='dot')), secondary_y=True); fig.update_layout(height=280, margin=dict(l=0, r=0, t=20, b=0), showlegend=False, hovermode=False); st.plotly_chart(fig, use_container_width=True, config=LOCKED_CONFIG)
 
+            # Phase Breakdown with Distance Line
             p_phases = phase_df[(phase_df['Name'] == sel_p) & (phase_df['Date'] == curr_date)].copy()
             if not p_phases.empty:
                 st.markdown('<div class="section-header">Practice Phase Breakdown</div>', unsafe_allow_html=True)
@@ -177,12 +190,12 @@ try:
                                 t_grade += g; c_metrics += 1
                                 dv = (v - a) / a if a != 0 else 0
                                 h_c = "class='bg-highlight-red'" if abs(dv) > 0.10 else ""
-                                arr_g = f"<span class='arrow-red'>{'↑' if dv > 0.10 else '↓'}</span>" if abs(dv) > 0.10 else ""
+                                arrow_g = f"<span class='arrow-red'>{'↑' if dv > 0.10 else '↓'}</span>" if abs(dv) > 0.10 else ""
                                 r_html += f"<tr><td>{k}</td><td {h_c}>{v} {arr_g}</td><td>{m}</td><td>{g}</td></tr>"
                         sc_g = math.ceil(t_grade / c_metrics) if c_metrics > 0 else 0
                         with cols[j]: st.markdown(f'<div class="gallery-card"><div style="display:flex; align-items:center; gap:10px;"><div style="flex:1.2; text-align:center;"><img src="{pd_row["PhotoURL"]}" class="gallery-photo"><p style="font-weight:bold; font-size:15px; margin-top:8px;">{pd_row["Name"]}</p></div><div style="flex:3;"><table class="scout-table"><thead><tr><th>Metric</th><th>Val</th><th>Max</th><th>Grade</th></tr></thead><tbody>{r_html}</tbody></table></div><div style="flex:1; text-align:center;"><div style="background-color:{get_flipped_gradient(sc_g)}; color:white; padding:10px; border-radius:12px; font-size:32px; font-weight:900;">{sc_g}</div></div></div></div>', unsafe_allow_html=True)
 
-    # --- TAB 2: GAME V PRACTICE ---
+    # --- TAB 2: GAME V PRACTICE (DUAL AXIS DISTANCE) ---
     with tabs[2]:
         st.markdown('<div class="section-header">Weekly Prep Intensity vs. Game Demands</div>', unsafe_allow_html=True)
         c_ga, c_gw, c_gg = st.columns(3)
@@ -210,11 +223,12 @@ try:
                 fig_dual.add_trace(go.Bar(x=low_val_metrics, y=[w_avg[m] for m in low_val_metrics], name="Weekly Avg", marker_color='#FF8200'), secondary_y=False)
                 fig_dual.add_trace(go.Bar(x=low_val_metrics, y=[g_d[m] for m in low_val_metrics], name="Game Demand", marker_color='#4895DB'), secondary_y=False)
                 if high_val_metric:
-                    fig_dual.add_trace(go.Bar(x=[high_val_metric], y=[w_avg[high_val_metric]], name="Weekly Dist", marker_color='#FF8200', opacity=0.8), secondary_y=True)
-                    fig_dual.add_trace(go.Bar(x=[high_val_metric], y=[g_d[high_val_metric]], name="Game Dist", marker_color='#4895DB', opacity=0.8), secondary_y=True)
+                    fig_dual.add_trace(go.Bar(x=[high_val_metric], y=[w_avg[high_val_metric]], name="Weekly Distance", marker_color='#FF8200', opacity=0.8), secondary_y=True)
+                    fig_dual.add_trace(go.Bar(x=[high_val_metric], y=[g_d[high_val_metric]], name="Game Distance", marker_color='#4895DB', opacity=0.8), secondary_y=True)
                 fig_dual.update_layout(height=400, barmode='group', showlegend=True, legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1), hovermode=False)
                 st.plotly_chart(fig_dual, use_container_width=True, config=LOCKED_CONFIG)
 
+            # Weekly Trends
             st.markdown(f'<div class="section-header">Average Weekly Load Context: {sel_w}</div>', unsafe_allow_html=True)
             week_team_trends = df[df['Week'] == sel_w].groupby(['Date', 'Session_Type']).agg({'Player Load': 'mean'}).reset_index().sort_values('Date')
             week_team_trends['Day_Label'] = week_team_trends['Date'].dt.strftime('%a %m/%d')
@@ -225,6 +239,29 @@ try:
                 fig_tr.add_trace(go.Scatter(x=subset['Day_Label'], y=subset['Player Load'], name=s_type, mode='markers', marker=dict(color=color, size=12, line=dict(width=2, color='white'))))
             fig_tr.update_layout(height=350, margin=dict(l=0, r=0, t=20, b=0), yaxis_title="Average Player Load", hovermode=False)
             st.plotly_chart(fig_tr, use_container_width=True, config=LOCKED_CONFIG)
+
+    # --- TAB 3: POSITION ANALYSIS ---
+    with tabs[3]:
+        st.markdown('<div class="section-header">Position Group Player Load Analysis</div>', unsafe_allow_html=True)
+        if not day_df.empty:
+            pos_stats = day_df.groupby('Position')['Player Load'].agg(['mean', 'max']).reset_index()
+            pos_stats.columns = ['Position', 'Avg Load', 'Max Load']
+            pos_stats = pos_stats[pos_stats['Position'] != "N/A"].sort_values('Avg Load', ascending=False)
+
+            c_pos1, c_pos2 = st.columns([2, 1])
+            with c_pos1:
+                fig_pos = px.bar(pos_stats, x='Position', y='Avg Load', text_auto='.1f', color='Position', color_discrete_sequence=['#FF8200', '#4895DB', '#515154'])
+                fig_pos.update_layout(height=400, showlegend=False, xaxis_title=None, hovermode=False)
+                st.plotly_chart(fig_pos, use_container_width=True, config=LOCKED_CONFIG)
+            with c_pos2:
+                p_tbl_h = '<table class="scout-table"><thead><tr><th>Position</th><th>Avg</th><th>Max</th></tr></thead><tbody>'
+                for _, r in pos_stats.iterrows(): p_tbl_h += f"<tr><td>{r['Position']}</td><td>{r['Avg Load']:.1f}</td><td>{r['Max Load']:.1f}</td></tr>"
+                st.markdown(p_tbl_h + '</tbody></table>', unsafe_allow_html=True)
+
+            st.markdown('<div class="section-header">Individual Distribution by Position</div>', unsafe_allow_html=True)
+            fig_dist = px.box(day_df[day_df['Position'] != "N/A"], x='Position', y='Player Load', color='Position', points="all", color_discrete_sequence=['#FF8200', '#4895DB', '#515154'])
+            fig_dist.update_layout(height=400, showlegend=False, xaxis_title=None, hovermode=False)
+            st.plotly_chart(fig_dist, use_container_width=True, config=LOCKED_CONFIG)
 
 except Exception as e:
     st.error(f"Sync Error: {e}")
