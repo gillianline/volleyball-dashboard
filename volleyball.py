@@ -9,7 +9,7 @@ from datetime import timedelta
 # --- PAGE CONFIG ---
 st.set_page_config(page_title="", layout="wide")
 
-# --- CSS: FIXED PADDING, LADY VOLS THEMING & HIGHLIGHTS ---
+# --- CSS: FORMATTING & HIGHLIGHTING ---
 st.markdown("""
     <style>
     .stApp { background-color: #FFFFFF; color: #1D1D1F; }
@@ -53,6 +53,7 @@ def load_all_data():
     phase_df.columns = phase_df.columns.str.strip()
     if 'Phases' in phase_df.columns: phase_df = phase_df.rename(columns={'Phases': 'Phase'})
     phase_df['Date'] = pd.to_datetime(phase_df['Date'])
+    
     rename_map = {
         'Total Jumps': 'Total Jumps', 'IMA Jump Count Med Band': 'Moderate Jumps', 'IMA Jump Count High Band': 'High Jumps', 
         'BMP Jumping Load': 'Jump Load', 'Total Player Load': 'Player Load', 'Estimated Distance (y)': 'Estimated Distance (y)', 
@@ -83,28 +84,28 @@ try:
     st.markdown("""
         <div style="text-align: center; margin-top: 10px; margin-bottom: 15px;">
             <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/f/fc/Tennessee_Lady_Volunteers_logo.svg/1280px-Tennessee_Lady_Volunteers_logo.svg.png" width="120">
-            <div style='color: #FF8200; font-size: 2rem; font-weight: 900; margin-top: 10px;'>LADY VOLS VOLLEYBALL PERFORMANCE Lab</div>
+            <div style='color: #FF8200; font-size: 2rem; font-weight: 900; margin-top: 10px;'>LADY VOLS VOLLEYBALL PERFORMANCE</div>
         </div>
     """, unsafe_allow_html=True)
     
     tabs = st.tabs(["Individual Profile", "Team Practice Grade Profiles", "Game v. Practice", "Position Analysis"])
-    session_map = df[['Date', 'Session_Name']].drop_duplicates().sort_values('Date', ascending=False)
-    
-    # Logic for Tab 0 and Tab 1
-    c_f1, c_f2 = st.columns(2)
-    with c_f1: selected_session = st.selectbox("Practice Selection", session_map['Session_Name'].tolist(), index=0, key="nav_sel")
-    with c_f2: pos_f = st.selectbox("Position Filter", ["All Positions"] + sorted([p for p in df['Position'].unique() if p != "N/A"]), key="nav_pos")
-
-    day_df = df[df['Session_Name'] == selected_session].copy()
-    curr_date = day_df['Date'].iloc[0]
-    if pos_f != "All Positions": day_df = day_df[day_df['Position'] == pos_f]
+    session_list = df[['Date', 'Session_Name']].drop_duplicates().sort_values('Date', ascending=False)['Session_Name'].tolist()
 
     # --- TAB 0: INDIVIDUAL PROFILE ---
     with tabs[0]:
+        c_f1, c_f2 = st.columns(2)
+        with c_f1: selected_session = st.selectbox("Practice Selection", session_list, index=0, key="nav_sel_ind")
+        with c_f2: pos_f = st.selectbox("Position Filter", ["All Positions"] + sorted([p for p in df['Position'].unique() if p != "N/A"]), key="nav_pos_ind")
+
+        day_df = df[df['Session_Name'] == selected_session].copy()
+        curr_date = day_df['Date'].iloc[0]
+        if pos_f != "All Positions": day_df = day_df[day_df['Position'] == pos_f]
+
         if not day_df.empty:
             sel_p = st.selectbox("Select Athlete", sorted(day_df['Name'].unique()))
             p = day_df[day_df['Name'] == sel_p].iloc[0]
             lb = df[(df['Name'] == sel_p) & (df['Date'] >= curr_date - timedelta(days=30)) & (df['Date'] <= curr_date)]
+            
             m_rows = ""; total_grade = 0; count = 0
             for k in all_metrics:
                 if k in p:
@@ -113,8 +114,9 @@ try:
                     total_grade += grade; count += 1
                     diff = (val - avg) / avg if avg != 0 else 0
                     h_class = "class='bg-highlight-red'" if abs(diff) > 0.10 else ""
-                    arr_ind = f"<span class='arrow-red'>{'↑' if diff > 0.10 else '↓'}</span>" if abs(diff) > 0.10 else ""
-                    m_rows += f"<tr><td>{k}</td><td {h_class}>{val} {arr_ind}</td><td>{mx}</td><td>{grade}</td></tr>"
+                    arr_val = f"<span class='arrow-red'>{'↑' if diff > 0.10 else '↓'}</span>" if abs(diff) > 0.10 else ""
+                    m_rows += f"<tr><td>{k}</td><td {h_class}>{val} {arr_val}</td><td>{mx}</td><td>{grade}</td></tr>"
+            
             score = math.ceil(total_grade / count) if count > 0 else 0
             c1, c2, c3 = st.columns([1.2, 2.5, 1.2])
             with c1: st.markdown(f'<div style="text-align:center;"><img src="{p["PhotoURL"]}" class="player-photo-large"></div><h3 style="text-align:center;">{p["Name"]}</h3>', unsafe_allow_html=True)
@@ -148,7 +150,7 @@ try:
                     fig_ph.add_trace(go.Scatter(x=p_phases['Phase'], y=p_phases['Estimated Distance (y)'], name="Distance (y)", line=dict(color='#515154', width=2, dash='dash')), secondary_y=True)
                 fig_ph.update_layout(height=350, showlegend=True, legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1), hovermode=False)
                 st.plotly_chart(fig_ph, use_container_width=True, config=LOCKED_CONFIG)
-                dist_th = "<th>Estimated Distance (y)</th>" if "Estimated Distance (y)" in p_phases.columns else ""
+                dist_th = "<th>Distance (y)</th>" if "Estimated Distance (y)" in p_phases.columns else ""
                 p_tbl = f'<table class="scout-table"><thead><tr><th>Phase</th><th>Jumps</th><th>Load</th>{dist_th}</tr></thead><tbody>'
                 for _, r in p_phases.iterrows(): 
                     dist_td = f"<td>{r['Estimated Distance (y)']:.1f}</td>" if "Estimated Distance (y)" in p_phases.columns else ""
@@ -157,13 +159,20 @@ try:
 
     # --- TAB 1: TEAM GALLERY ---
     with tabs[1]:
-        if not day_df.empty:
-            for i in range(0, len(day_df), 2):
+        c_gal1, c_gal2 = st.columns(2)
+        with c_gal1: selected_session_gal = st.selectbox("Practice Selection", session_list, index=0, key="nav_sel_gal")
+        with c_gal2: pos_f_gal = st.selectbox("Position Filter", ["All Positions"] + sorted([p for p in df['Position'].unique() if p != "N/A"]), key="nav_pos_gal")
+        
+        gal_df = df[df['Session_Name'] == selected_session_gal].copy()
+        if pos_f_gal != "All Positions": gal_df = gal_df[gal_df['Position'] == pos_f_gal]
+
+        if not gal_df.empty:
+            for i in range(0, len(gal_df), 2):
                 cols = st.columns(2)
                 for j in range(2):
-                    if i + j < len(day_df):
-                        pd_row = day_df.iloc[i + j]
-                        lb_g = df[(df['Name'] == pd_row['Name']) & (df['Date'] >= curr_date - timedelta(days=30)) & (df['Date'] <= curr_date)]
+                    if i + j < len(gal_df):
+                        pd_row = gal_df.iloc[i + j]
+                        lb_g = df[(df['Name'] == pd_row['Name']) & (df['Date'] >= pd_row['Date'] - timedelta(days=30)) & (df['Date'] <= pd_row['Date'])]
                         r_html = ""; t_grade = 0; c_metrics = 0
                         for k in all_metrics:
                             if k in pd_row:
@@ -172,8 +181,8 @@ try:
                                 t_grade += g; c_metrics += 1
                                 dv = (v - a) / a if a != 0 else 0
                                 h_c = "class='bg-highlight-red'" if abs(dv) > 0.10 else ""
-                                arr_g = f"<span class='arrow-red'>{'↑' if dv > 0.10 else '↓'}</span>" if abs(dv) > 0.10 else ""
-                                r_html += f"<tr><td>{k}</td><td {h_c}>{v} {arr_g}</td><td>{m}</td><td>{g}</td></tr>"
+                                arr_gal = f"<span class='arrow-red'>{'↑' if dv > 0.10 else '↓'}</span>" if abs(dv) > 0.10 else ""
+                                r_html += f"<tr><td>{k}</td><td {h_c}>{v} {arr_gal}</td><td>{m}</td><td>{g}</td></tr>"
                         sc_g = math.ceil(t_grade / c_metrics) if c_metrics > 0 else 0
                         with cols[j]: st.markdown(f'<div class="gallery-card"><div style="display:flex; align-items:center; gap:10px;"><div style="flex:1.2; text-align:center;"><img src="{pd_row["PhotoURL"]}" class="gallery-photo"><p style="font-weight:bold; font-size:15px; margin-top:8px;">{pd_row["Name"]}</p></div><div style="flex:3;"><table class="scout-table"><thead><tr><th>Metric</th><th>Val</th><th>Max</th><th>Grade</th></tr></thead><tbody>{r_html}</tbody></table></div><div style="flex:1; text-align:center;"><div style="background-color:{get_flipped_gradient(sc_g)}; color:white; padding:10px; border-radius:12px; font-size:32px; font-weight:900;">{sc_g}</div></div></div></div>', unsafe_allow_html=True)
 
@@ -186,10 +195,13 @@ try:
             w_r = df.groupby('Week')['Date'].agg(['min', 'max']).reset_index(); w_r['L'] = w_r.apply(lambda x: f"{x['Week']} ({x['min'].strftime('%m/%d')} - {x['max'].strftime('%m/%d')})", axis=1)
             gp_w = st.selectbox("Week", w_r['L'].tolist(), key="gp_w_vf"); sel_w = w_r[w_r['L'] == gp_w]['Week'].values[0]
         with c_gg: gp_g = st.selectbox("Game", df[(df['Name'] == gp_p) & (df['Session_Type'] == 'Game')]['Session_Name'].unique(), key="gp_g_vf")
+        
         low_val_metrics = [m for m in ['Total Jumps', 'Player Load', 'Explosive Efforts'] if m in df.columns]
         high_val_metric = 'Estimated Distance (y)' if 'Estimated Distance (y)' in df.columns else None
+        
         w_data = df[(df['Name'] == gp_p) & (df['Session_Type'] == 'Practice') & (df['Week'] == sel_w)]
         g_data_l = df[(df['Name'] == gp_p) & (df['Session_Name'] == gp_g)]
+        
         if not w_data.empty and not g_data_l.empty:
             all_m = low_val_metrics + ([high_val_metric] if high_val_metric else [])
             w_avg = w_data[all_m].mean(); g_d = g_data_l.iloc[0]; cg1, cg2 = st.columns([1, 2])
@@ -206,6 +218,7 @@ try:
                     fig_dual.add_trace(go.Bar(x=[high_val_metric], y=[g_d[high_val_metric]], name="Game Dist", marker_color='#4895DB', opacity=0.8), secondary_y=True)
                 fig_dual.update_layout(height=400, barmode='group', showlegend=True, legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1), hovermode=False)
                 st.plotly_chart(fig_dual, use_container_width=True, config=LOCKED_CONFIG)
+
             st.markdown(f'<div class="section-header">Average Weekly Load Context: {sel_w}</div>', unsafe_allow_html=True)
             week_team_trends = df[df['Week'] == sel_w].groupby(['Date', 'Session_Type']).agg({'Player Load': 'mean'}).reset_index().sort_values('Date')
             week_team_trends['Day_Label'] = week_team_trends['Date'].dt.strftime('%a %m/%d')
@@ -219,11 +232,17 @@ try:
 
     # --- TAB 3: POSITION ANALYSIS ---
     with tabs[3]:
+        # Filter moved to the top of this tab
+        selected_session_pos = st.selectbox("Practice Selection", session_list, index=0, key="nav_sel_pos")
         st.markdown('<div class="section-header">Selected Session: Player Load by Position</div>', unsafe_allow_html=True)
-        if not day_df.empty:
-            pos_stats = day_df.groupby('Position')['Player Load'].agg(['mean', 'max']).reset_index()
+        
+        day_df_pos = df[df['Session_Name'] == selected_session_pos].copy()
+        
+        if not day_df_pos.empty:
+            pos_stats = day_df_pos.groupby('Position')['Player Load'].agg(['mean', 'max']).reset_index()
             pos_stats.columns = ['Position', 'Avg Load', 'Max Load']
             pos_stats = pos_stats[pos_stats['Position'] != "N/A"].sort_values('Avg Load', ascending=False)
+
             c_pos1, c_pos2 = st.columns([2, 1])
             with c_pos1:
                 fig_pos = px.bar(pos_stats, x='Position', y='Avg Load', text_auto='.1f', color='Position', color_discrete_sequence=['#FF8200', '#4895DB', '#515154'])
@@ -233,29 +252,6 @@ try:
                 p_tbl_h = '<table class="scout-table"><thead><tr><th>Position</th><th>Avg</th><th>Max</th></tr></thead><tbody>'
                 for _, r in pos_stats.iterrows(): p_tbl_h += f"<tr><td>{r['Position']}</td><td>{r['Avg Load']:.1f}</td><td>{r['Max Load']:.1f}</td></tr>"
                 st.markdown(p_tbl_h + '</tbody></table>', unsafe_allow_html=True)
-            
-            # Historical Position Trend Analysis
-            st.markdown('<div class="section-header">Position Load Trends by Practice Date</div>', unsafe_allow_html=True)
-            # Filter out N/A positions and group by Date and Position
-            trend_df = df[df['Position'] != "N/A"].groupby(['Date', 'Position'])['Player Load'].mean().reset_index().sort_values('Date')
-            trend_df['Date_Label'] = trend_df['Date'].dt.strftime('%m/%d')
-            
-            fig_pos_trend = px.line(
-                trend_df, 
-                x='Date_Label', 
-                y='Player Load', 
-                color='Position',
-                color_discrete_sequence=['#FF8200', '#4895DB', '#515154', '#8da0cb', '#e78ac3'],
-                markers=True
-            )
-            fig_pos_trend.update_layout(
-                height=450, 
-                xaxis_title=None, 
-                yaxis_title="Average Player Load",
-                hovermode=False,
-                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
-            )
-            st.plotly_chart(fig_pos_trend, use_container_width=True, config=LOCKED_CONFIG)
 
 except Exception as e:
     st.error(f"Sync Error: {e}")
