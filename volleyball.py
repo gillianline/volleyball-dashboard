@@ -9,14 +9,14 @@ from datetime import timedelta
 # --- PAGE CONFIG ---
 st.set_page_config(page_title="", layout="wide")
 
-# --- CSS: FORMATTING & HIGHLIGHTING ---
+# --- CSS: FIXED PADDING, LADY VOLS THEMING & HIGHLIGHTS ---
 st.markdown("""
     <style>
     .stApp { background-color: #FFFFFF; color: #1D1D1F; }
     hr { display: none !important; }
     .block-container { padding-top: 2rem !important; }
 
-    /* HIDE ANCHORS */
+    /* HIDE ANCHORS & STREAMLIT LINKS */
     .viewerBadge_link__1S137, .main_heading_anchor__m6v0K, a.header-anchor { display: none !important; }
     header a { display: none !important; }
 
@@ -36,6 +36,7 @@ st.markdown("""
     .section-header { font-size: 14px; font-weight: 800; color: #4895DB; border-bottom: 2px solid #FF8200; margin-top: 25px; margin-bottom: 15px; padding-bottom: 5px; text-transform: uppercase; }
     .info-box { background-color: #f8f9fa; border-left: 5px solid #FF8200; padding: 12px; margin-top: 10px; font-size: 12px; color: #1D1D1F; font-weight: 600; line-height: 1.4; }
     
+    /* DISABLE CLICKS ON GRAPHS */
     .js-plotly-plot { pointer-events: none; }
     </style>
     """, unsafe_allow_html=True)
@@ -43,23 +44,19 @@ st.markdown("""
 # --- DATA LOADING ---
 @st.cache_data(ttl=300)
 def load_all_data():
-    # Performance Data
     df = pd.read_csv(st.secrets["GOOGLE_SHEET_URL"])
     df.columns = df.columns.str.strip()
     df['Session_Type'] = df['Activity'].apply(lambda x: 'Game' if any(w in str(x).lower() for w in ['game', 'match', 'v.']) else 'Practice')
     
-    # CMJ Data
     cmj_df = pd.read_csv(st.secrets["CMJ_SHEET_URL"])
     cmj_df.columns = cmj_df.columns.str.strip()
     cmj_df['Jump Height (in)'] = cmj_df['Jump Height (Imp-Mom) [cm]'] * 0.3937
     
-    # Phase Data
     phase_df = pd.read_csv(st.secrets["PHASES_SHEET_URL"])
     phase_df.columns = phase_df.columns.str.strip()
     if 'Phases' in phase_df.columns: phase_df = phase_df.rename(columns={'Phases': 'Phase'})
     phase_df['Date'] = pd.to_datetime(phase_df['Date'])
     
-    # Mapping
     rename_map = {
         'Total Jumps': 'Total Jumps', 'IMA Jump Count Med Band': 'Moderate Jumps', 'IMA Jump Count High Band': 'High Jumps', 
         'BMP Jumping Load': 'Jump Load', 'Total Player Load': 'Player Load', 'Estimated Distance (y)': 'Estimated Distance (y)', 
@@ -88,7 +85,7 @@ try:
         if score <= 70: return "#D4A017"
         return "#A52A2A"
 
-    # --- LOGO HEADER ---
+    # --- CENTERED LOGO HEADER ---
     st.markdown("""
         <div style="text-align: center; margin-top: 10px; margin-bottom: 15px;">
             <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/f/fc/Tennessee_Lady_Volunteers_logo.svg/1280px-Tennessee_Lady_Volunteers_logo.svg.png" width="120">
@@ -99,7 +96,7 @@ try:
     tabs = st.tabs(["Individual Profile", "Team Practice Grade Profiles", "Game v. Practice", "Position Analysis"])
 
     session_map = df[['Date', 'Session_Name']].drop_duplicates().sort_values('Date', ascending=False)
-
+    
     # --- TAB 0: INDIVIDUAL PROFILE ---
     with tabs[0]:
         c_f1, c_f2 = st.columns(2)
@@ -223,7 +220,6 @@ try:
                 fig_dual.update_layout(height=400, barmode='group', showlegend=True, legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1), hovermode=False)
                 st.plotly_chart(fig_dual, use_container_width=True, config=LOCKED_CONFIG)
 
-            # Weekly Trends
             st.markdown(f'<div class="section-header">Average Weekly Load Context: {sel_w}</div>', unsafe_allow_html=True)
             week_team_trends = df[df['Week'] == sel_w].groupby(['Date', 'Session_Type']).agg({'Player Load': 'mean'}).reset_index().sort_values('Date')
             week_team_trends['Day_Label'] = week_team_trends['Date'].dt.strftime('%a %m/%d')
@@ -252,11 +248,6 @@ try:
                 p_tbl_h = '<table class="scout-table"><thead><tr><th>Position</th><th>Avg</th><th>Max</th></tr></thead><tbody>'
                 for _, r in pos_stats.iterrows(): p_tbl_h += f"<tr><td>{r['Position']}</td><td>{r['Avg Load']:.1f}</td><td>{r['Max Load']:.1f}</td></tr>"
                 st.markdown(p_tbl_h + '</tbody></table>', unsafe_allow_html=True)
-
-            st.markdown('<div class="section-header">Individual Distribution by Position</div>', unsafe_allow_html=True)
-            fig_dist = px.box(day_df[day_df['Position'] != "N/A"], x='Position', y='Player Load', color='Position', points="all", color_discrete_sequence=['#FF8200', '#4895DB', '#515154'])
-            fig_dist.update_layout(height=400, showlegend=False, xaxis_title=None, hovermode=False)
-            st.plotly_chart(fig_dist, use_container_width=True, config=LOCKED_CONFIG)
 
 except Exception as e:
     st.error(f"Sync Error: {e}")
