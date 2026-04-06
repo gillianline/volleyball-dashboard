@@ -9,14 +9,14 @@ from datetime import timedelta
 # --- PAGE CONFIG ---
 st.set_page_config(page_title="", layout="wide")
 
-# --- CSS: FIXED PADDING, LADY VOLS THEMING & HIGHLIGHTS ---
+# --- CSS: FORMATTING & HIGHLIGHTING ---
 st.markdown("""
     <style>
     .stApp { background-color: #FFFFFF; color: #1D1D1F; }
     hr { display: none !important; }
     .block-container { padding-top: 2rem !important; }
 
-    /* HIDE ANCHORS & STREAMLIT LINKS */
+    /* HIDE ANCHORS */
     .viewerBadge_link__1S137, .main_heading_anchor__m6v0K, a.header-anchor { display: none !important; }
     header a { display: none !important; }
 
@@ -36,7 +36,6 @@ st.markdown("""
     .section-header { font-size: 14px; font-weight: 800; color: #4895DB; border-bottom: 2px solid #FF8200; margin-top: 25px; margin-bottom: 15px; padding-bottom: 5px; text-transform: uppercase; }
     .info-box { background-color: #f8f9fa; border-left: 5px solid #FF8200; padding: 12px; margin-top: 10px; font-size: 12px; color: #1D1D1F; font-weight: 600; line-height: 1.4; }
     
-    /* DISABLE CLICKS ON GRAPHS */
     .js-plotly-plot { pointer-events: none; }
     </style>
     """, unsafe_allow_html=True)
@@ -89,7 +88,7 @@ try:
         if score <= 70: return "#D4A017"
         return "#A52A2A"
 
-    # --- CENTERED LOGO HEADER ---
+    # --- LOGO HEADER ---
     st.markdown("""
         <div style="text-align: center; margin-top: 10px; margin-bottom: 15px;">
             <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/f/fc/Tennessee_Lady_Volunteers_logo.svg/1280px-Tennessee_Lady_Volunteers_logo.svg.png" width="120">
@@ -99,10 +98,8 @@ try:
     
     tabs = st.tabs(["Individual Profile", "Team Practice Grade Profiles", "Game v. Practice", "Position Analysis"])
 
-    # --- INDIVIDUAL PROFILE (T0) & TEAM GALLERY (T1) SHARED FILTERS ---
-    # These only show on the first two tabs to keep the UI clean
     session_map = df[['Date', 'Session_Name']].drop_duplicates().sort_values('Date', ascending=False)
-    
+
     # --- TAB 0: INDIVIDUAL PROFILE ---
     with tabs[0]:
         c_f1, c_f2 = st.columns(2)
@@ -126,8 +123,8 @@ try:
                     total_grade += grade; count += 1
                     diff = (val - avg) / avg if avg != 0 else 0
                     h_class = "class='bg-highlight-red'" if abs(diff) > 0.10 else ""
-                    arr = f"<span class='arrow-red'>{'↑' if diff > 0.10 else '↓'}</span>" if abs(diff) > 0.10 else ""
-                    m_rows += f"<tr><td>{k}</td><td {h_class}>{val} {arr}</td><td>{mx}</td><td>{grade}</td></tr>"
+                    arrow_ind = f"<span class='arrow-red'>{'↑' if diff > 0.10 else '↓'}</span>" if abs(diff) > 0.10 else ""
+                    m_rows += f"<tr><td>{k}</td><td {h_class}>{val} {arrow_ind}</td><td>{mx}</td><td>{grade}</td></tr>"
             
             score = math.ceil(total_grade / count) if count > 0 else 0
             c1, c2, c3 = st.columns([1.2, 2.5, 1.2])
@@ -135,7 +132,6 @@ try:
             with c2: st.markdown(f'<table class="scout-table"><thead><tr><th>Metric</th><th>Today</th><th>30d Max</th><th>Grade</th></tr></thead><tbody>{m_rows}</tbody></table>', unsafe_allow_html=True)
             with c3: st.markdown(f'<div style="display:flex; justify-content:center;"><div class="score-box" style="background-color:{get_flipped_gradient(score)};">{score}</div></div>', unsafe_allow_html=True)
             
-            # Readiness Profile (Restore descriptions)
             st.markdown('<div class="section-header">Weekly Readiness Profile</div>', unsafe_allow_html=True)
             jc1, jc2 = st.columns([1.5, 3.5])
             with jc1:
@@ -153,7 +149,6 @@ try:
                 if not p_cmj_hist.empty:
                     fig = make_subplots(specs=[[{"secondary_y": True}]]); fig.add_trace(go.Scatter(x=p_cmj_hist['Test Date'], y=p_cmj_hist['Jump Height (in)'], name="Height", line=dict(color='#FF8200', width=3)), secondary_y=False); fig.add_trace(go.Scatter(x=p_cmj_hist['Test Date'], y=p_cmj_hist['RSI-modified [m/s]'], name="RSI", line=dict(color='#4895DB', dash='dot')), secondary_y=True); fig.update_layout(height=280, margin=dict(l=0, r=0, t=20, b=0), showlegend=False, hovermode=False); st.plotly_chart(fig, use_container_width=True, config=LOCKED_CONFIG)
 
-            # Phase Breakdown with Distance Line
             p_phases = phase_df[(phase_df['Name'] == sel_p) & (phase_df['Date'] == curr_date)].copy()
             if not p_phases.empty:
                 st.markdown('<div class="section-header">Practice Phase Breakdown</div>', unsafe_allow_html=True)
@@ -191,11 +186,11 @@ try:
                                 dv = (v - a) / a if a != 0 else 0
                                 h_c = "class='bg-highlight-red'" if abs(dv) > 0.10 else ""
                                 arrow_g = f"<span class='arrow-red'>{'↑' if dv > 0.10 else '↓'}</span>" if abs(dv) > 0.10 else ""
-                                r_html += f"<tr><td>{k}</td><td {h_c}>{v} {arr_g}</td><td>{m}</td><td>{g}</td></tr>"
+                                r_html += f"<tr><td>{k}</td><td {h_c}>{v} {arrow_g}</td><td>{m}</td><td>{g}</td></tr>"
                         sc_g = math.ceil(t_grade / c_metrics) if c_metrics > 0 else 0
                         with cols[j]: st.markdown(f'<div class="gallery-card"><div style="display:flex; align-items:center; gap:10px;"><div style="flex:1.2; text-align:center;"><img src="{pd_row["PhotoURL"]}" class="gallery-photo"><p style="font-weight:bold; font-size:15px; margin-top:8px;">{pd_row["Name"]}</p></div><div style="flex:3;"><table class="scout-table"><thead><tr><th>Metric</th><th>Val</th><th>Max</th><th>Grade</th></tr></thead><tbody>{r_html}</tbody></table></div><div style="flex:1; text-align:center;"><div style="background-color:{get_flipped_gradient(sc_g)}; color:white; padding:10px; border-radius:12px; font-size:32px; font-weight:900;">{sc_g}</div></div></div></div>', unsafe_allow_html=True)
 
-    # --- TAB 2: GAME V PRACTICE (DUAL AXIS DISTANCE) ---
+    # --- TAB 2: GAME V PRACTICE ---
     with tabs[2]:
         st.markdown('<div class="section-header">Weekly Prep Intensity vs. Game Demands</div>', unsafe_allow_html=True)
         c_ga, c_gw, c_gg = st.columns(3)
@@ -223,8 +218,8 @@ try:
                 fig_dual.add_trace(go.Bar(x=low_val_metrics, y=[w_avg[m] for m in low_val_metrics], name="Weekly Avg", marker_color='#FF8200'), secondary_y=False)
                 fig_dual.add_trace(go.Bar(x=low_val_metrics, y=[g_d[m] for m in low_val_metrics], name="Game Demand", marker_color='#4895DB'), secondary_y=False)
                 if high_val_metric:
-                    fig_dual.add_trace(go.Bar(x=[high_val_metric], y=[w_avg[high_val_metric]], name="Weekly Distance", marker_color='#FF8200', opacity=0.8), secondary_y=True)
-                    fig_dual.add_trace(go.Bar(x=[high_val_metric], y=[g_d[high_val_metric]], name="Game Distance", marker_color='#4895DB', opacity=0.8), secondary_y=True)
+                    fig_dual.add_trace(go.Bar(x=[high_val_metric], y=[w_avg[high_val_metric]], name="Weekly Dist", marker_color='#FF8200', opacity=0.8), secondary_y=True)
+                    fig_dual.add_trace(go.Bar(x=[high_val_metric], y=[g_d[high_val_metric]], name="Game Dist", marker_color='#4895DB', opacity=0.8), secondary_y=True)
                 fig_dual.update_layout(height=400, barmode='group', showlegend=True, legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1), hovermode=False)
                 st.plotly_chart(fig_dual, use_container_width=True, config=LOCKED_CONFIG)
 
