@@ -24,14 +24,26 @@ st.markdown("""
     .arrow-red { color: #b30000 !important; font-weight: 900; margin-left: 4px; }
     .player-photo-large { border-radius: 50%; width: 220px; height: 220px; object-fit: cover; border: 6px solid #FF8200; }
     .score-box { padding: 12px 20px; border-radius: 12px; font-size: 28px; font-weight: 800; min-width: 100px; color: #FFFFFF; line-height: 1.2; text-align: center;}
-    .gallery-card { border: 1px solid #E5E5E7; padding: 15px; border-radius: 15px; background-color: #FFFFFF; min-height: 380px; display: flex; flex-direction: column; justify-content: center; }
+    
+    .gallery-card { 
+        border: 1px solid #E5E5E7; 
+        padding: 0; 
+        border-radius: 15px; 
+        background-color: #FFFFFF; 
+        margin-bottom: 30px; 
+        overflow: hidden;
+        display: flex; 
+        flex-direction: column;
+        break-inside: avoid !important;
+        page-break-inside: avoid !important;
+    }
+
     .gallery-photo { border-radius: 50%; width: 110px; height: 110px; object-fit: cover; border: 4px solid #FF8200; }
     .section-header { font-size: 14px; font-weight: 800; color: #4895DB; border-bottom: 2px solid #FF8200; margin-top: 25px; margin-bottom: 15px; padding-bottom: 5px; text-transform: uppercase; }
     .info-box { background-color: #f8f9fa; border-left: 5px solid #FF8200; padding: 12px; margin-top: 10px; font-size: 12px; color: #1D1D1F; font-weight: 600; line-height: 1.4; }
     .js-plotly-plot { pointer-events: none; }
 
     @media print {
-        /* HIDE ALL UI ELEMENTS */
         .stTabs [role="tablist"], 
         .main-logo-container,
         [data-testid="stSidebar"], 
@@ -47,19 +59,7 @@ st.markdown("""
         button { 
             display: none !important; 
         }
-
-        /* RESET LAYOUT FOR PAPER */
         .main .block-container { padding: 0 !important; max-width: 100% !important; }
-        
-        /* FORCE CARDS AND GRAPHS TO STAY TOGETHER */
-        [data-testid="stVerticalBlock"] > div:has(.gallery-card) {
-            break-inside: avoid-page !important;
-            page-break-inside: avoid !important;
-            margin-bottom: 50px !important;
-            display: block !important;
-        }
-
-        /* FORCE FULL WIDTH FOR PRINTING */
         [data-testid="column"] {
             width: 100% !important;
             flex: 1 1 100% !important;
@@ -108,7 +108,7 @@ try:
     df, cmj_df, phase_df = load_all_data()
     all_metrics = ['Total Jumps', 'Moderate Jumps', 'High Jumps', 'Jump Load', 'Player Load', 'Estimated Distance (y)', 'Explosive Efforts', 'High Intensity Movement']
     def get_flipped_gradient(score):
-        score = float(score)
+        score = float(score); 
         if score <= 40: return "#2D5A27"
         if score <= 70: return "#D4A017"
         return "#A52A2A"
@@ -123,7 +123,7 @@ try:
     tabs = st.tabs(["Individual Profile", "Team Gallery", "Game v. Practice", "Position Analysis", "Match Summary"])
     session_list = df[['Date', 'Session_Name']].drop_duplicates().sort_values('Date', ascending=False)['Session_Name'].tolist()
 
-    # --- TABS 0-3 --- (RESTORED EXACTLY)
+    # --- TABS 0-3 (Restored Exactly) ---
     with tabs[0]:
         c_f1, c_f2 = st.columns(2)
         with c_f1: selected_session = st.selectbox("Practice Selection", session_list, index=0, key="nav_sel_ind")
@@ -152,7 +152,7 @@ try:
                 p_cmj_hist = cmj_df[(cmj_df['Athlete'] == sel_p) & (cmj_df['Test Date'] <= curr_date)].sort_values('Test Date'); sync_cmj = p_cmj_hist[(p_cmj_hist['Test Date'] > curr_date - timedelta(days=7))]
                 if not sync_cmj.empty:
                     latest = sync_cmj.iloc[-1]; base_h = p_cmj_hist.tail(5).iloc[:-1]['Jump Height (in)'].mean(); base_rsi = p_cmj_hist.tail(5).iloc[:-1]['RSI-modified [m/s]'].mean(); cur_h, cur_rsi = latest['Jump Height (in)'], latest['RSI-modified [m/s]']; p_diff = ((cur_h - base_h) / base_h) * 100
-                    label, color, profile = ("ELITE", "#28a745", "Jump Height and RSI are both High.") if cur_h >= base_h and cur_rsi >= base_rsi else ("GRINDER", "#ffc107", "Jump Height is High | RSI is Low.") if cur_h >= base_h and cur_rsi < base_rsi else ("SPRINGY", "#ffc107", "Jump Height is Low | RSI is High.") if cur_h < base_h and cur_rsi >= base_rsi else ("FATIGUED", "#dc3545", "Low Readiness")
+                    label, color, profile = ("ELITE", "#28a745", "Jump Height and RSI are both High.") if cur_h >= base_h and cur_rsi >= base_rsi else ("GRINDER", "#ffc107", "Mixed Readiness") if cur_h >= base_h or cur_rsi >= base_rsi else ("FATIGUED", "#dc3545", "Low Readiness")
                     st.markdown(f'<div style="text-align:center;"><div class="score-box" style="background-color:{color};">{p_diff:+.1f}%<span style="font-size:10px; display:block;">{label}</span></div></div><div class="info-box"><b>Today:</b> {cur_h:.1f}" | {cur_rsi:.2f} RSI<br><b>Profile:</b> {profile}</div>', unsafe_allow_html=True)
             with jc2:
                 if not p_cmj_hist.empty:
@@ -182,7 +182,7 @@ try:
                         for k in all_metrics:
                             if k in pd_row: v, m, a = pd_row[k], lb_g[k].max(), lb_g[k].mean(); g = math.ceil((v / m) * 100) if m > 0 else 0; t_grade += g; c_metrics += 1; r_html += f"<tr><td>{k}</td><td>{v}</td><td>{m}</td><td>{g}</td></tr>"
                         sc_g = math.ceil(t_grade / c_metrics) if c_metrics > 0 else 0
-                        with cols[j]: st.markdown(f'<div class="gallery-card"><div style="display:flex; align-items:center; gap:10px;"><div style="flex:1.2; text-align:center;"><img src="{pd_row["PhotoURL"]}" class="gallery-photo"><p style="font-weight:bold; font-size:15px; margin-top:8px;">{pd_row["Name"]}</p></div><div style="flex:3;"><table class="scout-table"><thead><tr><th>Metric</th><th>Val</th><th>Max</th><th>Grade</th></tr></thead><tbody>{r_html}</tbody></table></div><div style="flex:1; text-align:center;"><div style="background-color:{get_flipped_gradient(sc_g)}; color:white; padding:10px; border-radius:12px; font-size:32px; font-weight:900;">{sc_g}</div></div></div></div>', unsafe_allow_html=True)
+                        with cols[j]: st.markdown(f'<div class="gallery-card"><div style="padding:15px;"><div style="display:flex; align-items:center; gap:10px;"><div style="flex:1.2; text-align:center;"><img src="{pd_row["PhotoURL"]}" class="gallery-photo"><p style="font-weight:bold; font-size:15px; margin-top:8px;">{pd_row["Name"]}</p></div><div style="flex:3;"><table class="scout-table"><thead><tr><th>Metric</th><th>Val</th><th>Max</th><th>Grade</th></tr></thead><tbody>{r_html}</tbody></table></div><div style="flex:1; text-align:center;"><div style="background-color:{get_flipped_gradient(sc_g)}; color:white; padding:10px; border-radius:12px; font-size:32px; font-weight:900;">{sc_g}</div></div></div></div></div>', unsafe_allow_html=True)
 
     with tabs[2]:
         st.markdown('<div class="section-header">Weekly Prep Intensity vs. Game Demands</div>', unsafe_allow_html=True)
@@ -209,10 +209,10 @@ try:
     with tabs[3]:
         st.markdown('<div class="section-header">Positional Performance Trends</div>', unsafe_allow_html=True)
 
-    # --- TAB 4: MATCH SUMMARY ---
+    # --- TAB 4: MATCH SUMMARY (INTEGRATED GRAPH VERSION) ---
     with tabs[4]:
         st.markdown('<div class="print-hide">', unsafe_allow_html=True)
-        if st.button("🖨️ Prepare Report for PDF"): st.markdown('<script>window.print();</script>', unsafe_allow_html=True)
+        if st.button("🖨️ Prepare PDF for Printing"): st.markdown('<script>window.print();</script>', unsafe_allow_html=True)
         st.markdown('<div class="section-header">Match Comparison Selection</div>', unsafe_allow_html=True)
         c_ts1, c_ts2 = st.columns([2, 1])
         with c_ts1:
@@ -229,28 +229,43 @@ try:
             ath_t = sorted(tourney_df['Name'].unique())
             
             for i in range(0, len(ath_t), 2):
-                card_cols = st.columns(2)
+                cols = st.columns(2)
                 for j in range(2):
                     if i + j < len(ath_t):
                         name = ath_t[i+j]; ad = tourney_df[tourney_df['Name'] == name]
-                        with card_cols[j]:
-                            st.markdown('<div class="print-group">', unsafe_allow_html=True)
-                            card_html = f"""<div class="gallery-card"><div style="display:flex; align-items:center; gap:15px; padding:15px; background:#f8f9fa; border-bottom:2px solid #FF8200;"><img src="{ad['PhotoURL'].iloc[0]}" class="gallery-photo" style="width:70px; height:70px;"><div><p style="margin:0; font-weight:900; color:#1D1D1F; font-size:18px;">{name}</p><p style="margin:0; color:#4895DB; font-weight:700; font-size:12px;">{ad['Position'].iloc[0]}</p></div></div><div style="padding:10px 15px;"><table class="scout-table"><thead><tr><th>Match</th><th>Total Jumps</th><th>Player Load</th><th>Explosive Efforts</th><th>Est Dist (y)</th></tr></thead><tbody>"""
-                            for _, r in ad.iterrows(): card_html += f"<tr><td style='font-weight:700;'>{r['Session_Name']}</td><td>{int(r['Total Jumps'])}</td><td>{r['Player Load']:.0f}</td><td>{r['Explosive Efforts']:.0f}</td><td>{r['Estimated Distance (y)']:.0f}</td></tr>"
-                            card_html += f"<tr style='background:#4895DB; color:white; font-weight:900;'><td>TOTAL</td><td>{int(ad['Total Jumps'].sum())}</td><td>{ad['Player Load'].sum():.0f}</td><td>{ad['Explosive Efforts'].sum():.0f}</td><td>{ad['Estimated Distance (y)'].sum():.0f}</td></tr></tbody></table></div>"
-                            st.markdown(card_html, unsafe_allow_html=True)
+                        with cols[j]:
+                            # WRAP EVERYTHING INSIDE THE CARD DIV
+                            card_start = f"""
+                            <div class="gallery-card">
+                                <div style="display:flex; align-items:center; gap:15px; padding:15px; background:#f8f9fa; border-bottom:2px solid #FF8200;">
+                                    <img src="{ad['PhotoURL'].iloc[0]}" class="gallery-photo" style="width:70px; height:70px;">
+                                    <div><p style="margin:0; font-weight:900; color:#1D1D1F; font-size:18px;">{name}</p><p style="margin:0; color:#4895DB; font-weight:700; font-size:12px;">{ad['Position'].iloc[0]}</p></div>
+                                </div>
+                                <div style="padding:10px 15px;">
+                                    <table class="scout-table" style="margin-bottom:0;">
+                                        <thead><tr><th>Match</th><th>Total Jumps</th><th>Player Load</th><th>Explosive Efforts</th><th>Est Dist (y)</th></tr></thead>
+                                        <tbody>
+                            """
+                            for _, r in ad.iterrows():
+                                card_start += f"<tr><td style='font-weight:700;'>{r['Session_Name']}</td><td>{int(r['Total Jumps'])}</td><td>{r['Player Load']:.0f}</td><td>{r['Explosive Efforts']:.0f}</td><td>{r['Estimated Distance (y)']:.0f}</td></tr>"
+                            card_start += f"<tr style='background:#4895DB; color:white; font-weight:900;'><td>TOTAL</td><td>{int(ad['Total Jumps'].sum())}</td><td>{ad['Player Load'].sum():.0f}</td><td>{ad['Explosive Efforts'].sum():.0f}</td><td>{ad['Estimated Distance (y)'].sum():.0f}</td></tr></tbody></table></div>"
+                            st.markdown(card_start, unsafe_allow_html=True)
+                            
+                            # RENDER PLOTLY DIRECTLY BELOW TABLE WITHIN CARD
                             fig_ath = make_subplots(specs=[[{"secondary_y": True}]]);
                             for _, r in ad.iterrows():
                                 fig_ath.add_trace(go.Bar(name=r['Session_Name'], x=['Jumps', 'Load', 'Effort'], y=[r['Total Jumps'], r['Player Load'], r['Explosive Efforts']], marker_color=m_map[r['Session_Name']]), secondary_y=False)
                                 fig_ath.add_trace(go.Bar(name="Dist", x=['Distance'], y=[r['Estimated Distance (y)']], marker=dict(color=m_map[r['Session_Name']], opacity=0.6), showlegend=False), secondary_y=True)
-                            fig_ath.update_layout(barmode='group', height=340, margin=dict(b=80), legend=dict(orientation="h", yanchor="top", y=-0.4, xanchor="center", x=0.5), template="simple_white"); st.plotly_chart(fig_ath, use_container_width=True, config=LOCKED_CONFIG)
+                            fig_ath.update_layout(barmode='group', height=280, margin=dict(l=20, r=20, t=20, b=100), legend=dict(orientation="h", yanchor="top", y=-0.4, xanchor="center", x=0.5), template="simple_white"); 
+                            st.plotly_chart(fig_ath, use_container_width=True, config=LOCKED_CONFIG)
+                            
                             st.markdown('</div>', unsafe_allow_html=True)
 
             st.write("<br><br>", unsafe_allow_html=True); st.markdown('<div class="section-header">Team Match Averages</div>', unsafe_allow_html=True)
             team_avg_t = tourney_df.groupby(['Session_Name', 'Sheet_Order'])[['Total Jumps', 'Player Load', 'Explosive Efforts', 'Estimated Distance (y)']].mean().reset_index().sort_values('Sheet_Order')
-            c1, c2 = st.columns(2); c3, c4 = st.columns(2); cols = [c1, c2, c3, c4]
+            c1, c2 = st.columns(2); c3, c4 = st.columns(2); t_cols = [c1, c2, c3, c4]
             for idx, m in enumerate(['Total Jumps', 'Player Load', 'Explosive Efforts', 'Estimated Distance (y)']):
-                with cols[idx]:
+                with t_cols[idx]:
                     fig_t = go.Figure(); fig_t.add_trace(go.Bar(x=team_avg_t['Session_Name'], y=team_avg_t[m], marker_color=[m_map[g] for g in team_avg_t['Session_Name']], marker_line_width=0))
                     fig_t.update_layout(title=f"Team Avg: {m}", showlegend=False, height=400, template="simple_white", bargap=0.01); st.plotly_chart(fig_t, use_container_width=True, config=LOCKED_CONFIG)
 
