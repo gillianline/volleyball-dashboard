@@ -95,7 +95,7 @@ try:
         </div>
     """, unsafe_allow_html=True)
     
-    tabs = st.tabs(["Individual Profile", "Team Gallery", "Game v. Practice", "Position Analysis", "Match Summary"])
+    tabs = st.tabs(["Individual Profile", "Team Gallery", "Match v. Practice", "Position Analysis", "Match Summary"])
     session_list = df[['Date', 'Session_Name']].drop_duplicates().sort_values('Date', ascending=False)['Session_Name'].tolist()
 
     # --- TAB 0: INDIVIDUAL PROFILE ---
@@ -190,7 +190,7 @@ try:
 
     # --- TAB 2: GAME V PRACTICE (FIXED & RESTORED) ---
     with tabs[2]:
-        st.markdown('<div class="section-header">Weekly Prep Intensity vs. Game Demands</div>', unsafe_allow_html=True)
+        st.markdown('<div class="section-header">Weekly Prep Intensity vs. Match Demands</div>', unsafe_allow_html=True)
         c_ga, c_gw, c_gg = st.columns(3)
         with c_ga: gp_p = st.selectbox("Athlete", sorted(df['Name'].unique()), key="gp_p_vf")
         with c_gw:
@@ -200,7 +200,7 @@ try:
             sel_w = w_r[w_r['L'] == gp_w]['Week'].values[0]
         with c_gg: 
             game_opts = df[(df['Name'] == gp_p) & (df['Session_Type'] == 'Game') & (df['Week'] == sel_w)]['Session_Name'].unique()
-            gp_g = st.selectbox("Select Specific Game", game_opts, key="gp_g_vf")
+            gp_g = st.selectbox("Select Specific Match", game_opts, key="gp_g_vf")
         
         w_data = df[(df['Name'] == gp_p) & (df['Session_Type'] == 'Practice') & (df['Week'] == sel_w)]
         g_data_l = df[(df['Name'] == gp_p) & (df['Session_Name'] == gp_g)]
@@ -228,7 +228,7 @@ try:
             wk_trends['Day_Label'] = wk_trends['Date'].dt.strftime('%a %m/%d')
             fig_tr = go.Figure()
             fig_tr.add_trace(go.Scatter(x=wk_trends['Day_Label'], y=wk_trends['Player Load'], mode='lines', line=dict(color='#4895DB', width=3), showlegend=False))
-            for s_t, clr in [('Practice', '#4895DB'), ('Game', '#FF8200')]:
+            for s_t, clr in [('Practice', '#4895DB'), ('Match', '#FF8200')]:
                 sub = wk_trends[wk_trends['Session_Type'] == s_t]
                 for _, r in sub.iterrows():
                     is_sel = (r['Session_Name'] == gp_g)
