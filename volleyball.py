@@ -59,13 +59,13 @@ if check_password():
                 display: none !important; 
             }
             
-            /* AGGRESSIVE REMOVAL OF SELECT BOXES/OVALS */
-            [data-testid="stMultiSelect"], [data-testid="stSelectbox"], [data-baseweb="select"], .stMultiSelect, .stSelectbox {
+            /* HIDE WIDGETS AND HEADERS IN HIDDEN SECTION */
+            .print-hide, .print-hide div, .print-hide h1, .print-hide h2, .print-hide h3, .print-hide .section-header {
                 display: none !important;
-                visibility: hidden !important;
-                height: 0 !important;
-                margin: 0 !important;
-                padding: 0 !important;
+            }
+            
+            [data-testid="stMultiSelect"], [data-testid="stSelectbox"], [data-baseweb="select"] {
+                display: none !important;
             }
             
             .main .block-container { padding: 0 !important; max-width: 100% !important; }
@@ -113,14 +113,17 @@ if check_password():
         df, cmj_df, phase_df = load_all_data()
         all_metrics = ['Total Jumps', 'Moderate Jumps', 'High Jumps', 'Jump Load', 'Player Load', 'Estimated Distance (y)', 'Explosive Efforts', 'High Intensity Movement']
         def get_flipped_gradient(score):
-            score = float(score); return "#2D5A27" if score <= 40 else "#D4A017" if score <= 70 else "#A52A2A"
+            score = float(score); 
+            if score <= 40: return "#2D5A27"
+            if score <= 70: return "#D4A017"
+            return "#A52A2A"
 
         st.markdown('<div class="main-logo-container" style="text-align: center; margin-top: 10px; margin-bottom: 15px;"><img src="https://upload.wikimedia.org/wikipedia/commons/thumb/f/fc/Tennessee_Lady_Volunteers_logo.svg/1280px-Tennessee_Lady_Volunteers_logo.svg.png" width="120"><div style="color: #FF8200; font-size: 2rem; font-weight: 900; margin-top: 10px;">LADY VOLS VOLLEYBALL PERFORMANCE</div></div>', unsafe_allow_html=True)
         
         tabs = st.tabs(["Individual Profile", "Team Gallery", "Game v. Practice", "Position Analysis", "Match Summary"])
         session_list = df[['Date', 'Session_Name']].drop_duplicates().sort_values('Date', ascending=False)['Session_Name'].tolist()
 
-        # Tabs 0, 1, 2, 3 character restoration
+        # --- TAB 0, 1, 2, 3Character-for-Character restoration ---
         with tabs[0]:
             c_f1, c_f2 = st.columns(2)
             with c_f1: selected_session = st.selectbox("Practice Selection", session_list, index=0, key="nav_sel_ind")
@@ -179,7 +182,8 @@ if check_password():
                             for k in all_metrics:
                                 if k in pd_row:
                                     v, mx, avg = pd_row[k], lb_g[k].max(), lb_g[k].mean(); g = math.ceil((v / mx) * 100) if mx > 0 else 0
-                                    t_grade += g; c_metrics += 1; diff = (v - avg) / avg if avg != 0 else 0; h_class = "class='bg-highlight-red'" if abs(diff) > 0.10 else ""; arr_val = f"<span class='arrow-red'>{'↑' if diff > 0.10 else '↓'}</span>" if abs(diff) > 0.10 else ""
+                                    t_grade += g; c_metrics += 1; diff = (v - avg) / avg if avg != 0 else 0
+                                    h_class = "class='bg-highlight-red'" if abs(diff) > 0.10 else ""; arr_val = f"<span class='arrow-red'>{'↑' if diff > 0.10 else '↓'}</span>" if abs(diff) > 0.10 else ""
                                     r_html += f"<tr><td>{k}</td><td {h_class}>{v} {arr_val}</td><td>{mx}</td><td>{g}</td></tr>"
                             sc_g = math.ceil(t_grade / c_metrics) if c_metrics > 0 else 0
                             with cols[j]: st.markdown(f'<div class="gallery-card" style="border:1px solid #E5E5E7; border-radius:15px; padding:15px; margin-bottom:20px;"><div style="display:flex; align-items:center; gap:10px;"><div style="flex:1.2; text-align:center;"><img src="{pd_row["PhotoURL"]}" class="gallery-photo"><p style="font-weight:bold; font-size:15px; margin-top:8px;">{pd_row["Name"]}</p></div><div style="flex:3;"><table class="scout-table"><thead><tr><th>Metric</th><th>Val</th><th>Max</th><th>Grade</th></tr></thead><tbody>{r_html}</tbody></table></div><div style="flex:1; text-align:center;"><div style="background-color:{get_flipped_gradient(sc_g)}; color:white; padding:10px; border-radius:12px; font-size:32px; font-weight:900;">{sc_g}</div></div></div></div>', unsafe_allow_html=True)
@@ -204,13 +208,12 @@ if check_password():
                     for _, r in sub.iterrows(): is_sel = (r['Session_Name'] == gp_g); fig_tr.add_trace(go.Scatter(x=[r['Day_Label']], y=[r['Player Load']], name=r['Session_Name'] if s_t == 'Game' else s_t, mode='markers', marker=dict(color=clr, size=16 if is_sel else 10, line=dict(width=3 if is_sel else 1, color='black' if is_sel else 'white')), showlegend=True if s_t == 'Game' else (True if _ == sub.index[0] else False)))
                 fig_tr.update_layout(height=350, margin=dict(l=0, r=0, t=20, b=0), yaxis_title="Avg Player Load"); st.plotly_chart(fig_tr, use_container_width=True, config=LOCKED_CONFIG)
 
-        with tabs[3]:
-            st.markdown('<div class="section-header">Positional Performance Trends</div>', unsafe_allow_html=True)
-
         # --- TAB 4: MATCH SUMMARY ---
         with tabs[4]:
             st.markdown('<div class="print-hide">', unsafe_allow_html=True)
             if st.button("🖨️ Prepare PDF for Printing"): st.markdown('<script>window.print();</script>', unsafe_allow_html=True)
+            
+            # --- SELECTION WIDGETS WRAPPED TO HIDE HEADERS ---
             st.markdown('<div class="section-header">Match Comparison Selection</div>', unsafe_allow_html=True)
             c_ts1, c_ts2 = st.columns([2, 1])
             with c_ts1:
@@ -232,17 +235,17 @@ if check_password():
                     side_cols = st.columns([1.5, 2])
                     with side_cols[0]:
                         card_start = f"""
-                            <div style="display:flex; align-items:center; gap:15px; padding-bottom:10px; border-bottom:2px solid #FF8200;">
-                                <img src="{ad['PhotoURL'].iloc[0]}" class="gallery-photo" style="width:60px; height:60px;">
-                                <div><p style="margin:0; font-weight:900; color:#1D1D1F; font-size:16px;">{name}</p><p style="margin:0; color:#4895DB; font-weight:700; font-size:11px;">{ad['Position'].iloc[0]}</p></div>
+                            <div style="display:flex; align-items:center; gap:12px; padding:10px; background:#f8f9fa; border-bottom:2px solid #FF8200;">
+                                <img src="{ad['PhotoURL'].iloc[0]}" class="gallery-photo" style="width:55px; height:55px;">
+                                <div><p style="margin:0; font-weight:900; color:#1D1D1F; font-size:15px;">{name}</p><p style="margin:0; color:#4895DB; font-weight:700; font-size:10px;">{ad['Position'].iloc[0]}</p></div>
                             </div>
-                            <div style="padding-top:10px;">
+                            <div style="padding:5px;">
                                 <table class="scout-table" style="margin-bottom:0;">
                                     <thead><tr><th>Match</th><th>Jumps</th><th>Load</th><th>Effort</th><th>Dist</th></tr></thead>
                                     <tbody>
                         """
                         for _, r in ad.iterrows():
-                            card_start += f"<tr><td style='font-weight:700; font-size:10px;'>{r['Session_Name']}</td><td>{int(r['Total Jumps'])}</td><td>{r['Player Load']:.0f}</td><td>{r['Explosive Efforts']:.0f}</td><td>{r['Estimated Distance (y)']:.0f}</td></tr>"
+                            card_start += f"<tr><td style='font-weight:700; font-size:9px;'>{r['Session_Name']}</td><td>{int(r['Total Jumps'])}</td><td>{r['Player Load']:.0f}</td><td>{r['Explosive Efforts']:.0f}</td><td>{r['Estimated Distance (y)']:.0f}</td></tr>"
                         card_start += f"<tr style='background:#4895DB; color:white; font-weight:900;'><td>TOTAL</td><td>{int(ad['Total Jumps'].sum())}</td><td>{ad['Player Load'].sum():.0f}</td><td>{ad['Explosive Efforts'].sum():.0f}</td><td>{ad['Estimated Distance (y)'].sum():.0f}</td></tr></tbody></table></div>"
                         st.markdown(card_start, unsafe_allow_html=True)
                     with side_cols[1]:
