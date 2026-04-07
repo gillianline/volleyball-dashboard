@@ -1,4 +1,3 @@
-import streamlit as st
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
@@ -69,7 +68,7 @@ if check_password():
         </style>
         """, unsafe_allow_html=True)
 
-    # --- HELPER FUNCTIONS ---
+    # Helper for Readiness
     def get_flipped_gradient(score):
         score = float(score)
         if score <= 40: return "#2D5A27"
@@ -84,6 +83,8 @@ if check_password():
         df = df.dropna(subset=['Date']) 
         if 'Week' in df.columns:
             df['Week'] = pd.to_numeric(df['Week'].astype(str).str.extract('(\d+)', expand=False), errors='coerce').fillna(0).astype(int)
+        
+        # RESTORED CRITICAL MAPPING
         rename_map = {
             'Total Jumps': 'Total Jumps', 'IMA Jump Count Med Band': 'Moderate Jumps', 'IMA Jump Count High Band': 'High Jumps', 
             'BMP Jumping Load': 'Jump Load', 'Total Player Load': 'Player Load', 'Estimated Distance (y)': 'Estimated Distance (y)', 
@@ -96,10 +97,12 @@ if check_password():
         df['Session_Name'] = df['Activity'].fillna(df['Date'].dt.strftime('%m/%d/%Y'))
         df['Position'] = df.groupby('Name')['Position'].ffill().bfill().fillna("N/A")
         df['PhotoURL'] = df.groupby('Name')['PhotoURL'].ffill().bfill().fillna("https://www.w3schools.com/howto/img_avatar.png")
+        
         cmj_df = pd.read_csv(st.secrets["CMJ_SHEET_URL"])
         cmj_df.columns = cmj_df.columns.str.strip()
         cmj_df['Jump Height (in)'] = cmj_df['Jump Height (Imp-Mom) [cm]'] * 0.3937
         cmj_df['Test Date'] = pd.to_datetime(cmj_df['Test Date'], errors='coerce')
+        
         phase_df = pd.read_csv(st.secrets["PHASES_SHEET_URL"])
         phase_df.columns = phase_df.columns.str.strip()
         if 'Phases' in phase_df.columns: phase_df = phase_df.rename(columns={'Phases': 'Phase'})
@@ -207,22 +210,22 @@ if check_password():
                     with cols[i]:
                         fig_t = go.Figure(); p_t = tr_df[tr_df['Name'] == sel_p_pos].groupby('Week')[m].mean().reset_index(); fig_t.add_trace(go.Scatter(x=p_t['Week'], y=p_t[m], name=sel_p_pos, line=dict(color='#0046ad', width=4), mode='lines+markers')); pos_t = tr_df[tr_df['Position'] == pos_label].groupby('Week')[m].mean().reset_index(); fig_t.add_trace(go.Scatter(x=pos_t['Week'], y=pos_t[m], name=f"{pos_label} Avg", line=dict(color='#ff7f0e', dash='dash'))); fig_t.update_layout(title=f"4-Week {m}", xaxis=dict(dtick=1), height=300, margin=dict(l=10, r=10, t=40, b=10), showlegend=True, legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)); st.plotly_chart(fig_t, use_container_width=True, config=LOCKED_CONFIG)
 
-        with tabs[4]: # Match Summary
+        with tabs[4]: # Match Summary (THE FIX)
             if st.session_state.is_printing:
                 if st.button("🔙 Back to Filters"):
                     st.session_state.is_printing = False
                     st.rerun()
             else:
                 st.markdown('<div class="print-hide">', unsafe_allow_html=True)
-                if st.button("Prepare PDF for Printing"):
+                if st.button("🖨️ Prepare PDF for Printing"):
                     st.session_state.is_printing = True
                     st.rerun()
                 st.markdown('<div class="section-header">Match Comparison Selection</div>', unsafe_allow_html=True)
                 c_ts1, c_ts2 = st.columns([2, 1])
                 with c_ts1:
-                    match_list_t = df[df['Session_Type'].isin(['Game', 'Match'])]['Session_Name'].unique()
+                    match_list_t = df[df['Session_Type'].isin(['Game', 'Match'])].sort_values(['Date', 'Sheet_Order'])['Session_Name'].unique()
                     if "matches_state" not in st.session_state: st.session_state.matches_state = match_list_t[-3:] if len(match_list_t) >=3 else match_list_t
-                    st.session_state.matches_state = st.multiselect("Select Matches", match_list_t, default=st.session_state.matches_state)
+                    st.session_state.matches_state = st.multiselect("Select Weekend Matches", match_list_t, default=st.session_state.matches_state)
                 with c_ts2:
                     if "pos_state" not in st.session_state: st.session_state.pos_state = "All Positions"
                     st.session_state.pos_state = st.selectbox("Filter by Position", ["All Positions"] + sorted(list(df['Position'].unique())), index=0)
@@ -237,9 +240,8 @@ if check_password():
             if selected_matches:
                 c_pal = ['#4895DB', '#FF8200', '#515154']; m_map = {m: c_pal[idx % 3] for idx, m in enumerate(selected_matches)}
                 st.markdown('<div class="section-header">Athlete Match Performance Breakdown</div>', unsafe_allow_html=True)
-                tourney_df = df[df['Session_Name'].isin(selected_matches)].sort_values(['Date'])
+                tourney_df = df[df['Session_Name'].isin(selected_matches)].sort_values(['Date', 'Sheet_Order'])
                 if pos_filter_t != "All Positions": tourney_df = tourney_df[tourney_df['Position'] == pos_filter_t]
-                
                 ath_t = sorted(tourney_df['Name'].unique())
                 for name in ath_t:
                     ad = tourney_df[tourney_df['Name'] == name]
@@ -247,9 +249,9 @@ if check_password():
                     sc1, sc2 = st.columns([1.5, 2])
                     with sc1:
                         card_start = f'<div style="display:flex; align-items:center; gap:12px; padding:10px; background:#f8f9fa; border-bottom:2px solid #FF8200;"><img src="{ad["PhotoURL"].iloc[0]}" class="gallery-photo" style="width:55px; height:55px;"><div><p style="margin:0; font-weight:900; font-size:15px;">{name}</p><p style="margin:0; color:#4895DB; font-weight:700; font-size:10px;">{ad["Position"].iloc[0]}</p></div></div>'
-                        card_start += '<table class="scout-table"><thead><tr><th>Match</th><th>Jumps</th><th>Load</th><th>Effort</th></tr></thead><tbody>'
-                        for _, r in ad.iterrows(): card_start += f"<tr><td style='font-weight:700;'>{r['Session_Name']}</td><td>{int(r['Total Jumps'])}</td><td>{r['Player Load']:.0f}</td><td>{r['Explosive Efforts']:.0f}</td></tr>"
-                        card_start += f"<tr style='background:#4895DB; color:white; font-weight:900;'><td>TOTAL</td><td>{int(ad['Total Jumps'].sum())}</td><td>{ad['Player Load'].sum():.0f}</td><td>{ad['Explosive Efforts'].sum():.0f}</td></tr></tbody></table>"
+                        card_start += '<table class="scout-table"><thead><tr><th>Match</th><th>Jumps</th><th>Load</th><th>Effort</th><th>Dist</th></tr></thead><tbody>'
+                        for _, r in ad.iterrows(): card_start += f"<tr><td>{r['Session_Name']}</td><td>{int(r['Total Jumps'])}</td><td>{r['Player Load']:.0f}</td><td>{r['Explosive Efforts']:.0f}</td><td>{r['Estimated Distance (y)']:.0f}</td></tr>"
+                        card_start += f"<tr style='background:#4895DB; color:white; font-weight:900;'><td>TOTAL</td><td>{int(ad['Total Jumps'].sum())}</td><td>{ad['Player Load'].sum():.0f}</td><td>{ad['Explosive Efforts'].sum():.0f}</td><td>{ad['Estimated Distance (y)'].sum():.0f}</td></tr></tbody></table>"
                         st.markdown(card_start, unsafe_allow_html=True)
                     with sc2:
                         fig_ath = make_subplots(specs=[[{"secondary_y": True}]]);
@@ -260,17 +262,14 @@ if check_password():
                         st.plotly_chart(fig_ath, use_container_width=True, config=LOCKED_CONFIG)
                     st.markdown('</div>', unsafe_allow_html=True)
 
-                # --- FOUR TEAM AVERAGE GRAPHS RESTORED ---
                 st.write("<br><br>", unsafe_allow_html=True); st.markdown('<div class="section-header">Team Match Averages</div>', unsafe_allow_html=True)
                 team_avg = tourney_df.groupby('Session_Name')[['Total Jumps', 'Player Load', 'Explosive Efforts', 'Estimated Distance (y)']].mean().reset_index()
-                
-                c1, c2 = st.columns(2)
-                with c1: st.plotly_chart(px.bar(team_avg, x='Session_Name', y='Total Jumps', title="Avg Total Jumps", color='Session_Name', color_discrete_map=m_map), use_container_width=True, config=LOCKED_CONFIG)
-                with c2: st.plotly_chart(px.bar(team_avg, x='Session_Name', y='Player Load', title="Avg Player Load", color='Session_Name', color_discrete_map=m_map), use_container_width=True, config=LOCKED_CONFIG)
-                
-                c3, c4 = st.columns(2)
-                with c3: st.plotly_chart(px.bar(team_avg, x='Session_Name', y='Explosive Efforts', title="Avg Explosive Efforts", color='Session_Name', color_discrete_map=m_map), use_container_width=True, config=LOCKED_CONFIG)
-                with c4: st.plotly_chart(px.bar(team_avg, x='Session_Name', y='Estimated Distance (y)', title="Avg Distance (y)", color='Session_Name', color_discrete_map=m_map), use_container_width=True, config=LOCKED_CONFIG)
+                tc1, tc2 = st.columns(2)
+                with tc1: st.plotly_chart(px.bar(team_avg, x='Session_Name', y='Total Jumps', title="Avg Total Jumps", color='Session_Name', color_discrete_map=m_map), use_container_width=True, config=LOCKED_CONFIG)
+                with tc2: st.plotly_chart(px.bar(team_avg, x='Session_Name', y='Player Load', title="Avg Player Load", color='Session_Name', color_discrete_map=m_map), use_container_width=True, config=LOCKED_CONFIG)
+                tc3, tc4 = st.columns(2)
+                with tc3: st.plotly_chart(px.bar(team_avg, x='Session_Name', y='Explosive Efforts', title="Avg Explosive Efforts", color='Session_Name', color_discrete_map=m_map), use_container_width=True, config=LOCKED_CONFIG)
+                with tc4: st.plotly_chart(px.bar(team_avg, x='Session_Name', y='Estimated Distance (y)', title="Avg Distance (y)", color='Session_Name', color_discrete_map=m_map), use_container_width=True, config=LOCKED_CONFIG)
 
     except Exception as e:
         st.error(f"Sync Error: {e}")
