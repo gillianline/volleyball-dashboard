@@ -29,7 +29,7 @@ def check_password():
         return True
 
 if check_password():
-    # --- CSS: FORMATTING & CLEAN DIVIDERS ---
+    # --- CSS: FORMATTING & OVAL REMOVAL ---
     st.markdown("""
         <style>
         .stApp { background-color: #FFFFFF; color: #1D1D1F; }
@@ -70,7 +70,6 @@ if check_password():
         </style>
         """, unsafe_allow_html=True)
 
-    # --- DATA LOADING ---
     @st.cache_data(ttl=300)
     def load_all_data():
         df = pd.read_csv(st.secrets["GOOGLE_SHEET_URL"])
@@ -185,7 +184,7 @@ if check_password():
                             sc_g = math.ceil(t_grade / c_metrics) if c_metrics > 0 else 0
                             with cols[j]: st.markdown(f'<div class="gallery-card" style="border:1px solid #E5E5E7; border-radius:15px; padding:15px; margin-bottom:20px;"><div style="display:flex; align-items:center; gap:10px;"><div style="flex:1.2; text-align:center;"><img src="{pd_row["PhotoURL"]}" class="gallery-photo"><p style="font-weight:bold; font-size:15px; margin-top:8px;">{pd_row["Name"]}</p></div><div style="flex:3;"><table class="scout-table"><thead><tr><th>Metric</th><th>Val</th><th>Max</th><th>Grade</th></tr></thead><tbody>{r_html}</tbody></table></div><div style="flex:1; text-align:center;"><div style="background-color:{get_flipped_gradient(sc_g)}; color:white; padding:10px; border-radius:12px; font-size:32px; font-weight:900;">{sc_g}</div></div></div></div>', unsafe_allow_html=True)
 
-        # --- TAB 2: GAME V PRACTICE (RESTORATION character-for-character) ---
+        # --- TAB 2: GAME V PRACTICE ---
         with tabs[2]:
             st.markdown('<div class="section-header">Weekly Prep Intensity vs. Game Demands</div>', unsafe_allow_html=True)
             c_ga, c_gw, c_gg = st.columns(3)
@@ -206,10 +205,12 @@ if check_password():
                     for _, r in sub.iterrows(): is_sel = (r['Session_Name'] == gp_g); fig_tr.add_trace(go.Scatter(x=[r['Day_Label']], y=[r['Player Load']], name=r['Session_Name'] if s_t == 'Game' else s_t, mode='markers', marker=dict(color=clr, size=16 if is_sel else 10, line=dict(width=3 if is_sel else 1, color='black' if is_sel else 'white')), showlegend=True if s_t == 'Game' else (True if _ == sub.index[0] else False)))
                 fig_tr.update_layout(height=350, margin=dict(l=0, r=0, t=20, b=0), yaxis_title="Avg Player Load"); st.plotly_chart(fig_tr, use_container_width=True, config=LOCKED_CONFIG)
 
-        # --- TAB 4: MATCH SUMMARY (SIDE-BY-SIDE + DIVIDERS) ---
+        # --- TAB 4: MATCH SUMMARY ---
         with tabs[4]:
             st.markdown('<div class="print-hide">', unsafe_allow_html=True)
             if st.button("🖨️ Prepare PDF for Printing"): st.markdown('<script>window.print();</script>', unsafe_allow_html=True)
+            
+            # --- SELECTION WIDGETS WRAPPED IN PRINT-HIDE ---
             st.markdown('<div class="section-header">Match Comparison Selection</div>', unsafe_allow_html=True)
             c_ts1, c_ts2 = st.columns([2, 1])
             with c_ts1:
@@ -244,6 +245,7 @@ if check_password():
                             card_start += f"<tr><td style='font-weight:700; font-size:10px;'>{r['Session_Name']}</td><td>{int(r['Total Jumps'])}</td><td>{r['Player Load']:.0f}</td><td>{r['Explosive Efforts']:.0f}</td><td>{r['Estimated Distance (y)']:.0f}</td></tr>"
                         card_start += f"<tr style='background:#4895DB; color:white; font-weight:900;'><td>TOTAL</td><td>{int(ad['Total Jumps'].sum())}</td><td>{ad['Player Load'].sum():.0f}</td><td>{ad['Explosive Efforts'].sum():.0f}</td><td>{ad['Estimated Distance (y)'].sum():.0f}</td></tr></tbody></table></div>"
                         st.markdown(card_start, unsafe_allow_html=True)
+
                     with side_cols[1]:
                         fig_ath = make_subplots(specs=[[{"secondary_y": True}]]);
                         for _, r in ad.iterrows():
