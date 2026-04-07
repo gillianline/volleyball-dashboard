@@ -10,6 +10,9 @@ from datetime import timedelta
 # --- PAGE CONFIG ---
 st.set_page_config(page_title="Lady Vols VB Performance", layout="wide")
 
+# --- GLOBAL VARIABLES ---
+all_metrics = ['Total Jumps', 'Moderate Jumps', 'High Jumps', 'Jump Load', 'Player Load', 'Estimated Distance (y)', 'Explosive Efforts', 'High Intensity Movement']
+
 # --- CSS: FORMATTING & HIGHLIGHTING ---
 st.markdown("""
     <style>
@@ -29,8 +32,6 @@ st.markdown("""
     .gallery-photo { border-radius: 50%; width: 80px; height: 80px; object-fit: cover; border: 3px solid #FF8200; }
     .section-header { font-size: 14px; font-weight: 800; color: #4895DB; border-bottom: 2px solid #FF8200; margin-top: 25px; margin-bottom: 15px; padding-bottom: 5px; text-transform: uppercase; }
     .info-box { background-color: #f8f9fa; border-left: 5px solid #FF8200; padding: 12px; margin-top: 10px; font-size: 12px; color: #1D1D1F; font-weight: 600; line-height: 1.4; }
-    .tourney-stat-label { font-size: 10px; color: #515154; font-weight: 700; margin: 0; text-transform: uppercase; }
-    .tourney-stat-val { font-size: 13px; font-weight: 800; color: #1D1D1F; margin: 0; }
     .js-plotly-plot { pointer-events: none; }
     </style>
     """, unsafe_allow_html=True)
@@ -81,6 +82,13 @@ try:
     df, cmj_df, phase_df = load_all_data()
     LOCKED_CONFIG = {'staticPlot': True, 'displayModeBar': False}
     
+    st.markdown("""
+        <div style="text-align: center; margin-top: 10px; margin-bottom: 15px;">
+            <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/f/fc/Tennessee_Lady_Volunteers_logo.svg/1280px-Tennessee_Lady_Volunteers_logo.svg.png" width="120">
+            <div style='color: #FF8200; font-size: 2rem; font-weight: 900; margin-top: 10px;'>LADY VOLS VOLLEYBALL PERFORMANCE</div>
+        </div>
+    """, unsafe_allow_html=True)
+
     tabs = st.tabs(["Individual Profile", "Team Gallery", "Game v. Practice", "Position Analysis", "Tournament Summary"])
     session_list = df[['Date', 'Session_Name']].drop_duplicates().sort_values('Date', ascending=False)['Session_Name'].tolist()
 
@@ -226,96 +234,57 @@ try:
     with tabs[4]:
         st.markdown('<div class="section-header">Weekend Tournament Overview</div>', unsafe_allow_html=True)
         
-        # Move selections to a container to keep them organized
         with st.container():
             c_ts1, c_ts2 = st.columns([2, 1])
             with c_ts1:
-                game_list = sorted(df[df['Session_Type'] == 'Game']['Session_Name'].unique())
-                selected_games = st.multiselect("Select Tournament Matches", game_list, default=game_list[-3:] if len(game_list) >=3 else game_list, key="tourney_multi")
+                game_list_t = sorted(df[df['Session_Type'] == 'Game']['Session_Name'].unique())
+                selected_games = st.multiselect("Select Tournament Matches", game_list_t, default=game_list_t[-3:] if len(game_list_t) >=3 else game_list_t, key="tourney_multi")
             with c_ts2:
-                pos_filter = st.selectbox("Filter by Position", ["All Positions"] + sorted(list(df['Position'].unique())), key="tourney_pos_filter")
+                pos_filter_t = st.selectbox("Filter by Position", ["All Positions"] + sorted(list(df['Position'].unique())), key="tourney_pos_filter")
 
         if selected_games:
-            # 1. Athlete Tournament Box Score Cards
             st.markdown('<div class="section-header">Athlete Match-by-Match Breakdown</div>', unsafe_allow_html=True)
-            
             tourney_df = df[df['Session_Name'].isin(selected_games)].sort_values('Date')
-            if pos_filter != "All Positions":
-                tourney_df = tourney_df[tourney_df['Position'] == pos_filter]
+            if pos_filter_t != "All Positions":
+                tourney_df = tourney_df[tourney_df['Position'] == pos_filter_t]
                 
-            athletes = sorted(tourney_df['Name'].unique())
-            metrics = ['Total Jumps', 'Player Load', 'Estimated Distance (y)', 'Explosive Efforts']
+            athletes_t = sorted(tourney_df['Name'].unique())
+            t_metrics = ['Total Jumps', 'Player Load', 'Estimated Distance (y)', 'Explosive Efforts']
 
-            for i in range(0, len(athletes), 2):
+            for i in range(0, len(athletes_t), 2):
                 card_cols = st.columns(2)
                 for j in range(2):
-                    if i + j < len(athletes):
-                        ath_name = athletes[i+j]
-                        ath_data = tourney_df[tourney_df['Name'] == ath_name]
-                        
+                    if i + j < len(athletes_t):
+                        ath_name_t = athletes_t[i+j]
+                        ath_data_t = tourney_df[tourney_df['Name'] == ath_name_t]
                         with card_cols[j]:
-                            # Start Card HTML
                             card_html = f"""
                             <div class="gallery-card">
                                 <div style="display:flex; align-items:center; gap:15px; padding:15px; background:#f8f9fa; border-radius:15px 15px 0 0; border-bottom:2px solid #FF8200;">
-                                    <img src="{ath_data['PhotoURL'].iloc[0]}" class="gallery-photo">
+                                    <img src="{ath_data_t['PhotoURL'].iloc[0]}" class="gallery-photo">
                                     <div>
-                                        <p style="margin:0; font-weight:900; color:#1D1D1F; font-size:18px;">{ath_name}</p>
-                                        <p style="margin:0; color:#4895DB; font-weight:700; font-size:12px;">{ath_data['Position'].iloc[0]}</p>
+                                        <p style="margin:0; font-weight:900; color:#1D1D1F; font-size:18px;">{ath_name_t}</p>
+                                        <p style="margin:0; color:#4895DB; font-weight:700; font-size:12px;">{ath_data_t['Position'].iloc[0]}</p>
                                     </div>
                                 </div>
                                 <div style="padding:10px;">
-                                    <table class="scout-table" style="margin-top:0;">
-                                        <thead>
-                                            <tr>
-                                                <th>Match</th>
-                                                <th>Jumps</th>
-                                                <th>Load</th>
-                                                <th>Dist</th>
-                                                <th>Effort</th>
-                                            </tr>
-                                        </thead>
+                                    <table class="scout-table">
+                                        <thead><tr><th>Match</th><th>Jumps</th><th>Load</th><th>Dist</th><th>Effort</th></tr></thead>
                                         <tbody>
                             """
-                            # Add Row for each game
-                            for _, row in ath_data.iterrows():
-                                card_html += f"""
-                                    <tr>
-                                        <td style="font-weight:700; text-align:left;">{row['Session_Name']}</td>
-                                        <td>{int(row['Total Jumps'])}</td>
-                                        <td>{row['Player Load']:.0f}</td>
-                                        <td>{row['Estimated Distance (y)']:.0f}</td>
-                                        <td>{row['Explosive Efforts']:.0f}</td>
-                                    </tr>
-                                """
-                            
-                            # Add Totals Row
-                            card_html += f"""
-                                            <tr style="background:#4895DB; color:white; font-weight:900;">
-                                                <td>TOTAL</td>
-                                                <td>{int(ath_data['Total Jumps'].sum())}</td>
-                                                <td>{ath_data['Player Load'].sum():.0f}</td>
-                                                <td>{ath_data['Estimated Distance (y)'].sum():.0f}</td>
-                                                <td>{ath_data['Explosive Efforts'].sum():.0f}</td>
-                                            </tr>
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-                            """
+                            for _, r in ath_data_t.iterrows():
+                                card_html += f"<tr><td style='font-weight:700;'>{r['Session_Name']}</td><td>{int(r['Total Jumps'])}</td><td>{r['Player Load']:.0f}</td><td>{r['Estimated Distance (y)']:.0f}</td><td>{r['Explosive Efforts']:.0f}</td></tr>"
+                            card_html += f"<tr style='background:#4895DB; color:white; font-weight:900;'><td>TOTAL</td><td>{int(ath_data_t['Total Jumps'].sum())}</td><td>{ath_data_t['Player Load'].sum():.0f}</td><td>{ath_data_t['Estimated Distance (y)'].sum():.0f}</td><td>{ath_data_t['Explosive Efforts'].sum():.0f}</td></tr></tbody></table></div></div>"
                             st.markdown(card_html, unsafe_allow_html=True)
 
-            # 2. Team Averages (Moved to bottom)
             st.markdown('<div class="section-header">Team Tournament Averages</div>', unsafe_allow_html=True)
-            team_avg = df[df['Session_Name'].isin(selected_games)].groupby('Session_Name')[metrics].mean().reset_index()
-            
-            g_cols = st.columns(4)
-            for idx, metric in enumerate(metrics):
-                with g_cols[idx]:
-                    fig = px.bar(team_avg, x='Session_Name', y=metric, color='Session_Name', 
-                                 color_discrete_sequence=['#4895DB', '#FF8200', '#515154'])
-                    fig.update_layout(showlegend=False, height=250, margin=dict(l=10, r=10, t=30, b=10), xaxis_title=None, template="simple_white")
-                    st.plotly_chart(fig, use_container_width=True, config=LOCKED_CONFIG)
+            team_avg_t = df[df['Session_Name'].isin(selected_games)].groupby('Session_Name')[t_metrics].mean().reset_index()
+            g_cols_t = st.columns(4)
+            for idx, m in enumerate(t_metrics):
+                with g_cols_t[idx]:
+                    fig_t = px.bar(team_avg_t, x='Session_Name', y=m, color='Session_Name', color_discrete_sequence=['#4895DB', '#FF8200', '#515154'])
+                    fig_t.update_layout(showlegend=False, height=250, margin=dict(l=10, r=10, t=30, b=10), xaxis_title=None, template="simple_white")
+                    st.plotly_chart(fig_t, use_container_width=True, config=LOCKED_CONFIG)
 
 except Exception as e:
     st.error(f"Sync Error: {e}")
