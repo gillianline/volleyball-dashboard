@@ -9,7 +9,7 @@ from datetime import timedelta
 # --- PAGE CONFIG ---
 st.set_page_config(page_title="Lady Vols VB Performance", layout="wide")
 
-# --- CSS: FORMATTING & TOTAL PRINT HIDE ---
+# --- CSS: FORMATTING & AGGRESSIVE PRINT CONTROL ---
 st.markdown("""
     <style>
     .stApp { background-color: #FFFFFF; color: #1D1D1F; }
@@ -24,31 +24,14 @@ st.markdown("""
     .arrow-red { color: #b30000 !important; font-weight: 900; margin-left: 4px; }
     .player-photo-large { border-radius: 50%; width: 220px; height: 220px; object-fit: cover; border: 6px solid #FF8200; }
     .score-box { padding: 12px 20px; border-radius: 12px; font-size: 28px; font-weight: 800; min-width: 100px; color: #FFFFFF; line-height: 1.2; text-align: center;}
-    
-    /* Container to keep Table and Graph grouped during print */
-    .print-group {
-        break-inside: avoid !important;
-        page-break-inside: avoid !important;
-        margin-bottom: 30px;
-    }
-
-    .gallery-card { 
-        border: 1px solid #E5E5E7; 
-        padding: 15px; 
-        border-radius: 15px; 
-        background-color: #FFFFFF; 
-        min-height: 380px; 
-        display: flex; 
-        flex-direction: column; 
-        justify-content: center; 
-    }
-
+    .gallery-card { border: 1px solid #E5E5E7; padding: 15px; border-radius: 15px; background-color: #FFFFFF; min-height: 380px; display: flex; flex-direction: column; justify-content: center; }
     .gallery-photo { border-radius: 50%; width: 110px; height: 110px; object-fit: cover; border: 4px solid #FF8200; }
     .section-header { font-size: 14px; font-weight: 800; color: #4895DB; border-bottom: 2px solid #FF8200; margin-top: 25px; margin-bottom: 15px; padding-bottom: 5px; text-transform: uppercase; }
     .info-box { background-color: #f8f9fa; border-left: 5px solid #FF8200; padding: 12px; margin-top: 10px; font-size: 12px; color: #1D1D1F; font-weight: 600; line-height: 1.4; }
     .js-plotly-plot { pointer-events: none; }
 
     @media print {
+        /* HIDE ALL UI ELEMENTS */
         .stTabs [role="tablist"], 
         .main-logo-container,
         [data-testid="stSidebar"], 
@@ -64,17 +47,23 @@ st.markdown("""
         button { 
             display: none !important; 
         }
+
+        /* RESET LAYOUT FOR PAPER */
         .main .block-container { padding: 0 !important; max-width: 100% !important; }
         
-        /* Force Group to stay together */
-        .print-group {
-            width: 100% !important;
+        /* FORCE CARDS AND GRAPHS TO STAY TOGETHER */
+        [data-testid="stVerticalBlock"] > div:has(.gallery-card) {
+            break-inside: avoid-page !important;
+            page-break-inside: avoid !important;
+            margin-bottom: 50px !important;
             display: block !important;
         }
 
+        /* FORCE FULL WIDTH FOR PRINTING */
         [data-testid="column"] {
             width: 100% !important;
             flex: 1 1 100% !important;
+            max-width: 100% !important;
         }
     }
     </style>
@@ -134,7 +123,7 @@ try:
     tabs = st.tabs(["Individual Profile", "Team Gallery", "Game v. Practice", "Position Analysis", "Match Summary"])
     session_list = df[['Date', 'Session_Name']].drop_duplicates().sort_values('Date', ascending=False)['Session_Name'].tolist()
 
-    # TABS 0-3 RESTORED EXACTLY
+    # --- TABS 0-3 --- (RESTORED EXACTLY)
     with tabs[0]:
         c_f1, c_f2 = st.columns(2)
         with c_f1: selected_session = st.selectbox("Practice Selection", session_list, index=0, key="nav_sel_ind")
@@ -163,7 +152,7 @@ try:
                 p_cmj_hist = cmj_df[(cmj_df['Athlete'] == sel_p) & (cmj_df['Test Date'] <= curr_date)].sort_values('Test Date'); sync_cmj = p_cmj_hist[(p_cmj_hist['Test Date'] > curr_date - timedelta(days=7))]
                 if not sync_cmj.empty:
                     latest = sync_cmj.iloc[-1]; base_h = p_cmj_hist.tail(5).iloc[:-1]['Jump Height (in)'].mean(); base_rsi = p_cmj_hist.tail(5).iloc[:-1]['RSI-modified [m/s]'].mean(); cur_h, cur_rsi = latest['Jump Height (in)'], latest['RSI-modified [m/s]']; p_diff = ((cur_h - base_h) / base_h) * 100
-                    label, color, profile = ("ELITE", "#28a745", "Jump Height and RSI are both High.") if cur_h >= base_h and cur_rsi >= base_rsi else ("GRINDER", "#ffc107", "Mixed Readiness") if cur_h >= base_h or cur_rsi >= base_rsi else ("FATIGUED", "#dc3545", "Low Readiness")
+                    label, color, profile = ("ELITE", "#28a745", "Jump Height and RSI are both High.") if cur_h >= base_h and cur_rsi >= base_rsi else ("GRINDER", "#ffc107", "Jump Height is High | RSI is Low.") if cur_h >= base_h and cur_rsi < base_rsi else ("SPRINGY", "#ffc107", "Jump Height is Low | RSI is High.") if cur_h < base_h and cur_rsi >= base_rsi else ("FATIGUED", "#dc3545", "Low Readiness")
                     st.markdown(f'<div style="text-align:center;"><div class="score-box" style="background-color:{color};">{p_diff:+.1f}%<span style="font-size:10px; display:block;">{label}</span></div></div><div class="info-box"><b>Today:</b> {cur_h:.1f}" | {cur_rsi:.2f} RSI<br><b>Profile:</b> {profile}</div>', unsafe_allow_html=True)
             with jc2:
                 if not p_cmj_hist.empty:
@@ -208,7 +197,7 @@ try:
             with cg1:
                 for m in low_m + ([dist_m] if dist_m else []): pdif = ((w_avg[m] - g_d[m]) / g_d[m] * 100) if g_d[m] > 0 else 0; st.metric(label=m, value=f"{g_d[m]:.0f}", delta=f"{pdif:+.1f}% vs Weekly Avg")
             with cg2:
-                fig_dual = make_subplots(specs=[[{"secondary_y": True}]]); fig_dual.add_trace(go.Bar(x=low_m, y=[w_avg[m] for m in low_m], name="Weekly Avg", marker_color='#4895DB'), secondary_y=False); fig_dual.add_trace(go.Bar(x=low_m, y=[g_d[m] for m in low_m], name=f"Game Output", marker_color='#FF8200'), secondary_y=False)
+                fig_dual = make_subplots(specs=[[{"secondary_y": True}]]); fig_dual.add_trace(go.Bar(x=low_m, y=[w_avg[m] for m in low_m], name="Weekly Avg", marker_color='#4895DB'), secondary_y=False); fig_dual.add_trace(go.Bar(x=low_m, y=[g_d[m] for v, m in zip(low_m, low_m)], name=f"Game Output", marker_color='#FF8200'), secondary_y=False)
                 if dist_m: fig_dual.add_trace(go.Bar(x=[dist_m], y=[w_avg[dist_m]], name="Weekly Dist", marker_color='#4895DB', opacity=0.8), secondary_y=True); fig_dual.add_trace(go.Bar(x=[dist_m], y=[g_d[dist_m]], name="Game Dist", marker_color='#FF8200', opacity=0.8), secondary_y=True)
                 fig_dual.update_layout(height=400, barmode='group', showlegend=True, legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)); st.plotly_chart(fig_dual, use_container_width=True, config=LOCKED_CONFIG)
             wk_trends = df[df['Week'] == sel_w].groupby(['Date', 'Session_Name', 'Session_Type']).agg({'Player Load': 'mean'}).reset_index().sort_values('Date'); wk_trends['Day_Label'] = wk_trends['Date'].dt.strftime('%a %m/%d'); fig_tr = go.Figure(); fig_tr.add_trace(go.Scatter(x=wk_trends['Day_Label'], y=wk_trends['Player Load'], mode='lines', line=dict(color='#4895DB', width=3), showlegend=False))
@@ -223,7 +212,7 @@ try:
     # --- TAB 4: MATCH SUMMARY ---
     with tabs[4]:
         st.markdown('<div class="print-hide">', unsafe_allow_html=True)
-        if st.button("🖨️ Prepare PDF for Printing"): st.markdown('<script>window.print();</script>', unsafe_allow_html=True)
+        if st.button("🖨️ Prepare Report for PDF"): st.markdown('<script>window.print();</script>', unsafe_allow_html=True)
         st.markdown('<div class="section-header">Match Comparison Selection</div>', unsafe_allow_html=True)
         c_ts1, c_ts2 = st.columns([2, 1])
         with c_ts1:
@@ -245,30 +234,16 @@ try:
                     if i + j < len(ath_t):
                         name = ath_t[i+j]; ad = tourney_df[tourney_df['Name'] == name]
                         with card_cols[j]:
-                            # WRAP CARD + GRAPH IN GROUP
-                            st.markdown(f'<div class="print-group">', unsafe_allow_html=True)
-                            card_html = f"""
-                            <div class="gallery-card">
-                                <div style="display:flex; align-items:center; gap:15px; padding:15px; background:#f8f9fa; border-bottom:2px solid #FF8200;">
-                                    <img src="{ad['PhotoURL'].iloc[0]}" class="gallery-photo" style="width:70px; height:70px;">
-                                    <div><p style="margin:0; font-weight:900; color:#1D1D1F; font-size:18px;">{name}</p><p style="margin:0; color:#4895DB; font-weight:700; font-size:12px;">{ad['Position'].iloc[0]}</p></div>
-                                </div>
-                                <div style="padding:10px 15px;">
-                                    <table class="scout-table" style="margin-bottom:0;">
-                                        <thead><tr><th>Match</th><th>Total Jumps</th><th>Player Load</th><th>Explosive Efforts</th><th>Est Dist (y)</th></tr></thead>
-                                        <tbody>
-                            """
-                            for _, r in ad.iterrows():
-                                card_html += f"<tr><td style='font-weight:700;'>{r['Session_Name']}</td><td>{int(r['Total Jumps'])}</td><td>{r['Player Load']:.0f}</td><td>{r['Explosive Efforts']:.0f}</td><td>{r['Estimated Distance (y)']:.0f}</td></tr>"
+                            st.markdown('<div class="print-group">', unsafe_allow_html=True)
+                            card_html = f"""<div class="gallery-card"><div style="display:flex; align-items:center; gap:15px; padding:15px; background:#f8f9fa; border-bottom:2px solid #FF8200;"><img src="{ad['PhotoURL'].iloc[0]}" class="gallery-photo" style="width:70px; height:70px;"><div><p style="margin:0; font-weight:900; color:#1D1D1F; font-size:18px;">{name}</p><p style="margin:0; color:#4895DB; font-weight:700; font-size:12px;">{ad['Position'].iloc[0]}</p></div></div><div style="padding:10px 15px;"><table class="scout-table"><thead><tr><th>Match</th><th>Total Jumps</th><th>Player Load</th><th>Explosive Efforts</th><th>Est Dist (y)</th></tr></thead><tbody>"""
+                            for _, r in ad.iterrows(): card_html += f"<tr><td style='font-weight:700;'>{r['Session_Name']}</td><td>{int(r['Total Jumps'])}</td><td>{r['Player Load']:.0f}</td><td>{r['Explosive Efforts']:.0f}</td><td>{r['Estimated Distance (y)']:.0f}</td></tr>"
                             card_html += f"<tr style='background:#4895DB; color:white; font-weight:900;'><td>TOTAL</td><td>{int(ad['Total Jumps'].sum())}</td><td>{ad['Player Load'].sum():.0f}</td><td>{ad['Explosive Efforts'].sum():.0f}</td><td>{ad['Estimated Distance (y)'].sum():.0f}</td></tr></tbody></table></div>"
                             st.markdown(card_html, unsafe_allow_html=True)
-                            
                             fig_ath = make_subplots(specs=[[{"secondary_y": True}]]);
                             for _, r in ad.iterrows():
-                                fig_ath.add_trace(go.Bar(name=r['Session_Name'], x=['Total Jumps', 'Player Load', 'Explosive Efforts'], y=[r['Total Jumps'], r['Player Load'], r['Explosive Efforts']], marker_color=m_map[r['Session_Name']]), secondary_y=False)
-                                fig_ath.add_trace(go.Bar(name=f"Distance", x=['Estimated Distance'], y=[r['Estimated Distance (y)']], marker=dict(color=m_map[r['Session_Name']], opacity=0.6, line=dict(color=m_map[r['Session_Name']], width=2)), showlegend=False), secondary_y=True)
-                            # MOVED LEGEND DOWN (y=-0.35)
-                            fig_ath.update_layout(barmode='group', height=340, legend=dict(orientation="h", yanchor="top", y=-0.35, xanchor="center", x=0.5), template="simple_white"); st.plotly_chart(fig_ath, use_container_width=True, config=LOCKED_CONFIG)
+                                fig_ath.add_trace(go.Bar(name=r['Session_Name'], x=['Jumps', 'Load', 'Effort'], y=[r['Total Jumps'], r['Player Load'], r['Explosive Efforts']], marker_color=m_map[r['Session_Name']]), secondary_y=False)
+                                fig_ath.add_trace(go.Bar(name="Dist", x=['Distance'], y=[r['Estimated Distance (y)']], marker=dict(color=m_map[r['Session_Name']], opacity=0.6), showlegend=False), secondary_y=True)
+                            fig_ath.update_layout(barmode='group', height=340, margin=dict(b=80), legend=dict(orientation="h", yanchor="top", y=-0.4, xanchor="center", x=0.5), template="simple_white"); st.plotly_chart(fig_ath, use_container_width=True, config=LOCKED_CONFIG)
                             st.markdown('</div>', unsafe_allow_html=True)
 
             st.write("<br><br>", unsafe_allow_html=True); st.markdown('<div class="section-header">Team Match Averages</div>', unsafe_allow_html=True)
