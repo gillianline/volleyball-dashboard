@@ -10,7 +10,7 @@ from datetime import timedelta
 # --- PAGE CONFIG ---
 st.set_page_config(page_title="Lady Vols VB Performance", layout="wide")
 
-# --- CSS: FORMATTING & HIGHLIGHTING (RESTORED) ---
+# --- CSS: FORMATTING & HIGHLIGHTING ---
 st.markdown("""
     <style>
     .stApp { background-color: #FFFFFF; color: #1D1D1F; }
@@ -40,13 +40,12 @@ def get_flipped_gradient(score):
     if score <= 70: return "#D4A017"
     return "#A52A2A"
 
-# --- DATA LOADING (WITH CACHE BUSTER & DATE FIX) ---
+# --- DATA LOADING ---
 @st.cache_data(ttl=0)
 def load_all_data():
     def get_fresh_url(url):
         return f"{url}&cachebust={int(time.time())}"
     
-    # Main Sheet
     df = pd.read_csv(get_fresh_url(st.secrets["GOOGLE_SHEET_URL"]))
     df.columns = df.columns.str.strip()
     df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
@@ -71,13 +70,11 @@ def load_all_data():
     df['Position'] = df.groupby('Name')['Position'].ffill().bfill().fillna("N/A")
     df['PhotoURL'] = df.groupby('Name')['PhotoURL'].ffill().bfill().fillna("https://www.w3schools.com/howto/img_avatar.png")
     
-    # CMJ Sheet
     cmj_df = pd.read_csv(get_fresh_url(st.secrets["CMJ_SHEET_URL"]))
     cmj_df.columns = cmj_df.columns.str.strip()
     cmj_df['Jump Height (in)'] = cmj_df['Jump Height (Imp-Mom) [cm]'] * 0.3937
     cmj_df['Test Date'] = pd.to_datetime(cmj_df['Test Date'], errors='coerce')
     
-    # Phase Sheet
     phase_df = pd.read_csv(get_fresh_url(st.secrets["PHASES_SHEET_URL"]))
     phase_df.columns = phase_df.columns.str.strip()
     if 'Phases' in phase_df.columns: phase_df = phase_df.rename(columns={'Phases': 'Phase'})
@@ -92,6 +89,13 @@ try:
     df, cmj_df, phase_df = load_all_data()
     all_metrics = ['Total Jumps', 'Moderate Jumps', 'High Jumps', 'Jump Load', 'Player Load', 'Estimated Distance (y)', 'Explosive Efforts', 'High Intensity Movement']
     
+    st.markdown("""
+        <div style="text-align: center; margin-top: 10px; margin-bottom: 15px;">
+            <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/f/fc/Tennessee_Lady_Volunteers_logo.svg/1280px-Tennessee_Lady_Volunteers_logo.svg.png" width="120">
+            <div style='color: #FF8200; font-size: 2rem; font-weight: 900; margin-top: 10px;'>LADY VOLS VOLLEYBALL PERFORMANCE</div>
+        </div>
+    """, unsafe_allow_html=True)
+
     tabs = st.tabs(["Individual Profile", "Team Gallery", "Game v. Practice", "Position Analysis", "Tournament Summary"])
     session_list = df[['Date', 'Session_Name']].drop_duplicates().sort_values('Date', ascending=False)['Session_Name'].tolist()
 
@@ -105,7 +109,7 @@ try:
         if not day_df.empty:
             curr_date = day_df['Date'].iloc[0]
             if pos_f != "All Positions": day_df = day_df[day_df['Position'] == pos_f]
-            sel_p = st.selectbox("Select Athlete", sorted(day_df['Name'].unique()))
+            sel_p = st.selectbox("Select Athlete", sorted(day_df['Name'].unique()), key="athlete_sel_ind")
             p = day_df[day_df['Name'] == sel_p].iloc[0]
             lb = df[(df['Name'] == sel_p) & (df['Date'] >= curr_date - timedelta(days=30)) & (df['Date'] <= curr_date)]
             
@@ -126,18 +130,17 @@ try:
             with c2: st.markdown(f'<table class="scout-table"><thead><tr><th>Metric</th><th>Today</th><th>30d Max</th><th>Grade</th></tr></thead><tbody>{m_rows}</tbody></table>', unsafe_allow_html=True)
             with c3: st.markdown(f'<div style="display:flex; justify-content:center;"><div class="score-box" style="background-color:{get_flipped_gradient(score)};">{score}</div></div>', unsafe_allow_html=True)
 
+            # Readiness Profile logic
             st.markdown('<div class="section-header">Weekly Readiness Profile</div>', unsafe_allow_html=True)
             jc1, jc2 = st.columns([1.5, 3.5])
             with jc1:
                 p_cmj_hist = cmj_df[cmj_df['Athlete'] == sel_p].sort_values('Test Date')
                 if not p_cmj_hist.empty:
                     latest = p_cmj_hist.iloc[-1]
-                    # Grabs latest test regardless of the selected practice session
                     base_h = p_cmj_hist.tail(6).iloc[:-1]['Jump Height (in)'].mean()
                     base_rsi = p_cmj_hist.tail(6).iloc[:-1]['RSI-modified [m/s]'].mean()
                     cur_h, cur_rsi = latest['Jump Height (in)'], latest['RSI-modified [m/s]']
                     p_diff = ((cur_h - base_h) / base_h) * 100
-                    
                     label, color, profile = ("ELITE", "#28a745", "Jump Height and RSI are both High.") if cur_h >= base_h and cur_rsi >= base_rsi else \
                                            ("GRINDER", "#ffc107", "Jump Height is High | RSI is Low.") if cur_h >= base_h and cur_rsi < base_rsi else \
                                            ("SPRINGY", "#ffc107", "Jump Height is Low | RSI is High.") if cur_h < base_h and cur_rsi >= base_rsi else \
@@ -147,6 +150,7 @@ try:
                 if not p_cmj_hist.empty:
                     fig = make_subplots(specs=[[{"secondary_y": True}]]); fig.add_trace(go.Scatter(x=p_cmj_hist['Test Date'], y=p_cmj_hist['Jump Height (in)'], name="Height", line=dict(color='#FF8200', width=3)), secondary_y=False); fig.add_trace(go.Scatter(x=p_cmj_hist['Test Date'], y=p_cmj_hist['RSI-modified [m/s]'], name="RSI", line=dict(color='#4895DB', dash='dot')), secondary_y=True); fig.update_layout(height=280, margin=dict(l=0, r=0, t=20, b=0), showlegend=False, hovermode=False); st.plotly_chart(fig, use_container_width=True, config=LOCKED_CONFIG)
 
+            # Phase Breakdown logic
             p_ph = phase_df[(phase_df['Name'] == sel_p) & (phase_df['Date'] == curr_date)].copy()
             if not p_ph.empty:
                 st.markdown('<div class="section-header">Practice Phase Breakdown</div>', unsafe_allow_html=True)
@@ -155,7 +159,6 @@ try:
                 fig_ph.add_trace(go.Scatter(x=p_ph['Phase'], y=p_ph['Player Load'], name="Load", line=dict(color='#4895DB', width=4)), secondary_y=False)
                 fig_ph.update_layout(height=350, showlegend=True, legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1), hovermode=False)
                 st.plotly_chart(fig_ph, use_container_width=True, config=LOCKED_CONFIG)
-                
                 p_tbl = f'<table class="scout-table"><thead><tr><th>Phase</th><th>Jumps</th><th>Load</th></tr></thead><tbody>'
                 for _, r in p_ph.iterrows(): p_tbl += f"<tr><td>{r['Phase']}</td><td>{int(r['Total Jumps'])}</td><td>{r['Player Load']:.1f}</td></tr>"
                 st.markdown(p_tbl + '</tbody></table>', unsafe_allow_html=True)
@@ -218,7 +221,7 @@ try:
     # --- TAB 3: POSITION ANALYSIS ---
     with tabs[3]:
         st.markdown('<div class="section-header">Positional Performance & 4-Week Trends</div>', unsafe_allow_html=True)
-        sel_p_pos = st.selectbox("Select Athlete for Comparative Trend", sorted(df['Name'].unique()))
+        sel_p_pos = st.selectbox("Select Athlete for Comparative Trend", sorted(df['Name'].unique()), key="athlete_sel_pos")
         p_pos = df[df['Name'] == sel_p_pos].iloc[0]
         pos_label = p_pos['Position']
         max_wk = df['Week'].max()
@@ -238,11 +241,11 @@ try:
                     fig_t.update_layout(title=f"Weekly Total {m}", xaxis=dict(dtick=1), height=300, margin=dict(l=10, r=10, t=40, b=10))
                     st.plotly_chart(fig_t, use_container_width=True, config=LOCKED_CONFIG)
 
-    # --- NEW TAB 4: TOURNAMENT SUMMARY ---
+    # --- TAB 4: TOURNAMENT SUMMARY ---
     with tabs[4]:
         st.markdown('<div class="section-header">Tournament Match Comparison</div>', unsafe_allow_html=True)
         game_list = sorted(df[df['Session_Type'] == 'Game']['Session_Name'].unique())
-        selected_games = st.multiselect("Select Weekend Matches", game_list, default=game_list[-3:] if len(game_list) >=3 else game_list)
+        selected_games = st.multiselect("Select Weekend Matches", game_list, default=game_list[-3:] if len(game_list) >=3 else game_list, key="tourney_multiselect")
         
         if selected_games:
             tourney_df = df[df['Session_Name'].isin(selected_games)].copy()
@@ -256,14 +259,14 @@ try:
                 st.plotly_chart(px.bar(team_avg, x='Session_Name', y='Player Load', color='Session_Name', title="Avg Player Load", color_discrete_sequence=['#4895DB', '#FF8200']), use_container_width=True)
             
             st.markdown('<div class="section-header">Athlete Tournament Trend</div>', unsafe_allow_html=True)
-            sel_ath = st.selectbox("Select Athlete", sorted(tourney_df['Name'].unique()))
-            ath_df = tourney_df[tourney_df['Name'] == sel_ath].sort_values('Date')
+            sel_ath_tourney = st.selectbox("Select Athlete", sorted(tourney_df['Name'].unique()), key="athlete_sel_tourney")
+            ath_df_t = tourney_df[tourney_df['Name'] == sel_ath_tourney].sort_values('Date')
             
-            fig_ath = go.Figure()
+            fig_ath_t = go.Figure()
             for m in comp_metrics:
-                fig_ath.add_trace(go.Scatter(x=ath_df['Session_Name'], y=ath_df[m], name=m, mode='lines+markers'))
-            fig_ath.update_layout(height=400, title=f"{sel_ath} Workload across Tournament", legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
-            st.plotly_chart(fig_ath, use_container_width=True)
+                fig_ath_t.add_trace(go.Scatter(x=ath_df_t['Session_Name'], y=ath_df_t[m], name=m, mode='lines+markers'))
+            fig_ath_t.update_layout(height=400, title=f"{sel_ath_tourney} Workload across Tournament", legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
+            st.plotly_chart(fig_ath_t, use_container_width=True)
 
 except Exception as e:
     st.error(f"Sync Error: {e}")
