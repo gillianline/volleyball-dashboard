@@ -39,7 +39,7 @@ if check_password():
         header a { display: none !important; }
         .scout-table { width: 100%; border-collapse: collapse; text-align: center; table-layout: auto; }
         .scout-table th { background-color: #4895DB; color: white; padding: 6px; border-bottom: 2px solid #FF8200; font-weight: 700; font-size: 11px; text-transform: uppercase; }
-        .scout-table td { padding: 6px; border-bottom: 1px solid #F5F5F7; font-size: 11px; }
+        .scout-table td { padding: 6px; border-bottom: 1px solid #F5F5F7; font-size: 11px; color: #1D1D1F; }
         .bg-highlight-red { background-color: #ffcccc !important; font-weight: 900; }
         .arrow-red { color: #b30000 !important; font-weight: 900; margin-left: 4px; }
         .player-photo-large { border-radius: 50%; width: 220px; height: 220px; object-fit: cover; border: 6px solid #FF8200; }
@@ -85,6 +85,9 @@ if check_password():
                 flex: 1 1 100% !important;
                 max-width: 100% !important;
             }
+            /* Darken text for readability on paper */
+            .scout-table td, p, div { color: #000000 !important; }
+            .scout-table { border: 1px solid #000 !important; }
         }
         </style>
         """, unsafe_allow_html=True)
@@ -173,7 +176,7 @@ if check_password():
                     if not sync_cmj.empty:
                         latest = sync_cmj.iloc[-1]; base_h = p_cmj_hist.tail(5).iloc[:-1]['Jump Height (in)'].mean(); base_rsi = p_cmj_hist.tail(5).iloc[:-1]['RSI-modified [m/s]'].mean(); cur_h, cur_rsi = latest['Jump Height (in)'], latest['RSI-modified [m/s]']; p_diff = ((cur_h - base_h) / base_h) * 100
                         label, color, profile = ("ELITE", "#28a745", "Jump Height and RSI are both High.") if cur_h >= base_h and cur_rsi >= base_rsi else ("GRINDER", "#ffc107", "Mixed Readiness") if cur_h >= base_h or cur_rsi >= base_rsi else ("FATIGUED", "#dc3545", "Low Readiness")
-                        st.markdown(f'<div style="text-align:center;"><div class="score-box" style="background-color:{color};">{p_diff:+.1f}%<span style="font-size:10px; display:block;">{label}</span></div></div><div class="info-box"><b>Today:</b> {cur_h:.1f}" | {cur_rsi:.2f} RSI<br><b>Profile:</b> {profile}</div>', unsafe_allow_html=True)
+                        st.markdown(f'<div style="text-align:center;"><div class="score-box" style="background-color:{color};">{p_diff:+.1f}%<span style="font-size:10px; display:block;">{label}</span></div></div><div class="info-box"><b>Today:</b> {cur_h:.1f}" | {cur_rsi:.2f} RSI</div>', unsafe_allow_html=True)
                 with jc2:
                     if not p_cmj_hist.empty:
                         fig = make_subplots(specs=[[{"secondary_y": True}]]); fig.add_trace(go.Scatter(x=p_cmj_hist['Test Date'], y=p_cmj_hist['Jump Height (in)'], name="Height", line=dict(color='#FF8200', width=3)), secondary_y=False); fig.add_trace(go.Scatter(x=p_cmj_hist['Test Date'], y=p_cmj_hist['RSI-modified [m/s]'], name="RSI", line=dict(color='#4895DB', dash='dot')), secondary_y=True); fig.update_layout(height=280, margin=dict(l=0, r=0, t=20, b=0), showlegend=False, hovermode=False); st.plotly_chart(fig, use_container_width=True, config=LOCKED_CONFIG)
@@ -270,7 +273,6 @@ if check_password():
                                     card_start += f"<tr><td style='font-weight:700;'>{r['Session_Name']}</td><td>{int(r['Total Jumps'])}</td><td>{r['Player Load']:.0f}</td><td>{r['Explosive Efforts']:.0f}</td><td>{r['Estimated Distance (y)']:.0f}</td></tr>"
                                 card_start += f"<tr style='background:#4895DB; color:white; font-weight:900;'><td>TOTAL</td><td>{int(ad['Total Jumps'].sum())}</td><td>{ad['Player Load'].sum():.0f}</td><td>{ad['Explosive Efforts'].sum():.0f}</td><td>{ad['Estimated Distance (y)'].sum():.0f}</td></tr></tbody></table></div>"
                                 st.markdown(card_start, unsafe_allow_html=True)
-                                
                                 fig_ath = make_subplots(specs=[[{"secondary_y": True}]]);
                                 for _, r in ad.iterrows():
                                     fig_ath.add_trace(go.Bar(name=r['Session_Name'], x=['Jumps', 'Load', 'Effort'], y=[r['Total Jumps'], r['Player Load'], r['Explosive Efforts']], marker_color=m_map[r['Session_Name']]), secondary_y=False)
