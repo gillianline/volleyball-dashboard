@@ -29,6 +29,27 @@ st.markdown("""
     .section-header { font-size: 14px; font-weight: 800; color: #4895DB; border-bottom: 2px solid #FF8200; margin-top: 25px; margin-bottom: 15px; padding-bottom: 5px; text-transform: uppercase; }
     .info-box { background-color: #f8f9fa; border-left: 5px solid #FF8200; padding: 12px; margin-top: 10px; font-size: 12px; color: #1D1D1F; font-weight: 600; line-height: 1.4; }
     .js-plotly-plot { pointer-events: none; }
+
+    /* PDF PRINT LOGIC: Hides UI for a clean report */
+    @media print {
+        .stTabs [role="tablist"], 
+        .main-logo-container,
+        [data-testid="stSidebar"], 
+        header, 
+        footer,
+        [data-testid="stHeader"],
+        .print-hide,
+        [data-baseweb="select"],
+        [data-testid="stMultiSelect"],
+        [data-testid="stSelectbox"],
+        [data-testid="stWidgetLabel"],
+        label,
+        button { 
+            display: none !important; 
+        }
+        .main .block-container { padding: 0 !important; max-width: 100% !important; }
+        .gallery-card { break-inside: avoid; border: 1px solid #EEE !important; }
+    }
     </style>
     """, unsafe_allow_html=True)
 
@@ -89,7 +110,7 @@ try:
         return "#A52A2A"
 
     st.markdown("""
-        <div style="text-align: center; margin-top: 10px; margin-bottom: 15px;">
+        <div class="main-logo-container" style="text-align: center; margin-top: 10px; margin-bottom: 15px;">
             <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/f/fc/Tennessee_Lady_Volunteers_logo.svg/1280px-Tennessee_Lady_Volunteers_logo.svg.png" width="120">
             <div style='color: #FF8200; font-size: 2rem; font-weight: 900; margin-top: 10px;'>LADY VOLS VOLLEYBALL PERFORMANCE</div>
         </div>
@@ -236,15 +257,18 @@ try:
             fig_tr.update_layout(height=350, margin=dict(l=0, r=0, t=20, b=0), yaxis_title="Avg Player Load")
             st.plotly_chart(fig_tr, use_container_width=True, config=LOCKED_CONFIG)
 
-    # --- TAB 3: POSITION ANALYSIS ---
+    # --- TAB 3: POSITION ANALYSIS (4-WEEK TREND) ---
     with tabs[3]:
         st.markdown('<div class="section-header">Positional Performance & 4-Week Trends</div>', unsafe_allow_html=True)
         sel_p_pos = st.selectbox("Select Athlete for Comparative Trend", sorted(df['Name'].unique()))
         p_pos = df[df['Name'] == sel_p_pos].iloc[0]
         pos_label = p_pos['Position']
+        
+        # SLIDING WINDOW: Latest Week in data and 3 weeks prior
         max_wk = df['Week'].max()
         rec_4 = list(range(int(max_wk) - 3, int(max_wk) + 1))
         tr_df = df[df['Week'].isin(rec_4)]
+        
         t_col1, t_col2, t_col3 = st.columns(3)
         tr_metrics = ["Player Load", "Estimated Distance (y)", "Total Jumps"]
         cols = [t_col1, t_col2, t_col3]
@@ -262,6 +286,10 @@ try:
 
     # --- TAB 4: MATCH SUMMARY ---
     with tabs[4]:
+        st.markdown('<div class="print-hide">', unsafe_allow_html=True)
+        if st.button("🖨️ Prepare Report for PDF"):
+            st.markdown('<script>window.print();</script>', unsafe_allow_html=True)
+        
         st.markdown('<div class="section-header">Match Comparison Selection</div>', unsafe_allow_html=True)
         c_ts1, c_ts2 = st.columns([2, 1])
         with c_ts1:
@@ -269,6 +297,7 @@ try:
             selected_matches = st.multiselect("Select Weekend Matches", match_list_t, default=match_list_t[-3:] if len(match_list_t) >=3 else match_list_t)
         with c_ts2:
             pos_filter_t = st.selectbox("Filter by Position", ["All Positions"] + sorted(list(df['Position'].unique())), key="ms_pos_surgical")
+        st.markdown('</div>', unsafe_allow_html=True)
 
         if selected_matches:
             c_pal = ['#4895DB', '#FF8200', '#515154']; m_map = {m: c_pal[idx % 3] for idx, m in enumerate(selected_matches)}
@@ -298,10 +327,7 @@ try:
                                         <tbody>
                             """
                             for _, r in ad.iterrows():
-                                # COLUMNS: Jumps -> Load -> Efforts -> Distance
                                 card_html += f"<tr><td style='font-weight:700;'>{r['Session_Name']}</td><td>{int(r['Total Jumps'])}</td><td>{r['Player Load']:.0f}</td><td>{r['Explosive Efforts']:.0f}</td><td>{r['Estimated Distance (y)']:.0f}</td></tr>"
-                            
-                            # TOTALS: Jumps -> Load -> Efforts -> Distance
                             card_html += f"<tr style='background:#4895DB; color:white; font-weight:900;'><td>TOTAL</td><td>{int(ad['Total Jumps'].sum())}</td><td>{ad['Player Load'].sum():.0f}</td><td>{ad['Explosive Efforts'].sum():.0f}</td><td>{ad['Estimated Distance (y)'].sum():.0f}</td></tr></tbody></table></div>"
                             st.markdown(card_html, unsafe_allow_html=True)
                             
@@ -315,7 +341,6 @@ try:
             team_avg_t = tourney_df.groupby(['Session_Name', 'Sheet_Order'])[['Total Jumps', 'Player Load', 'Explosive Efforts', 'Estimated Distance (y)']].mean().reset_index().sort_values('Sheet_Order')
             c1, c2 = st.columns(2); c3, c4 = st.columns(2)
             cols = [c1, c2, c3, c4]
-            # GRAPH ORDER: Jumps -> Load -> Efforts -> Distance
             for idx, m in enumerate(['Total Jumps', 'Player Load', 'Explosive Efforts', 'Estimated Distance (y)']):
                 with cols[idx]:
                     fig_t = go.Figure(); fig_t.add_trace(go.Bar(x=team_avg_t['Session_Name'], y=team_avg_t[m], marker_color=[m_map[g] for g in team_avg_t['Session_Name']], marker_line_width=0))
