@@ -29,7 +29,7 @@ def check_password():
         return True
 
 if check_password():
-    # --- CSS: FORMATTING & OVAL REMOVAL ---
+    # --- CSS: FORMATTING & AGGRESSIVE PRINT CONTROL ---
     st.markdown("""
         <style>
         .stApp { background-color: #FFFFFF; color: #1D1D1F; }
@@ -38,8 +38,12 @@ if check_password():
         .viewerBadge_link__1S137, .main_heading_anchor__m6v0K, a.header-anchor { display: none !important; }
         header a { display: none !important; }
         .scout-table { width: 100%; border-collapse: collapse; text-align: center; table-layout: auto; }
-        .scout-table th { background-color: #4895DB; color: white; padding: 4px; border-bottom: 2px solid #FF8200; font-weight: 700; font-size: 10px; text-transform: uppercase; }
-        .scout-table td { padding: 4px; border-bottom: 1px solid #F5F5F7; font-size: 10px; color: #333333; }
+        .scout-table th { background-color: #4895DB; color: white; padding: 6px; border-bottom: 2px solid #FF8200; font-weight: 700; font-size: 11px; text-transform: uppercase; }
+        .scout-table td { padding: 6px; border-bottom: 1px solid #F5F5F7; font-size: 11px; color: #333333; }
+        .bg-highlight-red { background-color: #ffcccc !important; font-weight: 900; }
+        .arrow-red { color: #b30000 !important; font-weight: 900; margin-left: 4px; }
+        .player-photo-large { border-radius: 50%; width: 220px; height: 220px; object-fit: cover; border: 6px solid #FF8200; }
+        .score-box { padding: 12px 20px; border-radius: 12px; font-size: 28px; font-weight: 800; min-width: 100px; color: #FFFFFF; line-height: 1.2; text-align: center;}
         
         /* ELIMINATE GAPS BETWEEN PLAYERS */
         [data-testid="stVerticalBlock"] { gap: 0.5rem !important; }
@@ -47,7 +51,7 @@ if check_password():
         .gallery-card { 
             border: 1px solid #E5E5E7; 
             padding: 0; 
-            border-radius: 12px; 
+            border-radius: 15px; 
             background-color: #FFFFFF; 
             margin-bottom: 10px !important; 
             overflow: hidden;
@@ -58,17 +62,15 @@ if check_password():
         }
 
         .gallery-photo { border-radius: 50%; width: 110px; height: 110px; object-fit: cover; border: 4px solid #FF8200; }
-        .section-header { font-size: 14px; font-weight: 800; color: #4895DB; border-bottom: 2px solid #FF8200; margin-top: 15px; margin-bottom: 10px; padding-bottom: 5px; text-transform: uppercase; }
+        .section-header { font-size: 14px; font-weight: 800; color: #4895DB; border-bottom: 2px solid #FF8200; margin-top: 25px; margin-bottom: 15px; padding-bottom: 5px; text-transform: uppercase; }
         .js-plotly-plot { pointer-events: none; }
-        
+
         @media print {
             .stTabs [role="tablist"], .main-logo-container, [data-testid="stSidebar"], 
             header, footer, [data-testid="stHeader"], .print-hide,
-            button { 
-                display: none !important; 
-            }
+            button { display: none !important; }
             
-            /* REMOVE HORIZONTAL OVALS (PILLS) IN PRINT */
+            /* REMOVE OVALS (PILLS) IN PRINT */
             [data-testid="stMultiSelect"] span, .stMultiSelect [role="button"] {
                 background-color: transparent !important;
                 border: none !important;
@@ -106,12 +108,10 @@ if check_password():
         df['Session_Name'] = df['Activity'].fillna(df['Date'].dt.strftime('%m/%d/%Y'))
         df['Position'] = df.groupby('Name')['Position'].ffill().bfill().fillna("N/A")
         df['PhotoURL'] = df.groupby('Name')['PhotoURL'].ffill().bfill().fillna("https://www.w3schools.com/howto/img_avatar.png")
-        
         cmj_df = pd.read_csv(st.secrets["CMJ_SHEET_URL"])
         cmj_df.columns = cmj_df.columns.str.strip()
         cmj_df['Jump Height (in)'] = cmj_df['Jump Height (Imp-Mom) [cm]'] * 0.3937
         cmj_df['Test Date'] = pd.to_datetime(cmj_df['Test Date'], errors='coerce')
-        
         phase_df = pd.read_csv(st.secrets["PHASES_SHEET_URL"])
         phase_df.columns = phase_df.columns.str.strip()
         if 'Phases' in phase_df.columns: phase_df = phase_df.rename(columns={'Phases': 'Phase'})
@@ -124,7 +124,12 @@ if check_password():
     try:
         df, cmj_df, phase_df = load_all_data()
         all_metrics = ['Total Jumps', 'Moderate Jumps', 'High Jumps', 'Jump Load', 'Player Load', 'Estimated Distance (y)', 'Explosive Efforts', 'High Intensity Movement']
-        
+        def get_flipped_gradient(score):
+            score = float(score); 
+            if score <= 40: return "#2D5A27"
+            if score <= 70: return "#D4A017"
+            return "#A52A2A"
+
         st.markdown('<div class="main-logo-container" style="text-align: center; margin-top: 10px; margin-bottom: 15px;"><img src="https://upload.wikimedia.org/wikipedia/commons/thumb/f/fc/Tennessee_Lady_Volunteers_logo.svg/1280px-Tennessee_Lady_Volunteers_logo.svg.png" width="120"><div style="color: #FF8200; font-size: 2rem; font-weight: 900; margin-top: 10px;">LADY VOLS VOLLEYBALL PERFORMANCE</div></div>', unsafe_allow_html=True)
         
         tabs = st.tabs(["Individual Profile", "Team Gallery", "Game v. Practice", "Position Analysis", "Match Summary"])
@@ -148,8 +153,6 @@ if check_password():
                         val, mx, avg = p[k], lb[k].max(), lb[k].mean(); grade = math.ceil((val / mx) * 100) if mx > 0 else 0
                         total_grade += grade; count += 1; diff = (val - avg) / avg if avg != 0 else 0; h_class = "class='bg-highlight-red'" if abs(diff) > 0.10 else ""; arr_val = f"<span class='arrow-red'>{'↑' if diff > 0.10 else '↓'}</span>" if abs(diff) > 0.10 else ""
                         m_rows += f"<tr><td>{k}</td><td {h_class}>{val} {arr_val}</td><td>{mx}</td><td>{grade}</td></tr>"
-                def get_flipped_gradient(score):
-                    score = float(score); return "#2D5A27" if score <= 40 else "#D4A017" if score <= 70 else "#A52A2A"
                 score = math.ceil(total_grade / count) if count > 0 else 0
                 c1, c2, c3 = st.columns([1.2, 2.5, 1.2])
                 with c1: st.markdown(f'<div style="text-align:center;"><img src="{p["PhotoURL"]}" class="player-photo-large"></div><h3 style="text-align:center;">{p["Name"]}</h3>', unsafe_allow_html=True)
