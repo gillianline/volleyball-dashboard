@@ -94,7 +94,7 @@ try:
         </div>
     """, unsafe_allow_html=True)
     
-    tabs = st.tabs(["Individual Profile", "Team Gallery", "Game v. Practice", "Position Analysis"])
+    tabs = st.tabs(["Individual Profile", "Team Gallery", "Game v. Practice", "Match Comparison", "Position Analysis"])
     session_list = df[['Date', 'Session_Name']].drop_duplicates().sort_values('Date', ascending=False)['Session_Name'].tolist()
 
     # --- TAB 0: INDIVIDUAL PROFILE ---
@@ -237,8 +237,31 @@ try:
             fig_tr.update_layout(height=350, margin=dict(l=0, r=0, t=20, b=0), yaxis_title="Avg Player Load")
             st.plotly_chart(fig_tr, use_container_width=True, config=LOCKED_CONFIG)
 
-    # --- TAB 3: POSITION ANALYSIS (4-WEEK TREND) ---
+    # --- TAB: MATCH COMPARISON ---
     with tabs[3]:
+        st.markdown('<div class="section-header">Head-to-Head Match Analysis</div>', unsafe_allow_html=True)
+        game_list = sorted(df[df['Session_Type'] == 'Game']['Session_Name'].unique())
+        if len(game_list) >= 2:
+            cc1, cc2 = st.columns(2)
+            with cc1: m1 = st.selectbox("Match A", game_list, index=0)
+            with cc2: m2 = st.selectbox("Match B", game_list, index=1)
+            
+            comp_m = st.multiselect("Metrics", all_metrics, default=['Total Jumps', 'Player Load', 'High Intensity Movement'])
+            
+            m1_data = df[df['Session_Name'] == m1].groupby('Position')[comp_m].mean().reset_index()
+            m2_data = df[df['Session_Name'] == m2].groupby('Position')[comp_m].mean().reset_index()
+            
+            for met in comp_m:
+                fig_c = go.Figure()
+                fig_c.add_trace(go.Bar(x=m1_data['Position'], y=m1_data[met], name=m1, marker_color='#4895DB'))
+                fig_c.add_trace(go.Bar(x=m2_data['Position'], y=m2_data[met], name=m2, marker_color='#FF8200'))
+                fig_c.update_layout(title=f"Positional Comparison: {met}", barmode='group', height=350, margin=dict(t=50, b=20))
+                st.plotly_chart(fig_c, use_container_width=True, config=LOCKED_CONFIG)
+        else:
+            st.warning("Not enough game data found to perform comparison.")
+
+    # --- TAB 3: POSITION ANALYSIS (4-WEEK TREND) ---
+    with tabs[4]:
         st.markdown('<div class="section-header">Positional Performance & 4-Week Trends</div>', unsafe_allow_html=True)
         sel_p_pos = st.selectbox("Select Athlete for Comparative Trend", sorted(df['Name'].unique()))
         p_pos = df[df['Name'] == sel_p_pos].iloc[0]
