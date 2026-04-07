@@ -10,7 +10,7 @@ from datetime import timedelta
 # --- PAGE CONFIG ---
 st.set_page_config(page_title="Lady Vols VB Performance", layout="wide")
 
-# --- CSS: FORMATTING & HIGHLIGHTING (RESTORED) ---
+# --- CSS: FORMATTING & HIGHLIGHTING ---
 st.markdown("""
     <style>
     .stApp { background-color: #FFFFFF; color: #1D1D1F; }
@@ -33,7 +33,14 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- DATA LOADING (WITH CACHE BUSTER) ---
+# --- HELPER FUNCTIONS ---
+def get_flipped_gradient(score):
+    score = float(score)
+    if score <= 40: return "#2D5A27" # Green
+    if score <= 70: return "#D4A017" # Yellow
+    return "#A52A2A" # Red
+
+# --- DATA LOADING ---
 @st.cache_data(ttl=0)
 def load_all_data():
     def get_fresh_url(url):
@@ -85,7 +92,7 @@ try:
     tabs = st.tabs(["Individual Profile", "Team Gallery", "Game v. Practice", "Position Analysis"])
     session_list = df[['Date', 'Session_Name']].drop_duplicates().sort_values('Date', ascending=False)['Session_Name'].tolist()
 
-    # --- TAB 0: INDIVIDUAL PROFILE (RESTORED) ---
+    # --- TAB 0: INDIVIDUAL PROFILE ---
     with tabs[0]:
         c_f1, c_f2 = st.columns(2)
         with c_f1: selected_session = st.selectbox("Practice Selection", session_list, index=0, key="nav_sel_ind")
@@ -116,7 +123,7 @@ try:
             with c2: st.markdown(f'<table class="scout-table"><thead><tr><th>Metric</th><th>Today</th><th>30d Max</th><th>Grade</th></tr></thead><tbody>{m_rows}</tbody></table>', unsafe_allow_html=True)
             with c3: st.markdown(f'<div style="display:flex; justify-content:center;"><div class="score-box" style="background-color:{get_flipped_gradient(score)};">{score}</div></div>', unsafe_allow_html=True)
 
-            # Readiness Profile
+            # Readiness
             st.markdown('<div class="section-header">Weekly Readiness Profile</div>', unsafe_allow_html=True)
             jc1, jc2 = st.columns([1.5, 3.5])
             with jc1:
@@ -135,25 +142,20 @@ try:
                     fig = make_subplots(specs=[[{"secondary_y": True}]]); fig.add_trace(go.Scatter(x=p_cmj_hist['Test Date'], y=p_cmj_hist['Jump Height (in)'], name="Height", line=dict(color='#FF8200', width=3)), secondary_y=False); fig.add_trace(go.Scatter(x=p_cmj_hist['Test Date'], y=p_cmj_hist['RSI-modified [m/s]'], name="RSI", line=dict(color='#4895DB', dash='dot')), secondary_y=True); fig.update_layout(height=280, margin=dict(l=0, r=0, t=20, b=0), showlegend=False, hovermode=False); st.plotly_chart(fig, use_container_width=True, config=LOCKED_CONFIG)
 
             # Phase Breakdown
-            p_phases = phase_df[(phase_df['Name'] == sel_p) & (phase_df['Date'] == curr_date)].copy()
-            if not p_phases.empty:
+            p_ph = phase_df[(phase_df['Name'] == sel_p) & (phase_df['Date'] == curr_date)].copy()
+            if not p_ph.empty:
                 st.markdown('<div class="section-header">Practice Phase Breakdown</div>', unsafe_allow_html=True)
                 fig_ph = make_subplots(specs=[[{"secondary_y": True}]])
-                fig_ph.add_trace(go.Bar(x=p_phases['Phase'], y=p_phases['Total Jumps'], name="Jumps", marker_color='#FF8200'), secondary_y=False)
-                fig_ph.add_trace(go.Scatter(x=p_phases['Phase'], y=p_phases['Player Load'], name="Load", line=dict(color='#4895DB', width=4)), secondary_y=False)
-                if 'Estimated Distance (y)' in p_phases.columns:
-                    fig_ph.add_trace(go.Scatter(x=p_phases['Phase'], y=p_phases['Estimated Distance (y)'], name="Distance (y)", line=dict(color='#515154', width=2, dash='dash')), secondary_y=True)
+                fig_ph.add_trace(go.Bar(x=p_ph['Phase'], y=p_ph['Total Jumps'], name="Jumps", marker_color='#FF8200'), secondary_y=False)
+                fig_ph.add_trace(go.Scatter(x=p_ph['Phase'], y=p_ph['Player Load'], name="Load", line=dict(color='#4895DB', width=4)), secondary_y=False)
                 fig_ph.update_layout(height=350, showlegend=True, legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1), hovermode=False)
                 st.plotly_chart(fig_ph, use_container_width=True, config=LOCKED_CONFIG)
                 
-                dist_th = "<th>Distance (y)</th>" if "Estimated Distance (y)" in p_phases.columns else ""
-                p_tbl = f'<table class="scout-table"><thead><tr><th>Phase</th><th>Jumps</th><th>Load</th>{dist_th}</tr></thead><tbody>'
-                for _, r in p_phases.iterrows(): 
-                    dist_td = f"<td>{r['Estimated Distance (y)']:.1f}</td>" if "Estimated Distance (y)" in p_phases.columns else ""
-                    p_tbl += f"<tr><td>{r['Phase']}</td><td>{int(r['Total Jumps'])}</td><td>{r['Player Load']:.1f}</td>{dist_td}</tr>"
+                p_tbl = f'<table class="scout-table"><thead><tr><th>Phase</th><th>Jumps</th><th>Load</th></tr></thead><tbody>'
+                for _, r in p_ph.iterrows(): p_tbl += f"<tr><td>{r['Phase']}</td><td>{int(r['Total Jumps'])}</td><td>{r['Player Load']:.1f}</td></tr>"
                 st.markdown(p_tbl + '</tbody></table>', unsafe_allow_html=True)
 
-    # --- TAB 1: TEAM GALLERY (RESTORED) ---
+    # --- TAB 1: TEAM GALLERY ---
     with tabs[1]:
         c_gal1, c_gal2 = st.columns(2)
         with c_gal1: selected_session_gal = st.selectbox("Practice Selection", session_list, index=0, key="nav_sel_gal")
@@ -177,7 +179,7 @@ try:
                         sc_g = math.ceil(t_grade / c_metrics) if c_metrics > 0 else 0
                         with cols[j]: st.markdown(f'<div class="gallery-card"><div style="display:flex; align-items:center; gap:10px;"><div style="flex:1.2; text-align:center;"><img src="{pd_row["PhotoURL"]}" class="gallery-photo"><p style="font-weight:bold; font-size:15px; margin-top:8px;">{pd_row["Name"]}</p></div><div style="flex:3;"><table class="scout-table"><thead><tr><th>Metric</th><th>Val</th><th>Max</th><th>Grade</th></tr></thead><tbody>{r_html}</tbody></table></div><div style="flex:1; text-align:center;"><div style="background-color:{get_flipped_gradient(sc_g)}; color:white; padding:10px; border-radius:12px; font-size:32px; font-weight:900;">{sc_g}</div></div></div></div>', unsafe_allow_html=True)
 
-    # --- TAB 2: GAME V PRACTICE (FIXED GAME PICKER) ---
+    # --- TAB 2: GAME V PRACTICE ---
     with tabs[2]:
         st.markdown('<div class="section-header">Weekly Prep Intensity vs. Game Demands</div>', unsafe_allow_html=True)
         c_ga, c_gw, c_gg = st.columns(3)
@@ -188,9 +190,8 @@ try:
             gp_w = st.selectbox("Week", w_r['L'].tolist(), key="gp_w_vf")
             sel_w = w_r[w_r['L'] == gp_w]['Week'].values[0]
         with c_gg: 
-            # DYNAMIC FILTER: Shows only games from THIS week
             game_opts = df[(df['Name'] == gp_p) & (df['Session_Type'] == 'Game') & (df['Week'] == sel_w)]['Session_Name'].unique()
-            gp_g = st.selectbox("Select Game", game_opts, key="gp_g_vf")
+            gp_g = st.selectbox("Select Specific Game", game_opts, key="gp_g_vf")
         
         w_data = df[(df['Name'] == gp_p) & (df['Session_Type'] == 'Practice') & (df['Week'] == sel_w)]
         g_data_l = df[(df['Name'] == gp_p) & (df['Session_Name'] == gp_g)]
@@ -210,14 +211,14 @@ try:
                 fig_dual.update_layout(height=400, barmode='group', showlegend=True, legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
                 st.plotly_chart(fig_dual, use_container_width=True, config=LOCKED_CONFIG)
 
-    # --- TAB 3: POSITION ANALYSIS (4-WEEK TREND) ---
+    # --- TAB 3: POSITION ANALYSIS (TREND FIX) ---
     with tabs[3]:
         st.markdown('<div class="section-header">Positional Performance & 4-Week Trends</div>', unsafe_allow_html=True)
         sel_p_pos = st.selectbox("Select Athlete for Comparative Trend", sorted(df['Name'].unique()))
         p_pos = df[df['Name'] == sel_p_pos].iloc[0]
         pos_label = p_pos['Position']
         
-        # LOGIC: Sliding 4-Week total jumps trend
+        # SLIDING WINDOW: Latest Week in data and 3 weeks prior
         max_wk = df['Week'].max()
         rec_4 = list(range(int(max_wk) - 3, int(max_wk) + 1))
         tr_df = df[df['Week'].isin(rec_4)]
