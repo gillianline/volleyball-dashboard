@@ -29,7 +29,7 @@ def check_password():
         return True
 
 if check_password():
-    # --- CSS: FORMATTING & OVAL REMOVAL ---
+    # --- CSS: FORMATTING & AGGRESSIVE WIDGET REMOVAL ---
     st.markdown("""
         <style>
         .stApp { background-color: #FFFFFF; color: #1D1D1F; }
@@ -55,14 +55,19 @@ if check_password():
         @media print {
             .stTabs [role="tablist"], .main-logo-container, [data-testid="stSidebar"], 
             header, footer, [data-testid="stHeader"], .print-hide,
-            button { display: none !important; }
-            [data-testid="stMultiSelect"] span, .stMultiSelect [role="button"] {
-                background-color: transparent !important;
-                border: none !important;
-                padding: 0 !important;
-                margin: 0 5px 0 0 !important;
-                color: #000 !important;
+            button { 
+                display: none !important; 
             }
+            
+            /* AGGRESSIVE REMOVAL OF SELECT BOXES/OVALS */
+            [data-testid="stMultiSelect"], [data-testid="stSelectbox"], [data-baseweb="select"], .stMultiSelect, .stSelectbox {
+                display: none !important;
+                visibility: hidden !important;
+                height: 0 !important;
+                margin: 0 !important;
+                padding: 0 !important;
+            }
+            
             .main .block-container { padding: 0 !important; max-width: 100% !important; }
             [data-testid="column"] { width: 100% !important; flex: 1 1 100% !important; }
             .scout-table td, p, span, div { color: #222222 !important; }
@@ -108,17 +113,14 @@ if check_password():
         df, cmj_df, phase_df = load_all_data()
         all_metrics = ['Total Jumps', 'Moderate Jumps', 'High Jumps', 'Jump Load', 'Player Load', 'Estimated Distance (y)', 'Explosive Efforts', 'High Intensity Movement']
         def get_flipped_gradient(score):
-            score = float(score); 
-            if score <= 40: return "#2D5A27"
-            if score <= 70: return "#D4A017"
-            return "#A52A2A"
+            score = float(score); return "#2D5A27" if score <= 40 else "#D4A017" if score <= 70 else "#A52A2A"
 
         st.markdown('<div class="main-logo-container" style="text-align: center; margin-top: 10px; margin-bottom: 15px;"><img src="https://upload.wikimedia.org/wikipedia/commons/thumb/f/fc/Tennessee_Lady_Volunteers_logo.svg/1280px-Tennessee_Lady_Volunteers_logo.svg.png" width="120"><div style="color: #FF8200; font-size: 2rem; font-weight: 900; margin-top: 10px;">LADY VOLS VOLLEYBALL PERFORMANCE</div></div>', unsafe_allow_html=True)
         
         tabs = st.tabs(["Individual Profile", "Team Gallery", "Game v. Practice", "Position Analysis", "Match Summary"])
         session_list = df[['Date', 'Session_Name']].drop_duplicates().sort_values('Date', ascending=False)['Session_Name'].tolist()
 
-        # --- TAB 0: INDIVIDUAL PROFILE ---
+        # Tabs 0, 1, 2, 3 character restoration
         with tabs[0]:
             c_f1, c_f2 = st.columns(2)
             with c_f1: selected_session = st.selectbox("Practice Selection", session_list, index=0, key="nav_sel_ind")
@@ -162,7 +164,6 @@ if check_password():
                     for _, r in p_ph.iterrows(): p_tbl += f"<tr><td>{r['Phase']}</td><td>{int(r['Total Jumps'])}</td><td>{r['Player Load']:.1f}</td>{f'<td>{r['Estimated Distance (y)']:.1f}</td>' if 'Estimated Distance (y)' in p_ph.columns else ''}</tr>"
                     st.markdown(p_tbl + '</tbody></table>', unsafe_allow_html=True)
 
-        # --- TAB 1: TEAM GALLERY ---
         with tabs[1]:
             c_gal1, c_gal2 = st.columns(2)
             with c_gal1: selected_session_gal = st.selectbox("Practice Selection", session_list, index=0, key="nav_sel_gal")
@@ -178,13 +179,11 @@ if check_password():
                             for k in all_metrics:
                                 if k in pd_row:
                                     v, mx, avg = pd_row[k], lb_g[k].max(), lb_g[k].mean(); g = math.ceil((v / mx) * 100) if mx > 0 else 0
-                                    t_grade += g; c_metrics += 1; diff = (v - avg) / avg if avg != 0 else 0
-                                    h_class = "class='bg-highlight-red'" if abs(diff) > 0.10 else ""; arr_val = f"<span class='arrow-red'>{'↑' if diff > 0.10 else '↓'}</span>" if abs(diff) > 0.10 else ""
+                                    t_grade += g; c_metrics += 1; diff = (v - avg) / avg if avg != 0 else 0; h_class = "class='bg-highlight-red'" if abs(diff) > 0.10 else ""; arr_val = f"<span class='arrow-red'>{'↑' if diff > 0.10 else '↓'}</span>" if abs(diff) > 0.10 else ""
                                     r_html += f"<tr><td>{k}</td><td {h_class}>{v} {arr_val}</td><td>{mx}</td><td>{g}</td></tr>"
                             sc_g = math.ceil(t_grade / c_metrics) if c_metrics > 0 else 0
                             with cols[j]: st.markdown(f'<div class="gallery-card" style="border:1px solid #E5E5E7; border-radius:15px; padding:15px; margin-bottom:20px;"><div style="display:flex; align-items:center; gap:10px;"><div style="flex:1.2; text-align:center;"><img src="{pd_row["PhotoURL"]}" class="gallery-photo"><p style="font-weight:bold; font-size:15px; margin-top:8px;">{pd_row["Name"]}</p></div><div style="flex:3;"><table class="scout-table"><thead><tr><th>Metric</th><th>Val</th><th>Max</th><th>Grade</th></tr></thead><tbody>{r_html}</tbody></table></div><div style="flex:1; text-align:center;"><div style="background-color:{get_flipped_gradient(sc_g)}; color:white; padding:10px; border-radius:12px; font-size:32px; font-weight:900;">{sc_g}</div></div></div></div>', unsafe_allow_html=True)
 
-        # --- TAB 2: GAME V PRACTICE ---
         with tabs[2]:
             st.markdown('<div class="section-header">Weekly Prep Intensity vs. Game Demands</div>', unsafe_allow_html=True)
             c_ga, c_gw, c_gg = st.columns(3)
@@ -205,12 +204,13 @@ if check_password():
                     for _, r in sub.iterrows(): is_sel = (r['Session_Name'] == gp_g); fig_tr.add_trace(go.Scatter(x=[r['Day_Label']], y=[r['Player Load']], name=r['Session_Name'] if s_t == 'Game' else s_t, mode='markers', marker=dict(color=clr, size=16 if is_sel else 10, line=dict(width=3 if is_sel else 1, color='black' if is_sel else 'white')), showlegend=True if s_t == 'Game' else (True if _ == sub.index[0] else False)))
                 fig_tr.update_layout(height=350, margin=dict(l=0, r=0, t=20, b=0), yaxis_title="Avg Player Load"); st.plotly_chart(fig_tr, use_container_width=True, config=LOCKED_CONFIG)
 
+        with tabs[3]:
+            st.markdown('<div class="section-header">Positional Performance Trends</div>', unsafe_allow_html=True)
+
         # --- TAB 4: MATCH SUMMARY ---
         with tabs[4]:
             st.markdown('<div class="print-hide">', unsafe_allow_html=True)
             if st.button("🖨️ Prepare PDF for Printing"): st.markdown('<script>window.print();</script>', unsafe_allow_html=True)
-            
-            # --- SELECTION WIDGETS WRAPPED IN PRINT-HIDE ---
             st.markdown('<div class="section-header">Match Comparison Selection</div>', unsafe_allow_html=True)
             c_ts1, c_ts2 = st.columns([2, 1])
             with c_ts1:
@@ -245,13 +245,12 @@ if check_password():
                             card_start += f"<tr><td style='font-weight:700; font-size:10px;'>{r['Session_Name']}</td><td>{int(r['Total Jumps'])}</td><td>{r['Player Load']:.0f}</td><td>{r['Explosive Efforts']:.0f}</td><td>{r['Estimated Distance (y)']:.0f}</td></tr>"
                         card_start += f"<tr style='background:#4895DB; color:white; font-weight:900;'><td>TOTAL</td><td>{int(ad['Total Jumps'].sum())}</td><td>{ad['Player Load'].sum():.0f}</td><td>{ad['Explosive Efforts'].sum():.0f}</td><td>{ad['Estimated Distance (y)'].sum():.0f}</td></tr></tbody></table></div>"
                         st.markdown(card_start, unsafe_allow_html=True)
-
                     with side_cols[1]:
                         fig_ath = make_subplots(specs=[[{"secondary_y": True}]]);
                         for _, r in ad.iterrows():
                             fig_ath.add_trace(go.Bar(name=r['Session_Name'], x=['Jumps', 'Load', 'Effort'], y=[r['Total Jumps'], r['Player Load'], r['Explosive Efforts']], marker_color=m_map[r['Session_Name']]), secondary_y=False)
                             fig_ath.add_trace(go.Bar(name="Dist", x=['Distance'], y=[r['Estimated Distance (y)']], marker=dict(color=m_map[r['Session_Name']], opacity=0.4), showlegend=False), secondary_y=True)
-                        fig_ath.update_layout(barmode='group', height=240, margin=dict(l=10, r=10, t=10, b=80), template="simple_white", font=dict(color="#333333", size=10), legend=dict(orientation="h", yanchor="top", y=-0.3, xanchor="center", x=0.5))
+                        fig_ath.update_layout(barmode='group', height=260, margin=dict(l=10, r=10, t=10, b=80), template="simple_white", font=dict(color="#333333", size=10), legend=dict(orientation="h", yanchor="top", y=-0.3, xanchor="center", x=0.5))
                         st.plotly_chart(fig_ath, use_container_width=True, config=LOCKED_CONFIG)
 
                 st.write("<br><br>", unsafe_allow_html=True); st.markdown('<div class="section-header">Team Match Averages</div>', unsafe_allow_html=True)
