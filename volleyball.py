@@ -28,7 +28,11 @@ def check_password():
         return True
 
 if check_password():
-    # --- CSS: THE PRINT FIX ---
+    # Initialize print state
+    if "is_printing" not in st.session_state:
+        st.session_state.is_printing = False
+
+    # --- CSS: FORMATTING & PAGE BREAK CONTROLS ---
     st.markdown("""
         <style>
         .stApp { background-color: #FFFFFF; color: #1D1D1F; }
@@ -36,7 +40,7 @@ if check_password():
         .block-container { padding-top: 2rem !important; }
         .viewerBadge_link__1S137, .main_heading_anchor__m6v0K, a.header-anchor { display: none !important; }
         header a { display: none !important; }
-        .scout-table { width: 100%; border-collapse: collapse; text-align: center; }
+        .scout-table { width: 100%; border-collapse: collapse; text-align: center; table-layout: auto; }
         .scout-table th { background-color: #4895DB; color: white; padding: 4px; border-bottom: 2px solid #FF8200; font-weight: 700; font-size: 10px; text-transform: uppercase; }
         .scout-table td { padding: 4px; border-bottom: 1px solid #F5F5F7; font-size: 10px; color: #1D1D1F; }
         .bg-highlight-red { background-color: #ffcccc !important; font-weight: 900; }
@@ -45,11 +49,11 @@ if check_password():
         .score-box { padding: 12px 20px; border-radius: 12px; font-size: 28px; font-weight: 800; min-width: 100px; color: #FFFFFF; line-height: 1.2; text-align: center;}
         .info-box { background-color: #f8f9fa; border-left: 5px solid #FF8200; padding: 12px; margin-top: 10px; font-size: 12px; color: #1D1D1F; font-weight: 600; line-height: 1.4; }
         
-        .player-row-container {
-            break-inside: avoid !important;
-            page-break-inside: avoid !important;
-            display: block;
-            margin-bottom: 30px;
+        .player-row-container { 
+            break-inside: avoid !important; 
+            page-break-inside: avoid !important; 
+            display: block !important; 
+            margin-bottom: 30px; 
         }
         
         .player-divider { border: 0; height: 1px; background: #E5E5E7; margin-bottom: 15px; width: 100%; }
@@ -57,23 +61,10 @@ if check_password():
         .section-header { font-size: 14px; font-weight: 800; color: #4895DB; border-bottom: 2px solid #FF8200; margin-top: 15px; margin-bottom: 10px; padding-bottom: 5px; text-transform: uppercase; }
 
         @media print {
-            /* KEEP LOGO AND DATA VISIBLE */
             .main-logo-container { display: block !important; margin-bottom: 0 !important; }
-            .main .block-container { display: block !important; padding: 0 !important; }
-            
-            /* HIDE UI ELEMENTS */
-            .stTabs [role="tablist"], [data-testid="stSidebar"], 
-            header, footer, .print-hide, button { 
-                display: none !important; 
-            }
-
-            /* COLLAPSE GAPS */
-            [data-testid="stVerticalBlock"] > div:has(div.print-hide) {
-                display: none !important;
-                height: 0 !important;
-            }
-            
-            .scout-table td, p, div, span { color: #000000 !important; }
+            .stTabs [role="tablist"], [data-testid="stSidebar"], header, footer, button, .stButton { display: none !important; }
+            .main .block-container { padding: 0 !important; max-width: 100% !important; }
+            .scout-table td, p, span, div { color: #000000 !important; }
         }
         </style>
         """, unsafe_allow_html=True)
@@ -123,8 +114,7 @@ if check_password():
         tabs = st.tabs(["Individual Profile", "Team Gallery", "Game v. Practice", "Position Analysis", "Match Summary"])
         session_list = df[['Date', 'Session_Name']].drop_duplicates().sort_values('Date', ascending=False)['Session_Name'].tolist()
 
-        # --- TAB 0: INDIVIDUAL PROFILE ---
-        with tabs[0]:
+        with tabs[0]: # Individual Profile
             c_f1, c_f2 = st.columns(2)
             with c_f1: selected_session = st.selectbox("Practice Selection", session_list, index=0, key="nav_sel_ind")
             with c_f2: pos_f = st.selectbox("Position Filter", ["All Positions"] + sorted([p for p in df['Position'].unique() if p != "N/A"]), key="nav_pos_ind")
@@ -167,8 +157,7 @@ if check_password():
                     for _, r in p_ph.iterrows(): p_tbl += f"<tr><td>{r['Phase']}</td><td>{int(r['Total Jumps'])}</td><td>{r['Player Load']:.1f}</td>{f'<td>{r['Estimated Distance (y)']:.1f}</td>' if 'Estimated Distance (y)' in p_ph.columns else ''}</tr>"
                     st.markdown(p_tbl + '</tbody></table>', unsafe_allow_html=True)
 
-        # --- TAB 1: TEAM GALLERY ---
-        with tabs[1]:
+        with tabs[1]: # Team Gallery
             c_gal1, c_gal2 = st.columns(2)
             with c_gal1: selected_session_gal = st.selectbox("Practice Selection", session_list, index=0, key="nav_sel_gal")
             with c_gal2: pos_f_gal = st.selectbox("Position Filter", ["All Positions"] + sorted([p for p in df['Position'].unique() if p != "N/A"]), key="nav_pos_gal")
@@ -189,8 +178,7 @@ if check_password():
                             sc_g = math.ceil(t_grade / c_metrics) if c_metrics > 0 else 0
                             with cols[j]: st.markdown(f'<div style="border:1px solid #E5E5E7; border-radius:15px; padding:15px; margin-bottom:20px;"><div style="display:flex; align-items:center; gap:10px;"><div style="flex:1.2; text-align:center;"><img src="{pd_row["PhotoURL"]}" class="gallery-photo"><p style="font-weight:bold; font-size:15px; margin-top:8px;">{pd_row["Name"]}</p></div><div style="flex:3;"><table class="scout-table"><thead><tr><th>Metric</th><th>Val</th><th>Max</th><th>Grade</th></tr></thead><tbody>{r_html}</tbody></table></div><div style="flex:1; text-align:center;"><div style="background-color:{get_flipped_gradient(sc_g)}; color:white; padding:10px; border-radius:12px; font-size:32px; font-weight:900;">{sc_g}</div></div></div></div>', unsafe_allow_html=True)
 
-        # --- TAB 2: GAME V PRACTICE ---
-        with tabs[2]:
+        with tabs[2]: # Game v Practice
             st.markdown('<div class="section-header">Weekly Prep Intensity vs. Game Demands</div>', unsafe_allow_html=True)
             c_ga, c_gw, c_gg = st.columns(3)
             with c_ga: gp_p = st.selectbox("Athlete", sorted(df['Name'].unique()), key="gp_p_vf")
@@ -210,25 +198,44 @@ if check_password():
                     for _, r in sub.iterrows(): is_sel = (r['Session_Name'] == gp_g); fig_tr.add_trace(go.Scatter(x=[r['Day_Label']], y=[r['Player Load']], name=r['Session_Name'] if s_t == 'Game' else s_t, mode='markers', marker=dict(color=clr, size=16 if is_sel else 10, line=dict(width=3 if is_sel else 1, color='black' if is_sel else 'white')), showlegend=True if s_t == 'Game' else (True if _ == sub.index[0] else False)))
                 fig_tr.update_layout(height=350, margin=dict(l=0, r=0, t=20, b=0), yaxis_title="Avg Player Load"); st.plotly_chart(fig_tr, use_container_width=True, config=LOCKED_CONFIG)
 
-        # --- TAB 3: POSITION ANALYSIS ---
-        with tabs[3]:
+        with tabs[3]: # Position Analysis
             st.markdown('<div class="section-header">Positional Performance Trends</div>', unsafe_allow_html=True)
-            sel_p_pos = st.selectbox("Select Athlete", sorted(df['Name'].unique()), key="pos_athlete")
-            p_pos = df[df['Name'] == sel_p_pos].iloc[0]; pos_label = p_pos['Position']
-            tr_df = df[df['Position'] == pos_label].groupby(['Week', 'Name'])['Player Load'].mean().reset_index()
-            fig_pos = px.box(tr_df, x='Week', y='Player Load', title=f"{pos_label} Position Load Range"); st.plotly_chart(fig_pos, use_container_width=True)
+            sel_p_pos = st.selectbox("Select Athlete for Comparative Trend", sorted(df['Name'].unique())); p_pos = df[df['Name'] == sel_p_pos].iloc[0]; pos_label = p_pos['Position']; max_wk = df['Week'].max(); rec_4 = list(range(int(max_wk) - 3, int(max_wk) + 1)); tr_df = df[df['Week'].isin(rec_4)]; t_col1, t_col2, t_col3 = st.columns(3); tr_metrics = ["Player Load", "Estimated Distance (y)", "Total Jumps"]; cols = [t_col1, t_col2, t_col3]
+            for i, m in enumerate(tr_metrics):
+                if m in df.columns:
+                    with cols[i]:
+                        fig_t = go.Figure(); p_t = tr_df[tr_df['Name'] == sel_p_pos].groupby('Week')[m].mean().reset_index(); fig_t.add_trace(go.Scatter(x=p_t['Week'], y=p_t[m], name=sel_p_pos, line=dict(color='#0046ad', width=4), mode='lines+markers')); pos_t = tr_df[tr_df['Position'] == pos_label].groupby('Week')[m].mean().reset_index(); fig_t.add_trace(go.Scatter(x=pos_t['Week'], y=pos_t[m], name=f"{pos_label} Avg", line=dict(color='#ff7f0e', dash='dash'))); fig_t.update_layout(title=f"4-Week {m}", xaxis=dict(dtick=1), height=300, margin=dict(l=10, r=10, t=40, b=10), showlegend=True, legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)); st.plotly_chart(fig_t, use_container_width=True, config=LOCKED_CONFIG)
 
-        # --- TAB 4: MATCH SUMMARY ---
-        with tabs[4]:
-            st.markdown('<div class="print-hide">', unsafe_allow_html=True)
-            if st.button("🖨️ Prepare PDF for Printing"): st.markdown('<script>window.print();</script>', unsafe_allow_html=True)
-            st.markdown('<div id="print-hide-header"><div class="section-header">Match Comparison Selection</div></div>', unsafe_allow_html=True)
-            c_ts1, c_ts2 = st.columns([2, 1])
-            with c_ts1:
-                match_list_t = df[df['Session_Type'].isin(['Game', 'Match'])].sort_values(['Date', 'Sheet_Order'])['Session_Name'].unique()
-                selected_matches = st.multiselect("Select Weekend Matches", match_list_t, default=match_list_t[-3:] if len(match_list_t) >=3 else match_list_t)
-            with c_ts2: pos_filter_t = st.selectbox("Filter by Position", ["All Positions"] + sorted(list(df['Position'].unique())), key="ms_pos_surgical")
-            st.markdown('</div>', unsafe_allow_html=True)
+        with tabs[4]: # Match Summary (THE FIX)
+            # LOGIC: If is_printing is True, we do NOT show the selectbox area at all.
+            if st.session_state.is_printing:
+                if st.button("🔙 Back to Editor (Show Filters)"):
+                    st.session_state.is_printing = False
+                    st.rerun()
+            else:
+                st.markdown('<div class="print-hide">', unsafe_allow_html=True)
+                if st.button("🖨️ Prepare PDF for Printing"):
+                    st.session_state.is_printing = True
+                    st.rerun()
+                
+                st.markdown('<div class="section-header">Match Comparison Selection</div>', unsafe_allow_html=True)
+                c_ts1, c_ts2 = st.columns([2, 1])
+                with c_ts1:
+                    match_list_t = df[df['Session_Type'].isin(['Game', 'Match'])].sort_values(['Date', 'Sheet_Order'])['Session_Name'].unique()
+                    if "matches_state" not in st.session_state:
+                        st.session_state.matches_state = match_list_t[-3:] if len(match_list_t) >=3 else match_list_t
+                    st.session_state.matches_state = st.multiselect("Select Weekend Matches", match_list_t, default=st.session_state.matches_state)
+                with c_ts2:
+                    if "pos_state" not in st.session_state: st.session_state.pos_state = "All Positions"
+                    st.session_state.pos_state = st.selectbox("Filter by Position", ["All Positions"] + sorted(list(df['Position'].unique())), index=0)
+                st.markdown('</div>', unsafe_allow_html=True)
+
+            # Execution
+            if st.session_state.is_printing:
+                st.markdown('<script>window.print();</script>', unsafe_allow_html=True)
+
+            selected_matches = st.session_state.get("matches_state", [])
+            pos_filter_t = st.session_state.get("pos_state", "All Positions")
 
             if selected_matches:
                 c_pal = ['#4895DB', '#FF8200', '#515154']; m_map = {m: c_pal[idx % 3] for idx, m in enumerate(selected_matches)}
@@ -264,14 +271,6 @@ if check_password():
                         fig_ath.update_layout(barmode='group', height=260, margin=dict(l=10, r=10, t=10, b=80), template="simple_white", font=dict(color="#333333", size=10), legend=dict(orientation="h", yanchor="top", y=-0.3, xanchor="center", x=0.5))
                         st.plotly_chart(fig_ath, use_container_width=True, config=LOCKED_CONFIG)
                     st.markdown('</div>', unsafe_allow_html=True)
-
-                st.write("<br><br>", unsafe_allow_html=True); st.markdown('<div class="section-header">Team Match Averages</div>', unsafe_allow_html=True)
-                team_avg_t = tourney_df.groupby('Session_Name')[['Total Jumps', 'Player Load', 'Explosive Efforts', 'Estimated Distance (y)']].mean().reset_index()
-                c1, c2 = st.columns(2); c3, c4 = st.columns(2); t_cols = [c1, c2, c3, c4]
-                for idx, m in enumerate(['Total Jumps', 'Player Load', 'Explosive Efforts', 'Estimated Distance (y)']):
-                    with t_cols[idx]:
-                        fig_t = go.Figure(); fig_t.add_trace(go.Bar(x=team_avg_t['Session_Name'], y=team_avg_t[m], marker_color=[m_map[g] for g in team_avg_t['Session_Name']], marker_line_width=0))
-                        fig_t.update_layout(title=f"Team Avg: {m}", font=dict(color="#333333"), showlegend=False, height=400, template="simple_white", bargap=0.01); st.plotly_chart(fig_t, use_container_width=True, config=LOCKED_CONFIG)
 
     except Exception as e:
         st.error(f"Sync Error: {e}")
