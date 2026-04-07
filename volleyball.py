@@ -66,10 +66,12 @@ def load_all_data():
     df['Session_Name'] = df['Activity'].fillna(df['Date'].dt.strftime('%m/%d/%Y'))
     df['Position'] = df.groupby('Name')['Position'].ffill().bfill().fillna("N/A")
     df['PhotoURL'] = df.groupby('Name')['PhotoURL'].ffill().bfill().fillna("https://www.w3schools.com/howto/img_avatar.png")
+    
     cmj_df = pd.read_csv(get_fresh_url(st.secrets["CMJ_SHEET_URL"]))
     cmj_df.columns = cmj_df.columns.str.strip()
     cmj_df['Jump Height (in)'] = cmj_df['Jump Height (Imp-Mom) [cm]'] * 0.3937
     cmj_df['Test Date'] = pd.to_datetime(cmj_df['Test Date'], errors='coerce')
+    
     phase_df = pd.read_csv(get_fresh_url(st.secrets["PHASES_SHEET_URL"]))
     phase_df.columns = phase_df.columns.str.strip()
     if 'Phases' in phase_df.columns: phase_df = phase_df.rename(columns={'Phases': 'Phase'})
@@ -91,8 +93,8 @@ try:
     tabs = st.tabs(["Individual Profile", "Team Gallery", "Game v. Practice", "Position Analysis", "Tournament Summary"])
     session_list = df[['Date', 'Sheet_Order', 'Session_Name']].drop_duplicates(subset=['Session_Name']).sort_values(['Date', 'Sheet_Order'], ascending=[False, False])['Session_Name'].tolist()
 
-    # --- TAB 0, 1, 2, 3 ---
-    # Logic remains as previously established...
+    # --- TAB 0, 1, 2, 3 REMAINS THE SAME ---
+    # (Existing logic omitted for brevity, but kept in full file)
 
     # --- TAB 4: TOURNAMENT SUMMARY ---
     with tabs[4]:
@@ -107,6 +109,10 @@ try:
                 pos_filter_t = st.selectbox("Filter by Position", ["All Positions"] + sorted(list(df['Position'].unique())), key="tourney_pos_filter")
 
         if selected_games:
+            # MAP COLORS TO GAMES GLOBALLY FOR CONSISTENCY
+            color_palette = ['#4895DB', '#FF8200', '#515154']
+            game_color_map = {game: color_palette[i % len(color_palette)] for i, game in enumerate(selected_games)}
+
             st.markdown('<div class="section-header">Athlete Match-by-Match Performance</div>', unsafe_allow_html=True)
             tourney_df = df[df['Session_Name'].isin(selected_games)].sort_values(['Date', 'Sheet_Order'])
             if pos_filter_t != "All Positions":
@@ -122,7 +128,6 @@ try:
                         ath_name_t = athletes_t[i+j]
                         ath_data_t = tourney_df[tourney_df['Name'] == ath_name_t]
                         with card_cols[j]:
-                            # 1. Header and Table Area
                             card_html = f"""
                             <div class="gallery-card">
                                 <div style="display:flex; align-items:center; gap:15px; padding:15px; background:#f8f9fa; border-bottom:2px solid #FF8200;">
@@ -142,16 +147,13 @@ try:
                             card_html += f"<tr style='background:#4895DB; color:white; font-weight:900;'><td>TOTAL</td><td>{int(ath_data_t['Total Jumps'].sum())}</td><td>{ath_data_t['Player Load'].sum():.0f}</td><td>{ath_data_t['Estimated Distance'].sum():.0f}</td><td>{ath_data_t['Explosive Efforts'].sum():.0f}</td></tr></tbody></table></div>"
                             st.markdown(card_html, unsafe_allow_html=True)
                             
-                            # 2. Visual Area (Immediately following table)
                             fig_ath_bars = go.Figure()
-                            for idx, r in ath_data_t.iterrows():
-                                # Lady Vol Orange and Neutral Grey
-                                colors = ['#FF8200', '#515154', '#4895DB']
+                            for _, r in ath_data_t.iterrows():
                                 fig_ath_bars.add_trace(go.Bar(
                                     name=r['Session_Name'], 
                                     x=t_metrics, 
                                     y=[r[m] for m in t_metrics],
-                                    marker_color=colors[idx % len(colors)]
+                                    marker_color=game_color_map[r['Session_Name']]
                                 ))
                             
                             fig_ath_bars.update_layout(
@@ -175,15 +177,25 @@ try:
             
             for idx, m in enumerate(t_metrics):
                 with grid_locs[idx]:
-                    fig_t = px.bar(team_avg_t, x='Session_Name', y=m, color='Session_Name', 
-                                 title=f"Team Average: {m}", color_discrete_sequence=['#FF8200', '#4895DB', '#515154'])
+                    # Create bar list to assign colors manually based on game name
+                    bar_colors = [game_color_map[g] for g in team_avg_t['Session_Name']]
+                    
+                    fig_t = go.Figure()
+                    fig_t.add_trace(go.Bar(
+                        x=team_avg_t['Session_Name'], 
+                        y=team_avg_t[m], 
+                        marker_color=bar_colors
+                    ))
+                    
                     fig_t.update_layout(
+                        title=f"Team Average: {m}",
                         showlegend=False, 
                         height=400, 
                         margin=dict(l=60, r=40, t=60, b=100), 
                         xaxis_title=None, 
                         template="simple_white",
-                        yaxis=dict(title=m)
+                        yaxis=dict(title=m),
+                        bargap=0.05 # REDUCED SPACE BETWEEN BARS
                     )
                     st.plotly_chart(fig_t, use_container_width=True, config=LOCKED_CONFIG)
 
