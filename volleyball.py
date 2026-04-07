@@ -124,8 +124,34 @@ try:
             with c1: st.markdown(f'<div style="text-align:center;"><img src="{p["PhotoURL"]}" class="player-photo-large"></div><h3 style="text-align:center;">{p["Name"]}</h3>', unsafe_allow_html=True)
             with c2: st.markdown(f'<table class="scout-table"><thead><tr><th>Metric</th><th>Today</th><th>30d Max</th><th>Grade</th></tr></thead><tbody>{m_rows}</tbody></table>', unsafe_allow_html=True)
             with c3: st.markdown(f'<div style="display:flex; justify-content:center;"><div class="score-box" style="background-color:{get_flipped_gradient(score)};">{score}</div></div>', unsafe_allow_html=True)
-            
-            # readiness/phase code omitted for brevity as per your snippet flow...
+
+            st.markdown('<div class="section-header">Weekly Readiness Profile</div>', unsafe_allow_html=True)
+            jc1, jc2 = st.columns([1.5, 3.5])
+            with jc1:
+                p_cmj_hist = cmj_df[(cmj_df['Athlete'] == sel_p) & (cmj_df['Test Date'] <= curr_date)].sort_values('Test Date')
+                sync_cmj = p_cmj_hist[(p_cmj_hist['Test Date'] > curr_date - timedelta(days=7))]
+                if not sync_cmj.empty:
+                    latest = sync_cmj.iloc[-1]; base_h = p_cmj_hist.tail(5).iloc[:-1]['Jump Height (in)'].mean(); base_rsi = p_cmj_hist.tail(5).iloc[:-1]['RSI-modified [m/s]'].mean()
+                    cur_h, cur_rsi = latest['Jump Height (in)'], latest['RSI-modified [m/s]']; p_diff = ((cur_h - base_h) / base_h) * 100
+                    if cur_h >= base_h and cur_rsi >= base_rsi: label, color, profile = "ELITE", "#28a745", "Jump Height and RSI are both High."
+                    elif cur_h >= base_h and cur_rsi < base_rsi: label, color, profile = "GRINDER", "#ffc107", "Jump Height is High | RSI is Low."
+                    elif cur_h < base_h and cur_rsi >= base_rsi: label, color, profile = "SPRINGY", "#ffc107", "Jump Height is Low | RSI is High."
+                    else: label, color, profile = "FATIGUED", "#dc3545", "Jump Height and RSI are both Low."
+                    st.markdown(f'<div style="text-align:center;"><div class="score-box" style="background-color:{color};">{p_diff:+.1f}%<span style="font-size:10px; display:block;">{label}</span></div></div><div class="info-box"><b>Today:</b> {cur_h:.1f}" | {cur_rsi:.2f} RSI<br><b>Profile:</b> {profile}</div>', unsafe_allow_html=True)
+            with jc2:
+                if not p_cmj_hist.empty:
+                    fig = make_subplots(specs=[[{"secondary_y": True}]]); fig.add_trace(go.Scatter(x=p_cmj_hist['Test Date'], y=p_cmj_hist['Jump Height (in)'], name="Height", line=dict(color='#FF8200', width=3)), secondary_y=False); fig.add_trace(go.Scatter(x=p_cmj_hist['Test Date'], y=p_cmj_hist['RSI-modified [m/s]'], name="RSI", line=dict(color='#4895DB', dash='dot')), secondary_y=True); fig.update_layout(height=280, margin=dict(l=0, r=0, t=20, b=0), showlegend=False, hovermode=False); st.plotly_chart(fig, use_container_width=True, config=LOCKED_CONFIG)
+
+            p_phases = phase_df[(phase_df['Name'] == sel_p) & (phase_df['Date'] == curr_date)].copy()
+            if not p_phases.empty:
+                st.markdown('<div class="section-header">Practice Phase Breakdown</div>', unsafe_allow_html=True)
+                fig_ph = make_subplots(specs=[[{"secondary_y": True}]])
+                fig_ph.add_trace(go.Bar(x=p_phases['Phase'], y=p_phases['Total Jumps'], name="Jumps", marker_color='#FF8200'), secondary_y=False)
+                fig_ph.add_trace(go.Scatter(x=p_phases['Phase'], y=p_phases['Player Load'], name="Load", line=dict(color='#4895DB', width=4)), secondary_y=False)
+                if 'Estimated Distance (y)' in p_phases.columns:
+                    fig_ph.add_trace(go.Scatter(x=p_phases['Phase'], y=p_phases['Estimated Distance (y)'], name="Distance (y)", line=dict(color='#515154', width=2, dash='dash')), secondary_y=True)
+                fig_ph.update_layout(height=350, showlegend=True, legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1), hovermode=False)
+                st.plotly_chart(fig_ph, use_container_width=True, config=LOCKED_CONFIG)
 
     # --- TAB 1: TEAM GALLERY ---
     with tabs[1]:
@@ -155,7 +181,7 @@ try:
                         sc_g = math.ceil(t_grade / c_metrics) if c_metrics > 0 else 0
                         with cols[j]: st.markdown(f'<div class="gallery-card"><div style="display:flex; align-items:center; gap:10px;"><div style="flex:1.2; text-align:center;"><img src="{pd_row["PhotoURL"]}" class="gallery-photo"><p style="font-weight:bold; font-size:15px; margin-top:8px;">{pd_row["Name"]}</p></div><div style="flex:3;"><table class="scout-table"><thead><tr><th>Metric</th><th>Val</th><th>Max</th><th>Grade</th></tr></thead><tbody>{r_html}</tbody></table></div><div style="flex:1; text-align:center;"><div style="background-color:{get_flipped_gradient(sc_g)}; color:white; padding:10px; border-radius:12px; font-size:32px; font-weight:900;">{sc_g}</div></div></div></div>', unsafe_allow_html=True)
 
-    # --- TAB 2: GAME V PRACTICE (FIXED MULTI-GAME LOGIC) ---
+    # --- TAB 2: GAME V PRACTICE ---
     with tabs[2]:
         st.markdown('<div class="section-header">Weekly Prep Intensity vs. Game Demands</div>', unsafe_allow_html=True)
         c_ga, c_gw, c_gg = st.columns(3)
@@ -166,7 +192,6 @@ try:
             gp_w = st.selectbox("Week", w_r['L'].tolist(), key="gp_w_vf")
             sel_w = w_r[w_r['L'] == gp_w]['Week'].values[0]
         with c_gg: 
-            # DYNAMIC GAME FILTER: Only show games for THIS week and THIS athlete
             game_options = df[(df['Name'] == gp_p) & (df['Session_Type'] == 'Game') & (df['Week'] == sel_w)]['Session_Name'].unique()
             gp_g = st.selectbox("Select Specific Game", game_options, key="gp_g_vf")
         
@@ -178,8 +203,7 @@ try:
         
         if not w_data.empty and not g_data_l.empty:
             all_m = low_val_metrics + ([high_val_metric] if high_val_metric else [])
-            w_avg = w_data[all_m].mean()
-            g_d = g_data_l.iloc[0]
+            w_avg = w_data[all_m].mean(); g_d = g_data_l.iloc[0]
             cg1, cg2 = st.columns([1, 2])
             with cg1:
                 for m in all_m:
@@ -195,51 +219,38 @@ try:
                 fig_dual.update_layout(height=400, barmode='group', showlegend=True, legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
                 st.plotly_chart(fig_dual, use_container_width=True, config=LOCKED_CONFIG)
 
-            # --- WEEKLY LOAD TREND WITH SPECIFIC GAME HIGHLIGHT ---
             st.markdown(f'<div class="section-header">Average Weekly Load Context: Week {sel_w}</div>', unsafe_allow_html=True)
             week_team_trends = df[df['Week'] == sel_w].groupby(['Date', 'Session_Name', 'Session_Type']).agg({'Player Load': 'mean'}).reset_index().sort_values('Date')
             week_team_trends['Day_Label'] = week_team_trends['Date'].dt.strftime('%a %m/%d')
-            
             fig_tr = go.Figure()
-            # Background line for the week
             fig_tr.add_trace(go.Scatter(x=week_team_trends['Day_Label'], y=week_team_trends['Player Load'], mode='lines', line=dict(color='#4895DB', width=3), showlegend=False))
-            
-            # Scatter points for Practice vs Game
             for s_type, color in [('Practice', '#4895DB'), ('Game', '#FF8200')]:
                 subset = week_team_trends[week_team_trends['Session_Type'] == s_type]
                 for _, row in subset.iterrows():
                     is_selected = (row['Session_Name'] == gp_g)
-                    fig_tr.add_trace(go.Scatter(
-                        x=[row['Day_Label']], y=[row['Player Load']], 
-                        name=row['Session_Name'] if s_type == 'Game' else s_type,
-                        mode='markers',
-                        marker=dict(
-                            color=color, 
-                            size=16 if is_selected else 10,
-                            line=dict(width=3 if is_selected else 1, color='black' if is_selected else 'white')
-                        ),
-                        showlegend=True if s_type == 'Game' else (True if _ == subset.index[0] else False)
-                    ))
+                    fig_tr.add_trace(go.Scatter(x=[row['Day_Label']], y=[row['Player Load']], name=row['Session_Name'] if s_type == 'Game' else s_type, mode='markers',
+                        marker=dict(color=color, size=16 if is_selected else 10, line=dict(width=3 if is_selected else 1, color='black' if is_selected else 'white')),
+                        showlegend=True if s_type == 'Game' else (True if _ == subset.index[0] else False)))
             fig_tr.update_layout(height=350, margin=dict(l=0, r=0, t=20, b=0), yaxis_title="Avg Player Load")
             st.plotly_chart(fig_tr, use_container_width=True, config=LOCKED_CONFIG)
 
-    # --- TAB 3: POSITION ANALYSIS (WITH TRENDS) ---
+    # --- TAB 3: POSITION ANALYSIS ---
     with tabs[3]:
         selected_session_pos = st.selectbox("Practice Selection", session_list, index=0, key="nav_sel_pos")
-        st.markdown('<div class="section-header">Positional Performance Trends</div>', unsafe_allow_html=True)
+        st.markdown('<div class="section-header">Positional Performance & 4-Week Trends</div>', unsafe_allow_html=True)
         
-        # 1. Filter data
         day_df_pos = df[df['Session_Name'] == selected_session_pos].copy()
         if not day_df_pos.empty:
-            sel_p_pos = st.selectbox("Select Athlete for Trend", sorted(day_df_pos['Name'].unique()))
+            sel_p_pos = st.selectbox("Select Athlete for Comparative Trend", sorted(day_df_pos['Name'].unique()))
             p_pos = day_df_pos[day_df_pos['Name'] == sel_p_pos].iloc[0]
             pos_label = p_pos['Position']
             
-            # 2. Get 4-Week History
-            recent_weeks = sorted(df['Week'].unique())[-4:]
-            trend_df = df[df['Week'].isin(recent_weeks)]
+            # --- LOGIC: Most recent week and 3 weeks back (4-week total) ---
+            # Finds the most recent week in the dataset and calculates the window
+            max_week = df['Week'].max()
+            recent_4_weeks = list(range(max_week - 3, max_week + 1))
+            trend_df = df[df['Week'].isin(recent_4_weeks)]
             
-            # 3. Plot Trends
             t_col1, t_col2, t_col3 = st.columns(3)
             trend_metrics = ["Player Load", "Estimated Distance (y)", "Total Jumps"]
             cols = [t_col1, t_col2, t_col3]
@@ -248,14 +259,15 @@ try:
                 if metric in df.columns:
                     with cols[i]:
                         fig_t = go.Figure()
-                        # Player line
-                        p_trend = trend_df[trend_df['Name'] == sel_p_pos].groupby('Week')[metric].mean().reset_index()
-                        fig_t.add_trace(go.Scatter(x=p_trend['Week'], y=p_trend[metric], name=sel_p_pos, line=dict(color='#0046ad', width=4), mode='lines+markers'))
-                        # Position Avg line
-                        pos_avg_trend = trend_df[trend_df['Position'] == pos_label].groupby('Week')[metric].mean().reset_index()
-                        fig_t.add_trace(go.Scatter(x=pos_avg_trend['Week'], y=pos_avg_trend[metric], name=f"{pos_label} Avg", line=dict(color='#ff7f0e', dash='dash')))
+                        # Player Trend
+                        p_t = trend_df[trend_df['Name'] == sel_p_pos].groupby('Week')[metric].mean().reset_index()
+                        fig_t.add_trace(go.Scatter(x=p_t['Week'], y=p_t[metric], name=sel_p_pos, line=dict(color='#0046ad', width=4), mode='lines+markers'))
+                        # Position Avg Trend
+                        pos_t = trend_df[trend_df['Position'] == pos_label].groupby('Week')[metric].mean().reset_index()
+                        fig_t.add_trace(go.Scatter(x=pos_t['Week'], y=pos_t[metric], name=f"{pos_label} Avg", line=dict(color='#ff7f0e', dash='dash')))
                         
-                        fig_t.update_layout(title=f"4-Week {metric}", height=300, margin=dict(l=10, r=10, t=40, b=10), showlegend=False)
+                        fig_t.update_layout(title=f"4-Week {metric}", xaxis=dict(dtick=1), height=300, margin=dict(l=10, r=10, t=40, b=10), showlegend=True,
+                                            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
                         st.plotly_chart(fig_t, use_container_width=True, config=LOCKED_CONFIG)
 
 except Exception as e:
