@@ -36,9 +36,9 @@ st.markdown("""
 # --- HELPER FUNCTIONS ---
 def get_flipped_gradient(score):
     score = float(score)
-    if score <= 40: return "#2D5A27" # Green
-    if score <= 70: return "#D4A017" # Yellow
-    return "#A52A2A" # Red
+    if score <= 40: return "#2D5A27"
+    if score <= 70: return "#D4A017"
+    return "#A52A2A"
 
 # --- DATA LOADING ---
 @st.cache_data(ttl=0)
@@ -46,11 +46,11 @@ def load_all_data():
     def get_fresh_url(url):
         return f"{url}&cachebust={int(time.time())}"
     
+    # 1. Main GPS/Jumps Sheet
     df = pd.read_csv(get_fresh_url(st.secrets["GOOGLE_SHEET_URL"]))
     df.columns = df.columns.str.strip()
     df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
     df = df.dropna(subset=['Date']) 
-    
     if 'Week' in df.columns:
         df['Week'] = pd.to_numeric(df['Week'].astype(str).str.extract('(\d+)', expand=False), errors='coerce').fillna(0).astype(int)
 
@@ -70,11 +70,13 @@ def load_all_data():
     df['Position'] = df.groupby('Name')['Position'].ffill().bfill().fillna("N/A")
     df['PhotoURL'] = df.groupby('Name')['PhotoURL'].ffill().bfill().fillna("https://www.w3schools.com/howto/img_avatar.png")
     
+    # 2. CMJ Readiness Sheet
     cmj_df = pd.read_csv(get_fresh_url(st.secrets["CMJ_SHEET_URL"]))
     cmj_df.columns = cmj_df.columns.str.strip()
     cmj_df['Jump Height (in)'] = cmj_df['Jump Height (Imp-Mom) [cm]'] * 0.3937
     cmj_df['Test Date'] = pd.to_datetime(cmj_df['Test Date'], errors='coerce')
     
+    # 3. Practice Phase Sheet
     phase_df = pd.read_csv(get_fresh_url(st.secrets["PHASES_SHEET_URL"]))
     phase_df.columns = phase_df.columns.str.strip()
     if 'Phases' in phase_df.columns: phase_df = phase_df.rename(columns={'Phases': 'Phase'})
@@ -106,6 +108,7 @@ try:
             p = day_df[day_df['Name'] == sel_p].iloc[0]
             lb = df[(df['Name'] == sel_p) & (df['Date'] >= curr_date - timedelta(days=30)) & (df['Date'] <= curr_date)]
             
+            # Grade Logic
             m_rows = ""; total_grade = 0; count = 0
             for k in all_metrics:
                 if k in p:
@@ -116,32 +119,39 @@ try:
                     h_class = "class='bg-highlight-red'" if abs(diff) > 0.10 else ""
                     arr_val = f"<span class='arrow-red'>{'↑' if diff > 0.10 else '↓'}</span>" if abs(diff) > 0.10 else ""
                     m_rows += f"<tr><td>{k}</td><td {h_class}>{val} {arr_val}</td><td>{mx}</td><td>{grade}</td></tr>"
-            
             score = math.ceil(total_grade / count) if count > 0 else 0
+            
             c1, c2, c3 = st.columns([1.2, 2.5, 1.2])
             with c1: st.markdown(f'<div style="text-align:center;"><img src="{p["PhotoURL"]}" class="player-photo-large"></div><h3 style="text-align:center;">{p["Name"]}</h3>', unsafe_allow_html=True)
             with c2: st.markdown(f'<table class="scout-table"><thead><tr><th>Metric</th><th>Today</th><th>30d Max</th><th>Grade</th></tr></thead><tbody>{m_rows}</tbody></table>', unsafe_allow_html=True)
             with c3: st.markdown(f'<div style="display:flex; justify-content:center;"><div class="score-box" style="background-color:{get_flipped_gradient(score)};">{score}</div></div>', unsafe_allow_html=True)
 
-            # Readiness
+            # --- WEEKLY READINESS PROFILE (UPDATED TO IGNORE PRACTICE DATE) ---
             st.markdown('<div class="section-header">Weekly Readiness Profile</div>', unsafe_allow_html=True)
             jc1, jc2 = st.columns([1.5, 3.5])
             with jc1:
-                p_cmj_hist = cmj_df[(cmj_df['Athlete'] == sel_p) & (cmj_df['Test Date'] <= curr_date)].sort_values('Test Date')
-                sync_cmj = p_cmj_hist[(p_cmj_hist['Test Date'] > curr_date - timedelta(days=7))]
-                if not sync_cmj.empty:
-                    latest = sync_cmj.iloc[-1]; base_h = p_cmj_hist.tail(5).iloc[:-1]['Jump Height (in)'].mean(); base_rsi = p_cmj_hist.tail(5).iloc[:-1]['RSI-modified [m/s]'].mean()
-                    cur_h, cur_rsi = latest['Jump Height (in)'], latest['RSI-modified [m/s]']; p_diff = ((cur_h - base_h) / base_h) * 100
-                    label, color, profile = ("ELITE", "#28a745", "Jump Height and RSI are both High.") if cur_h >= base_h and cur_rsi >= base_rsi else \
-                                           ("GRINDER", "#ffc107", "Jump Height is High | RSI is Low.") if cur_h >= base_h and cur_rsi < base_rsi else \
-                                           ("SPRINGY", "#ffc107", "Jump Height is Low | RSI is High.") if cur_h < base_h and cur_rsi >= base_rsi else \
-                                           ("FATIGUED", "#dc3545", "Jump Height and RSI are both Low.")
-                    st.markdown(f'<div style="text-align:center;"><div class="score-box" style="background-color:{color};">{p_diff:+.1f}%<span style="font-size:10px; display:block;">{label}</span></div></div><div class="info-box"><b>Today:</b> {cur_h:.1f}" | {cur_rsi:.2f} RSI<br><b>Profile:</b> {profile}</div>', unsafe_allow_html=True)
+                p_cmj_hist = cmj_df[cmj_df['Athlete'] == sel_p].sort_values('Test Date')
+                # Grab the most recent test from the sheet, regardless of the GPS practice session date selected
+                if not p_cmj_hist.empty:
+                    latest = p_cmj_hist.iloc[-1]
+                    # Only show if the test is within the last 10 days to be "Current"
+                    if latest['Test Date'] >= p_cmj_hist['Test Date'].max() - timedelta(days=10):
+                        base_h = p_cmj_hist.tail(6).iloc[:-1]['Jump Height (in)'].mean()
+                        base_rsi = p_cmj_hist.tail(6).iloc[:-1]['RSI-modified [m/s]'].mean()
+                        cur_h, cur_rsi = latest['Jump Height (in)'], latest['RSI-modified [m/s]']
+                        p_diff = ((cur_h - base_h) / base_h) * 100
+                        
+                        label, color, profile = ("ELITE", "#28a745", "Jump Height and RSI are both High.") if cur_h >= base_h and cur_rsi >= base_rsi else \
+                                               ("GRINDER", "#ffc107", "Jump Height is High | RSI is Low.") if cur_h >= base_h and cur_rsi < base_rsi else \
+                                               ("SPRINGY", "#ffc107", "Jump Height is Low | RSI is High.") if cur_h < base_h and cur_rsi >= base_rsi else \
+                                               ("FATIGUED", "#dc3545", "Jump Height and RSI are both Low.")
+                        
+                        st.markdown(f'<div style="text-align:center;"><div class="score-box" style="background-color:{color};">{p_diff:+.1f}%<span style="font-size:10px; display:block;">{label}</span></div></div><div class="info-box"><b>Latest Test ({latest["Test Date"].strftime("%m/%d")}):</b> {cur_h:.1f}" | {cur_rsi:.2f} RSI<br><b>Profile:</b> {profile}</div>', unsafe_allow_html=True)
             with jc2:
                 if not p_cmj_hist.empty:
                     fig = make_subplots(specs=[[{"secondary_y": True}]]); fig.add_trace(go.Scatter(x=p_cmj_hist['Test Date'], y=p_cmj_hist['Jump Height (in)'], name="Height", line=dict(color='#FF8200', width=3)), secondary_y=False); fig.add_trace(go.Scatter(x=p_cmj_hist['Test Date'], y=p_cmj_hist['RSI-modified [m/s]'], name="RSI", line=dict(color='#4895DB', dash='dot')), secondary_y=True); fig.update_layout(height=280, margin=dict(l=0, r=0, t=20, b=0), showlegend=False, hovermode=False); st.plotly_chart(fig, use_container_width=True, config=LOCKED_CONFIG)
 
-            # Phase Breakdown
+            # Practice Phase Breakdown
             p_ph = phase_df[(phase_df['Name'] == sel_p) & (phase_df['Date'] == curr_date)].copy()
             if not p_ph.empty:
                 st.markdown('<div class="section-header">Practice Phase Breakdown</div>', unsafe_allow_html=True)
@@ -197,11 +207,10 @@ try:
         g_data_l = df[(df['Name'] == gp_p) & (df['Session_Name'] == gp_g)]
         if not w_data.empty and not g_data_l.empty:
             low_m = [m for m in ['Total Jumps', 'Player Load', 'Explosive Efforts'] if m in df.columns]
-            dist_m = 'Estimated Distance (y)' if 'Estimated Distance (y)' in df.columns else None
-            w_avg = w_data[low_m + ([dist_m] if dist_m else [])].mean(); g_d = g_data_l.iloc[0]
+            w_avg = w_data[low_m].mean(); g_d = g_data_l.iloc[0]
             cg1, cg2 = st.columns([1, 2])
             with cg1:
-                for m in low_m + ([dist_m] if dist_m else []):
+                for m in low_m:
                     pdif = ((w_avg[m] - g_d[m]) / g_d[m] * 100) if g_d[m] > 0 else 0
                     st.metric(label=m, value=f"{g_d[m]:.0f}", delta=f"{pdif:+.1f}% vs Weekly Avg")
             with cg2:
@@ -211,18 +220,15 @@ try:
                 fig_dual.update_layout(height=400, barmode='group', showlegend=True, legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
                 st.plotly_chart(fig_dual, use_container_width=True, config=LOCKED_CONFIG)
 
-    # --- TAB 3: POSITION ANALYSIS (TREND FIX) ---
+    # --- TAB 3: POSITION ANALYSIS ---
     with tabs[3]:
         st.markdown('<div class="section-header">Positional Performance & 4-Week Trends</div>', unsafe_allow_html=True)
         sel_p_pos = st.selectbox("Select Athlete for Comparative Trend", sorted(df['Name'].unique()))
         p_pos = df[df['Name'] == sel_p_pos].iloc[0]
         pos_label = p_pos['Position']
-        
-        # SLIDING WINDOW: Latest Week in data and 3 weeks prior
         max_wk = df['Week'].max()
         rec_4 = list(range(int(max_wk) - 3, int(max_wk) + 1))
         tr_df = df[df['Week'].isin(rec_4)]
-        
         t_col1, t_col2, t_col3 = st.columns(3)
         tr_metrics = ["Player Load", "Estimated Distance (y)", "Total Jumps"]
         cols = [t_col1, t_col2, t_col3]
@@ -230,13 +236,11 @@ try:
             if m in df.columns:
                 with cols[i]:
                     fig_t = go.Figure()
-                    # Individual (Daily updates grow the week's total)
                     p_t = tr_df[tr_df['Name'] == sel_p_pos].groupby('Week')[m].sum().reset_index()
                     fig_t.add_trace(go.Scatter(x=p_t['Week'], y=p_t[m], name=sel_p_pos, line=dict(color='#0046ad', width=4), mode='lines+markers'))
-                    # Positional average
                     pos_t = tr_df[tr_df['Position'] == pos_label].groupby(['Week', 'Name'])[m].sum().reset_index().groupby('Week')[m].mean().reset_index()
                     fig_t.add_trace(go.Scatter(x=pos_t['Week'], y=pos_t[m], name=f"{pos_label} Avg", line=dict(color='#ff7f0e', dash='dash')))
-                    fig_t.update_layout(title=f"Total Weekly {m}", xaxis=dict(dtick=1), height=300, margin=dict(l=10, r=10, t=40, b=10))
+                    fig_t.update_layout(title=f"Weekly Total {m}", xaxis=dict(dtick=1), height=300, margin=dict(l=10, r=10, t=40, b=10))
                     st.plotly_chart(fig_t, use_container_width=True, config=LOCKED_CONFIG)
 
 except Exception as e:
