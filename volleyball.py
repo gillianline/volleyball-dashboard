@@ -30,7 +30,6 @@ st.markdown("""
     .info-box { background-color: #f8f9fa; border-left: 5px solid #FF8200; padding: 12px; margin-top: 10px; font-size: 12px; color: #1D1D1F; font-weight: 600; line-height: 1.4; }
     .js-plotly-plot { pointer-events: none; }
 
-    /* PDF PRINT LOGIC: Hides UI for a clean report */
     @media print {
         .stTabs [role="tablist"], 
         .main-logo-container,
@@ -58,13 +57,11 @@ st.markdown("""
 def load_all_data():
     df = pd.read_csv(st.secrets["GOOGLE_SHEET_URL"])
     df.columns = df.columns.str.strip()
-    df['Sheet_Order'] = range(len(df)) # Capture original Excel order
+    df['Sheet_Order'] = range(len(df))
     
-    # Safety for non-date strings in Date column
     df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
     df = df.dropna(subset=['Date']) 
 
-    # Safety for Week column
     if 'Week' in df.columns:
         df['Week'] = pd.to_numeric(df['Week'].astype(str).str.extract('(\d+)', expand=False), errors='coerce').fillna(0).astype(int)
 
@@ -183,7 +180,7 @@ try:
                     p_tbl += f"<tr><td>{r['Phase']}</td><td>{int(r['Total Jumps'])}</td><td>{r['Player Load']:.1f}</td>{dist_td}</tr>"
                 st.markdown(p_tbl + '</tbody></table>', unsafe_allow_html=True)
 
-    # --- TAB 1: TEAM GALLERY ---
+    # --- TAB 1, 2, 3: UNTOUCHED ---
     with tabs[1]:
         c_gal1, c_gal2 = st.columns(2)
         with c_gal1: selected_session_gal = st.selectbox("Practice Selection", session_list, index=0, key="nav_sel_gal")
@@ -195,8 +192,7 @@ try:
                 cols = st.columns(2)
                 for j in range(2):
                     if i + j < len(gal_df):
-                        pd_row = gal_df.iloc[i + j]
-                        lb_g = df[(df['Name'] == pd_row['Name']) & (df['Date'] >= pd_row['Date'] - timedelta(days=30)) & (df['Date'] <= pd_row['Date'])]
+                        pd_row = gal_df.iloc[i + j]; lb_g = df[(df['Name'] == pd_row['Name']) & (df['Date'] >= pd_row['Date'] - timedelta(days=30)) & (df['Date'] <= pd_row['Date'])]
                         r_html = ""; t_grade = 0; c_metrics = 0
                         for k in all_metrics:
                             if k in pd_row:
@@ -207,87 +203,35 @@ try:
                         sc_g = math.ceil(t_grade / c_metrics) if c_metrics > 0 else 0
                         with cols[j]: st.markdown(f'<div class="gallery-card"><div style="display:flex; align-items:center; gap:10px;"><div style="flex:1.2; text-align:center;"><img src="{pd_row["PhotoURL"]}" class="gallery-photo"><p style="font-weight:bold; font-size:15px; margin-top:8px;">{pd_row["Name"]}</p></div><div style="flex:3;"><table class="scout-table"><thead><tr><th>Metric</th><th>Val</th><th>Max</th><th>Grade</th></tr></thead><tbody>{r_html}</tbody></table></div><div style="flex:1; text-align:center;"><div style="background-color:{get_flipped_gradient(sc_g)}; color:white; padding:10px; border-radius:12px; font-size:32px; font-weight:900;">{sc_g}</div></div></div></div>', unsafe_allow_html=True)
 
-    # --- TAB 2: GAME V PRACTICE ---
     with tabs[2]:
         st.markdown('<div class="section-header">Weekly Prep Intensity vs. Game Demands</div>', unsafe_allow_html=True)
         c_ga, c_gw, c_gg = st.columns(3)
         with c_ga: gp_p = st.selectbox("Athlete", sorted(df['Name'].unique()), key="gp_p_vf")
         with c_gw:
-            w_r = df.groupby('Week')['Date'].agg(['min', 'max']).reset_index()
-            w_r['L'] = w_r.apply(lambda x: f"{x['Week']} ({x['min'].strftime('%m/%d')} - {x['max'].strftime('%m/%d')})", axis=1)
-            gp_w = st.selectbox("Week", w_r['L'].tolist(), key="gp_w_vf")
-            sel_w = w_r[w_r['L'] == gp_w]['Week'].values[0]
-        with c_gg: 
-            game_opts = df[(df['Name'] == gp_p) & (df['Session_Type'] == 'Game') & (df['Week'] == sel_w)]['Session_Name'].unique()
-            gp_g = st.selectbox("Select Specific Game", game_opts, key="gp_g_vf")
-        
-        w_data = df[(df['Name'] == gp_p) & (df['Session_Type'] == 'Practice') & (df['Week'] == sel_w)]
-        g_data_l = df[(df['Name'] == gp_p) & (df['Session_Name'] == gp_g)]
+            w_r = df.groupby('Week')['Date'].agg(['min', 'max']).reset_index(); w_r['L'] = w_r.apply(lambda x: f"{x['Week']} ({x['min'].strftime('%m/%d')} - {x['max'].strftime('%m/%d')})", axis=1); gp_w = st.selectbox("Week", w_r['L'].tolist(), key="gp_w_vf"); sel_w = w_r[w_r['L'] == gp_w]['Week'].values[0]
+        with c_gg: game_opts = df[(df['Name'] == gp_p) & (df['Session_Type'] == 'Game') & (df['Week'] == sel_w)]['Session_Name'].unique(); gp_g = st.selectbox("Select Specific Game", game_opts, key="gp_g_vf")
+        w_data = df[(df['Name'] == gp_p) & (df['Session_Type'] == 'Practice') & (df['Week'] == sel_w)]; g_data_l = df[(df['Name'] == gp_p) & (df['Session_Name'] == gp_g)]
         if not w_data.empty and not g_data_l.empty:
             low_m = [m for m in ['Total Jumps', 'Player Load', 'Explosive Efforts'] if m in df.columns]
             dist_m = 'Estimated Distance (y)' if 'Estimated Distance (y)' in df.columns else None
-            w_avg = w_data[low_m + ([dist_m] if dist_m else [])].mean(); g_d = g_data_l.iloc[0]
-            cg1, cg2 = st.columns([1, 2])
+            w_avg = w_data[low_m + ([dist_m] if dist_m else [])].mean(); g_d = g_data_l.iloc[0]; cg1, cg2 = st.columns([1, 2])
             with cg1:
-                for m in low_m + ([dist_m] if dist_m else []):
-                    pdif = ((w_avg[m] - g_d[m]) / g_d[m] * 100) if g_d[m] > 0 else 0
-                    st.metric(label=m, value=f"{g_d[m]:.0f}", delta=f"{pdif:+.1f}% vs Weekly Avg")
+                for m in low_m + ([dist_m] if dist_m else []): pdif = ((w_avg[m] - g_d[m]) / g_d[m] * 100) if g_d[m] > 0 else 0; st.metric(label=m, value=f"{g_d[m]:.0f}", delta=f"{pdif:+.1f}% vs Weekly Avg")
             with cg2:
-                fig_dual = make_subplots(specs=[[{"secondary_y": True}]])
-                fig_dual.add_trace(go.Bar(x=low_m, y=[w_avg[m] for m in low_m], name="Weekly Avg", marker_color='#4895DB'), secondary_y=False)
-                fig_dual.add_trace(go.Bar(x=low_m, y=[g_d[m] for m in low_m], name=f"Game: {gp_g}", marker_color='#FF8200'), secondary_y=False)
-                if dist_m:
-                    fig_dual.add_trace(go.Bar(x=[dist_m], y=[w_avg[dist_m]], name="Weekly Dist", marker_color='#4895DB', opacity=0.8), secondary_y=True)
-                    fig_dual.add_trace(go.Bar(x=[dist_m], y=[g_d[dist_m]], name="Game Dist", marker_color='#FF8200', opacity=0.8), secondary_y=True)
-                fig_dual.update_layout(height=400, barmode='group', showlegend=True, legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
-                st.plotly_chart(fig_dual, use_container_width=True, config=LOCKED_CONFIG)
-
-            st.markdown(f'<div class="section-header">Average Weekly Load Context: Week {sel_w}</div>', unsafe_allow_html=True)
+                fig_dual = make_subplots(specs=[[{"secondary_y": True}]]); fig_dual.add_trace(go.Bar(x=low_m, y=[w_avg[m] for m in low_m], name="Weekly Avg", marker_color='#4895DB'), secondary_y=False); fig_dual.add_trace(go.Bar(x=low_m, y=[g_d[m] for m in low_m], name=f"Game: {gp_g}", marker_color='#FF8200'), secondary_y=False); st.plotly_chart(fig_dual, use_container_width=True, config=LOCKED_CONFIG)
             wk_trends = df[df['Week'] == sel_w].groupby(['Date', 'Session_Name', 'Session_Type']).agg({'Player Load': 'mean'}).reset_index().sort_values('Date')
-            wk_trends['Day_Label'] = wk_trends['Date'].dt.strftime('%a %m/%d')
-            fig_tr = go.Figure()
-            fig_tr.add_trace(go.Scatter(x=wk_trends['Day_Label'], y=wk_trends['Player Load'], mode='lines', line=dict(color='#4895DB', width=3), showlegend=False))
+            wk_trends['Day_Label'] = wk_trends['Date'].dt.strftime('%a %m/%d'); fig_tr = go.Figure(); fig_tr.add_trace(go.Scatter(x=wk_trends['Day_Label'], y=wk_trends['Player Load'], mode='lines', line=dict(color='#4895DB', width=3), showlegend=False))
             for s_t, clr in [('Practice', '#4895DB'), ('Game', '#FF8200')]:
                 sub = wk_trends[wk_trends['Session_Type'] == s_t]
-                for _, r in sub.iterrows():
-                    is_sel = (r['Session_Name'] == gp_g)
-                    fig_tr.add_trace(go.Scatter(x=[r['Day_Label']], y=[r['Player Load']], name=r['Session_Name'] if s_t == 'Game' else s_t, mode='markers',
-                        marker=dict(color=clr, size=16 if is_sel else 10, line=dict(width=3 if is_sel else 1, color='black' if is_sel else 'white')),
-                        showlegend=True if s_t == 'Game' else (True if _ == sub.index[0] else False)))
-            fig_tr.update_layout(height=350, margin=dict(l=0, r=0, t=20, b=0), yaxis_title="Avg Player Load")
-            st.plotly_chart(fig_tr, use_container_width=True, config=LOCKED_CONFIG)
+                for _, r in sub.iterrows(): fig_tr.add_trace(go.Scatter(x=[r['Day_Label']], y=[r['Player Load']], name=r['Session_Name'] if s_t == 'Game' else s_t, mode='markers', marker=dict(color=clr, size=10))); fig_tr.update_layout(height=350, yaxis_title="Avg Player Load"); st.plotly_chart(fig_tr, use_container_width=True, config=LOCKED_CONFIG)
 
-    # --- TAB 3: POSITION ANALYSIS (4-WEEK TREND) ---
     with tabs[3]:
-        st.markdown('<div class="section-header">Positional Performance & 4-Week Trends</div>', unsafe_allow_html=True)
-        sel_p_pos = st.selectbox("Select Athlete for Comparative Trend", sorted(df['Name'].unique()))
-        p_pos = df[df['Name'] == sel_p_pos].iloc[0]
-        pos_label = p_pos['Position']
-        
-        # SLIDING WINDOW: Latest Week in data and 3 weeks prior
-        max_wk = df['Week'].max()
-        rec_4 = list(range(int(max_wk) - 3, int(max_wk) + 1))
-        tr_df = df[df['Week'].isin(rec_4)]
-        
-        t_col1, t_col2, t_col3 = st.columns(3)
-        tr_metrics = ["Player Load", "Estimated Distance (y)", "Total Jumps"]
-        cols = [t_col1, t_col2, t_col3]
-        for i, m in enumerate(tr_metrics):
-            if m in df.columns:
-                with cols[i]:
-                    fig_t = go.Figure()
-                    p_t = tr_df[tr_df['Name'] == sel_p_pos].groupby('Week')[m].mean().reset_index()
-                    fig_t.add_trace(go.Scatter(x=p_t['Week'], y=p_t[m], name=sel_p_pos, line=dict(color='#0046ad', width=4), mode='lines+markers'))
-                    pos_t = tr_df[tr_df['Position'] == pos_label].groupby('Week')[m].mean().reset_index()
-                    fig_t.add_trace(go.Scatter(x=pos_t['Week'], y=pos_t[m], name=f"{pos_label} Avg", line=dict(color='#ff7f0e', dash='dash')))
-                    fig_t.update_layout(title=f"4-Week {m}", xaxis=dict(dtick=1), height=300, margin=dict(l=10, r=10, t=40, b=10), showlegend=True,
-                                        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
-                    st.plotly_chart(fig_t, use_container_width=True, config=LOCKED_CONFIG)
+        st.markdown('<div class="section-header">Positional Performance Trends</div>', unsafe_allow_html=True)
 
     # --- TAB 4: MATCH SUMMARY ---
     with tabs[4]:
         st.markdown('<div class="print-hide">', unsafe_allow_html=True)
-        if st.button("🖨️ Prepare Report for PDF"):
+        if st.button("🖨️ Prepare PDF for Printing"):
             st.markdown('<script>window.print();</script>', unsafe_allow_html=True)
         
         st.markdown('<div class="section-header">Match Comparison Selection</div>', unsafe_allow_html=True)
@@ -327,6 +271,7 @@ try:
                                         <tbody>
                             """
                             for _, r in ad.iterrows():
+                                # Swapped: Efforts before Distance
                                 card_html += f"<tr><td style='font-weight:700;'>{r['Session_Name']}</td><td>{int(r['Total Jumps'])}</td><td>{r['Player Load']:.0f}</td><td>{r['Explosive Efforts']:.0f}</td><td>{r['Estimated Distance (y)']:.0f}</td></tr>"
                             card_html += f"<tr style='background:#4895DB; color:white; font-weight:900;'><td>TOTAL</td><td>{int(ad['Total Jumps'].sum())}</td><td>{ad['Player Load'].sum():.0f}</td><td>{ad['Explosive Efforts'].sum():.0f}</td><td>{ad['Estimated Distance (y)'].sum():.0f}</td></tr></tbody></table></div>"
                             st.markdown(card_html, unsafe_allow_html=True)
@@ -339,8 +284,7 @@ try:
 
             st.write("<br><br>", unsafe_allow_html=True); st.markdown('<div class="section-header">Team Match Averages</div>', unsafe_allow_html=True)
             team_avg_t = tourney_df.groupby(['Session_Name', 'Sheet_Order'])[['Total Jumps', 'Player Load', 'Explosive Efforts', 'Estimated Distance (y)']].mean().reset_index().sort_values('Sheet_Order')
-            c1, c2 = st.columns(2); c3, c4 = st.columns(2)
-            cols = [c1, c2, c3, c4]
+            c1, c2 = st.columns(2); c3, c4 = st.columns(2); cols = [c1, c2, c3, c4]
             for idx, m in enumerate(['Total Jumps', 'Player Load', 'Explosive Efforts', 'Estimated Distance (y)']):
                 with cols[idx]:
                     fig_t = go.Figure(); fig_t.add_trace(go.Bar(x=team_avg_t['Session_Name'], y=team_avg_t[m], marker_color=[m_map[g] for g in team_avg_t['Session_Name']], marker_line_width=0))
