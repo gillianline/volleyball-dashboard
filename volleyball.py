@@ -29,7 +29,7 @@ def check_password():
         return True
 
 if check_password():
-    # --- CSS: FORMATTING & PAGE BREAK CONTROLS ---
+    # --- CSS: FORMATTING & PRINT GAP REMOVAL ---
     st.markdown("""
         <style>
         .stApp { background-color: #FFFFFF; color: #1D1D1F; }
@@ -46,7 +46,6 @@ if check_password():
         .score-box { padding: 12px 20px; border-radius: 12px; font-size: 28px; font-weight: 800; min-width: 100px; color: #FFFFFF; line-height: 1.2; text-align: center;}
         .info-box { background-color: #f8f9fa; border-left: 5px solid #FF8200; padding: 12px; margin-top: 10px; font-size: 12px; color: #1D1D1F; font-weight: 600; line-height: 1.4; }
         
-        /* PREVENT ATHLETE CARDS FROM SPLITTING ACROSS PAGES */
         .player-row-container {
             break-inside: avoid !important;
             page-break-inside: avoid !important;
@@ -57,14 +56,22 @@ if check_password():
         .player-divider { border: 0; height: 1px; background: #E5E5E7; margin-bottom: 15px; width: 100%; }
         .gallery-photo { border-radius: 50%; width: 110px; height: 110px; object-fit: cover; border: 4px solid #FF8200; }
         .section-header { font-size: 14px; font-weight: 800; color: #4895DB; border-bottom: 2px solid #FF8200; margin-top: 15px; margin-bottom: 10px; padding-bottom: 5px; text-transform: uppercase; }
-        .js-plotly-plot { pointer-events: none; }
 
         @media print {
-            .main-logo-container { display: block !important; }
+            .main-logo-container { display: block !important; margin-bottom: 0 !important; padding-bottom: 0 !important; }
             .stTabs [role="tablist"], [data-testid="stSidebar"], 
             header, footer, [data-testid="stHeader"], .print-hide,
             button, #print-hide-header { 
-                display: none !important; 
+                display: none !important;
+                height: 0 !important;
+                margin: 0 !important;
+                padding: 0 !important;
+            }
+            /* AGGRESSIVE GAP REMOVAL */
+            [data-testid="stVerticalBlock"] > div:has(div.print-hide) {
+                display: none !important;
+                height: 0 !important;
+                margin: 0 !important;
             }
             [data-testid="stMultiSelect"], [data-testid="stSelectbox"], [data-baseweb="select"] {
                 display: none !important;
@@ -166,8 +173,8 @@ if check_password():
 
         # --- TAB 1: TEAM GALLERY ---
         with tabs[1]:
-            gal_df = df[df['Session_Name'] == selected_session].copy()
-            if pos_f != "All Positions": gal_df = gal_df[gal_df['Position'] == pos_f]
+            gal_df = df[df['Session_Name'] == selected_session_gal].copy() if 'selected_session_gal' in locals() else df[df['Session_Name'] == selected_session].copy()
+            if pos_f_gal != "All Positions": gal_df = gal_df[gal_df['Position'] == pos_f_gal] if 'pos_f_gal' in locals() else gal_df
             if not gal_df.empty:
                 for i in range(0, len(gal_df), 2):
                     cols = st.columns(2)
@@ -181,7 +188,7 @@ if check_password():
                                     t_grade += g; c_metrics += 1; diff = (v - avg) / avg if avg != 0 else 0; h_class = "class='bg-highlight-red'" if abs(diff) > 0.10 else ""; arr_val = f"<span class='arrow-red'>{'↑' if diff > 0.10 else '↓'}</span>" if abs(diff) > 0.10 else ""
                                     r_html += f"<tr><td>{k}</td><td {h_class}>{v} {arr_val}</td><td>{mx}</td><td>{g}</td></tr>"
                             sc_g = math.ceil(t_grade / c_metrics) if c_metrics > 0 else 0
-                            with cols[j]: st.markdown(f'<div style="border:1px solid #E5E5E7; border-radius:15px; padding:15px; margin-bottom:20px;"><div style="display:flex; align-items:center; gap:10px;"><div style="flex:1.2; text-align:center;"><img src="{pd_row["PhotoURL"]}" class="gallery-photo"><p style="font-weight:bold; font-size:15px; margin-top:8px;">{pd_row["Name"]}</p></div><div style="flex:3;"><table class="scout-table"><thead><tr><th>Metric</th><th>Val</th><th>Max</th><th>Grade</th></tr></thead><tbody>{r_html}</tbody></table></div><div style="flex:1; text-align:center;"><div style="background-color:{get_flipped_gradient(sc_g)}; color:white; padding:10px; border-radius:12px; font-size:32px; font-weight:900;">{sc_g}</div></div></div></div>', unsafe_allow_html=True)
+                            with cols[j]: st.markdown(f'<div class="gallery-card" style="border:1px solid #E5E5E7; border-radius:15px; padding:15px; margin-bottom:20px;"><div style="display:flex; align-items:center; gap:10px;"><div style="flex:1.2; text-align:center;"><img src="{pd_row["PhotoURL"]}" class="gallery-photo"><p style="font-weight:bold; font-size:15px; margin-top:8px;">{pd_row["Name"]}</p></div><div style="flex:3;"><table class="scout-table"><thead><tr><th>Metric</th><th>Val</th><th>Max</th><th>Grade</th></tr></thead><tbody>{r_html}</tbody></table></div><div style="flex:1; text-align:center;"><div style="background-color:{get_flipped_gradient(sc_g)}; color:white; padding:10px; border-radius:12px; font-size:32px; font-weight:900;">{sc_g}</div></div></div></div>', unsafe_allow_html=True)
 
         # --- TAB 2: GAME V PRACTICE ---
         with tabs[2]:
@@ -204,17 +211,9 @@ if check_password():
                     for _, r in sub.iterrows(): is_sel = (r['Session_Name'] == gp_g); fig_tr.add_trace(go.Scatter(x=[r['Day_Label']], y=[r['Player Load']], name=r['Session_Name'] if s_t == 'Game' else s_t, mode='markers', marker=dict(color=clr, size=16 if is_sel else 10, line=dict(width=3 if is_sel else 1, color='black' if is_sel else 'white')), showlegend=True if s_t == 'Game' else (True if _ == sub.index[0] else False)))
                 fig_tr.update_layout(height=350, margin=dict(l=0, r=0, t=20, b=0), yaxis_title="Avg Player Load"); st.plotly_chart(fig_tr, use_container_width=True, config=LOCKED_CONFIG)
 
-        # --- TAB 3: POSITION ANALYSIS ---
-        with tabs[3]:
-            st.markdown('<div class="section-header">Positional Performance Trends</div>', unsafe_allow_html=True)
-            sel_p_pos = st.selectbox("Select Athlete for Comparative Trend", sorted(df['Name'].unique())); p_pos = df[df['Name'] == sel_p_pos].iloc[0]; pos_label = p_pos['Position']; max_wk = df['Week'].max(); rec_4 = list(range(int(max_wk) - 3, int(max_wk) + 1)); tr_df = df[df['Week'].isin(rec_4)]; t_col1, t_col2, t_col3 = st.columns(3); tr_metrics = ["Player Load", "Estimated Distance (y)", "Total Jumps"]; cols = [t_col1, t_col2, t_col3]
-            for i, m in enumerate(tr_metrics):
-                if m in df.columns:
-                    with cols[i]:
-                        fig_t = go.Figure(); p_t = tr_df[tr_df['Name'] == sel_p_pos].groupby('Week')[m].mean().reset_index(); fig_t.add_trace(go.Scatter(x=p_t['Week'], y=p_t[m], name=sel_p_pos, line=dict(color='#0046ad', width=4), mode='lines+markers')); pos_t = tr_df[tr_df['Position'] == pos_label].groupby('Week')[m].mean().reset_index(); fig_t.add_trace(go.Scatter(x=pos_t['Week'], y=pos_t[m], name=f"{pos_label} Avg", line=dict(color='#ff7f0e', dash='dash'))); fig_t.update_layout(title=f"4-Week {m}", xaxis=dict(dtick=1), height=300, margin=dict(l=10, r=10, t=40, b=10), showlegend=True, legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)); st.plotly_chart(fig_t, use_container_width=True, config=LOCKED_CONFIG)
-
         # --- TAB 4: MATCH SUMMARY ---
         with tabs[4]:
+            # ALL CONTROLS WRAPPED IN A SINGLE DIV WITH CLASS 'print-hide'
             st.markdown('<div class="print-hide">', unsafe_allow_html=True)
             if st.button("🖨️ Prepare PDF for Printing"): st.markdown('<script>window.print();</script>', unsafe_allow_html=True)
             st.markdown('<div id="print-hide-header"><div class="section-header">Match Comparison Selection</div></div>', unsafe_allow_html=True)
