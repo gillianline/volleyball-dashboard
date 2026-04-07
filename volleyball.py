@@ -29,7 +29,7 @@ def check_password():
         return True
 
 if check_password():
-    # --- CSS: BALANCED PRINT CONTROL & READABILITY ---
+    # --- CSS: FORMATTING & OVAL REMOVAL ---
     st.markdown("""
         <style>
         .stApp { background-color: #FFFFFF; color: #1D1D1F; }
@@ -38,19 +38,21 @@ if check_password():
         .viewerBadge_link__1S137, .main_heading_anchor__m6v0K, a.header-anchor { display: none !important; }
         header a { display: none !important; }
         .scout-table { width: 100%; border-collapse: collapse; text-align: center; table-layout: auto; }
-        .scout-table th { background-color: #4895DB; color: white; padding: 6px; border-bottom: 2px solid #FF8200; font-weight: 700; font-size: 11px; text-transform: uppercase; }
-        .scout-table td { padding: 6px; border-bottom: 1px solid #F5F5F7; font-size: 11px; color: #333333; }
+        .scout-table th { background-color: #4895DB; color: white; padding: 4px; border-bottom: 2px solid #FF8200; font-weight: 700; font-size: 10px; text-transform: uppercase; }
+        .scout-table td { padding: 4px; border-bottom: 1px solid #F5F5F7; font-size: 10px; color: #333333; }
         .bg-highlight-red { background-color: #ffcccc !important; font-weight: 900; }
         .arrow-red { color: #b30000 !important; font-weight: 900; margin-left: 4px; }
         .player-photo-large { border-radius: 50%; width: 220px; height: 220px; object-fit: cover; border: 6px solid #FF8200; }
         .score-box { padding: 12px 20px; border-radius: 12px; font-size: 28px; font-weight: 800; min-width: 100px; color: #FFFFFF; line-height: 1.2; text-align: center;}
         
+        [data-testid="stVerticalBlock"] { gap: 0.5rem !important; }
+
         .gallery-card { 
             border: 1px solid #E5E5E7; 
             padding: 0; 
-            border-radius: 15px; 
+            border-radius: 12px; 
             background-color: #FFFFFF; 
-            margin-bottom: 30px; 
+            margin-bottom: 10px !important; 
             overflow: hidden;
             display: flex; 
             flex-direction: column;
@@ -59,27 +61,30 @@ if check_password():
         }
 
         .gallery-photo { border-radius: 50%; width: 110px; height: 110px; object-fit: cover; border: 4px solid #FF8200; }
-        .section-header { font-size: 14px; font-weight: 800; color: #4895DB; border-bottom: 2px solid #FF8200; margin-top: 25px; margin-bottom: 15px; padding-bottom: 5px; text-transform: uppercase; }
+        .section-header { font-size: 14px; font-weight: 800; color: #4895DB; border-bottom: 2px solid #FF8200; margin-top: 15px; margin-bottom: 10px; padding-bottom: 5px; text-transform: uppercase; }
         .js-plotly-plot { pointer-events: none; }
 
         @media print {
-            .stTabs [role="tablist"], 
-            .main-logo-container,
-            [data-testid="stSidebar"], 
-            header, footer, [data-testid="stHeader"],
-            .print-hide,
-            [data-baseweb="select"], [data-testid="stMultiSelect"], [data-testid="stSelectbox"],
-            [data-testid="stWidgetLabel"], label, button { 
-                display: none !important; 
+            .stTabs [role="tablist"], .main-logo-container, [data-testid="stSidebar"], 
+            header, footer, [data-testid="stHeader"], .print-hide,
+            button { display: none !important; }
+            
+            /* REMOVE OVALS (PILLS) IN PRINT */
+            [data-testid="stMultiSelect"] span, .stMultiSelect [role="button"] {
+                background-color: transparent !important;
+                border: none !important;
+                padding: 0 !important;
+                margin: 0 5px 0 0 !important;
+                color: #000 !important;
             }
+            
             .main .block-container { padding: 0 !important; max-width: 100% !important; }
-            [data-testid="column"] { width: 100% !important; flex: 1 1 100% !important; max-width: 100% !important; }
+            [data-testid="column"] { width: 100% !important; flex: 1 1 100% !important; }
             .scout-table td, p, span, div { color: #222222 !important; }
         }
         </style>
         """, unsafe_allow_html=True)
 
-    # --- DATA LOADING ---
     @st.cache_data(ttl=300)
     def load_all_data():
         df = pd.read_csv(st.secrets["GOOGLE_SHEET_URL"])
@@ -156,12 +161,11 @@ if check_password():
                 with jc1:
                     p_cmj_hist = cmj_df[(cmj_df['Athlete'] == sel_p) & (cmj_df['Test Date'] <= curr_date)].sort_values('Test Date'); sync_cmj = p_cmj_hist[(p_cmj_hist['Test Date'] > curr_date - timedelta(days=7))]
                     if not sync_cmj.empty:
-                        latest = sync_cmj.iloc[-1]; base_h = p_cmj_hist.tail(5).iloc[:-1]['Jump Height (in)'].mean(); base_rsi = p_cmj_hist.tail(5).iloc[:-1]['RSI-modified [m/s]'].mean(); cur_h, cur_rsi = latest['Jump Height (in)'], latest['RSI-modified [m/s]']; p_diff = ((cur_h - base_h) / base_h) * 100
-                        label, color, profile = ("ELITE", "#28a745", "Jump Height and RSI are both High.") if cur_h >= base_h and cur_rsi >= base_rsi else ("GRINDER", "#ffc107", "Mixed Readiness") if cur_h >= base_h or cur_rsi >= base_rsi else ("FATIGUED", "#dc3545", "Low Readiness")
-                        st.markdown(f'<div style="text-align:center;"><div class="score-box" style="background-color:{color};">{p_diff:+.1f}%<span style="font-size:10px; display:block;">{label}</span></div></div><div class="info-box"><b>Today:</b> {cur_h:.1f}" | {cur_rsi:.2f} RSI</div>', unsafe_allow_html=True)
+                        latest = sync_cmj.iloc[-1]; base_h = p_cmj_hist.tail(5).iloc[:-1]['Jump Height (in)'].mean(); cur_h = latest['Jump Height (in)']; p_diff = ((cur_h - base_h) / base_h) * 100
+                        st.markdown(f'<div style="text-align:center;"><div class="score-box" style="background-color:{"#28a745" if p_diff >= 0 else "#dc3545"};">{p_diff:+.1f}%</div></div>', unsafe_allow_html=True)
                 with jc2:
                     if not p_cmj_hist.empty:
-                        fig = make_subplots(specs=[[{"secondary_y": True}]]); fig.add_trace(go.Scatter(x=p_cmj_hist['Test Date'], y=p_cmj_hist['Jump Height (in)'], name="Height", line=dict(color='#FF8200', width=3)), secondary_y=False); fig.add_trace(go.Scatter(x=p_cmj_hist['Test Date'], y=p_cmj_hist['RSI-modified [m/s]'], name="RSI", line=dict(color='#4895DB', dash='dot')), secondary_y=True); fig.update_layout(height=280, margin=dict(l=0, r=0, t=20, b=0), showlegend=False, hovermode=False); st.plotly_chart(fig, use_container_width=True, config=LOCKED_CONFIG)
+                        fig = make_subplots(specs=[[{"secondary_y": True}]]); fig.add_trace(go.Scatter(x=p_cmj_hist['Test Date'], y=p_cmj_hist['Jump Height (in)'], name="Height", line=dict(color='#FF8200', width=3)), secondary_y=False); fig.update_layout(height=280, margin=dict(l=0, r=0, t=20, b=0), showlegend=False); st.plotly_chart(fig, use_container_width=True, config=LOCKED_CONFIG)
                 p_ph = phase_df[(phase_df['Name'] == sel_p) & (phase_df['Date'] == curr_date)].copy()
                 if not p_ph.empty:
                     st.markdown('<div class="section-header">Practice Phase Breakdown</div>', unsafe_allow_html=True)
@@ -187,7 +191,7 @@ if check_password():
                             pd_row = gal_df.iloc[i + j]; lb_g = df[(df['Name'] == pd_row['Name']) & (df['Date'] >= pd_row['Date'] - timedelta(days=30)) & (df['Date'] <= pd_row['Date'])]; r_html = ""; t_grade = 0; c_metrics = 0
                             for k in all_metrics[:4]: v, m = pd_row[k], lb_g[k].max(); g = math.ceil((v / m) * 100) if m > 0 else 0; t_grade += g; c_metrics += 1; r_html += f"<tr><td>{k}</td><td>{v}</td><td>{g}</td></tr>"
                             sc_g = math.ceil(t_grade / c_metrics) if c_metrics > 0 else 0
-                            with cols[j]: st.markdown(f'<div class="gallery-card"><div style="padding:15px;"><div style="display:flex; align-items:center; gap:10px;"><div style="flex:1.2; text-align:center;"><img src="{pd_row["PhotoURL"]}" class="gallery-photo"><p style="font-weight:bold; font-size:15px; margin-top:8px;">{pd_row["Name"]}</p></div><div style="flex:3;"><table class="scout-table"><thead><tr><th>Metric</th><th>Val</th><th>Grade</th></tr></thead><tbody>{r_html}</tbody></table></div><div style="flex:1; text-align:center;"><div style="background-color:{get_flipped_gradient(sc_g)}; color:white; padding:10px; border-radius:12px; font-size:32px; font-weight:900;">{sc_g}</div></div></div></div></div>', unsafe_allow_html=True)
+                            with cols[j]: st.markdown(f'<div class="gallery-card"><div style="padding:15px;"><div style="display:flex; align-items:center; gap:10px;"><div style="flex:1.2; text-align:center;"><img src="{pd_row["PhotoURL"]}" class="gallery-photo"><p style="font-weight:bold; font-size:15px; margin-top:8px;">{pd_row["Name"]}</p></div><div style="flex:3;"><table class="scout-table"><thead><tr><th>Metric</th><th>Val</th><th>Grade</th></tr></thead><tbody>{r_html}</tbody></table></div><div style="flex:1; text-align:center;"><div style="background-color:{"#2D5A27" if sc_g <= 40 else "#D4A017" if sc_g <= 70 else "#A52A2A"}; color:white; padding:10px; border-radius:12px; font-size:32px; font-weight:900;">{sc_g}</div></div></div></div></div>', unsafe_allow_html=True)
 
         # --- TAB 2: GAME V PRACTICE ---
         with tabs[2]:
@@ -226,8 +230,8 @@ if check_password():
             st.markdown('<div class="section-header">Match Comparison Selection</div>', unsafe_allow_html=True)
             c_ts1, c_ts2 = st.columns([2, 1])
             with c_ts1:
-                match_list_t = df[df['Session_Type'].isin(['Game', 'Match'])].sort_values(['Date', 'Sheet_Order'])['Session_Name'].unique()
-                selected_matches = st.multiselect("Select Weekend Matches", match_list_t, default=match_list_t[-3:] if len(match_list_t) >=3 else match_list_t)
+                m_list_t = df[df['Session_Type'].isin(['Game', 'Match'])].sort_values(['Date', 'Sheet_Order'])['Session_Name'].unique()
+                selected_matches = st.multiselect("Select Weekend Matches", m_list_t, default=m_list_t[-3:] if len(m_list_t) >=3 else m_list_t)
             with c_ts2: pos_filter_t = st.selectbox("Filter by Position", ["All Positions"] + sorted(list(df['Position'].unique())), key="ms_pos_surgical")
             st.markdown('</div>', unsafe_allow_html=True)
 
@@ -240,10 +244,8 @@ if check_password():
                 
                 for name in ath_t:
                     ad = tourney_df[tourney_df['Name'] == name]
-                    # SIDE-BY-SIDE CONTAINER
-                    st.markdown('<div class="gallery-card" style="padding:15px;">', unsafe_allow_html=True)
+                    st.markdown('<div class="gallery-card">', unsafe_allow_html=True)
                     side_cols = st.columns([1.5, 2])
-                    
                     with side_cols[0]:
                         card_start = f"""
                             <div style="display:flex; align-items:center; gap:15px; padding-bottom:10px; border-bottom:2px solid #FF8200;">
@@ -252,7 +254,7 @@ if check_password():
                             </div>
                             <div style="padding-top:10px;">
                                 <table class="scout-table" style="margin-bottom:0;">
-                                    <thead><tr><th>Match</th><th>Jumps</th><th>Load</th><th>Effort</th><th>Distance</th></tr></thead>
+                                    <thead><tr><th>Match</th><th>Jumps</th><th>Load</th><th>Effort</th><th>Dist</th></tr></thead>
                                     <tbody>
                         """
                         for _, r in ad.iterrows():
@@ -270,10 +272,7 @@ if check_password():
                     st.markdown('</div>', unsafe_allow_html=True)
 
                 st.write("<br><br>", unsafe_allow_html=True); st.markdown('<div class="section-header">Team Match Averages</div>', unsafe_allow_html=True)
-                
-                # Ensure it averages the metrics per session name
                 team_avg_t = tourney_df.groupby('Session_Name')[['Total Jumps', 'Player Load', 'Explosive Efforts', 'Estimated Distance (y)']].mean().reset_index()
-                
                 c1, c2 = st.columns(2); c3, c4 = st.columns(2); t_cols = [c1, c2, c3, c4]
                 for idx, m in enumerate(['Total Jumps', 'Player Load', 'Explosive Efforts', 'Estimated Distance (y)']):
                     with t_cols[idx]:
