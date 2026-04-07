@@ -127,7 +127,7 @@ if check_password():
         tabs = st.tabs(["Individual Profile", "Team Gallery", "Game v. Practice", "Position Analysis", "Match Summary"])
         session_list = df[['Date', 'Session_Name']].drop_duplicates().sort_values('Date', ascending=False)['Session_Name'].tolist()
 
-        # --- TAB 0, 1, 2, 3 (Restored Exactly) ---
+        # --- TAB 0: INDIVIDUAL PROFILE ---
         with tabs[0]:
             c_f1, c_f2 = st.columns(2)
             with c_f1: selected_session = st.selectbox("Practice Selection", session_list, index=0, key="nav_sel_ind")
@@ -162,6 +162,7 @@ if check_password():
                     if not p_cmj_hist.empty:
                         fig = make_subplots(specs=[[{"secondary_y": True}]]); fig.add_trace(go.Scatter(x=p_cmj_hist['Test Date'], y=p_cmj_hist['Jump Height (in)'], name="Height", line=dict(color='#FF8200', width=3)), secondary_y=False); fig.add_trace(go.Scatter(x=p_cmj_hist['Test Date'], y=p_cmj_hist['RSI-modified [m/s]'], name="RSI", line=dict(color='#4895DB', dash='dot')), secondary_y=True); fig.update_layout(height=280, margin=dict(l=0, r=0, t=20, b=0), showlegend=False, hovermode=False); st.plotly_chart(fig, use_container_width=True, config=LOCKED_CONFIG)
 
+        # --- TAB 1: TEAM GALLERY ---
         with tabs[1]:
             c_gal1, c_gal2 = st.columns(2)
             with c_gal1: selected_session_gal = st.selectbox("Practice Selection", session_list, index=0, key="nav_sel_gal")
@@ -177,6 +178,7 @@ if check_password():
                             for k in all_metrics[:4]: v, m = pd_row[k], lb_g[k].max(); g = math.ceil((v / m) * 100) if m > 0 else 0; t_grade += g; c_metrics += 1; r_html += f"<tr><td>{k}</td><td>{v}</td><td>{g}</td></tr>"
                             with cols[j]: st.markdown(f'<div class="gallery-card"><div style="padding:15px;"><div style="display:flex; align-items:center; gap:10px;"><div style="flex:1.2; text-align:center;"><img src="{pd_row["PhotoURL"]}" class="gallery-photo"><p style="font-weight:bold; font-size:15px; margin-top:8px;">{pd_row["Name"]}</p></div><div style="flex:3;"><table class="scout-table"><thead><tr><th>Metric</th><th>Val</th><th>Grade</th></tr></thead><tbody>{r_html}</tbody></table></div></div></div></div>', unsafe_allow_html=True)
 
+        # --- TAB 2: GAME V PRACTICE ---
         with tabs[2]:
             st.markdown('<div class="section-header">Weekly Prep Intensity vs. Game Demands</div>', unsafe_allow_html=True)
             c_ga, c_gw, c_gg = st.columns(3)
@@ -190,8 +192,13 @@ if check_password():
                 with cg1:
                     for m in low_m + ['Estimated Distance (y)']: st.metric(label=m, value=f"{g_d[m]:.0f}", delta=f"{(w_avg[m]-g_d[m])/g_d[m]*100:+.1f}%")
                 with cg2:
-                    fig_dual = make_subplots(specs=[[{"secondary_y": True}]]); fig_dual.add_trace(go.Bar(x=low_m, y=[w_avg[m] for m in low_m], name="Weekly Avg", marker_color='#4895DB'), secondary_y=False); fig_dual.add_trace(go.Bar(x=low_m, y=[g_d[m] for m in low_m], name=f"Game Output", marker_color='#FF8200'), secondary_y=False); st.plotly_chart(fig_dual, use_container_width=True, config=LOCKED_CONFIG)
+                    fig_dual = make_subplots(specs=[[{"secondary_y": False}]]); fig_dual.add_trace(go.Bar(x=low_m, y=[w_avg[m] for m in low_m], name="Weekly Avg", marker_color='#4895DB')); fig_dual.add_trace(go.Bar(x=low_m, y=[g_d[m] for m in low_m], name=f"Game Output", marker_color='#FF8200')); fig_dual.update_layout(height=400, barmode='group', showlegend=True, legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)); st.plotly_chart(fig_dual, use_container_width=True, config=LOCKED_CONFIG)
+                wk_trends = df[df['Week'] == sel_w].groupby(['Date', 'Session_Name', 'Session_Type']).agg({'Player Load': 'mean'}).reset_index().sort_values('Date'); wk_trends['Day_Label'] = wk_trends['Date'].dt.strftime('%a %m/%d'); fig_tr = go.Figure(); fig_tr.add_trace(go.Scatter(x=wk_trends['Day_Label'], y=wk_trends['Player Load'], mode='lines', line=dict(color='#4895DB', width=3), showlegend=False))
+                for s_t, clr in [('Practice', '#4895DB'), ('Game', '#FF8200')]:
+                    sub = wk_trends[wk_trends['Session_Type'] == s_t]
+                    for _, r in sub.iterrows(): is_sel = (r['Session_Name'] == gp_g); fig_tr.add_trace(go.Scatter(x=[r['Day_Label']], y=[r['Player Load']], name=r['Session_Name'] if s_t == 'Game' else s_t, mode='markers', marker=dict(color=clr, size=10))); fig_tr.update_layout(height=350, yaxis_title="Avg Player Load"); st.plotly_chart(fig_tr, use_container_width=True, config=LOCKED_CONFIG)
 
+        # --- TAB 3: POSITION ANALYSIS ---
         with tabs[3]:
             st.markdown('<div class="section-header">Positional Performance Trends</div>', unsafe_allow_html=True)
 
@@ -245,10 +252,7 @@ if check_password():
                                 st.markdown('</div>', unsafe_allow_html=True)
 
                 st.write("<br><br>", unsafe_allow_html=True); st.markdown('<div class="section-header">Team Match Averages</div>', unsafe_allow_html=True)
-                
-                # FIXED: Explicitly call .mean() so multiple player outputs per game are averaged
                 team_avg_t = tourney_df.groupby('Session_Name')[['Total Jumps', 'Player Load', 'Explosive Efforts', 'Estimated Distance (y)']].mean().reset_index()
-                
                 c1, c2 = st.columns(2); c3, c4 = st.columns(2); t_cols = [c1, c2, c3, c4]
                 for idx, m in enumerate(['Total Jumps', 'Player Load', 'Explosive Efforts', 'Estimated Distance (y)']):
                     with t_cols[idx]:
