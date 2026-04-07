@@ -89,7 +89,7 @@ try:
     df, cmj_df, phase_df = load_all_data()
     all_metrics = ['Total Jumps', 'Moderate Jumps', 'High Jumps', 'Jump Load', 'Player Load', 'Estimated Distance (y)', 'Explosive Efforts', 'High Intensity Movement']
     
-    tabs = st.tabs(["Individual Profile", "Team Gallery", "Game v. Practice", "Position Analysis", "Tournament Summary"])
+    tabs = st.tabs(["Individual Profile", "Team Gallery", "Game v. Practice", "Position Analysis", "Match Summary"])
     session_list = df[['Date', 'Sheet_Order', 'Session_Name']].drop_duplicates(subset=['Session_Name']).sort_values(['Date', 'Sheet_Order'], ascending=[False, False])['Session_Name'].tolist()
 
     # --- TAB 0: INDIVIDUAL PROFILE ---
@@ -215,7 +215,7 @@ try:
 
     # --- TAB 4: TOURNAMENT SUMMARY (CLEAN ADDITION) ---
     with tabs[4]:
-        st.markdown('<div class="section-header">Tournament Match Comparison</div>', unsafe_allow_html=True)
+        st.markdown('<div class="section-header">Match Comparison</div>', unsafe_allow_html=True)
         with st.container():
             c_ts1, c_ts2 = st.columns([2, 1])
             with c_ts1: game_list_t = df[df['Session_Type'] == 'Game'].sort_values(['Date', 'Sheet_Order'])['Session_Name'].unique(); selected_games = st.multiselect("Select Weekend Matches", game_list_t, default=game_list_t[-3:] if len(game_list_t) >=3 else game_list_t, key="tourney_multi")
@@ -240,7 +240,7 @@ try:
                                 fig_ath.add_trace(go.Bar(name=r['Session_Name'], x=['Total Jumps', 'Player Load', 'Explosive Efforts'], y=[r['Total Jumps'], r['Player Load'], r['Explosive Efforts']], marker_color=game_color_map[r['Session_Name']]), secondary_y=False)
                                 fig_ath.add_trace(go.Bar(name=f"Distance", x=['Estimated Distance'], y=[r['Estimated Distance (y)']], marker=dict(color=game_color_map[r['Session_Name']], opacity=0.6, line=dict(color=game_color_map[r['Session_Name']], width=2)), showlegend=False), secondary_y=True)
                             fig_ath.update_layout(barmode='group', height=320, legend=dict(orientation="h", yanchor="top", y=-0.2, xanchor="center", x=0.5), template="simple_white"); st.plotly_chart(fig_ath, use_container_width=True, config=LOCKED_CONFIG); st.markdown("</div>", unsafe_allow_html=True)
-            st.write("<br><br>", unsafe_allow_html=True); st.markdown('<div class="section-header">Team Tournament Averages</div>', unsafe_allow_html=True)
+            st.write("<br><br>", unsafe_allow_html=True); st.markdown('<div class="section-header">Team Match Averages</div>', unsafe_allow_html=True)
             t_m_list = ['Total Jumps', 'Player Load', 'Estimated Distance (y)', 'Explosive Efforts']; team_avg_t = df[df['Session_Name'].isin(selected_games)].groupby(['Session_Name', 'Sheet_Order'])[t_m_list].mean().reset_index().sort_values('Sheet_Order')
             r1c1, r1c2 = st.columns(2); r2c1, r2c2 = st.columns(2); locs = [r1c1, r1c2, r2c1, r2c2]
             for idx, m in enumerate(t_m_list):
