@@ -28,7 +28,7 @@ def check_password():
         return True
 
 if check_password():
-    # --- CSS: FIXED PRINT LAYOUT ---
+    # --- CSS: SURGICAL PRINT FIX ---
     st.markdown("""
         <style>
         .stApp { background-color: #FFFFFF; color: #1D1D1F; }
@@ -45,6 +45,7 @@ if check_password():
         .score-box { padding: 12px 20px; border-radius: 12px; font-size: 28px; font-weight: 800; min-width: 100px; color: #FFFFFF; line-height: 1.2; text-align: center;}
         .info-box { background-color: #f8f9fa; border-left: 5px solid #FF8200; padding: 12px; margin-top: 10px; font-size: 12px; color: #1D1D1F; font-weight: 600; line-height: 1.4; }
         
+        /* THE FIX FOR PAGE BREAKS AND GAPS */
         .player-row-container { break-inside: avoid !important; page-break-inside: avoid !important; display: block !important; margin-bottom: 30px; }
         .player-divider { border: 0; height: 1px; background: #E5E5E7; margin-bottom: 15px; width: 100%; }
         .gallery-photo { border-radius: 50%; width: 110px; height: 110px; object-fit: cover; border: 4px solid #FF8200; }
@@ -58,11 +59,9 @@ if check_password():
                 margin: 0 !important; 
                 padding: 0 !important;
             }
-            /* Force report content to show */
-            .player-row-container, .section-header, .scout-table { 
-                display: block !important; 
-                visibility: visible !important;
-                opacity: 1 !important;
+            /* Target Streamlit's internal widget containers explicitly */
+            [data-testid="stVerticalBlock"] > div:has(div.print-hide), [data-testid="stMultiSelect"], [data-testid="stSelectbox"] {
+                display: none !important;
             }
             .main .block-container { padding: 0 !important; max-width: 100% !important; }
             .scout-table td, p, span, div { color: #000000 !important; }
@@ -122,7 +121,8 @@ if check_password():
             if pos_f != "All Positions": day_df = day_df[day_df['Position'] == pos_f]
             if not day_df.empty:
                 sel_p = st.selectbox("Select Athlete", sorted(day_df['Name'].unique()))
-                p = day_df[day_df['Name'] == sel_p].iloc[0]; lb = df[(df['Name'] == sel_p) & (df['Date'] >= p['Date'] - timedelta(days=30)) & (df['Date'] <= p['Date'])]
+                p = day_df[day_df['Name'] == sel_p].iloc[0]
+                lb = df[(df['Name'] == sel_p) & (df['Date'] >= p['Date'] - timedelta(days=30)) & (df['Date'] <= p['Date'])]
                 m_rows = ""; total_grade = 0; count = 0
                 for k in all_metrics:
                     if k in p:
@@ -139,15 +139,17 @@ if check_password():
                 with jc1:
                     p_cmj_hist = cmj_df[(cmj_df['Athlete'] == sel_p) & (cmj_df['Test Date'] <= p['Date'])].sort_values('Test Date'); sync_cmj = p_cmj_hist[(p_cmj_hist['Test Date'] > p['Date'] - timedelta(days=7))]
                     if not sync_cmj.empty:
-                        latest = sync_cmj.iloc[-1]; base_h = p_cmj_hist.tail(5).iloc[:-1]['Jump Height (in)'].mean(); cur_h = latest['Jump Height (in)']; p_diff = ((cur_h - base_h) / base_h) * 100
-                        st.markdown(f'<div style="text-align:center;"><div class="score-box" style="background-color:{"#28a745" if p_diff >= 0 else "#dc3545"};">{p_diff:+.1f}%</div></div>', unsafe_allow_html=True)
+                        latest = sync_cmj.iloc[-1]; base_h = p_cmj_hist.tail(5).iloc[:-1]['Jump Height (in)'].mean(); base_rsi = p_cmj_hist.tail(5).iloc[:-1]['RSI-modified [m/s]'].mean(); cur_h, cur_rsi = latest['Jump Height (in)'], latest['RSI-modified [m/s]']; p_diff = ((cur_h - base_h) / base_h) * 100
+                        label, color, profile = ("ELITE", "#28a745", "Height and RSI High") if cur_h >= base_h and cur_rsi >= base_rsi else ("GRINDER", "#ffc107", "Mixed Readiness") if cur_h >= base_h or cur_rsi >= base_rsi else ("FATIGUED", "#dc3545", "Low Readiness")
+                        st.markdown(f'<div style="text-align:center;"><div class="score-box" style="background-color:{color};">{p_diff:+.1f}%<span style="font-size:10px; display:block;">{label}</span></div></div><div class="info-box"><b>Today:</b> {cur_h:.1f}" | {cur_rsi:.2f} RSI</div>', unsafe_allow_html=True)
                 with jc2:
                     if not p_cmj_hist.empty:
-                        fig = make_subplots(specs=[[{"secondary_y": True}]]); fig.add_trace(go.Scatter(x=p_cmj_hist['Test Date'], y=p_cmj_hist['Jump Height (in)'], name="Height", line=dict(color='#FF8200', width=3)), secondary_y=False); fig.update_layout(height=280, margin=dict(l=0, r=0, t=20, b=0), showlegend=False); st.plotly_chart(fig, use_container_width=True, config=LOCKED_CONFIG)
+                        fig = make_subplots(specs=[[{"secondary_y": True}]]); fig.add_trace(go.Scatter(x=p_cmj_hist['Test Date'], y=p_cmj_hist['Jump Height (in)'], name="Height", line=dict(color='#FF8200', width=3)), secondary_y=False); fig.add_trace(go.Scatter(x=p_cmj_hist['Test Date'], y=p_cmj_hist['RSI-modified [m/s]'], name="RSI", line=dict(color='#4895DB', dash='dot')), secondary_y=True); fig.update_layout(height=280, margin=dict(l=0, r=0, t=20, b=0), showlegend=False, hovermode=False); st.plotly_chart(fig, use_container_width=True, config=LOCKED_CONFIG)
                 p_ph = phase_df[(phase_df['Name'] == sel_p) & (phase_df['Date'] == p['Date'])].copy()
                 if not p_ph.empty:
                     st.markdown('<div class="section-header">Practice Phase Breakdown</div>', unsafe_allow_html=True)
                     fig_ph = make_subplots(specs=[[{"secondary_y": True}]]); fig_ph.add_trace(go.Bar(x=p_ph['Phase'], y=p_ph['Total Jumps'], name="Jumps", marker_color='#FF8200'), secondary_y=False); fig_ph.add_trace(go.Scatter(x=p_ph['Phase'], y=p_ph['Player Load'], name="Load", line=dict(color='#4895DB', width=4)), secondary_y=False)
+                    if 'Estimated Distance (y)' in p_ph.columns: fig_ph.add_trace(go.Scatter(x=p_ph['Phase'], y=p_ph['Estimated Distance (y)'], name="Distance (y)", line=dict(color='#515154', width=2, dash='dash')), secondary_y=True)
                     fig_ph.update_layout(height=350, showlegend=True, legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1), hovermode=False); st.plotly_chart(fig_ph, use_container_width=True, config=LOCKED_CONFIG)
 
         with tabs[1]: # Team Gallery
@@ -156,15 +158,18 @@ if check_password():
             with c_gal2: pos_f_gal = st.selectbox("Position Filter", ["All Positions"] + sorted([p for p in df['Position'].unique() if p != "N/A"]), key="nav_pos_gal")
             gal_df = df[df['Session_Name'] == selected_session_gal].copy()
             if pos_f_gal != "All Positions": gal_df = gal_df[gal_df['Position'] == pos_f_gal]
-            if not gal_df.empty:
-                for i in range(0, len(gal_df), 2):
-                    cols = st.columns(2)
-                    for j in range(2):
-                        if i + j < len(gal_df):
-                            pd_row = gal_df.iloc[i + j]; lb_g = df[(df['Name'] == pd_row['Name']) & (df['Date'] >= pd_row['Date'] - timedelta(days=30)) & (df['Date'] <= pd_row['Date'])]; r_html = ""; t_grade = 0; c_metrics = 0
-                            for k in all_metrics[:4]: v, m = pd_row[k], lb_g[k].max(); g = math.ceil((v / m) * 100) if m > 0 else 0; t_grade += g; c_metrics += 1; r_html += f"<tr><td>{k}</td><td>{v}</td><td>{g}</td></tr>"
-                            sc_g = math.ceil(t_grade / c_metrics) if c_metrics > 0 else 0
-                            with cols[j]: st.markdown(f'<div class="gallery-card" style="border:1px solid #E5E5E7; border-radius:12px; padding:15px; margin-bottom:10px;"><div style="display:flex; align-items:center; gap:10px;"><div style="flex:1.2; text-align:center;"><img src="{pd_row["PhotoURL"]}" class="gallery-photo"><p style="font-weight:bold; font-size:15px; margin-top:8px;">{pd_row["Name"]}</p></div><div style="flex:3;"><table class="scout-table"><thead><tr><th>Metric</th><th>Val</th><th>Grade</th></tr></thead><tbody>{r_html}</tbody></table></div><div style="flex:1; text-align:center;"><div style="background-color:{get_flipped_gradient(sc_g)}; color:white; padding:10px; border-radius:12px; font-size:32px; font-weight:900;">{sc_g}</div></div></div></div>', unsafe_allow_html=True)
+            for i in range(0, len(gal_df), 2):
+                cols = st.columns(2)
+                for j in range(2):
+                    if i + j < len(gal_df):
+                        pd_row = gal_df.iloc[i + j]; lb_g = df[(df['Name'] == pd_row['Name']) & (df['Date'] >= pd_row['Date'] - timedelta(days=30)) & (df['Date'] <= pd_row['Date'])]; r_html = ""; t_grade = 0; c_metrics = 0
+                        for k in all_metrics:
+                            if k in pd_row:
+                                v, mx, avg = pd_row[k], lb_g[k].max(), lb_g[k].mean(); g = math.ceil((v / mx) * 100) if mx > 0 else 0
+                                t_grade += g; c_metrics += 1; diff = (v - avg) / avg if avg != 0 else 0; h_class = "class='bg-highlight-red'" if abs(diff) > 0.10 else ""; arr_val = f"<span class='arrow-red'>{'↑' if diff > 0.10 else '↓'}</span>" if abs(diff) > 0.10 else ""
+                                r_html += f"<tr><td>{k}</td><td {h_class}>{v} {arr_val}</td><td>{mx}</td><td>{g}</td></tr>"
+                        sc_g = math.ceil(t_grade / c_metrics) if c_metrics > 0 else 0
+                        with cols[j]: st.markdown(f'<div class="gallery-card" style="border:1px solid #E5E5E7; border-radius:15px; padding:15px; margin-bottom:20px;"><div style="display:flex; align-items:center; gap:10px;"><div style="flex:1.2; text-align:center;"><img src="{pd_row["PhotoURL"]}" class="gallery-photo"><p style="font-weight:bold; font-size:15px; margin-top:8px;">{pd_row["Name"]}</p></div><div style="flex:3;"><table class="scout-table"><thead><tr><th>Metric</th><th>Val</th><th>Max</th><th>Grade</th></tr></thead><tbody>{r_html}</tbody></table></div><div style="flex:1; text-align:center;"><div style="background-color:{get_flipped_gradient(sc_g)}; color:white; padding:10px; border-radius:12px; font-size:32px; font-weight:900;">{sc_g}</div></div></div></div>', unsafe_allow_html=True)
 
         with tabs[2]: # Game v Practice
             st.markdown('<div class="section-header">Weekly Prep Intensity vs. Game Demands</div>', unsafe_allow_html=True)
@@ -188,12 +193,12 @@ if check_password():
 
         with tabs[3]: # Position Analysis
             st.markdown('<div class="section-header">Positional Performance Trends</div>', unsafe_allow_html=True)
-            sel_p_pos = st.selectbox("Select Athlete", sorted(df['Name'].unique())); p_pos = df[df['Name'] == sel_p_pos].iloc[0]; pos_label = p_pos['Position']; tr_df = df[df['Week'] >= df['Week'].max()-3]; t_col1, t_col2, t_col3 = st.columns(3); tr_metrics = ["Player Load", "Estimated Distance (y)", "Total Jumps"]; cols = [t_col1, t_col2, t_col3]
+            sel_p_pos = st.selectbox("Select Athlete", sorted(df['Name'].unique())); p_pos = df[df['Name'] == sel_p_pos].iloc[0]; pos_label = p_pos['Position']; max_wk = df['Week'].max(); tr_df = df[df['Week'] >= max_wk-3]; t_col1, t_col2, t_col3 = st.columns(3); tr_metrics = ["Player Load", "Estimated Distance (y)", "Total Jumps"]
             for i, m in enumerate(tr_metrics):
-                with cols[i]:
+                with [t_col1, t_col2, t_col3][i]:
                     fig_t = go.Figure(); p_t = tr_df[tr_df['Name'] == sel_p_pos].groupby('Week')[m].mean().reset_index(); fig_t.add_trace(go.Scatter(x=p_t['Week'], y=p_t[m], name=sel_p_pos, line=dict(color='#0046ad', width=4), mode='lines+markers')); pos_t = tr_df[tr_df['Position'] == pos_label].groupby('Week')[m].mean().reset_index(); fig_t.add_trace(go.Scatter(x=pos_t['Week'], y=pos_t[m], name=f"{pos_label} Avg", line=dict(color='#ff7f0e', dash='dash'))); fig_t.update_layout(title=f"4-Week {m}", height=300); st.plotly_chart(fig_t, use_container_width=True, config=LOCKED_CONFIG)
 
-        with tabs[4]: # Match Summary
+        with tabs[4]: # Match Summary (Surgical Fix)
             st.markdown('<div class="print-hide">', unsafe_allow_html=True)
             if st.button("🖨️ Prepare PDF for Printing"): st.markdown('<script>window.print();</script>', unsafe_allow_html=True)
             st.markdown('<div class="section-header">Match Comparison Selection</div>', unsafe_allow_html=True)
@@ -217,7 +222,7 @@ if check_password():
                     with side_cols[0]:
                         card_start = f'<div style="display:flex; align-items:center; gap:12px; padding:10px; background:#f8f9fa; border-bottom:2px solid #FF8200;"><img src="{ad["PhotoURL"].iloc[0]}" class="gallery-photo" style="width:55px; height:55px;"><div><p style="margin:0; font-weight:900; font-size:15px;">{name}</p><p style="margin:0; color:#4895DB; font-weight:700; font-size:10px;">{ad["Position"].iloc[0]}</p></div></div>'
                         card_start += '<table class="scout-table"><thead><tr><th>Match</th><th>Jumps</th><th>Load</th><th>Effort</th><th>Dist</th></tr></thead><tbody>'
-                        for _, r in ad.iterrows(): card_start += f"<tr><td style='font-weight:700; font-size:9px;'>{r['Session_Name']}</td><td>{int(r['Total Jumps'])}</td><td>{r['Player Load']:.0f}</td><td>{r['Explosive Efforts']:.0f}</td><td>{r['Estimated Distance (y)']:.0f}</td></tr>"
+                        for _, r in ad.iterrows(): card_start += f"<tr><td>{r['Session_Name']}</td><td>{int(r['Total Jumps'])}</td><td>{r['Player Load']:.0f}</td><td>{r['Explosive Efforts']:.0f}</td><td>{r['Estimated Distance (y)']:.0f}</td></tr>"
                         card_start += f"<tr style='background:#4895DB; color:white; font-weight:900;'><td>TOTAL</td><td>{int(ad['Total Jumps'].sum())}</td><td>{ad['Player Load'].sum():.0f}</td><td>{ad['Explosive Efforts'].sum():.0f}</td><td>{ad['Estimated Distance (y)'].sum():.0f}</td></tr></tbody></table>"
                         st.markdown(card_start, unsafe_allow_html=True)
                     with side_cols[1]:
@@ -228,6 +233,12 @@ if check_password():
                         fig_ath.update_layout(height=260, template="simple_white", legend=dict(orientation="h", yanchor="top", y=-0.3, xanchor="center", x=0.5))
                         st.plotly_chart(fig_ath, use_container_width=True, config=LOCKED_CONFIG)
                     st.markdown('</div>', unsafe_allow_html=True)
+
+                st.write("<br><br>", unsafe_allow_html=True); st.markdown('<div class="section-header">Team Match Averages</div>', unsafe_allow_html=True)
+                team_avg_t = tourney_df.groupby('Session_Name')[['Total Jumps', 'Player Load', 'Explosive Efforts', 'Estimated Distance (y)']].mean().reset_index()
+                tc1, tc2 = st.columns(2)
+                with tc1: st.plotly_chart(px.bar(team_avg_t, x='Session_Name', y='Total Jumps', title="Avg Total Jumps", color='Session_Name', color_discrete_map=m_map), use_container_width=True, config=LOCKED_CONFIG)
+                with tc2: st.plotly_chart(px.bar(team_avg_t, x='Session_Name', y='Player Load', title="Avg Player Load", color='Session_Name', color_discrete_map=m_map), use_container_width=True, config=LOCKED_CONFIG)
 
     except Exception as e:
         st.error(f"Sync Error: {e}")
