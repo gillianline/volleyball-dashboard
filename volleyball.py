@@ -28,7 +28,7 @@ st.markdown("""
     .arrow-red { color: #b30000 !important; font-weight: 900; margin-left: 4px; }
     .player-photo-large { border-radius: 50%; width: 220px; height: 220px; object-fit: cover; border: 6px solid #FF8200; }
     .score-box { padding: 12px 20px; border-radius: 12px; font-size: 28px; font-weight: 800; min-width: 100px; color: #FFFFFF; line-height: 1.2; text-align: center;}
-    .gallery-card { border: 1px solid #E5E5E7; padding: 15px; border-radius: 15px; background-color: #FFFFFF; margin-bottom: 25px; min-height: 450px; }
+    .gallery-card { border: 1px solid #E5E5E7; padding: 15px; border-radius: 15px; background-color: #FFFFFF; margin-bottom: 25px; min-height: 500px; }
     .gallery-photo { border-radius: 50%; width: 80px; height: 80px; object-fit: cover; border: 3px solid #FF8200; }
     .section-header { font-size: 14px; font-weight: 800; color: #4895DB; border-bottom: 2px solid #FF8200; margin-top: 25px; margin-bottom: 15px; padding-bottom: 5px; text-transform: uppercase; }
     .info-box { background-color: #f8f9fa; border-left: 5px solid #FF8200; padding: 12px; margin-top: 10px; font-size: 12px; color: #1D1D1F; font-weight: 600; line-height: 1.4; }
@@ -48,9 +48,8 @@ def get_flipped_gradient(score):
 def load_all_data():
     def get_fresh_url(url): return f"{url}&cachebust={int(time.time())}"
     
-    # 1. Main Sheet
     df = pd.read_csv(get_fresh_url(st.secrets["GOOGLE_SHEET_URL"]))
-    # CRITICAL: Store original row order to handle same-day games correctly
+    # Track Excel Row Order
     df['Sheet_Order'] = range(len(df))
     df.columns = df.columns.str.strip()
     df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
@@ -75,13 +74,11 @@ def load_all_data():
     df['Position'] = df.groupby('Name')['Position'].ffill().bfill().fillna("N/A")
     df['PhotoURL'] = df.groupby('Name')['PhotoURL'].ffill().bfill().fillna("https://www.w3schools.com/howto/img_avatar.png")
     
-    # 2. CMJ Sheet
     cmj_df = pd.read_csv(get_fresh_url(st.secrets["CMJ_SHEET_URL"]))
     cmj_df.columns = cmj_df.columns.str.strip()
     cmj_df['Jump Height (in)'] = cmj_df['Jump Height (Imp-Mom) [cm]'] * 0.3937
     cmj_df['Test Date'] = pd.to_datetime(cmj_df['Test Date'], errors='coerce')
     
-    # 3. Phases Sheet
     phase_df = pd.read_csv(get_fresh_url(st.secrets["PHASES_SHEET_URL"]))
     phase_df.columns = phase_df.columns.str.strip()
     if 'Phases' in phase_df.columns: phase_df = phase_df.rename(columns={'Phases': 'Phase'})
@@ -104,7 +101,7 @@ try:
 
     tabs = st.tabs(["Individual Profile", "Team Gallery", "Game v. Practice", "Position Analysis", "Tournament Summary"])
     
-    # Session lists sorted by original sheet order (descending)
+    # Sort dropdowns by Excel sheet order
     session_list = df[['Date', 'Sheet_Order', 'Session_Name']].drop_duplicates(subset=['Session_Name']).sort_values(['Date', 'Sheet_Order'], ascending=[False, False])['Session_Name'].tolist()
 
     # --- TAB 0: INDIVIDUAL PROFILE ---
@@ -189,7 +186,7 @@ try:
                                 t_grade += g; c_metrics += 1
                                 r_html += f"<tr><td>{k}</td><td>{v}</td><td>{m}</td><td>{g}</td></tr>"
                         sc_g = math.ceil(t_grade / c_metrics) if c_metrics > 0 else 0
-                        with cols[j]: st.markdown(f'<div class="gallery-card"><div style="display:flex; align-items:center; gap:10px;"><div style="flex:1.2; text-align:center;"><img src="{pd_row["PhotoURL"]}" class="gallery-photo"><p style="font-weight:bold; font-size:15px; margin-top:8px;">{pd_row["Name"]}</p></div><div style="flex:3;"><table class="scout-table"><thead><tr><th>Metric</th><th>Val</th><th>Max</th><th>Grade</th></tr></thead><tbody>{r_html}</tbody></table></div><div style="flex:1; text-align:center;"><div style="background-color:{get_flipped_gradient(sc_g)}; color:white; padding:10px; border-radius:12px; font-size:32px; font-weight:900;">{sc_g}</div></div></div></div>', unsafe_allow_html=True)
+                        with cols[j]: st.markdown(f'<div class="gallery-card" style="min-height:300px;"><div style="display:flex; align-items:center; gap:10px;"><div style="flex:1.2; text-align:center;"><img src="{pd_row["PhotoURL"]}" class="gallery-photo"><p style="font-weight:bold; font-size:15px; margin-top:8px;">{pd_row["Name"]}</p></div><div style="flex:3;"><table class="scout-table"><thead><tr><th>Metric</th><th>Val</th><th>Max</th><th>Grade</th></tr></thead><tbody>{r_html}</tbody></table></div><div style="flex:1; text-align:center;"><div style="background-color:{get_flipped_gradient(sc_g)}; color:white; padding:10px; border-radius:12px; font-size:32px; font-weight:900;">{sc_g}</div></div></div></div>', unsafe_allow_html=True)
 
     # --- TAB 2: GAME V PRACTICE ---
     with tabs[2]:
@@ -252,7 +249,6 @@ try:
         with st.container():
             c_ts1, c_ts2 = st.columns([2, 1])
             with c_ts1:
-                # Sorted specifically by original entry order
                 game_list_t = df[df['Session_Type'] == 'Game'].sort_values(['Date', 'Sheet_Order'])['Session_Name'].unique()
                 selected_games = st.multiselect("Select Tournament Matches", game_list_t, default=game_list_t[-3:] if len(game_list_t) >=3 else game_list_t, key="tourney_multi")
             with c_ts2:
@@ -260,9 +256,7 @@ try:
 
         if selected_games:
             st.markdown('<div class="section-header">Athlete Match-by-Match Breakdown</div>', unsafe_allow_html=True)
-            # Re-sort display df by Sheet_Order to keep double-headers aligned
             tourney_df = df[df['Session_Name'].isin(selected_games)].sort_values(['Date', 'Sheet_Order'])
-            
             if pos_filter_t != "All Positions":
                 tourney_df = tourney_df[tourney_df['Position'] == pos_filter_t]
                 
@@ -295,23 +289,31 @@ try:
                             card_html += f"<tr style='background:#4895DB; color:white; font-weight:900;'><td>TOTAL</td><td>{int(ath_data_t['Total Jumps'].sum())}</td><td>{ath_data_t['Player Load'].sum():.0f}</td><td>{ath_data_t['Estimated Distance (y)'].sum():.0f}</td><td>{ath_data_t['Explosive Efforts'].sum():.0f}</td></tr></tbody></table>"
                             st.markdown(card_html + "</div>", unsafe_allow_html=True)
                             
-                            fig_radar = go.Figure()
+                            # Melded Visual: Grouped bar for metrics over games
+                            fig_ath_bars = go.Figure()
                             for _, r in ath_data_t.iterrows():
-                                fig_radar.add_trace(go.Scatterpolar(r=[r[m] for m in t_metrics], theta=t_metrics, fill='toself', name=r['Session_Name']))
-                            fig_radar.update_layout(polar=dict(radialaxis=dict(visible=False)), height=220, margin=dict(l=40, r=40, t=10, b=10), legend=dict(orientation="h", y=-0.3))
-                            st.plotly_chart(fig_radar, use_container_width=True, config=LOCKED_CONFIG)
+                                # Normalizing just for the chart so all metrics visible
+                                norm_vals = [r['Total Jumps'], r['Player Load']/5, r['Estimated Distance (y)']/10, r['Explosive Efforts']]
+                                fig_ath_bars.add_trace(go.Bar(name=r['Session_Name'], x=['Jumps', 'Load/5', 'Dist/10', 'Efforts'], y=norm_vals))
+                            
+                            fig_ath_bars.update_layout(barmode='group', height=250, margin=dict(l=20,r=20,t=10,b=20), legend=dict(orientation="h", y=-0.3), template="simple_white")
+                            st.plotly_chart(fig_ath_bars, use_container_width=True, config=LOCKED_CONFIG)
                             st.markdown("</div>", unsafe_allow_html=True)
 
-            st.write("---")
-            st.markdown('<div class="section-header">Team Tournament Averages</div>', unsafe_allow_html=True)
-            # Use original order for x-axis categories
+            # --- TEAM AVERAGES IN 2x2 GRID ---
+            st.write("<br><br>", unsafe_allow_html=True) # Extra space
+            st.markdown('<div class="section-header">Team Tournament Averages (Excel Order)</div>', unsafe_allow_html=True)
             team_avg_t = df[df['Session_Name'].isin(selected_games)].groupby(['Session_Name', 'Sheet_Order'])[t_metrics].mean().reset_index().sort_values('Sheet_Order')
             
-            g_cols_t = st.columns(4)
+            row1_c1, row1_c2 = st.columns(2)
+            row2_c1, row2_c2 = st.columns(2)
+            
+            grid_locs = [row1_c1, row1_c2, row2_c1, row2_c2]
             for idx, m in enumerate(t_metrics):
-                with g_cols_t[idx]:
-                    fig_t = px.bar(team_avg_t, x='Session_Name', y=m, color='Session_Name', color_discrete_sequence=['#4895DB', '#FF8200', '#515154'])
-                    fig_t.update_layout(showlegend=False, height=300, margin=dict(l=50, r=10, t=60, b=80), xaxis_title=None, template="simple_white")
+                with grid_locs[idx]:
+                    fig_t = px.bar(team_avg_t, x='Session_Name', y=m, color='Session_Name', 
+                                 title=f"Avg {m} (All Games)", color_discrete_sequence=['#4895DB', '#FF8200', '#515154'])
+                    fig_t.update_layout(showlegend=False, height=400, margin=dict(l=60, r=20, t=60, b=100), xaxis_title=None, template="simple_white")
                     st.plotly_chart(fig_t, use_container_width=True, config=LOCKED_CONFIG)
 
 except Exception as e:
