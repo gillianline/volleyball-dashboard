@@ -255,7 +255,7 @@ if check_password():
                             </div>
                             <div style="padding:5px;">
                                 <table class="scout-table" style="margin-bottom:0;">
-                                    <thead><tr><th>Match</th><th>Jumps</th><th>Load</th><th>Effort</th><th>Dist</th></tr></thead>
+                                    <thead><tr><th>Match</th><th>Total Jumps</th><th>Player Load</th><th>Explosive Efforts</th><th>Estimated Distance</th></tr></thead>
                                     <tbody>
                         """
                         for _, r in ad.iterrows():
@@ -265,8 +265,8 @@ if check_password():
                     with side_cols[1]:
                         fig_ath = make_subplots(specs=[[{"secondary_y": True}]]);
                         for _, r in ad.iterrows():
-                            fig_ath.add_trace(go.Bar(name=r['Session_Name'], x=['Jumps', 'Load', 'Effort'], y=[r['Total Jumps'], r['Player Load'], r['Explosive Efforts']], marker_color=m_map[r['Session_Name']]), secondary_y=False)
-                            fig_ath.add_trace(go.Bar(name="Dist", x=['Distance'], y=[r['Estimated Distance (y)']], marker=dict(color=m_map[r['Session_Name']], opacity=0.4), showlegend=False), secondary_y=True)
+                            fig_ath.add_trace(go.Bar(name=r['Session_Name'], x=['Total Jumps', 'Player Load', 'Explosive Efforts'], y=[r['Total Jumps'], r['Player Load'], r['Explosive Efforts']], marker_color=m_map[r['Session_Name']]), secondary_y=False)
+                            fig_ath.add_trace(go.Bar(name="Dist", x=['Estimated Distance'], y=[r['Estimated Distance (y)']], marker=dict(color=m_map[r['Session_Name']], opacity=0.4), showlegend=False), secondary_y=True)
                         
                         # Apply Fixed Axis Values
                         fig_ath.update_layout(
