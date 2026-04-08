@@ -41,8 +41,8 @@ if check_password():
         .viewerBadge_link__1S137, .main_heading_anchor__m6v0K, a.header-anchor { display: none !important; }
         header a { display: none !important; }
         .scout-table { width: 100%; border-collapse: collapse; text-align: center; table-layout: auto; }
-        .scout-table th { background-color: #4895DB; color: white; padding: 4px; border-bottom: 2px solid #FF8200; font-weight: 700; font-size: 12px; text-transform: uppercase; }
-        .scout-table td { padding: 4px; border-bottom: 1px solid #F5F5F7; font-size: 10px; color: #1D1D1F; }
+        .scout-table th { background-color: #4895DB; color: white; padding: 4px; border-bottom: 2px solid #FF8200; font-weight: 700; font-size: 11px; text-transform: uppercase; }
+        .scout-table td { padding: 4px; border-bottom: 1px solid #F5F5F7; font-size: 11px; color: #1D1D1F; }
         .bg-highlight-red { background-color: #ffcccc !important; font-weight: 900; }
         .arrow-red { color: #b30000 !important; font-weight: 900; margin-left: 4px; }
         .player-photo-large { border-radius: 50%; width: 220px; height: 220px; object-fit: cover; border: 6px solid #FF8200; }
