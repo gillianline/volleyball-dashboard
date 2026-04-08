@@ -207,12 +207,12 @@ if check_password():
 
         with tabs[4]: # Match Summary
             if st.session_state.is_printing:
-                if st.button("🔙 Back to Editor (Show Filters)"):
+                if st.button("Back to Editor (Show Filters)"):
                     st.session_state.is_printing = False
                     st.rerun()
             else:
                 st.markdown('<div class="print-hide">', unsafe_allow_html=True)
-                if st.button("🖨️ Prepare PDF for Printing"):
+                if st.button("Prepare PDF for Printing"):
                     st.session_state.is_printing = True
                     st.rerun()
                 st.markdown('<div class="section-header">Match Comparison Selection</div>', unsafe_allow_html=True)
@@ -220,7 +220,7 @@ if check_password():
                 with c_ts1:
                     match_list_t = df[df['Session_Type'].isin(['Game', 'Match'])].sort_values(['Date', 'Sheet_Order'])['Session_Name'].unique()
                     if "matches_state" not in st.session_state: st.session_state.matches_state = match_list_t[-3:] if len(match_list_t) >=3 else match_list_t
-                    st.session_state.matches_state = st.multiselect("Select Weekend Matches", match_list_t, default=st.session_state.matches_state)
+                    st.session_state.matches_state = st.multiselect("Select Matches", match_list_t, default=st.session_state.matches_state)
                 with c_ts2:
                     if "pos_state" not in st.session_state: st.session_state.pos_state = "All Positions"
                     st.session_state.pos_state = st.selectbox("Filter by Position", ["All Positions"] + sorted(list(df['Position'].unique())), index=0)
