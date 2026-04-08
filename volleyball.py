@@ -1,3 +1,4 @@
+import streamlit as st
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
@@ -5,7 +6,7 @@ from plotly.subplots import make_subplots
 import math 
 from datetime import timedelta
 
-# --- PAGE CONFIG ---
+# --- PAGE CONFIG MUST BE FIRST ---
 st.set_page_config(page_title="Lady Vols VB Performance", layout="wide")
 
 # --- PASSWORD PROTECTION ---
@@ -27,10 +28,6 @@ def check_password():
         return True
 
 if check_password():
-    # Initialize print state
-    if "is_printing" not in st.session_state:
-        st.session_state.is_printing = False
-
     # --- CSS: FIXED PRINT LAYOUT ---
     st.markdown("""
         <style>
@@ -54,21 +51,21 @@ if check_password():
             display: block !important; 
             margin-bottom: 30px; 
         }
-        
-        .player-divider { border: 0; height: 1px; background: #E5E5E7; margin-bottom: 15px; width: 100%; }
-        .gallery-photo { border-radius: 50%; width: 110px; height: 110px; object-fit: cover; border: 4px solid #FF8200; }
-        .section-header { font-size: 14px; font-weight: 800; color: #4895DB; border-bottom: 2px solid #FF8200; margin-top: 15px; margin-bottom: 10px; padding-bottom: 5px; text-transform: uppercase; }
 
         @media print {
             .main-logo-container { display: block !important; margin-bottom: 0 !important; }
-            .stTabs [role="tablist"], [data-testid="stSidebar"], header, footer, button, .stButton { display: none !important; }
-            .main .block-container { padding: 0 !important; max-width: 100% !important; }
+            .stTabs [role="tablist"], [data-testid="stSidebar"], header, footer, button, .print-hide { 
+                display: none !important; 
+            }
+            [data-testid="stVerticalBlock"] > div:has(div.print-hide), [data-testid="stMultiSelect"], [data-testid="stSelectbox"] {
+                display: none !important;
+            }
+            .main .block-container { padding: 0 !important; max-width: 100% !important; margin-top: 0 !important; }
             .scout-table td, p, span, div { color: #000000 !important; }
         }
         </style>
         """, unsafe_allow_html=True)
 
-    # Helper for Readiness
     def get_flipped_gradient(score):
         score = float(score)
         if score <= 40: return "#2D5A27"
@@ -84,7 +81,6 @@ if check_password():
         if 'Week' in df.columns:
             df['Week'] = pd.to_numeric(df['Week'].astype(str).str.extract('(\d+)', expand=False), errors='coerce').fillna(0).astype(int)
         
-        # RESTORED CRITICAL MAPPING
         rename_map = {
             'Total Jumps': 'Total Jumps', 'IMA Jump Count Med Band': 'Moderate Jumps', 'IMA Jump Count High Band': 'High Jumps', 
             'BMP Jumping Load': 'Jump Load', 'Total Player Load': 'Player Load', 'Estimated Distance (y)': 'Estimated Distance (y)', 
@@ -210,40 +206,24 @@ if check_password():
                     with cols[i]:
                         fig_t = go.Figure(); p_t = tr_df[tr_df['Name'] == sel_p_pos].groupby('Week')[m].mean().reset_index(); fig_t.add_trace(go.Scatter(x=p_t['Week'], y=p_t[m], name=sel_p_pos, line=dict(color='#0046ad', width=4), mode='lines+markers')); pos_t = tr_df[tr_df['Position'] == pos_label].groupby('Week')[m].mean().reset_index(); fig_t.add_trace(go.Scatter(x=pos_t['Week'], y=pos_t[m], name=f"{pos_label} Avg", line=dict(color='#ff7f0e', dash='dash'))); fig_t.update_layout(title=f"4-Week {m}", xaxis=dict(dtick=1), height=300, margin=dict(l=10, r=10, t=40, b=10), showlegend=True, legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)); st.plotly_chart(fig_t, use_container_width=True, config=LOCKED_CONFIG)
 
-        with tabs[4]: # Match Summary (THE FIX)
-            if st.session_state.is_printing:
-                if st.button("🔙 Back to Filters"):
-                    st.session_state.is_printing = False
-                    st.rerun()
-            else:
-                st.markdown('<div class="print-hide">', unsafe_allow_html=True)
-                if st.button("🖨️ Prepare PDF for Printing"):
-                    st.session_state.is_printing = True
-                    st.rerun()
-                st.markdown('<div class="section-header">Match Comparison Selection</div>', unsafe_allow_html=True)
-                c_ts1, c_ts2 = st.columns([2, 1])
-                with c_ts1:
-                    match_list_t = df[df['Session_Type'].isin(['Game', 'Match'])].sort_values(['Date', 'Sheet_Order'])['Session_Name'].unique()
-                    if "matches_state" not in st.session_state: st.session_state.matches_state = match_list_t[-3:] if len(match_list_t) >=3 else match_list_t
-                    st.session_state.matches_state = st.multiselect("Select Weekend Matches", match_list_t, default=st.session_state.matches_state)
-                with c_ts2:
-                    if "pos_state" not in st.session_state: st.session_state.pos_state = "All Positions"
-                    st.session_state.pos_state = st.selectbox("Filter by Position", ["All Positions"] + sorted(list(df['Position'].unique())), index=0)
-                st.markdown('</div>', unsafe_allow_html=True)
-
-            if st.session_state.is_printing:
-                st.markdown('<script>window.print();</script>', unsafe_allow_html=True)
-
-            selected_matches = st.session_state.get("matches_state", [])
-            pos_filter_t = st.session_state.get("pos_state", "All Positions")
+        with tabs[4]: # Match Summary
+            st.markdown('<div class="print-hide">', unsafe_allow_html=True)
+            if st.button("🖨️ Prepare PDF for Printing"): st.markdown('<script>window.print();</script>', unsafe_allow_html=True)
+            st.markdown('<div class="section-header">Match Comparison Selection</div>', unsafe_allow_html=True)
+            c_ts1, c_ts2 = st.columns([2, 1])
+            with c_ts1:
+                match_list_t = df[df['Session_Type'].isin(['Game', 'Match'])]['Session_Name'].unique()
+                selected_matches = st.multiselect("Select Weekend Matches", match_list_t, default=match_list_t[-3:] if len(match_list_t) >=3 else match_list_t)
+            with c_ts2: pos_filter_t = st.selectbox("Filter by Position", ["All Positions"] + sorted(list(df['Position'].unique())), key="ms_pos_surgical")
+            st.markdown('</div>', unsafe_allow_html=True)
 
             if selected_matches:
                 c_pal = ['#4895DB', '#FF8200', '#515154']; m_map = {m: c_pal[idx % 3] for idx, m in enumerate(selected_matches)}
                 st.markdown('<div class="section-header">Athlete Match Performance Breakdown</div>', unsafe_allow_html=True)
-                tourney_df = df[df['Session_Name'].isin(selected_matches)].sort_values(['Date', 'Sheet_Order'])
+                tourney_df = df[df['Session_Name'].isin(selected_matches)].sort_values(['Date'])
                 if pos_filter_t != "All Positions": tourney_df = tourney_df[tourney_df['Position'] == pos_filter_t]
-                ath_t = sorted(tourney_df['Name'].unique())
-                for name in ath_t:
+                
+                for name in sorted(tourney_df['Name'].unique()):
                     ad = tourney_df[tourney_df['Name'] == name]
                     st.markdown(f'<div class="player-row-container"><div class="player-divider"></div>', unsafe_allow_html=True)
                     sc1, sc2 = st.columns([1.5, 2])
@@ -264,12 +244,15 @@ if check_password():
 
                 st.write("<br><br>", unsafe_allow_html=True); st.markdown('<div class="section-header">Team Match Averages</div>', unsafe_allow_html=True)
                 team_avg = tourney_df.groupby('Session_Name')[['Total Jumps', 'Player Load', 'Explosive Efforts', 'Estimated Distance (y)']].mean().reset_index()
-                tc1, tc2 = st.columns(2)
-                with tc1: st.plotly_chart(px.bar(team_avg, x='Session_Name', y='Total Jumps', title="Avg Total Jumps", color='Session_Name', color_discrete_map=m_map), use_container_width=True, config=LOCKED_CONFIG)
-                with tc2: st.plotly_chart(px.bar(team_avg, x='Session_Name', y='Player Load', title="Avg Player Load", color='Session_Name', color_discrete_map=m_map), use_container_width=True, config=LOCKED_CONFIG)
-                tc3, tc4 = st.columns(2)
-                with tc3: st.plotly_chart(px.bar(team_avg, x='Session_Name', y='Explosive Efforts', title="Avg Explosive Efforts", color='Session_Name', color_discrete_map=m_map), use_container_width=True, config=LOCKED_CONFIG)
-                with tc4: st.plotly_chart(px.bar(team_avg, x='Session_Name', y='Estimated Distance (y)', title="Avg Distance (y)", color='Session_Name', color_discrete_map=m_map), use_container_width=True, config=LOCKED_CONFIG)
+                
+                # RESTORED FOUR TEAM AVERAGE GRAPHS
+                c1, c2 = st.columns(2)
+                with c1: st.plotly_chart(px.bar(team_avg, x='Session_Name', y='Total Jumps', title="Avg Total Jumps", color='Session_Name', color_discrete_map=m_map), use_container_width=True)
+                with c2: st.plotly_chart(px.bar(team_avg, x='Session_Name', y='Player Load', title="Avg Player Load", color='Session_Name', color_discrete_map=m_map), use_container_width=True)
+                
+                c3, c4 = st.columns(2)
+                with c3: st.plotly_chart(px.bar(team_avg, x='Session_Name', y='Explosive Efforts', title="Avg Explosive Efforts", color='Session_Name', color_discrete_map=m_map), use_container_width=True)
+                with c4: st.plotly_chart(px.bar(team_avg, x='Session_Name', y='Estimated Distance (y)', title="Avg Distance (y)", color='Session_Name', color_discrete_map=m_map), use_container_width=True)
 
     except Exception as e:
         st.error(f"Sync Error: {e}")
