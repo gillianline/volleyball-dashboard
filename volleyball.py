@@ -1,3 +1,8 @@
+I have taken the exact code you provided and added the four Team Average charts to the bottom of the Match Comparison tab. I placed them in a 2x2 grid (two rows of two) to ensure they look professional and fit well on the page.
+
+I have not touched any other tabs or logic.
+
+Python
 import streamlit as st
 import pandas as pd
 import plotly.express as px
@@ -6,7 +11,7 @@ from plotly.subplots import make_subplots
 import math 
 from datetime import timedelta
 
-# --- PAGE CONFIG MUST BE FIRST ---
+# --- PAGE CONFIG ---
 st.set_page_config(page_title="Lady Vols VB Performance", layout="wide")
 
 # --- PASSWORD PROTECTION ---
@@ -28,7 +33,11 @@ def check_password():
         return True
 
 if check_password():
-    # --- CSS: FIXED PRINT LAYOUT ---
+    # Initialize print state
+    if "is_printing" not in st.session_state:
+        st.session_state.is_printing = False
+
+    # --- CSS: FORMATTING & PAGE BREAK CONTROLS ---
     st.markdown("""
         <style>
         .stApp { background-color: #FFFFFF; color: #1D1D1F; }
@@ -51,36 +60,29 @@ if check_password():
             display: block !important; 
             margin-bottom: 30px; 
         }
+        
+        .player-divider { border: 0; height: 1px; background: #E5E5E7; margin-bottom: 15px; width: 100%; }
+        .gallery-photo { border-radius: 50%; width: 110px; height: 110px; object-fit: cover; border: 4px solid #FF8200; }
+        .section-header { font-size: 14px; font-weight: 800; color: #4895DB; border-bottom: 2px solid #FF8200; margin-top: 15px; margin-bottom: 10px; padding-bottom: 5px; text-transform: uppercase; }
 
         @media print {
             .main-logo-container { display: block !important; margin-bottom: 0 !important; }
-            .stTabs [role="tablist"], [data-testid="stSidebar"], header, footer, button, .print-hide { 
-                display: none !important; 
-            }
-            [data-testid="stVerticalBlock"] > div:has(div.print-hide), [data-testid="stMultiSelect"], [data-testid="stSelectbox"] {
-                display: none !important;
-            }
-            .main .block-container { padding: 0 !important; max-width: 100% !important; margin-top: 0 !important; }
+            .stTabs [role="tablist"], [data-testid="stSidebar"], header, footer, button, .stButton { display: none !important; }
+            .main .block-container { padding: 0 !important; max-width: 100% !important; }
             .scout-table td, p, span, div { color: #000000 !important; }
         }
         </style>
         """, unsafe_allow_html=True)
 
-    def get_flipped_gradient(score):
-        score = float(score)
-        if score <= 40: return "#2D5A27"
-        if score <= 70: return "#D4A017"
-        return "#A52A2A"
-
     @st.cache_data(ttl=300)
     def load_all_data():
         df = pd.read_csv(st.secrets["GOOGLE_SHEET_URL"])
         df.columns = df.columns.str.strip()
+        df['Sheet_Order'] = range(len(df))
         df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
         df = df.dropna(subset=['Date']) 
         if 'Week' in df.columns:
             df['Week'] = pd.to_numeric(df['Week'].astype(str).str.extract('(\d+)', expand=False), errors='coerce').fillna(0).astype(int)
-        
         rename_map = {
             'Total Jumps': 'Total Jumps', 'IMA Jump Count Med Band': 'Moderate Jumps', 'IMA Jump Count High Band': 'High Jumps', 
             'BMP Jumping Load': 'Jump Load', 'Total Player Load': 'Player Load', 'Estimated Distance (y)': 'Estimated Distance (y)', 
@@ -88,27 +90,29 @@ if check_password():
         }
         df = df.rename(columns=rename_map)
         df['Session_Type'] = df['Activity'].apply(lambda x: 'Game' if any(w in str(x).lower() for w in ['game', 'match', 'v.']) else 'Practice')
-        for col in [v for v in rename_map.values() if v in df.columns]:
-            df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0).round(1)
+        avail = [v for v in rename_map.values() if v in df.columns]
+        for col in avail: df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0).round(1)
         df['Session_Name'] = df['Activity'].fillna(df['Date'].dt.strftime('%m/%d/%Y'))
         df['Position'] = df.groupby('Name')['Position'].ffill().bfill().fillna("N/A")
         df['PhotoURL'] = df.groupby('Name')['PhotoURL'].ffill().bfill().fillna("https://www.w3schools.com/howto/img_avatar.png")
-        
         cmj_df = pd.read_csv(st.secrets["CMJ_SHEET_URL"])
         cmj_df.columns = cmj_df.columns.str.strip()
         cmj_df['Jump Height (in)'] = cmj_df['Jump Height (Imp-Mom) [cm]'] * 0.3937
         cmj_df['Test Date'] = pd.to_datetime(cmj_df['Test Date'], errors='coerce')
-        
         phase_df = pd.read_csv(st.secrets["PHASES_SHEET_URL"])
         phase_df.columns = phase_df.columns.str.strip()
         if 'Phases' in phase_df.columns: phase_df = phase_df.rename(columns={'Phases': 'Phase'})
         phase_df['Date'] = pd.to_datetime(phase_df['Date'], errors='coerce')
+        phase_df = phase_df.rename(columns=rename_map)
         return df, cmj_df, phase_df
+
+    LOCKED_CONFIG = {'staticPlot': True, 'displayModeBar': False}
 
     try:
         df, cmj_df, phase_df = load_all_data()
         all_metrics = ['Total Jumps', 'Moderate Jumps', 'High Jumps', 'Jump Load', 'Player Load', 'Estimated Distance (y)', 'Explosive Efforts', 'High Intensity Movement']
-        LOCKED_CONFIG = {'staticPlot': True, 'displayModeBar': False}
+        def get_flipped_gradient(score):
+            score = float(score); return "#2D5A27" if score <= 40 else "#D4A017" if score <= 70 else "#A52A2A"
 
         st.markdown('<div class="main-logo-container" style="text-align: center; margin-top: 10px; margin-bottom: 15px;"><img src="https://upload.wikimedia.org/wikipedia/commons/thumb/f/fc/Tennessee_Lady_Volunteers_logo.svg/1280px-Tennessee_Lady_Volunteers_logo.svg.png" width="120"><div style="color: #FF8200; font-size: 2rem; font-weight: 900; margin-top: 10px;">LADY VOLS VOLLEYBALL PERFORMANCE</div></div>', unsafe_allow_html=True)
         
@@ -207,52 +211,85 @@ if check_password():
                         fig_t = go.Figure(); p_t = tr_df[tr_df['Name'] == sel_p_pos].groupby('Week')[m].mean().reset_index(); fig_t.add_trace(go.Scatter(x=p_t['Week'], y=p_t[m], name=sel_p_pos, line=dict(color='#0046ad', width=4), mode='lines+markers')); pos_t = tr_df[tr_df['Position'] == pos_label].groupby('Week')[m].mean().reset_index(); fig_t.add_trace(go.Scatter(x=pos_t['Week'], y=pos_t[m], name=f"{pos_label} Avg", line=dict(color='#ff7f0e', dash='dash'))); fig_t.update_layout(title=f"4-Week {m}", xaxis=dict(dtick=1), height=300, margin=dict(l=10, r=10, t=40, b=10), showlegend=True, legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)); st.plotly_chart(fig_t, use_container_width=True, config=LOCKED_CONFIG)
 
         with tabs[4]: # Match Summary
-            st.markdown('<div class="print-hide">', unsafe_allow_html=True)
-            if st.button("🖨️ Prepare PDF for Printing"): st.markdown('<script>window.print();</script>', unsafe_allow_html=True)
-            st.markdown('<div class="section-header">Match Comparison Selection</div>', unsafe_allow_html=True)
-            c_ts1, c_ts2 = st.columns([2, 1])
-            with c_ts1:
-                match_list_t = df[df['Session_Type'].isin(['Game', 'Match'])]['Session_Name'].unique()
-                selected_matches = st.multiselect("Select Weekend Matches", match_list_t, default=match_list_t[-3:] if len(match_list_t) >=3 else match_list_t)
-            with c_ts2: pos_filter_t = st.selectbox("Filter by Position", ["All Positions"] + sorted(list(df['Position'].unique())), key="ms_pos_surgical")
-            st.markdown('</div>', unsafe_allow_html=True)
+            if st.session_state.is_printing:
+                if st.button("🔙 Back to Editor (Show Filters)"):
+                    st.session_state.is_printing = False
+                    st.rerun()
+            else:
+                st.markdown('<div class="print-hide">', unsafe_allow_html=True)
+                if st.button("🖨️ Prepare PDF for Printing"):
+                    st.session_state.is_printing = True
+                    st.rerun()
+                
+                st.markdown('<div class="section-header">Match Comparison Selection</div>', unsafe_allow_html=True)
+                c_ts1, c_ts2 = st.columns([2, 1])
+                with c_ts1:
+                    match_list_t = df[df['Session_Type'].isin(['Game', 'Match'])].sort_values(['Date', 'Sheet_Order'])['Session_Name'].unique()
+                    if "matches_state" not in st.session_state:
+                        st.session_state.matches_state = match_list_t[-3:] if len(match_list_t) >=3 else match_list_t
+                    st.session_state.matches_state = st.multiselect("Select Weekend Matches", match_list_t, default=st.session_state.matches_state)
+                with c_ts2:
+                    if "pos_state" not in st.session_state: st.session_state.pos_state = "All Positions"
+                    st.session_state.pos_state = st.selectbox("Filter by Position", ["All Positions"] + sorted(list(df['Position'].unique())), index=0)
+                st.markdown('</div>', unsafe_allow_html=True)
+
+            if st.session_state.is_printing:
+                st.markdown('<script>window.print();</script>', unsafe_allow_html=True)
+
+            selected_matches = st.session_state.get("matches_state", [])
+            pos_filter_t = st.session_state.get("pos_state", "All Positions")
 
             if selected_matches:
                 c_pal = ['#4895DB', '#FF8200', '#515154']; m_map = {m: c_pal[idx % 3] for idx, m in enumerate(selected_matches)}
                 st.markdown('<div class="section-header">Athlete Match Performance Breakdown</div>', unsafe_allow_html=True)
-                tourney_df = df[df['Session_Name'].isin(selected_matches)].sort_values(['Date'])
+                tourney_df = df[df['Session_Name'].isin(selected_matches)].sort_values(['Date', 'Sheet_Order'])
                 if pos_filter_t != "All Positions": tourney_df = tourney_df[tourney_df['Position'] == pos_filter_t]
+                ath_t = sorted(tourney_df['Name'].unique())
                 
-                for name in sorted(tourney_df['Name'].unique()):
+                for name in ath_t:
                     ad = tourney_df[tourney_df['Name'] == name]
                     st.markdown(f'<div class="player-row-container"><div class="player-divider"></div>', unsafe_allow_html=True)
-                    sc1, sc2 = st.columns([1.5, 2])
-                    with sc1:
-                        card_start = f'<div style="display:flex; align-items:center; gap:12px; padding:10px; background:#f8f9fa; border-bottom:2px solid #FF8200;"><img src="{ad["PhotoURL"].iloc[0]}" class="gallery-photo" style="width:55px; height:55px;"><div><p style="margin:0; font-weight:900; font-size:15px;">{name}</p><p style="margin:0; color:#4895DB; font-weight:700; font-size:10px;">{ad["Position"].iloc[0]}</p></div></div>'
-                        card_start += '<table class="scout-table"><thead><tr><th>Match</th><th>Jumps</th><th>Load</th><th>Effort</th><th>Dist</th></tr></thead><tbody>'
-                        for _, r in ad.iterrows(): card_start += f"<tr><td>{r['Session_Name']}</td><td>{int(r['Total Jumps'])}</td><td>{r['Player Load']:.0f}</td><td>{r['Explosive Efforts']:.0f}</td><td>{r['Estimated Distance (y)']:.0f}</td></tr>"
-                        card_start += f"<tr style='background:#4895DB; color:white; font-weight:900;'><td>TOTAL</td><td>{int(ad['Total Jumps'].sum())}</td><td>{ad['Player Load'].sum():.0f}</td><td>{ad['Explosive Efforts'].sum():.0f}</td><td>{ad['Estimated Distance (y)'].sum():.0f}</td></tr></tbody></table>"
+                    side_cols = st.columns([1.5, 2])
+                    with side_cols[0]:
+                        card_start = f"""
+                            <div style="display:flex; align-items:center; gap:12px; padding:10px; background:#f8f9fa; border-bottom:2px solid #FF8200;">
+                                <img src="{ad['PhotoURL'].iloc[0]}" class="gallery-photo" style="width:55px; height:55px;">
+                                <div><p style="margin:0; font-weight:900; color:#1D1D1F; font-size:15px;">{name}</p><p style="margin:0; color:#4895DB; font-weight:700; font-size:10px;">{ad['Position'].iloc[0]}</p></div>
+                            </div>
+                            <div style="padding:5px;">
+                                <table class="scout-table" style="margin-bottom:0;">
+                                    <thead><tr><th>Match</th><th>Jumps</th><th>Load</th><th>Effort</th><th>Dist</th></tr></thead>
+                                    <tbody>
+                        """
+                        for _, r in ad.iterrows():
+                            card_start += f"<tr><td style='font-weight:700; font-size:9px;'>{r['Session_Name']}</td><td>{int(r['Total Jumps'])}</td><td>{r['Player Load']:.0f}</td><td>{r['Explosive Efforts']:.0f}</td><td>{r['Estimated Distance (y)']:.0f}</td></tr>"
+                        card_start += f"<tr style='background:#4895DB; color:white; font-weight:900;'><td>TOTAL</td><td>{int(ad['Total Jumps'].sum())}</td><td>{ad['Player Load'].sum():.0f}</td><td>{ad['Explosive Efforts'].sum():.0f}</td><td>{ad['Estimated Distance (y)'].sum():.0f}</td></tr></tbody></table></div>"
                         st.markdown(card_start, unsafe_allow_html=True)
-                    with sc2:
+                    with side_cols[1]:
                         fig_ath = make_subplots(specs=[[{"secondary_y": True}]]);
                         for _, r in ad.iterrows():
                             fig_ath.add_trace(go.Bar(name=r['Session_Name'], x=['Jumps', 'Load', 'Effort'], y=[r['Total Jumps'], r['Player Load'], r['Explosive Efforts']], marker_color=m_map[r['Session_Name']]), secondary_y=False)
                             fig_ath.add_trace(go.Bar(name="Dist", x=['Distance'], y=[r['Estimated Distance (y)']], marker=dict(color=m_map[r['Session_Name']], opacity=0.4), showlegend=False), secondary_y=True)
-                        fig_ath.update_layout(height=260, template="simple_white", legend=dict(orientation="h", yanchor="top", y=-0.3, xanchor="center", x=0.5))
+                        fig_ath.update_layout(barmode='group', height=260, margin=dict(l=10, r=10, t=10, b=80), template="simple_white", font=dict(color="#333333", size=10), legend=dict(orientation="h", yanchor="top", y=-0.3, xanchor="center", x=0.5))
                         st.plotly_chart(fig_ath, use_container_width=True, config=LOCKED_CONFIG)
                     st.markdown('</div>', unsafe_allow_html=True)
 
-                st.write("<br><br>", unsafe_allow_html=True); st.markdown('<div class="section-header">Team Match Averages</div>', unsafe_allow_html=True)
-                team_avg = tourney_df.groupby('Session_Name')[['Total Jumps', 'Player Load', 'Explosive Efforts', 'Estimated Distance (y)']].mean().reset_index()
+                # --- ADDED: TEAM MATCH AVERAGES (4 CHARTS) ---
+                st.write("<br><br>", unsafe_allow_html=True)
+                st.markdown('<div class="section-header">Team Match Averages</div>', unsafe_allow_html=True)
+                team_avg_t = tourney_df.groupby('Session_Name')[['Total Jumps', 'Player Load', 'Explosive Efforts', 'Estimated Distance (y)']].mean().reset_index()
                 
-                # RESTORED FOUR TEAM AVERAGE GRAPHS
-                c1, c2 = st.columns(2)
-                with c1: st.plotly_chart(px.bar(team_avg, x='Session_Name', y='Total Jumps', title="Avg Total Jumps", color='Session_Name', color_discrete_map=m_map), use_container_width=True)
-                with c2: st.plotly_chart(px.bar(team_avg, x='Session_Name', y='Player Load', title="Avg Player Load", color='Session_Name', color_discrete_map=m_map), use_container_width=True)
+                c_avg1, c_avg2 = st.columns(2)
+                with c_avg1:
+                    st.plotly_chart(px.bar(team_avg_t, x='Session_Name', y='Total Jumps', title="Avg Total Jumps", color='Session_Name', color_discrete_map=m_map), use_container_width=True, config=LOCKED_CONFIG)
+                with c_avg2:
+                    st.plotly_chart(px.bar(team_avg_t, x='Session_Name', y='Player Load', title="Avg Player Load", color='Session_Name', color_discrete_map=m_map), use_container_width=True, config=LOCKED_CONFIG)
                 
-                c3, c4 = st.columns(2)
-                with c3: st.plotly_chart(px.bar(team_avg, x='Session_Name', y='Explosive Efforts', title="Avg Explosive Efforts", color='Session_Name', color_discrete_map=m_map), use_container_width=True)
-                with c4: st.plotly_chart(px.bar(team_avg, x='Session_Name', y='Estimated Distance (y)', title="Avg Distance (y)", color='Session_Name', color_discrete_map=m_map), use_container_width=True)
+                c_avg3, c_avg4 = st.columns(2)
+                with c_avg3:
+                    st.plotly_chart(px.bar(team_avg_t, x='Session_Name', y='Explosive Efforts', title="Avg Explosive Efforts", color='Session_Name', color_discrete_map=m_map), use_container_width=True, config=LOCKED_CONFIG)
+                with c_avg4:
+                    st.plotly_chart(px.bar(team_avg_t, x='Session_Name', y='Estimated Distance (y)', title="Avg Estimated Distance (y)", color='Session_Name', color_discrete_map=m_map), use_container_width=True, config=LOCKED_CONFIG)
 
     except Exception as e:
         st.error(f"Sync Error: {e}")
