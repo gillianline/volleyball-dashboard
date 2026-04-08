@@ -205,7 +205,7 @@ if check_password():
                     with cols[i]:
                         fig_t = go.Figure(); p_t = tr_df[tr_df['Name'] == sel_p_pos].groupby('Week')[m].mean().reset_index(); fig_t.add_trace(go.Scatter(x=p_t['Week'], y=p_t[m], name=sel_p_pos, line=dict(color='#0046ad', width=4), mode='lines+markers')); pos_t = tr_df[tr_df['Position'] == pos_label].groupby('Week')[m].mean().reset_index(); fig_t.add_trace(go.Scatter(x=pos_t['Week'], y=pos_t[m], name=f"{pos_label} Avg", line=dict(color='#ff7f0e', dash='dash'))); fig_t.update_layout(title=f"4-Week {m}", xaxis=dict(dtick=1), height=300, margin=dict(l=10, r=10, t=40, b=10), showlegend=True, legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)); st.plotly_chart(fig_t, use_container_width=True, config=LOCKED_CONFIG)
 
-        with tabs[4]:
+        with tabs[4]: # Match Summary
             if st.session_state.is_printing:
                 if st.button("🔙 Back to Editor (Show Filters)"):
                     st.session_state.is_printing = False
@@ -219,8 +219,7 @@ if check_password():
                 c_ts1, c_ts2 = st.columns([2, 1])
                 with c_ts1:
                     match_list_t = df[df['Session_Type'].isin(['Game', 'Match'])].sort_values(['Date', 'Sheet_Order'])['Session_Name'].unique()
-                    if "matches_state" not in st.session_state:
-                        st.session_state.matches_state = match_list_t[-3:] if len(match_list_t) >=3 else match_list_t
+                    if "matches_state" not in st.session_state: st.session_state.matches_state = match_list_t[-3:] if len(match_list_t) >=3 else match_list_t
                     st.session_state.matches_state = st.multiselect("Select Weekend Matches", match_list_t, default=st.session_state.matches_state)
                 with c_ts2:
                     if "pos_state" not in st.session_state: st.session_state.pos_state = "All Positions"
@@ -238,8 +237,12 @@ if check_password():
                 st.markdown('<div class="section-header">Athlete Match Performance Breakdown</div>', unsafe_allow_html=True)
                 tourney_df = df[df['Session_Name'].isin(selected_matches)].sort_values(['Date', 'Sheet_Order'])
                 if pos_filter_t != "All Positions": tourney_df = tourney_df[tourney_df['Position'] == pos_filter_t]
-                ath_t = sorted(tourney_df['Name'].unique())
                 
+                # --- CALC GLOBAL MAX FOR UNIFIED AXIS ---
+                global_max_primary = tourney_df[['Total Jumps', 'Player Load', 'Explosive Efforts']].max().max() * 1.1
+                global_max_dist = tourney_df['Estimated Distance (y)'].max() * 1.1
+
+                ath_t = sorted(tourney_df['Name'].unique())
                 for name in ath_t:
                     ad = tourney_df[tourney_df['Name'] == name]
                     st.markdown(f'<div class="player-row-container"><div class="player-divider"></div>', unsafe_allow_html=True)
@@ -264,18 +267,24 @@ if check_password():
                         for _, r in ad.iterrows():
                             fig_ath.add_trace(go.Bar(name=r['Session_Name'], x=['Jumps', 'Load', 'Effort'], y=[r['Total Jumps'], r['Player Load'], r['Explosive Efforts']], marker_color=m_map[r['Session_Name']]), secondary_y=False)
                             fig_ath.add_trace(go.Bar(name="Dist", x=['Distance'], y=[r['Estimated Distance (y)']], marker=dict(color=m_map[r['Session_Name']], opacity=0.4), showlegend=False), secondary_y=True)
-                        fig_ath.update_layout(barmode='group', height=260, margin=dict(l=10, r=10, t=10, b=80), template="simple_white", font=dict(color="#333333", size=10), legend=dict(orientation="h", yanchor="top", y=-0.3, xanchor="center", x=0.5))
+                        
+                        # Apply Fixed Axis Values
+                        fig_ath.update_layout(
+                            barmode='group', height=260, margin=dict(l=10, r=10, t=10, b=80), 
+                            template="simple_white", font=dict(color="#333333", size=10),
+                            legend=dict(orientation="h", yanchor="top", y=-0.3, xanchor="center", x=0.5),
+                            yaxis=dict(range=[0, global_max_primary]),
+                            yaxis2=dict(range=[0, global_max_dist])
+                        )
                         st.plotly_chart(fig_ath, use_container_width=True, config=LOCKED_CONFIG)
                     st.markdown('</div>', unsafe_allow_html=True)
 
-                # --- TEAM AVERAGES SECTION (4 GRAPHS - CLEAN VERSION) ---
                 st.write("<br><br>", unsafe_allow_html=True)
                 st.markdown('<div class="section-header">Team Match Averages</div>', unsafe_allow_html=True)
                 team_avg_t = tourney_df.groupby('Session_Name')[['Total Jumps', 'Player Load', 'Explosive Efforts', 'Estimated Distance (y)']].mean().reset_index()
                 
                 metrics_to_plot = ['Total Jumps', 'Player Load', 'Explosive Efforts', 'Estimated Distance (y)']
                 rows = [st.columns(2), st.columns(2)]
-                
                 for idx, m in enumerate(metrics_to_plot):
                     with rows[idx // 2][idx % 2]:
                         fig_t = go.Figure()
