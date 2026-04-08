@@ -205,7 +205,7 @@ if check_password():
                     with cols[i]:
                         fig_t = go.Figure(); p_t = tr_df[tr_df['Name'] == sel_p_pos].groupby('Week')[m].mean().reset_index(); fig_t.add_trace(go.Scatter(x=p_t['Week'], y=p_t[m], name=sel_p_pos, line=dict(color='#0046ad', width=4), mode='lines+markers')); pos_t = tr_df[tr_df['Position'] == pos_label].groupby('Week')[m].mean().reset_index(); fig_t.add_trace(go.Scatter(x=pos_t['Week'], y=pos_t[m], name=f"{pos_label} Avg", line=dict(color='#ff7f0e', dash='dash'))); fig_t.update_layout(title=f"4-Week {m}", xaxis=dict(dtick=1), height=300, margin=dict(l=10, r=10, t=40, b=10), showlegend=True, legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)); st.plotly_chart(fig_t, use_container_width=True, config=LOCKED_CONFIG)
 
-        with tabs[4]: # Match Summary
+        with tabs[4]:
             if st.session_state.is_printing:
                 if st.button("🔙 Back to Editor (Show Filters)"):
                     st.session_state.is_printing = False
@@ -215,7 +215,6 @@ if check_password():
                 if st.button("🖨️ Prepare PDF for Printing"):
                     st.session_state.is_printing = True
                     st.rerun()
-                
                 st.markdown('<div class="section-header">Match Comparison Selection</div>', unsafe_allow_html=True)
                 c_ts1, c_ts2 = st.columns([2, 1])
                 with c_ts1:
@@ -269,22 +268,20 @@ if check_password():
                         st.plotly_chart(fig_ath, use_container_width=True, config=LOCKED_CONFIG)
                     st.markdown('</div>', unsafe_allow_html=True)
 
-                # --- ADDED: TEAM MATCH AVERAGES (4 CHARTS) ---
+                # --- TEAM AVERAGES SECTION (4 GRAPHS - CLEAN VERSION) ---
                 st.write("<br><br>", unsafe_allow_html=True)
                 st.markdown('<div class="section-header">Team Match Averages</div>', unsafe_allow_html=True)
                 team_avg_t = tourney_df.groupby('Session_Name')[['Total Jumps', 'Player Load', 'Explosive Efforts', 'Estimated Distance (y)']].mean().reset_index()
                 
-                c_avg1, c_avg2 = st.columns(2)
-                with c_avg1:
-                    st.plotly_chart(px.bar(team_avg_t, x='Session_Name', y='Total Jumps', title="Avg Total Jumps", color='Session_Name', color_discrete_map=m_map), use_container_width=True, config=LOCKED_CONFIG)
-                with c_avg2:
-                    st.plotly_chart(px.bar(team_avg_t, x='Session_Name', y='Player Load', title="Avg Player Load", color='Session_Name', color_discrete_map=m_map), use_container_width=True, config=LOCKED_CONFIG)
+                metrics_to_plot = ['Total Jumps', 'Player Load', 'Explosive Efforts', 'Estimated Distance (y)']
+                rows = [st.columns(2), st.columns(2)]
                 
-                c_avg3, c_avg4 = st.columns(2)
-                with c_avg3:
-                    st.plotly_chart(px.bar(team_avg_t, x='Session_Name', y='Explosive Efforts', title="Avg Explosive Efforts", color='Session_Name', color_discrete_map=m_map), use_container_width=True, config=LOCKED_CONFIG)
-                with c_avg4:
-                    st.plotly_chart(px.bar(team_avg_t, x='Session_Name', y='Estimated Distance (y)', title="Avg Estimated Distance (y)", color='Session_Name', color_discrete_map=m_map), use_container_width=True, config=LOCKED_CONFIG)
+                for idx, m in enumerate(metrics_to_plot):
+                    with rows[idx // 2][idx % 2]:
+                        fig_t = go.Figure()
+                        fig_t.add_trace(go.Bar(x=team_avg_t['Session_Name'], y=team_avg_t[m], marker_color=[m_map[g] for g in team_avg_t['Session_Name']]))
+                        fig_t.update_layout(title=f"Avg {m}", height=300, template="simple_white", margin=dict(l=10, r=10, t=40, b=10))
+                        st.plotly_chart(fig_t, use_container_width=True, config=LOCKED_CONFIG)
 
     except Exception as e:
         st.error(f"Sync Error: {e}")
