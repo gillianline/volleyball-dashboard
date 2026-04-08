@@ -1,8 +1,3 @@
-I have taken the exact code you provided and added the four Team Average charts to the bottom of the Match Comparison tab. I placed them in a 2x2 grid (two rows of two) to ensure they look professional and fit well on the page.
-
-I have not touched any other tabs or logic.
-
-Python
 import streamlit as st
 import pandas as pd
 import plotly.express as px
