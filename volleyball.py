@@ -80,7 +80,7 @@ if check_password():
             df['Week'] = pd.to_numeric(df['Week'].astype(str).str.extract('(\d+)', expand=False), errors='coerce').fillna(0).astype(int)
         rename_map = {
             'Total Jumps': 'Total Jumps', 'IMA Jump Count Med Band': 'Moderate Jumps', 'IMA Jump Count High Band': 'High Jumps', 
-            'BMP Jumping Load': 'Jump Load', 'Total Player Load': 'Player Load', 'Estimated Distance (y)': 'Estimated Distance', 
+            'BMP Jumping Load': 'Jump Load', 'Total Player Load': 'Player Load', 'Estimated Distance': 'Estimated Distance (y)', 
             'Explosive Efforts': 'Explosive Efforts', 'High Intensity Movement': 'High Intensity Movement'
         }
         df = df.rename(columns=rename_map)
