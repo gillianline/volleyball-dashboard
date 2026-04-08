@@ -250,8 +250,8 @@ if check_password():
                     with side_cols[0]:
                         card_start = f"""
                             <div style="display:flex; align-items:center; gap:12px; padding:10px; background:#f8f9fa; border-bottom:2px solid #FF8200;">
-                                <img src="{ad['PhotoURL'].iloc[0]}" class="gallery-photo" style="width:55px; height:55px;">
-                                <div><p style="margin:0; font-weight:900; color:#1D1D1F; font-size:15px;">{name}</p><p style="margin:0; color:#4895DB; font-weight:700; font-size:10px;">{ad['Position'].iloc[0]}</p></div>
+                                <img src="{ad['PhotoURL'].iloc[0]}" class="gallery-photo" style="width:65px; height:65px;">
+                                <div><p style="margin:0; font-weight:900; color:#1D1D1F; font-size:18px;">{name}</p><p style="margin:0; color:#4895DB; font-weight:700; font-size:16px;">{ad['Position'].iloc[0]}</p></div>
                             </div>
                             <div style="padding:5px;">
                                 <table class="scout-table" style="margin-bottom:0;">
