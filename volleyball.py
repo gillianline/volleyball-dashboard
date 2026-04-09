@@ -72,7 +72,8 @@ if check_password():
     LOCKED_CONFIG = {'staticPlot': True, 'displayModeBar': False}
 
     def get_flipped_gradient(score):
-        score = float(score); return "#2D5A27" if score <= 40 else "#D4A017" if score <= 70 else "#A52A2A"
+        score = float(score)
+        return "#2D5A27" if score <= 40 else "#D4A017" if score <= 70 else "#A52A2A"
 
     @st.cache_data(ttl=300)
     def load_all_data():
@@ -81,6 +82,7 @@ if check_password():
         df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
         df = df.dropna(subset=['Date']) 
         
+        # Extract Week number (e.g., "Week 8" -> 8)
         if 'Week' in df.columns:
             df['Week'] = pd.to_numeric(df['Week'].astype(str).str.extract('(\d+)', expand=False), errors='coerce').fillna(0).astype(int)
 
@@ -131,9 +133,11 @@ if check_password():
                 if pos_f != "All Positions": dropdown_df = dropdown_df[dropdown_df['Position'] == pos_f]
                 sel_p = st.selectbox("Select Athlete", sorted(dropdown_df['Name'].unique()))
                 
-                # Group metrics by date to handle multiple sessions per day
+                # Handling Daily Totals (Combine morning/afternoon sessions)
                 p_full_hist = df[df['Name'] == sel_p]
                 daily_sums = p_full_hist.groupby('Date')[all_metrics].sum().reset_index()
+                
+                # Filter sums for 30-day window (ignoring Position Filter for Max accuracy)
                 lb = daily_sums[(daily_sums['Date'] >= curr_date - timedelta(days=30)) & (daily_sums['Date'] <= curr_date)]
                 
                 today_vals = daily_sums[daily_sums['Date'] == curr_date].iloc[0]
