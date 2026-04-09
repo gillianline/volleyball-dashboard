@@ -251,7 +251,6 @@ if check_password():
                 st.markdown('<div class="section-header">Match Comparison Selection</div>', unsafe_allow_html=True)
                 c_ts1, c_ts2 = st.columns([2, 1])
                 with c_ts1:
-                    # Pull list of matches from match_df
                     match_list_t = match_df.sort_values(['Date', 'Sheet_Order'])['Session_Name'].unique()
                     if "matches_state" not in st.session_state: 
                         st.session_state.matches_state = match_list_t[-3:] if len(match_list_t) >=3 else match_list_t
@@ -272,13 +271,14 @@ if check_password():
                 m_map = {m: c_pal[idx % 3] for idx, m in enumerate(selected_matches)}
                 st.markdown('<div class="section-header">Athlete Match Performance Breakdown</div>', unsafe_allow_html=True)
                 
-                # Filter specifically from the new match_df source
                 tourney_df = match_df[match_df['Session_Name'].isin(selected_matches)].sort_values(['Date', 'Sheet_Order'])
                 if pos_filter_t != "All Positions": 
                     tourney_df = tourney_df[tourney_df['Position'] == pos_filter_t]
                 
-                # --- CALC GLOBAL MAX FOR UNIFIED AXIS ---
+                # --- CALC INDEPENDENT MAXES FOR AXIS SCALING ---
+                # Left Axis: Load, Jumps, Efforts
                 global_max_primary = tourney_df[['Total Jumps', 'Player Load', 'Explosive Efforts']].max().max() * 1.1
+                # Right Axis: Distance only
                 global_max_dist = tourney_df['Estimated Distance (y)'].max() * 1.1
 
                 ath_t = sorted(tourney_df['Name'].unique())
@@ -303,9 +303,10 @@ if check_password():
                         st.markdown(card_start, unsafe_allow_html=True)
                     
                     with side_cols[1]:
+                        # Using make_subplots to create the twin axes
                         fig_ath = make_subplots(specs=[[{"secondary_y": True}]])
                         for _, r in ad.iterrows():
-                            # Primary Metrics
+                            # Primary Metrics (Scale 1 - Left)
                             fig_ath.add_trace(go.Bar(
                                 name=r['Session_Name'], 
                                 x=['Total Jumps', 'Player Load', 'Explosive Efforts'], 
@@ -314,12 +315,13 @@ if check_password():
                                 offsetgroup=r['Session_Name']
                             ), secondary_y=False)
                             
-                            # Ghost Distance Bar
+                            # Distance Metric (Scale 2 - Right)
+                            # This gets its own X category so it doesn't overlap the others
                             fig_ath.add_trace(go.Bar(
-                                name="Dist", 
+                                name=f"Dist ({r['Session_Name']})", 
                                 x=['Estimated Distance'], 
                                 y=[r['Estimated Distance (y)']], 
-                                marker=dict(color=m_map[r['Session_Name']], opacity=0.4), 
+                                marker=dict(color=m_map[r['Session_Name']], opacity=0.35), # Lower opacity for ghost effect
                                 showlegend=False,
                                 offsetgroup=r['Session_Name']
                             ), secondary_y=True)
@@ -331,23 +333,11 @@ if check_password():
                             template="simple_white", 
                             font=dict(color="#333333", size=10),
                             legend=dict(orientation="h", yanchor="top", y=-0.3, xanchor="center", x=0.5),
-                            yaxis=dict(range=[0, global_max_primary]),
-                            yaxis2=dict(range=[0, global_max_dist])
+                            # Separate Axis Limits
+                            yaxis=dict(range=[0, global_max_primary], title="Intensity Metrics", showgrid=False),
+                            yaxis2=dict(range=[0, global_max_dist], title="Distance (y)", showgrid=False, overlaying='y', side='right')
                         )
                         st.plotly_chart(fig_ath, use_container_width=True, config=LOCKED_CONFIG)
                     st.markdown('</div>', unsafe_allow_html=True)
-
-                st.write("<br><br>", unsafe_allow_html=True)
-                st.markdown('<div class="section-header">Team Match Averages</div>', unsafe_allow_html=True)
-                team_avg_t = tourney_df.groupby('Session_Name')[['Total Jumps', 'Player Load', 'Explosive Efforts', 'Estimated Distance (y)']].mean().reset_index()
-                
-                metrics_to_plot = ['Total Jumps', 'Player Load', 'Explosive Efforts', 'Estimated Distance (y)']
-                rows = [st.columns(2), st.columns(2)]
-                for idx, m in enumerate(metrics_to_plot):
-                    with rows[idx // 2][idx % 2]:
-                        fig_t = go.Figure()
-                        fig_t.add_trace(go.Bar(x=team_avg_t['Session_Name'], y=team_avg_t[m], marker_color=[m_map[g] for g in team_avg_t['Session_Name']]))
-                        fig_t.update_layout(title=f"Avg {m}", height=300, template="simple_white", margin=dict(l=10, r=10, t=40, b=10))
-                        st.plotly_chart(fig_t, use_container_width=True, config=LOCKED_CONFIG)
     except Exception as e:
         st.error(f"Sync Error: {e}")
