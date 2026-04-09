@@ -275,68 +275,59 @@ if check_password():
                 if pos_filter_t != "All Positions": 
                     tourney_df = tourney_df[tourney_df['Position'] == pos_filter_t]
                 
-                # --- CALCULATE INDEPENDENT AXIS MAXES ---
-                # Left Axis: Counts/Load (usually 0-500)
-                global_max_primary = tourney_df[['Total Jumps', 'Player Load', 'Explosive Efforts']].max().max() * 1.15
-                # Right Axis: Distance (usually 1000-5000)
-                global_max_dist = tourney_df['Estimated Distance (y)'].max() * 1.15
+                # --- INDEPENDENT SCALING FOR NOTICEABILITY ---
+                # Focus Axis (Left): Player Load & Explosive Efforts
+                global_max_focus = tourney_df[['Player Load', 'Explosive Efforts']].max().max() * 1.2
+                # Background Axis (Right): Total Jumps & Distance
+                global_max_bg = max(tourney_df['Total Jumps'].max(), tourney_df['Estimated Distance (y)'].max() / 10) * 1.2
 
-                ath_t = sorted(tourney_df['Name'].unique())
-                for name in ath_t:
+                for name in sorted(tourney_df['Name'].unique()):
                     ad = tourney_df[tourney_df['Name'] == name]
                     st.markdown(f'<div class="player-row-container"><div class="player-divider"></div>', unsafe_allow_html=True)
                     side_cols = st.columns([1.5, 2])
                     with side_cols[0]:
-                        card_start = f"""
+                        card_html = f"""
                             <div style="display:flex; align-items:center; gap:12px; padding:10px; background:#f8f9fa; border-bottom:2px solid #FF8200;">
                                 <img src="{ad['PhotoURL'].iloc[0]}" class="gallery-photo" style="width:65px; height:65px;">
                                 <div><p style="margin:0; font-weight:900; color:#1D1D1F; font-size:18px;">{name}</p><p style="margin:0; color:#4895DB; font-weight:700; font-size:16px;">{ad['Position'].iloc[0]}</p></div>
                             </div>
-                            <div style="padding:5px;">
-                                <table class="scout-table" style="margin-bottom:0;">
-                                    <thead><tr><th>Match</th><th>Total Jumps</th><th>Player Load</th><th>Explosive Efforts</th><th>Estimated Distance</th></tr></thead>
-                                    <tbody>
+                            <table class="scout-table">
+                                <thead><tr><th>Match</th><th>Total Jumps</th><th>Player Load</th><th>Explosive Efforts</th><th>Estimated Distance</th></tr></thead>
+                                <tbody>
                         """
                         for _, r in ad.iterrows():
-                            card_start += f"<tr><td style='font-weight:700; font-size:11px;'>{r['Session_Name']}</td><td>{int(r['Total Jumps'])}</td><td>{r['Player Load']:.0f}</td><td>{r['Explosive Efforts']:.0f}</td><td>{r['Estimated Distance (y)']:.0f}</td></tr>"
-                        card_start += f"<tr style='background:#4895DB; color:white; font-weight:900;'><td>TOTAL</td><td>{int(ad['Total Jumps'].sum())}</td><td>{ad['Player Load'].sum():.0f}</td><td>{ad['Explosive Efforts'].sum():.0f}</td><td>{ad['Estimated Distance (y)'].sum():.0f}</td></tr></tbody></table></div>"
-                        st.markdown(card_start, unsafe_allow_html=True)
+                            card_html += f"<tr><td>{r['Session_Name']}</td><td>{int(r['Total Jumps'])}</td><td>{r['Player Load']:.0f}</td><td>{r['Explosive Efforts']:.0f}</td><td>{r['Estimated Distance (y)']:.0f}</td></tr>"
+                        st.markdown(card_html + "</tbody></table>", unsafe_allow_html=True)
                     
                     with side_cols[1]:
                         fig_ath = make_subplots(specs=[[{"secondary_y": True}]])
                         for _, r in ad.iterrows():
-                            # Primary Metrics (Left Axis)
+                            # NOTICEABLE METRICS (Primary Axis)
                             fig_ath.add_trace(go.Bar(
-                                name=r['Session_Name'], 
-                                x=['Total Jumps', 'Player Load', 'Explosive Efforts'], 
-                                y=[r['Total Jumps'], r['Player Load'], r['Explosive Efforts']], 
+                                name=f"{r['Session_Name']} (Main)", 
+                                x=['Player Load', 'Explosive Efforts'], 
+                                y=[r['Player Load'], r['Explosive Efforts']], 
                                 marker_color=m_map[r['Session_Name']],
                                 offsetgroup=r['Session_Name']
                             ), secondary_y=False)
                             
-                            # Distance Metric (Right Axis)
-                            # Using 'secondary_y=True' ensures this doesn't flatten the other bars
+                            # REFERENCE METRICS (Secondary Axis - Ghosted)
                             fig_ath.add_trace(go.Bar(
-                                name=f"Dist ({r['Session_Name']})", 
-                                x=['Estimated Distance'], 
-                                y=[r['Estimated Distance (y)']], 
-                                marker=dict(color=m_map[r['Session_Name']], opacity=0.3), # Low opacity ghost bar
+                                name=f"{r['Session_Name']} (Ref)", 
+                                x=['Total Jumps', 'Estimated Distance'], 
+                                y=[r['Total Jumps'], r['Estimated Distance (y)']], 
+                                marker=dict(color=m_map[r['Session_Name']], opacity=0.2),
                                 showlegend=False,
                                 offsetgroup=r['Session_Name']
                             ), secondary_y=True)
                         
                         fig_ath.update_layout(
-                            barmode='group', 
-                            height=260, 
-                            margin=dict(l=10, r=10, t=10, b=80), 
-                            template="simple_white", 
-                            font=dict(color="#333333", size=10),
+                            barmode='group', height=260, margin=dict(l=0, r=0, t=10, b=80), 
+                            template="simple_white", font=dict(size=10),
                             legend=dict(orientation="h", yanchor="top", y=-0.3, xanchor="center", x=0.5),
-                            # Fix scaling by setting independent ranges
-                            yaxis=dict(range=[0, global_max_primary], title="Intensity/Count", showgrid=False),
-                            yaxis2=dict(range=[0, global_max_dist], title="Distance (y)", showgrid=False, overlaying='y', side='right')
+                            yaxis=dict(range=[0, global_max_focus], title="Focus Metrics", showgrid=False),
+                            yaxis2=dict(range=[0, global_max_bg * 10], showgrid=False, overlaying='y', side='right', showticklabels=False)
                         )
                         st.plotly_chart(fig_ath, use_container_width=True, config=LOCKED_CONFIG)
-                    st.markdown('</div>', unsafe_allow_html=True)
     except Exception as e:
         st.error(f"Sync Error: {e}")
