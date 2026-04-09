@@ -477,7 +477,7 @@ if check_password():
             st.markdown('<div class="section-header">Practice Phase Intensity Breakdown</div>', unsafe_allow_html=True)
             
             if phase_df is not None and not phase_df.empty:
-                # --- PHASE CONSOLIDATION ---
+                # --- 1. PHASE CONSOLIDATION ---
                 phase_map = {
                     "Brizo (2)": "Brizo",
                     "2 Ball (Set 1)": "2 Ball", "2 Ball (Set 2)": "2 Ball", 
@@ -490,50 +490,24 @@ if check_password():
                 working_df = phase_df.copy()
                 working_df['Phase'] = working_df['Phase'].replace(phase_map)
 
-                # --- 1. GLOBAL SUMMARY TABLE ---
-                p_sum = working_df.groupby('Phase').agg({
-                    'Player Load': 'mean',
-                    'Explosive Efforts': 'mean',
-                    'Total Jumps': 'mean',
-                    'Estimated Distance (y)': 'mean'
-                }).reset_index().sort_values('Player Load', ascending=False)
+                # --- 2. DEFINE GROUPS TO SHOW ---
+                # Start with Team Overall, then add each unique position
+                pos_list = sorted([p for p in working_df['Position'].unique() if pd.notna(p) and p != "N/A"])
+                display_groups = ["Team Overall"] + pos_list
 
-                if not p_sum.empty:
-                    t_html = """
-                        <table class="scout-table">
-                            <thead>
-                                <tr style="background-color: #4895DB; color: white;">
-                                    <th style='text-align:left; padding-left:20px;'>Practice Phase (Team Avg)</th>
-                                    <th>Avg Player Load</th>
-                                    <th>Explosive Efforts</th>
-                                    <th>Total Jumps</th>
-                                    <th>Avg Distance (y)</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                    """
-                    for _, row in p_sum.iterrows():
-                        t_html += f"<tr><td style='text-align:left; padding-left:20px; font-weight:700;'>{row['Phase']}</td><td>{row['Player Load']:.1f}</td><td>{row['Explosive Efforts']:.1f}</td><td>{row['Total Jumps']:.1f}</td><td>{row['Estimated Distance (y)']:.0f}</td></tr>"
-                    st.markdown(t_html + "</tbody></table>", unsafe_allow_html=True)
-
-                # --- 2. DRILL-DOWN SECTION ---
-                st.write("<br>", unsafe_allow_html=True)
-                st.markdown("Phase Metric Breakdown")
-                
-                if 'Position' in working_df.columns:
-                    # Added "All Positions" to the list
-                    pos_options = ["All Positions"] + sorted([p for p in working_df['Position'].unique() if pd.notna(p) and p != "N/A"])
-                    selected_pos = st.selectbox("Select Filter", pos_options, key="ph_pos_drill_v5")
-
-                    # Filter Logic
-                    if selected_pos == "All Positions":
+                # --- 3. THE MATRIX LOOP ---
+                for group in display_groups:
+                    st.markdown(f"#### 📊 {group} Phase Performance")
+                    
+                    # Filter data for the current group
+                    if group == "Team Overall":
                         plot_df = working_df.copy()
-                        title_prefix = "Team Overall"
+                        m_prefix = "Team"
                     else:
-                        plot_df = working_df[working_df['Position'] == selected_pos]
-                        title_prefix = selected_pos
+                        plot_df = working_df[working_df['Position'] == group]
+                        m_prefix = group
 
-                    # Aggregate for graphs
+                    # Aggregate
                     plot_sum = plot_df.groupby('Phase').agg({
                         'Player Load': 'mean',
                         'Explosive Efforts': 'mean',
@@ -542,29 +516,35 @@ if check_password():
                     }).reset_index().sort_values('Player Load', ascending=False)
 
                     if not plot_sum.empty:
-                        g1, g2 = st.columns(2)
-                        g3, g4 = st.columns(2)
+                        # Create 4 columns for the 4 metrics side-by-side
+                        g1, g2, g3, g4 = st.columns(4)
                         
-                        metrics_to_plot = [
+                        metrics_config = [
                             ('Player Load', '#515154', g1),
                             ('Total Jumps', '#FF8200', g2),
                             ('Explosive Efforts', '#4895DB', g3),
                             ('Estimated Distance (y)', '#A52A2A', g4)
                         ]
 
-                        for metric, m_color, col in metrics_to_plot:
+                        for metric, m_color, col in metrics_config:
                             with col:
                                 fig = go.Figure()
-                                fig.add_trace(go.Bar(x=plot_sum['Phase'], y=plot_sum[metric], marker_color=m_color))
+                                fig.add_trace(go.Bar(
+                                    x=plot_sum['Phase'], 
+                                    y=plot_sum[metric], 
+                                    marker_color=m_color
+                                ))
                                 fig.update_layout(
-                                    title=f"<b>{title_prefix}</b>: {metric}",
-                                    height=300, template="simple_white",
-                                    margin=dict(l=10, r=10, t=40, b=10),
-                                    xaxis={'categoryorder':'total descending'}
+                                    title=dict(text=f"<b>{metric}</b>", font=dict(size=10)),
+                                    height=220, 
+                                    template="simple_white",
+                                    margin=dict(l=5, r=5, t=30, b=5),
+                                    xaxis={'categoryorder':'total descending', 'showticklabels': True, 'tickfont': {'size': 8}},
+                                    yaxis={'showticklabels': True, 'tickfont': {'size': 8}}
                                 )
                                 st.plotly_chart(fig, use_container_width=True, config=LOCKED_CONFIG)
-                else:
-                    st.warning("Position column not found.")
+                    
+                    st.markdown("---") # Visual separator between positions
             else:
                 st.info("Phase data is loading...")
                 
