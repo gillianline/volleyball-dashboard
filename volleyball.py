@@ -477,11 +477,11 @@ if check_password():
             st.markdown('<div class="section-header">Practice Phase Intensity Breakdown</div>', unsafe_allow_html=True)
             
             if phase_df is not None and not phase_df.empty:
-                # --- 1. CAPTURE ORIGINAL SHEET ORDER ---
-                # This gets the phases in the exact order they appear in the Excel rows
-                original_order = phase_df['Phase'].unique().tolist()
+                # --- 1. DEFINE & LOCK PHASE ORDER ---
+                # We start with your required sequence
+                priority_phases = ["Pre-Practice", "Warm Up"]
                 
-                # --- 2. PHASE CONSOLIDATION ---
+                # Consolidate names for the order list first
                 phase_map = {
                     "Brizo (2)": "Brizo",
                     "2 Ball (Set 1)": "2 Ball", "2 Ball (Set 2)": "2 Ball", 
@@ -491,16 +491,20 @@ if check_password():
                     "Serve & Pass": "Serve and Pass"
                 }
 
+                # Get all unique phases from sheet, apply the map, and filter out duplicates
+                raw_sheet_phases = phase_df['Phase'].unique().tolist()
+                mapped_sheet_phases = []
+                for p in raw_sheet_phases:
+                    m = phase_map.get(p, p)
+                    if m not in mapped_sheet_phases:
+                        mapped_sheet_phases.append(m)
+
+                # Build final order: Priority first, then the rest of the sheet order
+                final_phase_order = priority_phases + [p for p in mapped_sheet_phases if p not in priority_phases]
+
+                # --- 2. DATA PROCESSING ---
                 working_df = phase_df.copy()
                 working_df['Phase'] = working_df['Phase'].replace(phase_map)
-                
-                # Update the order list to reflect consolidated names while maintaining sequence
-                # We use a list comprehension to keep the order but remove duplicates created by mapping
-                final_phase_order = []
-                for p in original_order:
-                    mapped_name = phase_map.get(p, p)
-                    if mapped_name not in final_phase_order:
-                        final_phase_order.append(mapped_name)
 
                 # --- 3. VIEW SELECTION ---
                 view_col1, view_col2 = st.columns([1, 2])
@@ -523,7 +527,6 @@ if check_password():
                 # --- 5. RENDER MATRIX ---
                 for group in display_groups:
                     header_color = "#4895DB" if group == "Team Overall" else "#FF8200"
-                    
                     st.markdown(f"{group} Breakdown")
                     
                     if group == "Team Overall":
@@ -539,8 +542,7 @@ if check_password():
                         'Estimated Distance (y)': 'mean'
                     }).reset_index()
                     
-                    # --- RE-APPLY THE LOCKED ORDER ---
-                    # Convert 'Phase' to a category with our fixed order and sort by it
+                    # Re-Apply Locked Categorical Order
                     plot_sum['Phase'] = pd.Categorical(plot_sum['Phase'], categories=final_phase_order, ordered=True)
                     plot_sum = plot_sum.sort_values('Phase').dropna(subset=['Phase'])
 
@@ -575,6 +577,6 @@ if check_password():
                         
                         html_output.append('</tbody></table></div>')
                         st.write("".join(html_output), unsafe_allow_html=True)
-                
+                        
     except Exception as e:
         st.error(f"Sync Error: {e}")
