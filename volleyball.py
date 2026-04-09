@@ -490,7 +490,8 @@ if check_password():
                 working_df = phase_df.copy()
                 working_df['Phase'] = working_df['Phase'].replace(phase_map)
 
-                # --- AGGREGATION ---
+                # --- 1. GLOBAL SUMMARY TABLE ---
+                # Averages metrics across everything for each consolidated phase
                 p_sum = working_df.groupby('Phase').agg({
                     'Player Load': 'mean',
                     'Explosive Efforts': 'mean',
@@ -499,12 +500,11 @@ if check_password():
                 }).reset_index().sort_values('Player Load', ascending=False)
 
                 if not p_sum.empty:
-                    # --- SUMMARY TABLE ---
                     t_html = """
                         <table class="scout-table">
                             <thead>
-                                <tr>
-                                    <th style='text-align:left; padding-left:20px;'>Practice Phase</th>
+                                <tr style="background-color: #4895DB; color: white;">
+                                    <th style='text-align:left; padding-left:20px;'>Practice Phase (Team Avg)</th>
                                     <th>Avg Player Load</th>
                                     <th>Explosive Efforts</th>
                                     <th>Total Jumps</th>
@@ -517,44 +517,57 @@ if check_password():
                         t_html += f"<tr><td style='text-align:left; padding-left:20px; font-weight:700;'>{row['Phase']}</td><td>{row['Player Load']:.1f}</td><td>{row['Explosive Efforts']:.1f}</td><td>{row['Total Jumps']:.1f}</td><td>{row['Estimated Distance (y)']:.0f}</td></tr>"
                     st.markdown(t_html + "</tbody></table>", unsafe_allow_html=True)
 
-                    # --- NEW SPLIT CHART VIEW ---
-                    st.write("<br>", unsafe_allow_html=True)
-                    
-                    # Create two columns for side-by-side charts
-                    graph_col1, graph_col2 = st.columns(2)
-                    
-                    with graph_col1:
-                        # Chart 1: Explosive Actions (Jumps & Efforts)
-                        fig_vol = go.Figure()
-                        fig_vol.add_trace(go.Bar(x=p_sum['Phase'], y=p_sum['Total Jumps'], name="Jumps", marker_color='#FF8200'))
-                        fig_vol.add_trace(go.Bar(x=p_sum['Phase'], y=p_sum['Explosive Efforts'], name="Efforts", marker_color='#4895DB'))
-                        
-                        fig_vol.update_layout(
-                            title="<b>Phase Volume</b> (Jumps & Efforts)",
-                            barmode='group', height=400, template="simple_white",
-                            margin=dict(l=20, r=20, t=60, b=20),
-                            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
-                        )
-                        st.plotly_chart(fig_vol, use_container_width=True, config=LOCKED_CONFIG)
+                # --- 2. POSITION DRILL-DOWN SECTION ---
+                st.write("<br>", unsafe_allow_html=True)
+                st.markdown("### 📊 Positional Drill-Down")
+                
+                # Filter for Position
+                pos_list = sorted([p for p in working_df['Position'].unique() if p != "N/A"])
+                selected_pos = st.selectbox("Select Position to View Specific Phase Trends", pos_list, key="ph_pos_drill")
 
-                    with graph_col2:
-                        # Chart 2: Overall Load (Load & Distance)
-                        fig_load = go.Figure()
-                        fig_load.add_trace(go.Bar(x=p_sum['Phase'], y=p_sum['Player Load'], name="Load", marker_color='#515154'))
-                        # Distance is usually 10x larger than load, so we'll just show Load here or use a line for Distance
-                        fig_load.add_trace(go.Scatter(x=p_sum['Phase'], y=p_sum['Estimated Distance (y)'], name="Distance (y)", 
-                                                   line=dict(color='#A52A2A', width=3), mode='lines+markers', yaxis="y2"))
-                        
-                        fig_load.update_layout(
-                            title="<b>Phase Intensity</b> (Load vs Dist)",
-                            height=400, template="simple_white",
-                            margin=dict(l=20, r=20, t=60, b=20),
-                            yaxis2=dict(overlaying='y', side='right', showgrid=False),
-                            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
-                        )
-                        st.plotly_chart(fig_load, use_container_width=True, config=LOCKED_CONFIG)
+                # Filter data for selected position
+                pos_df = working_df[working_df['Position'] == selected_pos]
+                
+                pos_sum = pos_df.groupby('Phase').agg({
+                    'Player Load': 'mean',
+                    'Explosive Efforts': 'mean',
+                    'Total Jumps': 'mean',
+                    'Estimated Distance (y)': 'mean'
+                }).reset_index().sort_values('Player Load', ascending=False)
+
+                if not pos_sum.empty:
+                    # Create a 2x2 Grid for the Position's Phase Graphs
+                    g1, g2 = st.columns(2)
+                    g3, g4 = st.columns(2)
+                    
+                    metrics_to_plot = [
+                        ('Player Load', '#515154', g1),
+                        ('Total Jumps', '#FF8200', g2),
+                        ('Explosive Efforts', '#4895DB', g3),
+                        ('Estimated Distance (y)', '#A52A2A', g4)
+                    ]
+
+                    for metric, m_color, col in metrics_to_plot:
+                        with col:
+                            fig = go.Figure()
+                            fig.add_trace(go.Bar(
+                                x=pos_sum['Phase'], 
+                                y=pos_sum[metric],
+                                marker_color=m_color,
+                                name=metric
+                            ))
+                            fig.update_layout(
+                                title=f"<b>{selected_pos}</b>: {metric} per Phase",
+                                height=300,
+                                template="simple_white",
+                                margin=dict(l=10, r=10, t=40, b=10),
+                                xaxis={'categoryorder':'total descending'}
+                            )
+                            st.plotly_chart(fig, use_container_width=True, config=LOCKED_CONFIG)
                 else:
-                    st.warning("No data found in the phases sheet.")
+                    st.info(f"No specific phase data found for {selected_pos}.")
+            else:
+                st.info("Phase data is currently empty or loading...")
                 
     except Exception as e:
         st.error(f"Sync Error: {e}")
