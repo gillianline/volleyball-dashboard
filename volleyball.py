@@ -251,7 +251,6 @@ if check_password():
                 st.markdown('<div class="section-header">Match Comparison Selection</div>', unsafe_allow_html=True)
                 c_ts1, c_ts2 = st.columns([2, 1])
                 with c_ts1:
-                    # Pulling from the new Matches Sheet
                     match_list_t = match_df.sort_values(['Date', 'Sheet_Order'])['Session_Name'].unique()
                     if "matches_state" not in st.session_state: 
                         st.session_state.matches_state = match_list_t[-3:] if len(match_list_t) >=3 else match_list_t
@@ -272,14 +271,9 @@ if check_password():
                 m_map = {m: c_pal[idx % 3] for idx, m in enumerate(selected_matches)}
                 st.markdown('<div class="section-header">Athlete Match Performance Breakdown</div>', unsafe_allow_html=True)
                 
-                # Filter specifically from match_df
                 tourney_df = match_df[match_df['Session_Name'].isin(selected_matches)].sort_values(['Date', 'Sheet_Order'])
                 if pos_filter_t != "All Positions": 
                     tourney_df = tourney_df[tourney_df['Position'] == pos_filter_t]
-                
-                # Restore original unified axis logic
-                global_max_primary = tourney_df[['Total Jumps', 'Player Load', 'Explosive Efforts']].max().max() * 1.1
-                global_max_dist = tourney_df['Estimated Distance (y)'].max() * 1.1
 
                 ath_t = sorted(tourney_df['Name'].unique())
                 for name in ath_t:
@@ -303,10 +297,10 @@ if check_password():
                         st.markdown(card_start, unsafe_allow_html=True)
                     
                     with side_cols[1]:
-                        # Back to original twin-axis ghost bar layout
+                        # Autoscale enabled (ranges removed)
                         fig_ath = make_subplots(specs=[[{"secondary_y": True}]])
                         for _, r in ad.iterrows():
-                            # Main Bars
+                            # Main Bars (Jumps, Load, Efforts)
                             fig_ath.add_trace(go.Bar(
                                 name=r['Session_Name'], 
                                 x=['Total Jumps', 'Player Load', 'Explosive Efforts'], 
@@ -330,8 +324,9 @@ if check_password():
                             template="simple_white", 
                             font=dict(color="#333333", size=10),
                             legend=dict(orientation="h", yanchor="top", y=-0.3, xanchor="center", x=0.5),
-                            yaxis=dict(range=[0, global_max_primary]),
-                            yaxis2=dict(range=[0, global_max_dist])
+                            # Automatic scaling per athlete
+                            yaxis=dict(showgrid=False, title="Intensity / Count"),
+                            yaxis2=dict(showgrid=False, title="Distance (y)", overlaying='y', side='right')
                         )
                         st.plotly_chart(fig_ath, use_container_width=True, config=LOCKED_CONFIG)
                     st.markdown('</div>', unsafe_allow_html=True)
