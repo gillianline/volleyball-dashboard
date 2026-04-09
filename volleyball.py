@@ -490,24 +490,48 @@ if check_password():
                 working_df = phase_df.copy()
                 working_df['Phase'] = working_df['Phase'].replace(phase_map)
 
-                # --- 2. DEFINE GROUPS TO SHOW ---
-                # Start with Team Overall, then add each unique position
+                # --- 2. MASTER SUMMARY TABLE (Team Averages) ---
+                p_sum_table = working_df.groupby('Phase').agg({
+                    'Player Load': 'mean',
+                    'Explosive Efforts': 'mean',
+                    'Total Jumps': 'mean',
+                    'Estimated Distance (y)': 'mean'
+                }).reset_index().sort_values('Player Load', ascending=False)
+
+                if not p_sum_table.empty:
+                    st.markdown("Team Average Summary")
+                    t_html = """
+                        <table class="scout-table" style="margin-bottom: 30px;">
+                            <thead>
+                                <tr style="background-color: #4895DB; color: white;">
+                                    <th style='text-align:left; padding-left:20px;'>Practice Phase</th>
+                                    <th>Avg Player Load</th>
+                                    <th>Explosive Efforts</th>
+                                    <th>Total Jumps</th>
+                                    <th>Avg Distance (y)</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                    """
+                    for _, row in p_sum_table.iterrows():
+                        t_html += f"<tr><td style='text-align:left; padding-left:20px; font-weight:700;'>{row['Phase']}</td><td>{row['Player Load']:.1f}</td><td>{row['Explosive Efforts']:.1f}</td><td>{row['Total Jumps']:.1f}</td><td>{row['Estimated Distance (y)']:.0f}</td></tr>"
+                    st.markdown(t_html + "</tbody></table>", unsafe_allow_html=True)
+
+                # --- 3. POSITION MATRIX (Visuals) ---
+                st.write("<br>", unsafe_allow_html=True)
+                st.markdown("### 📊 Positional Intensity Matrix")
+                
                 pos_list = sorted([p for p in working_df['Position'].unique() if pd.notna(p) and p != "N/A"])
                 display_groups = ["Team Overall"] + pos_list
 
-                # --- 3. THE MATRIX LOOP ---
                 for group in display_groups:
-                    st.markdown(f"#### 📊 {group} Phase Performance")
+                    st.markdown(f"**{group} Performance Profile**")
                     
-                    # Filter data for the current group
                     if group == "Team Overall":
                         plot_df = working_df.copy()
-                        m_prefix = "Team"
                     else:
                         plot_df = working_df[working_df['Position'] == group]
-                        m_prefix = group
 
-                    # Aggregate
                     plot_sum = plot_df.groupby('Phase').agg({
                         'Player Load': 'mean',
                         'Explosive Efforts': 'mean',
@@ -516,7 +540,6 @@ if check_password():
                     }).reset_index().sort_values('Player Load', ascending=False)
 
                     if not plot_sum.empty:
-                        # Create 4 columns for the 4 metrics side-by-side
                         g1, g2, g3, g4 = st.columns(4)
                         
                         metrics_config = [
@@ -529,22 +552,17 @@ if check_password():
                         for metric, m_color, col in metrics_config:
                             with col:
                                 fig = go.Figure()
-                                fig.add_trace(go.Bar(
-                                    x=plot_sum['Phase'], 
-                                    y=plot_sum[metric], 
-                                    marker_color=m_color
-                                ))
+                                fig.add_trace(go.Bar(x=plot_sum['Phase'], y=plot_sum[metric], marker_color=m_color))
                                 fig.update_layout(
                                     title=dict(text=f"<b>{metric}</b>", font=dict(size=10)),
-                                    height=220, 
+                                    height=200, 
                                     template="simple_white",
                                     margin=dict(l=5, r=5, t=30, b=5),
-                                    xaxis={'categoryorder':'total descending', 'showticklabels': True, 'tickfont': {'size': 8}},
-                                    yaxis={'showticklabels': True, 'tickfont': {'size': 8}}
+                                    xaxis={'categoryorder':'total descending', 'showticklabels': True, 'tickfont': {'size': 8}}
                                 )
                                 st.plotly_chart(fig, use_container_width=True, config=LOCKED_CONFIG)
                     
-                    st.markdown("---") # Visual separator between positions
+                    st.markdown('<hr style="border:1px solid #f0f2f6; margin: 10px 0;">', unsafe_allow_html=True)
             else:
                 st.info("Phase data is loading...")
                 
