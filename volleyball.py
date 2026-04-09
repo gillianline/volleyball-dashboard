@@ -493,8 +493,24 @@ if check_password():
                 working_df = phase_df.copy()
                 working_df['Phase'] = working_df['Phase'].replace(phase_map)
 
+                # --- FILTERS ---
+                c_ph1, c_ph2 = st.columns([1, 2])
+                with c_ph1:
+                    ph_period = st.selectbox("Analysis Period", ["Season to Date", "Last 4 Weeks"], key="ph_period_fixed")
+                with c_ph2:
+                    # Pulling positions directly from the sheet
+                    pos_list_ph = sorted([p for p in working_df['Position'].unique() if p != "N/A"])
+                    ph_pos = st.selectbox("Position Filter", ["All Positions"] + pos_list_ph, key="ph_pos_fixed")
+
+                # --- FILTERING ---
+                if ph_pos != "All Positions":
+                    working_df = working_df[working_df['Position'] == ph_pos]
+                
+                if ph_period == "Last 4 Weeks":
+                    mx_w = working_df['Week'].max()
+                    working_df = working_df[working_df['Week'] > (mx_w - 4)]
+
                 # --- AGGREGATION ---
-                # Grouping by the cleaned Phase names
                 p_sum = working_df.groupby('Phase').agg({
                     'Player Load': 'mean',
                     'Explosive Efforts': 'mean',
@@ -534,7 +550,6 @@ if check_password():
                     st.write("<br>", unsafe_allow_html=True)
                     fig_ph = make_subplots(specs=[[{"secondary_y": True}]])
 
-                    # Primary Metrics (Bars)
                     fig_ph.add_trace(go.Bar(
                         x=p_sum['Phase'], y=p_sum['Total Jumps'],
                         name="Jumps", marker_color='#FF8200'
@@ -545,7 +560,6 @@ if check_password():
                         name="Efforts", marker_color='#4895DB'
                     ), secondary_y=False)
 
-                    # Secondary Metrics (Ghost Bars)
                     fig_ph.add_trace(go.Bar(
                         x=p_sum['Phase'], y=p_sum['Player Load'],
                         name="Load", marker=dict(color='#515154', opacity=0.25)
@@ -557,7 +571,7 @@ if check_password():
                     ), secondary_y=True)
 
                     fig_ph.update_layout(
-                        title=dict(text="Consolidated Phase Breakdown", font=dict(size=18, color='#4895DB', weight='bold'), x=0.5, xanchor='center'),
+                        title=dict(text="Phase Volume vs Intensity Breakdown", font=dict(size=18, color='#4895DB', weight='bold'), x=0.5, xanchor='center'),
                         barmode='group', height=500, template="simple_white",
                         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
                         margin=dict(t=100)
@@ -568,7 +582,7 @@ if check_password():
                     
                     st.plotly_chart(fig_ph, use_container_width=True, config=LOCKED_CONFIG)
             else:
-                st.info("Phase data is currently empty or loading...")
+                st.info("No phase data available.")
                 
     except Exception as e:
         st.error(f"Sync Error: {e}")
