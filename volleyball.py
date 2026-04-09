@@ -294,7 +294,7 @@ if check_password():
 
             # --- ATHLETE CARD & TABLE ---
             st.markdown(f'<div class="player-row-container">', unsafe_allow_html=True)
-            c_ath1, c_ath2 = st.columns([2, 3], gap="medium") # Wider table ratio
+            c_ath1, c_ath2 = st.columns([2, 3], gap="medium")
             
             with c_ath1:
                 st.markdown(f"""
@@ -329,7 +329,6 @@ if check_password():
                 st.markdown(table_html, unsafe_allow_html=True)
 
             with c_ath2:
-                # Optional: Adding a brief summary text or leaving blank to balance the card
                 st.markdown(f"""
                     <div style="padding: 20px; background: #ffffff; border: 1px dashed #E5E5E7; border-radius: 10px; height: 100%;">
                         <p style="color: #515154; font-size: 13px; font-style: italic;">
@@ -369,7 +368,11 @@ if check_password():
                         ))
                         
                         fig_t.update_layout(
-                            title=dict(text=f"4-Week {m}", font=dict(size=14, color='#4895DB', fontWeight='bold')),
+                            # FIXED FONT PROPERTY HERE
+                            title=dict(
+                                text=f"4-Week {m}", 
+                                font=dict(size=14, color='#4895DB', weight='bold')
+                            ),
                             xaxis=dict(dtick=1, title="Week", showgrid=False), 
                             yaxis=dict(showgrid=True, gridcolor='#F5F5F7'),
                             height=280, 
