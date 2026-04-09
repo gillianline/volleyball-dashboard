@@ -489,9 +489,11 @@ if check_password():
 
                 working_df = phase_df.copy()
                 working_df['Phase'] = working_df['Phase'].replace(phase_map)
+                
+                # --- CRITICAL FIX: Ensure Week is Numeric ---
+                working_df['Week'] = pd.to_numeric(working_df['Week'], errors='coerce')
 
                 # --- 1. GLOBAL SUMMARY TABLE ---
-                # Averages metrics across everything for each consolidated phase
                 p_sum = working_df.groupby('Phase').agg({
                     'Player Load': 'mean',
                     'Explosive Efforts': 'mean',
@@ -517,17 +519,16 @@ if check_password():
                         t_html += f"<tr><td style='text-align:left; padding-left:20px; font-weight:700;'>{row['Phase']}</td><td>{row['Player Load']:.1f}</td><td>{row['Explosive Efforts']:.1f}</td><td>{row['Total Jumps']:.1f}</td><td>{row['Estimated Distance (y)']:.0f}</td></tr>"
                     st.markdown(t_html + "</tbody></table>", unsafe_allow_html=True)
 
-                # --- 2. POSITION DRILL-DOWN SECTION ---
+                # --- 2. POSITION DRILL-DOWN ---
                 st.write("<br>", unsafe_allow_html=True)
-                st.markdown("### 📊 Positional Drill-Down")
+                st.markdown("### Positional Drill-Down")
                 
-                # Filter for Position
-                pos_list = sorted([p for p in working_df['Position'].unique() if p != "N/A"])
-                selected_pos = st.selectbox("Select Position to View Specific Phase Trends", pos_list, key="ph_pos_drill")
+                # Pull clean list of positions
+                pos_list = sorted([p for p in working_df['Position'].unique() if pd.notna(p) and p != "N/A"])
+                selected_pos = st.selectbox("Select Position to View Specific Phase Trends", pos_list, key="ph_pos_drill_v4")
 
-                # Filter data for selected position
+                # Filter and plot
                 pos_df = working_df[working_df['Position'] == selected_pos]
-                
                 pos_sum = pos_df.groupby('Phase').agg({
                     'Player Load': 'mean',
                     'Explosive Efforts': 'mean',
@@ -536,7 +537,6 @@ if check_password():
                 }).reset_index().sort_values('Player Load', ascending=False)
 
                 if not pos_sum.empty:
-                    # Create a 2x2 Grid for the Position's Phase Graphs
                     g1, g2 = st.columns(2)
                     g3, g4 = st.columns(2)
                     
@@ -550,24 +550,14 @@ if check_password():
                     for metric, m_color, col in metrics_to_plot:
                         with col:
                             fig = go.Figure()
-                            fig.add_trace(go.Bar(
-                                x=pos_sum['Phase'], 
-                                y=pos_sum[metric],
-                                marker_color=m_color,
-                                name=metric
-                            ))
+                            fig.add_trace(go.Bar(x=pos_sum['Phase'], y=pos_sum[metric], marker_color=m_color))
                             fig.update_layout(
-                                title=f"<b>{selected_pos}</b>: {metric} per Phase",
-                                height=300,
-                                template="simple_white",
+                                title=f"<b>{selected_pos}</b>: {metric}",
+                                height=300, template="simple_white",
                                 margin=dict(l=10, r=10, t=40, b=10),
                                 xaxis={'categoryorder':'total descending'}
                             )
                             st.plotly_chart(fig, use_container_width=True, config=LOCKED_CONFIG)
-                else:
-                    st.info(f"No specific phase data found for {selected_pos}.")
-            else:
-                st.info("Phase data is currently empty or loading...")
                 
     except Exception as e:
         st.error(f"Sync Error: {e}")
