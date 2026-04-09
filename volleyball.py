@@ -275,11 +275,11 @@ if check_password():
                 if pos_filter_t != "All Positions": 
                     tourney_df = tourney_df[tourney_df['Position'] == pos_filter_t]
                 
-                # --- CALC INDEPENDENT MAXES FOR AXIS SCALING ---
-                # Left Axis: Load, Jumps, Efforts
-                global_max_primary = tourney_df[['Total Jumps', 'Player Load', 'Explosive Efforts']].max().max() * 1.1
-                # Right Axis: Distance only
-                global_max_dist = tourney_df['Estimated Distance (y)'].max() * 1.1
+                # --- CALCULATE INDEPENDENT AXIS MAXES ---
+                # Left Axis: Counts/Load (usually 0-500)
+                global_max_primary = tourney_df[['Total Jumps', 'Player Load', 'Explosive Efforts']].max().max() * 1.15
+                # Right Axis: Distance (usually 1000-5000)
+                global_max_dist = tourney_df['Estimated Distance (y)'].max() * 1.15
 
                 ath_t = sorted(tourney_df['Name'].unique())
                 for name in ath_t:
@@ -303,10 +303,9 @@ if check_password():
                         st.markdown(card_start, unsafe_allow_html=True)
                     
                     with side_cols[1]:
-                        # Using make_subplots to create the twin axes
                         fig_ath = make_subplots(specs=[[{"secondary_y": True}]])
                         for _, r in ad.iterrows():
-                            # Primary Metrics (Scale 1 - Left)
+                            # Primary Metrics (Left Axis)
                             fig_ath.add_trace(go.Bar(
                                 name=r['Session_Name'], 
                                 x=['Total Jumps', 'Player Load', 'Explosive Efforts'], 
@@ -315,13 +314,13 @@ if check_password():
                                 offsetgroup=r['Session_Name']
                             ), secondary_y=False)
                             
-                            # Distance Metric (Scale 2 - Right)
-                            # This gets its own X category so it doesn't overlap the others
+                            # Distance Metric (Right Axis)
+                            # Using 'secondary_y=True' ensures this doesn't flatten the other bars
                             fig_ath.add_trace(go.Bar(
                                 name=f"Dist ({r['Session_Name']})", 
                                 x=['Estimated Distance'], 
                                 y=[r['Estimated Distance (y)']], 
-                                marker=dict(color=m_map[r['Session_Name']], opacity=0.35), # Lower opacity for ghost effect
+                                marker=dict(color=m_map[r['Session_Name']], opacity=0.3), # Low opacity ghost bar
                                 showlegend=False,
                                 offsetgroup=r['Session_Name']
                             ), secondary_y=True)
@@ -333,8 +332,8 @@ if check_password():
                             template="simple_white", 
                             font=dict(color="#333333", size=10),
                             legend=dict(orientation="h", yanchor="top", y=-0.3, xanchor="center", x=0.5),
-                            # Separate Axis Limits
-                            yaxis=dict(range=[0, global_max_primary], title="Intensity Metrics", showgrid=False),
+                            # Fix scaling by setting independent ranges
+                            yaxis=dict(range=[0, global_max_primary], title="Intensity/Count", showgrid=False),
                             yaxis2=dict(range=[0, global_max_dist], title="Distance (y)", showgrid=False, overlaying='y', side='right')
                         )
                         st.plotly_chart(fig_ath, use_container_width=True, config=LOCKED_CONFIG)
