@@ -492,12 +492,10 @@ if check_password():
                     "Serve & Pass": "Serve and Pass"
                 }
                 
-                # Apply cleanup to ensure metrics combine for duplicate names
                 working_df = phase_df.copy()
                 working_df['Phase'] = working_df['Phase'].replace(phase_map)
 
                 # --- AGGREGATION ---
-                # Averages metrics across the entire squad for each consolidated phase
                 p_sum = working_df.groupby('Phase').agg({
                     'Player Load': 'mean',
                     'Explosive Efforts': 'mean',
@@ -507,12 +505,13 @@ if check_password():
 
                 if not p_sum.empty:
                     # --- SUMMARY TABLE ---
-                    st.markdown('<div class="player-row-container" style="padding: 0; border: none;">', unsafe_allow_html=True)
+                    # Wrapping the entire table in one string and one st.markdown call
                     t_html = """
-                        <table class="scout-table" style="width:100%; border: 1px solid #E5E5E7;">
+                    <div class="player-row-container" style="padding: 0; border: none;">
+                        <table class="scout-table" style="width:100%; border: 1px solid #E5E5E7; border-collapse: collapse;">
                             <thead>
                                 <tr style="background-color: #4895DB; color: white;">
-                                    <th style='text-align:left; padding-left:20px;'>Practice Phase</th>
+                                    <th style='text-align:left; padding: 20px;'>Practice Phase</th>
                                     <th>Avg Player Load</th>
                                     <th>Explosive Efforts</th>
                                     <th>Total Jumps</th>
@@ -521,6 +520,7 @@ if check_password():
                             </thead>
                             <tbody>
                     """
+                    
                     for _, row in p_sum.iterrows():
                         t_html += f"""
                             <tr>
@@ -531,13 +531,16 @@ if check_password():
                                 <td>{row['Estimated Distance (y)']:.0f}</td>
                             </tr>
                         """
-                    st.markdown(t_html + "</tbody></table></div>", unsafe_allow_html=True)
+                    
+                    t_html += "</tbody></table></div>"
+                    
+                    # CRITICAL: This line renders the HTML instead of printing the text
+                    st.markdown(t_html, unsafe_allow_html=True)
 
                     # --- PHASE CHART ---
                     st.write("<br>", unsafe_allow_html=True)
                     fig_ph = make_subplots(specs=[[{"secondary_y": True}]])
 
-                    # Primary Metrics: Jumps & Efforts (Left Axis)
                     fig_ph.add_trace(go.Bar(
                         x=p_sum['Phase'], y=p_sum['Total Jumps'],
                         name="Jumps", marker_color='#FF8200'
@@ -548,7 +551,6 @@ if check_password():
                         name="Efforts", marker_color='#4895DB'
                     ), secondary_y=False)
 
-                    # Secondary Metrics: Load & Distance (Right Axis - Ghosted)
                     fig_ph.add_trace(go.Bar(
                         x=p_sum['Phase'], y=p_sum['Player Load'],
                         name="Load", marker=dict(color='#515154', opacity=0.25)
