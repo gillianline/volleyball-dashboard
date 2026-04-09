@@ -510,7 +510,7 @@ if check_password():
                 for group in display_groups:
                     header_color = "#4895DB" if group == "Team Overall" else "#FF8200"
                     
-                    st.markdown(f"#### 📋 {group} Breakdown ({view_type})")
+                    st.markdown(f"{group} Breakdown ({view_type})")
                     
                     if group == "Team Overall":
                         plot_df = working_df.copy()
