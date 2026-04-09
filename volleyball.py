@@ -480,7 +480,6 @@ if check_password():
             if phase_df is not None and not phase_df.empty:
                 
                 # --- PHASE CONSOLIDATION ---
-                # Add this map to combine the variations you mentioned
                 phase_map = {
                     "Brizo (2)": "Brizo",
                     "2 Ball (Set 1)": "2 Ball",
@@ -488,34 +487,21 @@ if check_password():
                     "2 Ball (Set 3)": "2 Ball",
                     "2 Ball (Set 4)": "2 Ball",
                     "serving (2)": "serving",
+                    "serving": "serving",
                     "Serving (2)": "serving",
                     "2/3 Hitters (2)": "2/3 Hitters",
                     "5v5 (2)": "5v5",
                     "Serve & Pass": "Serve and Pass"
                 }
 
-                # --- FILTERS ---
-                c_ph1, c_ph2 = st.columns([1, 2])
-                with c_ph1:
-                    ph_period = st.selectbox("Analysis Period", ["Season to Date", "Last 4 Weeks"], key="ph_period_final")
-                with c_ph2:
-                    pos_list_ph = sorted([p for p in phase_df['Position'].unique() if p != "N/A"])
-                    ph_pos = st.selectbox("Position Filter", ["All Positions"] + pos_list_ph, key="ph_pos_final")
-
-                # --- FILTERING LOGIC ---
+                # --- DATA PROCESSING ---
                 working_df = phase_df.copy()
                 
-                # Apply the name cleanup here so aggregation combines them
+                # Apply the name cleanup so aggregation combines them
                 working_df['Phase'] = working_df['Phase'].replace(phase_map)
-                
-                if ph_pos != "All Positions":
-                    working_df = working_df[working_df['Position'] == ph_pos]
-                
-                if ph_period == "Last 4 Weeks":
-                    mx_w = working_df['Week'].max()
-                    working_df = working_df[working_df['Week'] > (mx_w - 4)]
 
                 # --- AGGREGATION ---
+                # Averages metrics across everything for each consolidated phase
                 p_sum = working_df.groupby('Phase').agg({
                     'Player Load': 'mean',
                     'Explosive Efforts': 'mean',
@@ -555,6 +541,7 @@ if check_password():
                     st.write("<br>", unsafe_allow_html=True)
                     fig_ph = make_subplots(specs=[[{"secondary_y": True}]])
 
+                    # Jumps & Efforts (Left Axis)
                     fig_ph.add_trace(go.Bar(
                         x=p_sum['Phase'], y=p_sum['Total Jumps'],
                         name="Jumps", marker_color='#FF8200'
@@ -565,6 +552,7 @@ if check_password():
                         name="Efforts", marker_color='#4895DB'
                     ), secondary_y=False)
 
+                    # Load & Distance (Right Axis - Ghosted)
                     fig_ph.add_trace(go.Bar(
                         x=p_sum['Phase'], y=p_sum['Player Load'],
                         name="Load", marker=dict(color='#515154', opacity=0.25)
@@ -589,9 +577,9 @@ if check_password():
                     
                     st.plotly_chart(fig_ph, use_container_width=True, config=LOCKED_CONFIG)
                 else:
-                    st.warning("No data found for the selected filters.")
+                    st.warning("No data found in the phases sheet.")
             else:
-                st.error("Phase data could not be loaded from the URL. Please check your data connection.")
+                st.error("Phase data could not be loaded. Please check your data connection.")
                 
     except Exception as e:
         st.error(f"Sync Error: {e}")
