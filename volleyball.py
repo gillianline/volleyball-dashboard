@@ -277,50 +277,67 @@ if check_password():
                 
         with tabs[3]: # Position Analysis
             st.markdown('<div class="section-header">Positional Performance Trends</div>', unsafe_allow_html=True)
-            sel_p_pos = st.selectbox("Select Athlete for Comparative Trend", sorted(df['Name'].unique()))
+            sel_p_pos = st.selectbox("Select Athlete for Comparative Trend", sorted(df['Name'].unique()), key="pos_analysis_sel")
             
-            # --- GET DATA ---
+            # --- DATA GATHERING ---
             p_pos_meta = df[df['Name'] == sel_p_pos].iloc[0]
             pos_label = p_pos_meta['Position']
             max_wk = df['Week'].max()
             rec_4 = list(range(int(max_wk) - 3, int(max_wk) + 1))
             tr_df = df[df['Week'].isin(rec_4)]
             
+            # Sync Photo from Master
+            try:
+                athlete_photo_pos = df[df['Name'] == sel_p_pos]['PhotoURL'].iloc[0]
+            except:
+                athlete_photo_pos = p_pos_meta['PhotoURL']
+
             # --- ATHLETE CARD & TABLE ---
             st.markdown(f'<div class="player-row-container">', unsafe_allow_html=True)
-            c_ath1, c_ath2 = st.columns([1.5, 2])
+            c_ath1, c_ath2 = st.columns([2, 3], gap="medium") # Wider table ratio
             
             with c_ath1:
-                # Reusing your card style from Match Summary
                 st.markdown(f"""
                     <div style="display:flex; align-items:center; gap:12px; padding:10px; background:#f8f9fa; border-bottom:2px solid #FF8200; border-radius: 10px 10px 0 0;">
-                        <img src="{p_pos_meta['PhotoURL']}" class="gallery-photo" style="width:70px; height:70px;">
+                        <img src="{athlete_photo_pos}" class="gallery-photo" style="width:70px; height:70px; object-fit: cover;">
                         <div>
                             <p style="margin:0; font-weight:900; color:#1D1D1F; font-size:18px;">{sel_p_pos}</p>
-                            <p style="margin:0; color:#4895DB; font-weight:700; font-size:16px;">{pos_label} - 4 Week Average</p>
+                            <p style="margin:0; color:#4895DB; font-weight:700; font-size:14px;">{pos_label} | 4-Week Average</p>
                         </div>
                     </div>
                 """, unsafe_allow_html=True)
                 
-                # Calculate 4-week averages for Table
+                # Calculate 4-week averages
                 tr_metrics = ["Player Load", "Estimated Distance (y)", "Total Jumps"]
                 p_4wk_avg = tr_df[tr_df['Name'] == sel_p_pos][tr_metrics].mean()
                 pos_4wk_avg = tr_df[tr_df['Position'] == pos_label][tr_metrics].mean()
                 
                 table_html = f"""
-                    <table class="scout-table">
-                        <thead>
-                            <tr><th>Metric</th><th>{sel_p_pos}</th><th>{pos_label} Group</th></tr>
-                        </thead>
-                        <tbody>
-                            <tr><td>Player Load</td><td>{p_4wk_avg['Player Load']:.1f}</td><td>{pos_4wk_avg['Player Load']:.1f}</td></tr>
-                            <tr><td>Distance (y)</td><td>{p_4wk_avg['Estimated Distance (y)']:.0f}</td><td>{pos_4wk_avg['Estimated Distance (y)']:.0f}</td></tr>
-                            <tr><td>Total Jumps</td><td>{p_4wk_avg['Total Jumps']:.0f}</td><td>{pos_4wk_avg['Total Jumps']:.0f}</td></tr>
-                        </tbody>
-                    </table>
+                    <div style="min-height: 200px;">
+                        <table class="scout-table" style="width:100%; margin-top:10px;">
+                            <thead>
+                                <tr><th>Metric</th><th>{sel_p_pos}</th><th>{pos_label} Group</th></tr>
+                            </thead>
+                            <tbody>
+                                <tr><td style="font-weight:700;">Player Load</td><td>{p_4wk_avg['Player Load']:.1f}</td><td>{pos_4wk_avg['Player Load']:.1f}</td></tr>
+                                <tr><td style="font-weight:700;">Distance (y)</td><td>{p_4wk_avg['Estimated Distance (y)']:.0f}</td><td>{pos_4wk_avg['Estimated Distance (y)']:.0f}</td></tr>
+                                <tr><td style="font-weight:700;">Total Jumps</td><td>{p_4wk_avg['Total Jumps']:.0f}</td><td>{pos_4wk_avg['Total Jumps']:.0f}</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
                 """
                 st.markdown(table_html, unsafe_allow_html=True)
 
+            with c_ath2:
+                # Optional: Adding a brief summary text or leaving blank to balance the card
+                st.markdown(f"""
+                    <div style="padding: 20px; background: #ffffff; border: 1px dashed #E5E5E7; border-radius: 10px; height: 100%;">
+                        <p style="color: #515154; font-size: 13px; font-style: italic;">
+                            Showing comparison data for <b>Week {rec_4[0]} through Week {rec_4[-1]}</b>. 
+                            Charts below display the specific trend of individual output vs. positional norms.
+                        </p>
+                    </div>
+                """, unsafe_allow_html=True)
             st.markdown('</div>', unsafe_allow_html=True)
             
             # --- TREND GRAPHS ---
@@ -338,7 +355,7 @@ if check_password():
                         fig_t.add_trace(go.Scatter(
                             x=p_t['Week'], y=p_t[m], 
                             name=sel_p_pos, 
-                            line=dict(color='#0046ad', width=4), 
+                            line=dict(color='#4895DB', width=4), 
                             mode='lines+markers'
                         ))
                         
@@ -347,20 +364,22 @@ if check_password():
                         fig_t.add_trace(go.Scatter(
                             x=pos_t['Week'], y=pos_t[m], 
                             name=f"{pos_label} Avg", 
-                            line=dict(color='#ff7f0e', dash='dash'),
+                            line=dict(color='#FF8200', dash='dash'),
                             mode='lines'
                         ))
                         
                         fig_t.update_layout(
-                            title=f"4-Week {m} Trend", 
-                            xaxis=dict(dtick=1, title="Week Number"), 
-                            height=300, 
-                            margin=dict(l=10, r=10, t=40, b=10), 
+                            title=dict(text=f"4-Week {m}", font=dict(size=14, color='#4895DB', fontWeight='bold')),
+                            xaxis=dict(dtick=1, title="Week", showgrid=False), 
+                            yaxis=dict(showgrid=True, gridcolor='#F5F5F7'),
+                            height=280, 
+                            margin=dict(l=10, r=10, t=50, b=10), 
                             showlegend=True,
                             template="simple_white",
                             legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
                         )
                         st.plotly_chart(fig_t, use_container_width=True, config=LOCKED_CONFIG)
+                        
         with tabs[4]: # Match Summary
             if st.session_state.is_printing:
                 if st.button("Back to Editor (Show Filters)"):
