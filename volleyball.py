@@ -478,39 +478,37 @@ if check_password():
             # --- FILTERS ---
             c_ph1, c_ph2 = st.columns([1, 2])
             with c_ph1:
-                ph_period = st.selectbox("Analysis Period", ["Season to Date", "Last 4 Weeks", "Current Week"], key="ph_period_sel")
+                ph_period = st.selectbox("Analysis Period", ["Season to Date", "Last 4 Weeks", "Current Week"], key="ph_period_sel_v2")
             with c_ph2:
-                # Safety check for Position list
                 pos_list_ph = sorted([p for p in df['Position'].unique() if p != "N/A"]) if not df.empty else []
-                ph_pos = st.selectbox("Position Filter", ["All Positions"] + pos_list_ph, key="ph_pos_filt")
+                ph_pos = st.selectbox("Position Filter", ["All Positions"] + pos_list_ph, key="ph_pos_filt_v2")
 
             # --- DATA FILTERING ---
-            ph_df = phase_df.copy()
+            ph_working = phase_df.copy()
             if ph_pos != "All Positions":
-                ph_df = ph_df[ph_df['Position'] == ph_pos]
+                ph_working = ph_working[ph_working['Position'] == ph_pos]
             
-            if not ph_df.empty:
+            if not ph_working.empty:
                 if ph_period == "Last 4 Weeks":
-                    max_wk_ph = ph_df['Week'].max()
-                    ph_df = ph_df[ph_df['Week'] > (max_wk_ph - 4)]
+                    mx_w = ph_working['Week'].max()
+                    ph_working = ph_working[ph_working['Week'] > (mx_w - 4)]
                 elif ph_period == "Current Week":
-                    ph_df = ph_df[ph_df['Week'] == ph_df['Week'].max()]
+                    ph_working = ph_working[ph_working['Week'] == ph_working['Week'].max()]
 
-            # --- AGGREGATION & SAFETY CHECK ---
-            if not ph_df.empty:
-                phase_summary = ph_df.groupby('Phase').agg({
+            # --- AGGREGATION ---
+            if not ph_working.empty:
+                # Grouping by Phase name
+                p_sum = ph_working.groupby('Phase').agg({
                     'Player Load': 'mean',
                     'Explosive Efforts': 'mean',
                     'Total Jumps': 'mean',
                     'Estimated Distance (y)': 'mean'
                 }).reset_index().sort_values('Player Load', ascending=False)
 
-                # Final check before building UI
-                if not phase_summary.empty:
+                if not p_sum.empty:
                     # --- PHASE TABLE ---
                     st.markdown('<div class="player-row-container" style="padding: 0; border: none;">', unsafe_allow_html=True)
-                    
-                    table_html = """
+                    t_html = """
                         <table class="scout-table" style="width:100%; border: 1px solid #E5E5E7;">
                             <thead>
                                 <tr>
@@ -523,59 +521,55 @@ if check_password():
                             </thead>
                             <tbody>
                     """
-                    for _, row in phase_summary.iterrows():
-                        table_html += f"""
-                            <tr>
-                                <td style='text-align:left; padding-left:20px; font-weight:700;'>{row['Phase']}</td>
-                                <td>{row['Player Load']:.1f}</td>
-                                <td>{row['Explosive Efforts']:.1f}</td>
-                                <td>{row['Total Jumps']:.1f}</td>
-                                <td>{row['Estimated Distance (y)']:.0f}</td>
-                            </tr>
-                        """
-                    st.markdown(table_html + "</tbody></table></div>", unsafe_allow_html=True)
+                    for _, row in p_sum.iterrows():
+                        t_html += f"<tr><td style='text-align:left; padding-left:20px; font-weight:700;'>{row['Phase']}</td><td>{row['Player Load']:.1f}</td><td>{row['Explosive Efforts']:.1f}</td><td>{row['Total Jumps']:.1f}</td><td>{row['Estimated Distance (y)']:.0f}</td></tr>"
+                    st.markdown(t_html + "</tbody></table></div>", unsafe_allow_html=True)
 
-                    # --- VISUAL BREAKDOWN ---
+                    # --- VISUAL BREAKDOWN (FIXED PLOTLY LOGIC) ---
                     st.write("<br>", unsafe_allow_html=True)
-                    fig_ph_all = make_subplots(specs=[[{"secondary_y": True}]])
+                    
+                    # We specify secondary_y=True here
+                    fig_ph = make_subplots(specs=[[{"secondary_y": True}]])
 
-                    # Primary (Left Axis)
-                    fig_ph_all.add_trace(go.Bar(
-                        x=phase_summary['Phase'], y=phase_summary['Total Jumps'],
-                        name="Total Jumps", marker_color='#FF8200', offsetgroup=1
+                    # Primary (Left Axis) - Jumps and Efforts
+                    fig_ph.add_trace(go.Bar(
+                        x=p_sum['Phase'], y=p_sum['Total Jumps'],
+                        name="Jumps", marker_color='#FF8200'
                     ), secondary_y=False)
                     
-                    fig_ph_all.add_trace(go.Bar(
-                        x=phase_summary['Phase'], y=phase_summary['Explosive Efforts'],
-                        name="Explosive Efforts", marker_color='#4895DB', offsetgroup=2
+                    fig_ph.add_trace(go.Bar(
+                        x=p_sum['Phase'], y=p_sum['Explosive Efforts'],
+                        name="Efforts", marker_color='#4895DB'
                     ), secondary_y=False)
 
-                    # Secondary (Right Axis - Ghost Bars)
-                    fig_ph_all.add_trace(go.Bar(
-                        x=phase_summary['Phase'], y=phase_summary['Player Load'],
-                        name="Player Load", marker=dict(color='#515154', opacity=0.2), offsetgroup=3
+                    # Secondary (Right Axis) - Load and Distance (Ghosted)
+                    fig_ph.add_trace(go.Bar(
+                        x=p_sum['Phase'], y=p_sum['Player Load'],
+                        name="Load", marker=dict(color='#515154', opacity=0.2)
                     ), secondary_y=True)
 
-                    fig_ph_all.add_trace(go.Bar(
-                        x=phase_summary['Phase'], y=phase_summary['Estimated Distance (y)'],
-                        name="Distance", marker=dict(color='#A52A2A', opacity=0.2), offsetgroup=4
+                    fig_ph.add_trace(go.Bar(
+                        x=p_sum['Phase'], y=p_sum['Estimated Distance (y)'],
+                        name="Distance", marker=dict(color='#A52A2A', opacity=0.2)
                     ), secondary_y=True)
 
-                    fig_ph_all.update_layout(
-                        title=dict(text="Phase Volume & Intensity", font=dict(size=18, color='#4895DB', weight='bold'), x=0.5, xanchor='center'),
-                        barmode='group', height=450, template="simple_white",
+                    fig_ph.update_layout(
+                        title=dict(text="Phase Volume vs Intensity", font=dict(size=18, color='#4895DB', weight='bold'), x=0.5, xanchor='center'),
+                        barmode='group', # Simplified grouping to prevent tuple index error
+                        height=450,
+                        template="simple_white",
                         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-                        margin=dict(t=80)
+                        margin=dict(t=100)
                     )
                     
-                    fig_ph_all.update_yaxes(title_text="Jumps / Efforts", secondary_y=False, showgrid=False)
-                    fig_ph_all.update_yaxes(title_text="Load / Distance", secondary_y=True, showgrid=False)
+                    fig_ph.update_yaxes(title_text="Jumps / Efforts", secondary_y=False)
+                    fig_ph.update_yaxes(title_text="Load / Distance", secondary_y=True)
                     
-                    st.plotly_chart(fig_ph_all, use_container_width=True, config=LOCKED_CONFIG)
+                    st.plotly_chart(fig_ph, use_container_width=True, config=LOCKED_CONFIG)
                 else:
-                    st.info("No data found for this selection.")
+                    st.info("No phases found for this selection.")
             else:
-                st.info("No data available for the selected filters.")
+                st.info("No data available for the current filters.")
                 
     except Exception as e:
         st.error(f"Sync Error: {e}")
