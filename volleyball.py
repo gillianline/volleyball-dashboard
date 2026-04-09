@@ -251,6 +251,7 @@ if check_password():
                 st.markdown('<div class="section-header">Match Comparison Selection</div>', unsafe_allow_html=True)
                 c_ts1, c_ts2 = st.columns([2, 1])
                 with c_ts1:
+                    # Pulling from the new Matches Sheet
                     match_list_t = match_df.sort_values(['Date', 'Sheet_Order'])['Session_Name'].unique()
                     if "matches_state" not in st.session_state: 
                         st.session_state.matches_state = match_list_t[-3:] if len(match_list_t) >=3 else match_list_t
@@ -260,6 +261,9 @@ if check_password():
                     st.session_state.pos_state = st.selectbox("Filter by Position", ["All Positions"] + sorted(list(match_df['Position'].unique())), index=0)
                 st.markdown('</div>', unsafe_allow_html=True)
 
+            if st.session_state.is_printing:
+                st.markdown('<script>window.print();</script>', unsafe_allow_html=True)
+
             selected_matches = st.session_state.get("matches_state", [])
             pos_filter_t = st.session_state.get("pos_state", "All Positions")
 
@@ -268,64 +272,66 @@ if check_password():
                 m_map = {m: c_pal[idx % 3] for idx, m in enumerate(selected_matches)}
                 st.markdown('<div class="section-header">Athlete Match Performance Breakdown</div>', unsafe_allow_html=True)
                 
+                # Filter specifically from match_df
                 tourney_df = match_df[match_df['Session_Name'].isin(selected_matches)].sort_values(['Date', 'Sheet_Order'])
                 if pos_filter_t != "All Positions": 
                     tourney_df = tourney_df[tourney_df['Position'] == pos_filter_t]
                 
-                # --- INDEPENDENT SCALING ---
-                # Left Axis: Total Jumps & Explosive Efforts
-                global_max_primary = tourney_df[['Total Jumps', 'Explosive Efforts']].max().max() * 1.1
-                # Right Axis: Player Load & Distance
-                global_max_secondary = tourney_df[['Player Load', 'Estimated Distance (y)']].max().max() * 1.1
+                # Restore original unified axis logic
+                global_max_primary = tourney_df[['Total Jumps', 'Player Load', 'Explosive Efforts']].max().max() * 1.1
+                global_max_dist = tourney_df['Estimated Distance (y)'].max() * 1.1
 
-                for name in sorted(tourney_df['Name'].unique()):
+                ath_t = sorted(tourney_df['Name'].unique())
+                for name in ath_t:
                     ad = tourney_df[tourney_df['Name'] == name]
                     st.markdown(f'<div class="player-row-container"><div class="player-divider"></div>', unsafe_allow_html=True)
                     side_cols = st.columns([1.5, 2])
-                    
                     with side_cols[0]:
-                        card_html = f"""
+                        card_start = f"""
                             <div style="display:flex; align-items:center; gap:12px; padding:10px; background:#f8f9fa; border-bottom:2px solid #FF8200;">
                                 <img src="{ad['PhotoURL'].iloc[0]}" class="gallery-photo" style="width:65px; height:65px;">
                                 <div><p style="margin:0; font-weight:900; color:#1D1D1F; font-size:18px;">{name}</p><p style="margin:0; color:#4895DB; font-weight:700; font-size:16px;">{ad['Position'].iloc[0]}</p></div>
                             </div>
-                            <table class="scout-table">
-                                <thead><tr><th>Match</th><th>Total Jumps</th><th>Player Load</th><th>Explosive Efforts</th><th>Estimated Distance</th></tr></thead>
-                                <tbody>
+                            <div style="padding:5px;">
+                                <table class="scout-table" style="margin-bottom:0;">
+                                    <thead><tr><th>Match</th><th>Total Jumps</th><th>Player Load</th><th>Explosive Efforts</th><th>Estimated Distance</th></tr></thead>
+                                    <tbody>
                         """
                         for _, r in ad.iterrows():
-                            card_html += f"<tr><td>{r['Session_Name']}</td><td>{int(r['Total Jumps'])}</td><td>{r['Player Load']:.0f}</td><td>{r['Explosive Efforts']:.0f}</td><td>{r['Estimated Distance (y)']:.0f}</td></tr>"
-                        st.markdown(card_html + "</tbody></table>", unsafe_allow_html=True)
+                            card_start += f"<tr><td style='font-weight:700; font-size:11px;'>{r['Session_Name']}</td><td>{int(r['Total Jumps'])}</td><td>{r['Player Load']:.0f}</td><td>{r['Explosive Efforts']:.0f}</td><td>{r['Estimated Distance (y)']:.0f}</td></tr>"
+                        card_start += f"<tr style='background:#4895DB; color:white; font-weight:900;'><td>TOTAL</td><td>{int(ad['Total Jumps'].sum())}</td><td>{ad['Player Load'].sum():.0f}</td><td>{ad['Explosive Efforts'].sum():.0f}</td><td>{ad['Estimated Distance (y)'].sum():.0f}</td></tr></tbody></table></div>"
+                        st.markdown(card_start, unsafe_allow_html=True)
                     
                     with side_cols[1]:
+                        # Back to original twin-axis ghost bar layout
                         fig_ath = make_subplots(specs=[[{"secondary_y": True}]])
-                        
                         for _, r in ad.iterrows():
-                            # MAIN BARS (Primary Axis - Left)
+                            # Main Bars
                             fig_ath.add_trace(go.Bar(
                                 name=r['Session_Name'], 
-                                x=['Total Jumps', 'Explosive Efforts'], 
-                                y=[r['Total Jumps'], r['Explosive Efforts']], 
-                                marker_color=m_map[r['Session_Name']],
-                                offsetgroup=r['Session_Name']
+                                x=['Total Jumps', 'Player Load', 'Explosive Efforts'], 
+                                y=[r['Total Jumps'], r['Player Load'], r['Explosive Efforts']], 
+                                marker_color=m_map[r['Session_Name']]
                             ), secondary_y=False)
                             
-                            # GHOST BARS (Secondary Axis - Right)
+                            # Ghost Distance Bar
                             fig_ath.add_trace(go.Bar(
-                                name=f"Ref {r['Session_Name']}", 
-                                x=['Player Load', 'Estimated Distance'], 
-                                y=[r['Player Load'], r['Estimated Distance (y)']], 
-                                marker=dict(color=m_map[r['Session_Name']], opacity=0.25),
-                                showlegend=False,
-                                offsetgroup=r['Session_Name']
+                                name="Dist", 
+                                x=['Estimated Distance'], 
+                                y=[r['Estimated Distance (y)']], 
+                                marker=dict(color=m_map[r['Session_Name']], opacity=0.4), 
+                                showlegend=False
                             ), secondary_y=True)
                         
                         fig_ath.update_layout(
-                            barmode='group', height=280, margin=dict(l=0, r=0, t=10, b=80), 
-                            template="simple_white", font=dict(size=10),
+                            barmode='group', 
+                            height=260, 
+                            margin=dict(l=10, r=10, t=10, b=80), 
+                            template="simple_white", 
+                            font=dict(color="#333333", size=10),
                             legend=dict(orientation="h", yanchor="top", y=-0.3, xanchor="center", x=0.5),
-                            yaxis=dict(range=[0, global_max_primary], title="Jumps / Efforts", showgrid=False),
-                            yaxis2=dict(range=[0, global_max_secondary], title="Load / Dist", showgrid=False, overlaying='y', side='right')
+                            yaxis=dict(range=[0, global_max_primary]),
+                            yaxis2=dict(range=[0, global_max_dist])
                         )
                         st.plotly_chart(fig_ath, use_container_width=True, config=LOCKED_CONFIG)
                     st.markdown('</div>', unsafe_allow_html=True)
