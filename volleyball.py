@@ -254,7 +254,18 @@ if check_password():
                 with cg1:
                     for m in low_m + ['Estimated Distance (y)']: st.metric(label=m, value=f"{g_d[m]:.0f}", delta=f"{(w_avg[m]-g_d[m])/g_d[m]*100:+.1f}%")
                 with cg2:
-                    fig_dual = make_subplots(specs=[[{"secondary_y": True}]]); fig_dual.add_trace(go.Bar(x=low_m, y=[w_avg[m] for m in low_m], name="Weekly Avg", marker_color='#4895DB'), secondary_y=False); fig_dual.add_trace(go.Bar(x=low_m, y=[g_d[m] for m in low_m], name=f"Game Output", marker_color='#FF8200'), secondary_y=False); st.plotly_chart(fig_dual, use_container_width=True, config=LOCKED_CONFIG)
+                    fig_dual = make_subplots(specs=[[{"secondary_y": True}]])
+                    
+                    # Primary Metrics (Left Axis)
+                    fig_dual.add_trace(go.Bar(x=low_m, y=[w_avg[m] for m in low_m], name="Weekly Avg", marker_color='#4895DB', offsetgroup=1), secondary_y=False)
+                    fig_dual.add_trace(go.Bar(x=low_m, y=[g_d[m] for m in low_m], name=f"Game Output", marker_color='#FF8200', offsetgroup=2), secondary_y=False)
+                    
+                    # Distance Ghost Bars (Right Axis)
+                    fig_dual.add_trace(go.Bar(x=['Estimated Distance (y)'], y=[w_avg['Estimated Distance (y)']], name="Wkly Dist", marker=dict(color='#4895DB', opacity=0.3), offsetgroup=1), secondary_y=True)
+                    fig_dual.add_trace(go.Bar(x=['Estimated Distance (y)'], y=[g_d['Estimated Distance (y)']], name="Game Dist", marker=dict(color='#FF8200', opacity=0.3), offsetgroup=2), secondary_y=True)
+                    
+                    fig_dual.update_layout(barmode='group', height=350, margin=dict(l=0, r=0, t=20, b=0), template="simple_white")
+                    st.plotly_chart(fig_dual, use_container_width=True, config=LOCKED_CONFIG)
                 
                 # Trends pull from combined sources to show the full week
                 combined_wk = pd.concat([w_data, g_data_l])
