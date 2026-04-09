@@ -85,8 +85,12 @@ if check_password():
         }
         df = df.rename(columns=rename_map)
         df['Session_Type'] = df['Activity'].apply(lambda x: 'Game' if any(w in str(x).lower() for w in ['game', 'match', 'v.']) else 'Practice')
+        
+        # FIX: Ensure all data is numeric and rounded BEFORE any grouping or max calculations are done
         avail = [v for v in rename_map.values() if v in df.columns]
-        for col in avail: df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0).round(1)
+        for col in avail:
+            df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0).round(1)
+            
         df['Session_Name'] = df['Activity'].fillna(df['Date'].dt.strftime('%m/%d/%Y'))
         df['Position'] = df.groupby('Name')['Position'].ffill().bfill().fillna("N/A")
         df['PhotoURL'] = df.groupby('Name')['PhotoURL'].ffill().bfill().fillna("https://www.w3schools.com/howto/img_avatar.png")
@@ -98,6 +102,8 @@ if check_password():
         phase_df.columns = phase_df.columns.str.strip()
         if 'Phases' in phase_df.columns: phase_df = phase_df.rename(columns={'Phases': 'Phase'})
         phase_df['Date'] = pd.to_datetime(phase_df['Date'], errors='coerce')
+        
+        # Ensure Phase data also has correct names for metrics
         phase_df = phase_df.rename(columns=rename_map)
         return df, cmj_df, phase_df
 
@@ -176,6 +182,8 @@ if check_password():
                                     r_html += f"<tr><td>{k}</td><td {h_class}>{v} {arr_val}</td><td>{mx}</td><td>{g}</td></tr>"
                             sc_g = math.ceil(t_grade / c_metrics) if c_metrics > 0 else 0
                             with cols[j]: st.markdown(f'<div style="border:1px solid #E5E5E7; border-radius:15px; padding:15px; margin-bottom:20px;"><div style="display:flex; align-items:center; gap:10px;"><div style="flex:1.2; text-align:center;"><img src="{pd_row["PhotoURL"]}" class="gallery-photo"><p style="font-weight:bold; font-size:15px; margin-top:8px;">{pd_row["Name"]}</p></div><div style="flex:3;"><table class="scout-table"><thead><tr><th>Metric</th><th>Val</th><th>Max</th><th>Grade</th></tr></thead><tbody>{r_html}</tbody></table></div><div style="flex:1; text-align:center;"><div style="background-color:{get_flipped_gradient(sc_g)}; color:white; padding:10px; border-radius:12px; font-size:32px; font-weight:900;">{sc_g}</div></div></div></div>', unsafe_allow_html=True)
+    except Exception as e:
+        st.error(f"Sync Error: {e}")
 
         with tabs[2]: # Game v Practice
             st.markdown('<div class="section-header">Weekly Prep Intensity vs. Game Demands</div>', unsafe_allow_html=True)
