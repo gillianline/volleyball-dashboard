@@ -475,30 +475,43 @@ if check_password():
         with tabs[5]: # Phase Analysis
             st.markdown('<div class="section-header">Practice Phase Intensity Breakdown</div>', unsafe_allow_html=True)
             
-            # --- FILTERS ---
-            c_ph1, c_ph2 = st.columns([1, 2])
-            with c_ph1:
-                ph_period = st.selectbox("Analysis Period", ["Season to Date", "Last 4 Weeks", "Current Week"], key="ph_period_sel_v2")
-            with c_ph2:
-                pos_list_ph = sorted([p for p in df['Position'].unique() if p != "N/A"]) if not df.empty else []
-                ph_pos = st.selectbox("Position Filter", ["All Positions"] + pos_list_ph, key="ph_pos_filt_v2")
+            if phase_df is not None and not phase_df.empty:
+                
+                # --- PHASE CONSOLIDATION LOGIC ---
+                # This maps the various "Set" and "(2)" names to a single master name
+                phase_map = {
+                    "Brizo (2)": "Brizo",
+                    "2 Ball (Set 1)": "2 Ball",
+                    "2 Ball (Set 2)": "2 Ball",
+                    "2 Ball (Set 3)": "2 Ball",
+                    "2 Ball (Set 4)": "2 Ball",
+                    "serving (2)": "serving",
+                    "2/3 Hitters (2)": "2/3 Hitters"
+                }
+                
+                # Apply the cleanup to a copy of the dataframe
+                working_df = phase_df.copy()
+                working_df['Phase'] = working_df['Phase'].replace(phase_map)
 
-            # --- DATA FILTERING ---
-            ph_working = phase_df.copy()
-            if ph_pos != "All Positions":
-                ph_working = ph_working[ph_working['Position'] == ph_pos]
-            
-            if not ph_working.empty:
+                # --- FILTERS ---
+                c_ph1, c_ph2 = st.columns([1, 2])
+                with c_ph1:
+                    ph_period = st.selectbox("Analysis Period", ["Season to Date", "Last 4 Weeks"], key="ph_period_final")
+                with c_ph2:
+                    pos_list_ph = sorted([p for p in working_df['Position'].unique() if p != "N/A"])
+                    ph_pos = st.selectbox("Position Filter", ["All Positions"] + pos_list_ph, key="ph_pos_final")
+
+                # --- FILTERING ---
+                if ph_pos != "All Positions":
+                    working_df = working_df[working_df['Position'] == ph_pos]
+                
                 if ph_period == "Last 4 Weeks":
-                    mx_w = ph_working['Week'].max()
-                    ph_working = ph_working[ph_working['Week'] > (mx_w - 4)]
-                elif ph_period == "Current Week":
-                    ph_working = ph_working[ph_working['Week'] == ph_working['Week'].max()]
+                    mx_w = working_df['Week'].max()
+                    working_df = working_df[working_df['Week'] > (mx_w - 4)]
 
-            # --- AGGREGATION ---
-            if not ph_working.empty:
-                # Grouping by Phase name
-                p_sum = ph_working.groupby('Phase').agg({
+                # --- AGGREGATION ---
+                # Now that names are combined, we group and average
+                p_sum = working_df.groupby('Phase').agg({
                     'Player Load': 'mean',
                     'Explosive Efforts': 'mean',
                     'Total Jumps': 'mean',
@@ -506,12 +519,12 @@ if check_password():
                 }).reset_index().sort_values('Player Load', ascending=False)
 
                 if not p_sum.empty:
-                    # --- PHASE TABLE ---
+                    # --- SUMMARY TABLE ---
                     st.markdown('<div class="player-row-container" style="padding: 0; border: none;">', unsafe_allow_html=True)
                     t_html = """
                         <table class="scout-table" style="width:100%; border: 1px solid #E5E5E7;">
                             <thead>
-                                <tr>
+                                <tr style="background-color: #4895DB; color: white;">
                                     <th style='text-align:left; padding-left:20px;'>Practice Phase</th>
                                     <th>Avg Player Load</th>
                                     <th>Explosive Efforts</th>
@@ -522,16 +535,21 @@ if check_password():
                             <tbody>
                     """
                     for _, row in p_sum.iterrows():
-                        t_html += f"<tr><td style='text-align:left; padding-left:20px; font-weight:700;'>{row['Phase']}</td><td>{row['Player Load']:.1f}</td><td>{row['Explosive Efforts']:.1f}</td><td>{row['Total Jumps']:.1f}</td><td>{row['Estimated Distance (y)']:.0f}</td></tr>"
+                        t_html += f"""
+                            <tr>
+                                <td style='text-align:left; padding-left:20px; font-weight:700;'>{row['Phase']}</td>
+                                <td>{row['Player Load']:.1f}</td>
+                                <td>{row['Explosive Efforts']:.1f}</td>
+                                <td>{row['Total Jumps']:.1f}</td>
+                                <td>{row['Estimated Distance (y)']:.0f}</td>
+                            </tr>
+                        """
                     st.markdown(t_html + "</tbody></table></div>", unsafe_allow_html=True)
 
-                    # --- VISUAL BREAKDOWN (FIXED PLOTLY LOGIC) ---
+                    # --- PHASE CHART ---
                     st.write("<br>", unsafe_allow_html=True)
-                    
-                    # We specify secondary_y=True here
                     fig_ph = make_subplots(specs=[[{"secondary_y": True}]])
 
-                    # Primary (Left Axis) - Jumps and Efforts
                     fig_ph.add_trace(go.Bar(
                         x=p_sum['Phase'], y=p_sum['Total Jumps'],
                         name="Jumps", marker_color='#FF8200'
@@ -542,22 +560,19 @@ if check_password():
                         name="Efforts", marker_color='#4895DB'
                     ), secondary_y=False)
 
-                    # Secondary (Right Axis) - Load and Distance (Ghosted)
                     fig_ph.add_trace(go.Bar(
                         x=p_sum['Phase'], y=p_sum['Player Load'],
-                        name="Load", marker=dict(color='#515154', opacity=0.2)
+                        name="Load", marker=dict(color='#515154', opacity=0.25)
                     ), secondary_y=True)
 
                     fig_ph.add_trace(go.Bar(
                         x=p_sum['Phase'], y=p_sum['Estimated Distance (y)'],
-                        name="Distance", marker=dict(color='#A52A2A', opacity=0.2)
+                        name="Distance", marker=dict(color='#A52A2A', opacity=0.25)
                     ), secondary_y=True)
 
                     fig_ph.update_layout(
-                        title=dict(text="Phase Volume vs Intensity", font=dict(size=18, color='#4895DB', weight='bold'), x=0.5, xanchor='center'),
-                        barmode='group', # Simplified grouping to prevent tuple index error
-                        height=450,
-                        template="simple_white",
+                        title=dict(text="Consolidated Phase Volume vs Intensity", font=dict(size=18, color='#4895DB', weight='bold'), x=0.5, xanchor='center'),
+                        barmode='group', height=450, template="simple_white",
                         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
                         margin=dict(t=100)
                     )
@@ -566,10 +581,8 @@ if check_password():
                     fig_ph.update_yaxes(title_text="Load / Distance", secondary_y=True)
                     
                     st.plotly_chart(fig_ph, use_container_width=True, config=LOCKED_CONFIG)
-                else:
-                    st.info("No phases found for this selection.")
             else:
-                st.info("No data available for the current filters.")
+                st.error("No phase data found. Ensure PHASES_URL is correctly configured.")
                 
     except Exception as e:
         st.error(f"Sync Error: {e}")
