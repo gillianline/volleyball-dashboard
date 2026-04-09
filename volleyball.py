@@ -34,91 +34,92 @@ if check_password():
 
     # --- CSS: FORMATTING & PAGE BREAK CONTROLS ---
     # --- FULL CSS CODE ---
-st.markdown("""
-    <style>
-    /* Main App Background & Text */
-    .stApp { background-color: #FFFFFF; color: #1D1D1F; }
+    # --- FULL CSS CODE ---
+    st.markdown("""
+        <style>
+        /* Main App Background & Text */
+        .stApp { background-color: #FFFFFF; color: #1D1D1F; }
     
-    /* Section Headers */
-    .section-header {
-        background-color: #4895DB;
-        color: white;
-        padding: 10px 15px;
-        border-radius: 5px;
-        font-weight: bold;
-        margin-bottom: 20px;
-        border-left: 5px solid #FF8200;
-    }
+        /* Section Headers */
+        .section-header {
+            background-color: #4895DB;
+            color: white;
+            padding: 10px 15px;
+            border-radius: 5px;
+            font-weight: bold;
+            margin-bottom: 20px;
+            border-left: 5px solid #FF8200;
+        }
 
-    /* Scout & Data Tables */
-    .scout-table { 
-        width: 100%; 
-        border-collapse: collapse; 
-        text-align: center; 
-        margin-top: 10px; 
-        font-family: sans-serif;
-    }
-    .scout-table th { 
-        background-color: #4895DB; 
-        color: white; 
-        padding: 10px; 
-        border-bottom: 2px solid #FF8200; 
-        font-size: 13px; 
-    }
-    .scout-table td { 
-        padding: 10px; 
-        border-bottom: 1px solid #F5F5F7; 
-        font-size: 13px; 
-        color: #1D1D1F;
-    }
-    .scout-table tbody tr:hover { background-color: #f8f9fa; }
+        /* Scout & Data Tables */
+        .scout-table { 
+            width: 100%; 
+            border-collapse: collapse; 
+            text-align: center; 
+            margin-top: 10px; 
+            font-family: sans-serif;
+        }
+        .scout-table th { 
+            background-color: #4895DB; 
+            color: white; 
+            padding: 10px; 
+            border-bottom: 2px solid #FF8200; 
+            font-size: 13px; 
+        }
+        .scout-table td { 
+            padding: 10px; 
+            border-bottom: 1px solid #F5F5F7; 
+            font-size: 13px; 
+            color: #1D1D1F;
+        }
+        .scout-table tbody tr:hover { background-color: #f8f9fa; }
 
-    /* Athlete Photo Styling - Prevents Zooming/Stretching */
-    .gallery-photo { 
-        border-radius: 50%; 
-        width: 85px; 
-        height: 85px; 
-        object-fit: contain; /* Keeps the whole face in view */
-        background-color: #ffffff; /* Fills gaps for non-square images */
-        border: 3px solid #FF8200; 
-        display: block;
-        margin-left: auto;
-        margin-right: auto;
-    }
+        /* Athlete Photo Styling - Prevents Zooming/Stretching */
+        .gallery-photo { 
+            border-radius: 50%; 
+            width: 85px; 
+            height: 85px; 
+            object-fit: contain; /* Keeps the whole face in view */
+            background-color: #ffffff; /* Fills gaps for non-square images */
+            border: 3px solid #FF8200; 
+            display: block;
+            margin-left: auto;
+            margin-right: auto;
+        }
 
-    /* Player Card/Row Containers */
-    .player-row-container { 
-        padding: 20px; 
-        border: 1px solid #E5E5E7; 
-        border-radius: 15px; 
-        margin-bottom: 25px; 
-        background-color: #ffffff;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.05);
-    }
+        /* Player Card/Row Containers */
+        .player-row-container { 
+            padding: 20px; 
+            border: 1px solid #E5E5E7; 
+            border-radius: 15px; 
+            margin-bottom: 25px; 
+            background-color: #ffffff;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+        }
 
-    /* Metric Score Boxes (Readiness Score) */
-    .score-box {
-        width: 80px;
-        height: 80px;
-        line-height: 80px;
-        border-radius: 50%;
-        color: white;
-        text-align: center;
-        font-size: 24px;
-        font-weight: bold;
-        margin: 0 auto;
-    }
+        /* Metric Score Boxes (Readiness Score) */
+        .score-box {
+            width: 80px;
+            height: 80px;
+            line-height: 80px;
+            border-radius: 50%;
+            color: white;
+            text-align: center;
+            font-size: 24px;
+            font-weight: bold;
+            margin: 0 auto;
+        }
 
-    /* Highlight Classes for Table Diffs */
-    .bg-highlight-red { background-color: #ffe3e3 !important; color: #d90429 !important; font-weight: bold; }
-    .arrow-red { color: #d90429; font-weight: bold; margin-left: 5px; }
+        /* Highlight Classes for Table Diffs */
+        .bg-highlight-red { background-color: #ffe3e3 !important; color: #d90429 !important; font-weight: bold; }
+        .arrow-red { color: #d90429; font-weight: bold; margin-left: 5px; }
 
-    /* Print/Hide Logic for PDF Generation */
-    @media print {
-        .print-hide { display: none !important; }
-    }
-    </style>
-    """, unsafe_allow_html=True)
+        /* Print/Hide Logic for PDF Generation */
+        @media print {
+            .print-hide { display: none !important; }
+        }
+        </style>
+        """, unsafe_allow_html=True)
 
     def get_flipped_gradient(score):
         score = float(score)
