@@ -79,9 +79,7 @@ if check_password():
         df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
         df = df.dropna(subset=['Date']) 
         
-        # --- FIXED WEEK LOGIC ---
         if 'Week' in df.columns:
-            # Extracts the digits from "Week 8" and converts to numeric, filling blanks with 0
             df['Week'] = pd.to_numeric(df['Week'].astype(str).str.extract('(\d+)', expand=False), errors='coerce').fillna(0).astype(int)
 
         rename_map = {
@@ -131,6 +129,7 @@ if check_password():
                 if pos_f != "All Positions": dropdown_df = dropdown_df[dropdown_df['Position'] == pos_f]
                 sel_p = st.selectbox("Select Athlete", sorted(dropdown_df['Name'].unique()))
                 
+                # Group metrics by date to handle multiple sessions per day
                 p_full_hist = df[df['Name'] == sel_p]
                 daily_sums = p_full_hist.groupby('Date')[all_metrics].sum().reset_index()
                 lb = daily_sums[(daily_sums['Date'] >= curr_date - timedelta(days=30)) & (daily_sums['Date'] <= curr_date)]
