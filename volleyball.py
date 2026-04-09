@@ -490,21 +490,34 @@ if check_password():
                 working_df = phase_df.copy()
                 working_df['Phase'] = working_df['Phase'].replace(phase_map)
 
-                # --- 2. DEFINE GROUPS ---
+                # --- 2. VIEW SELECTION ---
+                view_col1, view_col2 = st.columns([1, 2])
+                with view_col1:
+                    view_type = st.radio("Select View", ["Overall (Season)", "By Specific Practice"], horizontal=True)
+                
+                if view_type == "By Specific Practice":
+                    with view_col2:
+                        # Assumes you have a 'Date' column in your phase_df
+                        available_dates = sorted(working_df['Date'].unique(), reverse=True)
+                        selected_date = st.selectbox("Select Practice Date", available_dates)
+                        working_df = working_df[working_df['Date'] == selected_date]
+
+                # --- 3. DEFINE GROUPS ---
                 pos_list = sorted([p for p in working_df['Position'].unique() if pd.notna(p) and p != "N/A"])
                 display_groups = ["Team Overall"] + pos_list
 
-                # --- 3. RENDER MATRIX ---
+                # --- 4. RENDER MATRIX ---
                 for group in display_groups:
                     header_color = "#4895DB" if group == "Team Overall" else "#FF8200"
                     
-                    st.markdown(f"{group} Breakdown")
+                    st.markdown(f"#### 📋 {group} Breakdown ({view_type})")
                     
                     if group == "Team Overall":
                         plot_df = working_df.copy()
                     else:
                         plot_df = working_df[working_df['Position'] == group]
 
+                    # Aggregate Metrics
                     plot_sum = plot_df.groupby('Phase').agg({
                         'Player Load': 'mean',
                         'Explosive Efforts': 'mean',
@@ -513,11 +526,13 @@ if check_password():
                     }).reset_index().sort_values('Player Load', ascending=False)
 
                     if not plot_sum.empty:
-                        # Identify max values for highlighting
-                        max_load = plot_sum['Player Load'].max()
-                        max_efforts = plot_sum['Explosive Efforts'].max()
-                        max_jumps = plot_sum['Total Jumps'].max()
-                        max_dist = plot_sum['Estimated Distance (y)'].max()
+                        # Identify max values for highlighting per group
+                        max_vals = {
+                            'Player Load': plot_sum['Player Load'].max(),
+                            'Explosive Efforts': plot_sum['Explosive Efforts'].max(),
+                            'Total Jumps': plot_sum['Total Jumps'].max(),
+                            'Estimated Distance (y)': plot_sum['Estimated Distance (y)'].max()
+                        }
 
                         html_output = []
                         html_output.append(f'<div style="margin-bottom: 25px; border: 1px solid #E5E5E7; border-radius: 10px; overflow: hidden;">')
@@ -526,28 +541,24 @@ if check_password():
                         html_output.append(f'<th style="text-align:left; padding: 12px 20px;">Phase</th>')
                         html_output.append(f'<th>Avg Player Load</th><th>Explosive Efforts</th><th>Total Jumps</th><th>Avg Distance (y)</th></tr></thead><tbody>')
                         
-                        # Helper for conditional styling
-                        def get_style(val, max_val):
-                            if val == max_val and val > 0:
+                        def get_highlight(val, col_name):
+                            if val == max_vals[col_name] and val > 0:
                                 return "style='background-color: #FFF3E0; color: #E65100; font-weight: 800; border: 1px solid #FFCC80;'"
                             return ""
 
                         for _, row in plot_sum.iterrows():
                             html_output.append(f"<tr>")
                             html_output.append(f"<td style='text-align:left; padding-left:20px; font-weight:700;'>{row['Phase']}</td>")
-                            
-                            # Apply Highlight to each metric cell
-                            html_output.append(f"<td {get_style(row['Player Load'], max_load)}>{row['Player Load']:.1f}</td>")
-                            html_output.append(f"<td {get_style(row['Explosive Efforts'], max_efforts)}>{row['Explosive Efforts']:.1f}</td>")
-                            html_output.append(f"<td {get_style(row['Total Jumps'], max_jumps)}>{row['Total Jumps']:.1f}</td>")
-                            html_output.append(f"<td {get_style(row['Estimated Distance (y)'], max_dist)}>{row['Estimated Distance (y)']:.0f}</td>")
-                            
+                            html_output.append(f"<td {get_highlight(row['Player Load'], 'Player Load')}>{row['Player Load']:.1f}</td>")
+                            html_output.append(f"<td {get_highlight(row['Explosive Efforts'], 'Explosive Efforts')}>{row['Explosive Efforts']:.1f}</td>")
+                            html_output.append(f"<td {get_highlight(row['Total Jumps'], 'Total Jumps')}>{row['Total Jumps']:.1f}</td>")
+                            html_output.append(f"<td {get_highlight(row['Estimated Distance (y)'], 'Estimated Distance (y)')}>{row['Estimated Distance (y)']:.0f}</td>")
                             html_output.append(f"</tr>")
                         
                         html_output.append('</tbody></table></div>')
                         st.write("".join(html_output), unsafe_allow_html=True)
                     else:
-                        st.info(f"No data for {group}")
+                        st.info(f"No data found for {group} on this selection.")
             else:
                 st.info("Phase data is loading...")
                 
