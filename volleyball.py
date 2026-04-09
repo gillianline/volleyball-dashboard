@@ -289,6 +289,7 @@ if check_password():
                 else:
                     available_names = sorted(df['Name'].unique())
                 
+                # Multiselect allows comparing multiple people at once
                 sel_p_list = st.multiselect("Select Athletes for Comparison", available_names, default=[available_names[0]], key="pos_analysis_sel_multi")
             
             if sel_p_list:
@@ -297,45 +298,45 @@ if check_password():
                 rec_4 = list(range(int(max_wk) - 3, int(max_wk) + 1))
                 tr_df = df[df['Week'].isin(rec_4)]
                 
-                # Get the position label from the first selected athlete for the "Group Avg" comparison
+                # Use the position of the first selected athlete for group average comparison
                 primary_pos = df[df['Name'] == sel_p_list[0]]['Position'].iloc[0]
                 
-                # --- FULL WIDTH TABLE SECTION ---
-                st.markdown('<div class="player-row-container" style="padding: 0;">', unsafe_allow_html=True)
+                # --- FULL WIDTH SUMMARY TABLE ---
+                st.markdown('<div class="player-row-container" style="padding: 0; border: none; background: transparent;">', unsafe_allow_html=True)
                 
                 tr_metrics = ["Player Load", "Estimated Distance (y)", "Total Jumps"]
-                pos_4wk_avg = tr_df[df['Position'] == primary_pos][tr_metrics].mean()
+                pos_4wk_avg = tr_df[tr_df['Position'] == primary_pos][tr_metrics].mean()
 
                 # Build Dynamic Table Header
-                table_head = f"<tr><th>Metric</th>"
+                table_head = f"<tr><th>Metric (4-Week Avg)</th>"
                 for name in sel_p_list:
                     table_head += f"<th>{name}</th>"
-                table_head += f"<th>{primary_pos} Group Avg</th></tr>"
+                table_head += f"<th style='background:#4895DB; color:white;'>{primary_pos} Group Avg</th></tr>"
 
                 # Build Table Rows
                 rows_html = ""
                 for m in tr_metrics:
-                    row = f"<tr><td style='font-weight:700;'>{m}</td>"
+                    row = f"<tr><td style='font-weight:700; text-align: left; padding-left: 15px;'>{m}</td>"
                     for name in sel_p_list:
                         val = tr_df[tr_df['Name'] == name][m].mean()
                         row += f"<td>{val:.1f}</td>"
-                    row += f"<td style='background:#f8f9fa; font-weight:700;'>{pos_4wk_avg[m]:.1f}</td></tr>"
+                    row += f"<td style='background:#f8f9fa; font-weight:700; color:#FF8200;'>{pos_4wk_avg[m]:.1f}</td></tr>"
                     rows_html += row
 
                 st.markdown(f"""
-                    <table class="scout-table" style="width:100%;">
+                    <table class="scout-table" style="width:100%; border: 1px solid #E5E5E7;">
                         <thead>{table_head}</thead>
                         <tbody>{rows_html}</tbody>
                     </table>
                 """, unsafe_allow_html=True)
                 st.markdown('</div>', unsafe_allow_html=True)
 
-                # --- TREND GRAPHS ---
+                # --- TREND GRAPHS (FIXED SPACING & TITLES) ---
                 st.write("<br>", unsafe_allow_html=True)
                 t_col1, t_col2, t_col3 = st.columns(3)
                 cols = [t_col1, t_col2, t_col3]
                 
-                # Use a standard color palette for multiple athletes
+                # Tennessee Palette
                 colors = ['#4895DB', '#FF8200', '#2D5A27', '#A52A2A', '#515154']
 
                 for i, m in enumerate(tr_metrics):
@@ -343,7 +344,7 @@ if check_password():
                         with cols[i]:
                             fig_t = go.Figure()
                             
-                            # Add line for each selected athlete
+                            # Add lines for all selected athletes
                             for idx, name in enumerate(sel_p_list):
                                 p_t = tr_df[tr_df['Name'] == name].groupby('Week')[m].mean().reset_index()
                                 fig_t.add_trace(go.Scatter(
@@ -353,7 +354,7 @@ if check_password():
                                     mode='lines+markers'
                                 ))
                             
-                            # Add Position Average reference line
+                            # Add dashed line for Position Average
                             pos_t = tr_df[tr_df['Position'] == primary_pos].groupby('Week')[m].mean().reset_index()
                             fig_t.add_trace(go.Scatter(
                                 x=pos_t['Week'], y=pos_t[m], 
@@ -365,17 +366,29 @@ if check_password():
                             fig_t.update_layout(
                                 title=dict(
                                     text=f"4-Week {m} Trend", 
-                                    font=dict(size=14, color='#4895DB', weight='bold')
+                                    font=dict(size=16, color='#4895DB', weight='bold'),
+                                    y=0.95,
+                                    x=0.5,
+                                    xanchor='center'
                                 ),
-                                xaxis=dict(dtick=1, title="Week", showgrid=False), 
+                                xaxis=dict(dtick=1, title="Week Number", showgrid=False), 
                                 yaxis=dict(showgrid=True, gridcolor='#F5F5F7'),
-                                height=320, 
-                                margin=dict(l=10, r=10, t=50, b=10), 
+                                height=400, # Height increased for legend room
+                                margin=dict(l=10, r=10, t=80, b=100), # Ample margins to prevent overlap
                                 showlegend=True,
                                 template="simple_white",
-                                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+                                legend=dict(
+                                    orientation="h", 
+                                    yanchor="top", 
+                                    y=-0.25, # Pushes legend well below the X-axis
+                                    xanchor="center", 
+                                    x=0.5,
+                                    font=dict(size=10)
+                                )
                             )
                             st.plotly_chart(fig_t, use_container_width=True, config=LOCKED_CONFIG)
+            else:
+                st.info("Please select at least one athlete to view positional trends.")
                             
                         
         with tabs[4]: # Match Summary
