@@ -297,24 +297,26 @@ if check_password():
                         st.markdown(card_start, unsafe_allow_html=True)
                     
                     with side_cols[1]:
-                        # Autoscale enabled (ranges removed)
+                        # Twin axes: Primary for Jumps/Efforts, Secondary for Ghosted Player Load
                         fig_ath = make_subplots(specs=[[{"secondary_y": True}]])
                         for _, r in ad.iterrows():
-                            # Main Bars (Jumps, Load, Efforts)
+                            # Main Bars (Left Axis)
                             fig_ath.add_trace(go.Bar(
                                 name=r['Session_Name'], 
-                                x=['Total Jumps', 'Player Load', 'Explosive Efforts'], 
-                                y=[r['Total Jumps'], r['Player Load'], r['Explosive Efforts']], 
-                                marker_color=m_map[r['Session_Name']]
+                                x=['Total Jumps', 'Explosive Efforts'], 
+                                y=[r['Total Jumps'], r['Explosive Efforts']], 
+                                marker_color=m_map[r['Session_Name']],
+                                offsetgroup=r['Session_Name']
                             ), secondary_y=False)
                             
-                            # Ghost Distance Bar
+                            # Ghost Player Load Bar (Right Axis)
                             fig_ath.add_trace(go.Bar(
-                                name="Dist", 
-                                x=['Estimated Distance'], 
-                                y=[r['Estimated Distance (y)']], 
-                                marker=dict(color=m_map[r['Session_Name']], opacity=0.4), 
-                                showlegend=False
+                                name=f"Load ({r['Session_Name']})", 
+                                x=['Player Load'], 
+                                y=[r['Player Load']], 
+                                marker=dict(color=m_map[r['Session_Name']], opacity=0.3), 
+                                showlegend=False,
+                                offsetgroup=r['Session_Name']
                             ), secondary_y=True)
                         
                         fig_ath.update_layout(
@@ -324,9 +326,8 @@ if check_password():
                             template="simple_white", 
                             font=dict(color="#333333", size=10),
                             legend=dict(orientation="h", yanchor="top", y=-0.3, xanchor="center", x=0.5),
-                            # Automatic scaling per athlete
-                            yaxis=dict(showgrid=False, title="Intensity / Count"),
-                            yaxis2=dict(showgrid=False, title="Distance (y)", overlaying='y', side='right')
+                            yaxis=dict(showgrid=False, title="Jumps / Efforts"),
+                            yaxis2=dict(showgrid=False, title="Player Load", overlaying='y', side='right')
                         )
                         st.plotly_chart(fig_ath, use_container_width=True, config=LOCKED_CONFIG)
                     st.markdown('</div>', unsafe_allow_html=True)
