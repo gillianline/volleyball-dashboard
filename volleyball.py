@@ -482,7 +482,7 @@ if check_password():
                     "Brizo (2)": "Brizo",
                     "2 Ball (Set 1)": "2 Ball", "2 Ball (Set 2)": "2 Ball", 
                     "2 Ball (Set 3)": "2 Ball", "2 Ball (Set 4)": "2 Ball",
-                    "serving (2)": "serving", "serving": "serving", "Serving (2)": "serving",
+                    "serving (2)": "Serving", "serving": "Serving", "Serving (2)": "Serving",
                     "2/3 Hitters (2)": "2/3 Hitters", "5v5 (2)": "5v5",
                     "Serve & Pass": "Serve and Pass"
                 }
@@ -496,33 +496,32 @@ if check_password():
 
                 # --- 3. RENDER MATRIX ---
                 for group in display_groups:
-                    # Set a unique color for the position header
                     header_color = "#4895DB" if group == "Team Overall" else "#FF8200"
                     
-                    st.markdown(f"{group} Breakdown")
-                    
-                    # Filter data
-                    if group == "Team Overall":
-                        plot_df = working_df.copy()
-                    else:
-                        plot_df = working_df[working_df['Position'] == group]
+                    # Force a clean container for each position to prevent HTML spillover
+                    with st.container():
+                        st.markdown(f"{group} Breakdown")
+                        
+                        if group == "Team Overall":
+                            plot_df = working_df.copy()
+                        else:
+                            plot_df = working_df[working_df['Position'] == group]
 
-                    # Aggregate
-                    plot_sum = plot_df.groupby('Phase').agg({
-                        'Player Load': 'mean',
-                        'Explosive Efforts': 'mean',
-                        'Total Jumps': 'mean',
-                        'Estimated Distance (y)': 'mean'
-                    }).reset_index().sort_values('Player Load', ascending=False)
+                        plot_sum = plot_df.groupby('Phase').agg({
+                            'Player Load': 'mean',
+                            'Explosive Efforts': 'mean',
+                            'Total Jumps': 'mean',
+                            'Estimated Distance (y)': 'mean'
+                        }).reset_index().sort_values('Player Load', ascending=False)
 
-                    if not plot_sum.empty:
-                        # Build HTML Table String
-                        t_html = f"""
-                            <div style="margin-bottom: 30px; border: 1px solid #E5E5E7; border-radius: 10px; overflow: hidden;">
-                                <table class="scout-table">
+                        if not plot_sum.empty:
+                            # Start table string
+                            t_html = f"""
+                            <div style="margin-bottom: 20px; border: 1px solid #E5E5E7; border-radius: 10px; overflow: hidden;">
+                                <table class="scout-table" style="width:100%; border-collapse: collapse;">
                                     <thead>
                                         <tr style="background-color: {header_color}; color: white;">
-                                            <th style='text-align:left; padding-left:20px; width: 30%;'>Phase</th>
+                                            <th style='text-align:left; padding: 12px 20px;'>Phase</th>
                                             <th>Avg Player Load</th>
                                             <th>Explosive Efforts</th>
                                             <th>Total Jumps</th>
@@ -530,20 +529,25 @@ if check_password():
                                         </tr>
                                     </thead>
                                     <tbody>
-                        """
-                        for _, row in plot_sum.iterrows():
-                            t_html += f"""
-                                <tr>
-                                    <td style='text-align:left; padding-left:20px; font-weight:700;'>{row['Phase']}</td>
-                                    <td>{row['Player Load']:.1f}</td>
-                                    <td>{row['Explosive Efforts']:.1f}</td>
-                                    <td>{row['Total Jumps']:.1f}</td>
-                                    <td>{row['Estimated Distance (y)']:.0f}</td>
-                                </tr>
                             """
-                        st.markdown(t_html + "</tbody></table></div>", unsafe_allow_html=True)
-                    else:
-                        st.info(f"No phase data found for {group}.")
+                            # Add rows
+                            for _, row in plot_sum.iterrows():
+                                t_html += f"""
+                                    <tr>
+                                        <td style='text-align:left; padding-left:20px; font-weight:700;'>{row['Phase']}</td>
+                                        <td>{row['Player Load']:.1f}</td>
+                                        <td>{row['Explosive Efforts']:.1f}</td>
+                                        <td>{row['Total Jumps']:.1f}</td>
+                                        <td>{row['Estimated Distance (y)']:.0f}</td>
+                                    </tr>
+                                """
+                            
+                            t_html += "</tbody></table></div>"
+                            
+                            # CRITICAL: Render the HTML for this specific position
+                            st.markdown(t_html, unsafe_allow_html=True)
+                        else:
+                            st.info(f"No data for {group}")
             else:
                 st.info("Phase data is loading...")
                 
