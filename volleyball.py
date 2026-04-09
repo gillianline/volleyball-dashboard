@@ -490,7 +490,7 @@ if check_password():
                 working_df = phase_df.copy()
                 working_df['Phase'] = working_df['Phase'].replace(phase_map)
 
-                # --- 1. GLOBAL SUMMARY TABLE (OVERALL) ---
+                # --- 1. GLOBAL SUMMARY TABLE ---
                 p_sum = working_df.groupby('Phase').agg({
                     'Player Load': 'mean',
                     'Explosive Efforts': 'mean',
@@ -516,25 +516,32 @@ if check_password():
                         t_html += f"<tr><td style='text-align:left; padding-left:20px; font-weight:700;'>{row['Phase']}</td><td>{row['Player Load']:.1f}</td><td>{row['Explosive Efforts']:.1f}</td><td>{row['Total Jumps']:.1f}</td><td>{row['Estimated Distance (y)']:.0f}</td></tr>"
                     st.markdown(t_html + "</tbody></table>", unsafe_allow_html=True)
 
-                # --- 2. POSITION DRILL-DOWN (OVERALL) ---
+                # --- 2. DRILL-DOWN SECTION ---
                 st.write("<br>", unsafe_allow_html=True)
-                st.markdown("###Positional Drill-Down")
+                st.markdown("Phase Metric Breakdown")
                 
-                # Check for Position column before creating filter
                 if 'Position' in working_df.columns:
-                    pos_list = sorted([p for p in working_df['Position'].unique() if pd.notna(p) and p != "N/A"])
-                    selected_pos = st.selectbox("Select Position to View Specific Phase Trends", pos_list, key="ph_pos_drill_overall")
+                    # Added "All Positions" to the list
+                    pos_options = ["All Positions"] + sorted([p for p in working_df['Position'].unique() if pd.notna(p) and p != "N/A"])
+                    selected_pos = st.selectbox("Select Filter", pos_options, key="ph_pos_drill_v5")
 
-                    # Filter and plot
-                    pos_df = working_df[working_df['Position'] == selected_pos]
-                    pos_sum = pos_df.groupby('Phase').agg({
+                    # Filter Logic
+                    if selected_pos == "All Positions":
+                        plot_df = working_df.copy()
+                        title_prefix = "Team Overall"
+                    else:
+                        plot_df = working_df[working_df['Position'] == selected_pos]
+                        title_prefix = selected_pos
+
+                    # Aggregate for graphs
+                    plot_sum = plot_df.groupby('Phase').agg({
                         'Player Load': 'mean',
                         'Explosive Efforts': 'mean',
                         'Total Jumps': 'mean',
                         'Estimated Distance (y)': 'mean'
                     }).reset_index().sort_values('Player Load', ascending=False)
 
-                    if not pos_sum.empty:
+                    if not plot_sum.empty:
                         g1, g2 = st.columns(2)
                         g3, g4 = st.columns(2)
                         
@@ -548,18 +555,18 @@ if check_password():
                         for metric, m_color, col in metrics_to_plot:
                             with col:
                                 fig = go.Figure()
-                                fig.add_trace(go.Bar(x=pos_sum['Phase'], y=pos_sum[metric], marker_color=m_color))
+                                fig.add_trace(go.Bar(x=plot_sum['Phase'], y=plot_sum[metric], marker_color=m_color))
                                 fig.update_layout(
-                                    title=f"<b>{selected_pos}</b>: {metric}",
+                                    title=f"<b>{title_prefix}</b>: {metric}",
                                     height=300, template="simple_white",
                                     margin=dict(l=10, r=10, t=40, b=10),
                                     xaxis={'categoryorder':'total descending'}
                                 )
                                 st.plotly_chart(fig, use_container_width=True, config=LOCKED_CONFIG)
                 else:
-                    st.warning("Position column not found in dataset. Showing team-wide averages only.")
+                    st.warning("Position column not found.")
             else:
-                st.info("Phase data is currently empty or loading...")
+                st.info("Phase data is loading...")
                 
     except Exception as e:
         st.error(f"Sync Error: {e}")
