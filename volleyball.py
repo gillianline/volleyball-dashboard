@@ -37,72 +37,35 @@ if check_password():
     # --- FULL CSS CODE ---
     st.markdown("""
     <style>
-    /* Section Headers */
-    .section-header {
-        background-color: #4895DB;
-        color: white;
-        padding: 10px 15px;
-        border-radius: 5px;
-        font-weight: bold;
-        margin-bottom: 20px;
-        border-left: 5px solid #FF8200;
-    }
-
-    /* Target ONLY our custom scout-table class to avoid breaking standard Streamlit tables */
+    /* ONLY targets the specific table class for Phase Analysis */
     .scout-table { 
         width: 100% !important; 
         border-collapse: collapse !important; 
-        text-align: center !important; 
-        margin-top: 10px !important; 
     }
     .scout-table th { 
         background-color: #4895DB !important; 
         color: white !important; 
         padding: 10px !important; 
-        border-bottom: 2px solid #FF8200 !important; 
     }
     .scout-table td { 
         padding: 10px !important; 
-        border-bottom: 1px solid #F5F5F7 !important; 
-        color: #1D1D1F !important;
+        border-bottom: 1px solid #EEEEEE !important; 
     }
 
-    /* Fixes the 'Zoomed In' face issue by containing the image */
+    /* ONLY targets the athlete photos in the Card view */
     .gallery-photo { 
         border-radius: 50% !important; 
         width: 85px !important; 
         height: 85px !important; 
         object-fit: contain !important; 
-        background-color: #ffffff !important; 
-        border: 3px solid #FF8200 !important; 
+        background-color: white !important; 
+        border: 3px solid #FF8200 !important;
         display: block !important;
         margin: 0 auto !important;
     }
-
-    /* Player Card Containers */
-    .player-row-container { 
-        padding: 20px !important; 
-        border: 1px solid #E5E5E7 !important; 
-        border-radius: 15px !important; 
-        margin-bottom: 25px !important; 
-        background-color: #ffffff !important;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.05) !important;
-    }
-
-    /* Metric Score Boxes */
-    .score-box {
-        width: 80px; height: 80px; line-height: 80px;
-        border-radius: 50%; color: white; text-align: center;
-        font-size: 24px; font-weight: bold; margin: 0 auto;
-    }
-
-    .bg-highlight-red { background-color: #ffe3e3 !important; color: #d90429 !important; font-weight: bold; }
-    .arrow-red { color: #d90429; font-weight: bold; margin-left: 5px; }
-
-    @media print { .print-hide { display: none !important; } }
     </style>
     """, unsafe_allow_html=True)
-
+    
     def get_flipped_gradient(score):
         score = float(score)
         return "#2D5A27" if score <= 40 else "#D4A017" if score <= 70 else "#A52A2A"    
