@@ -513,26 +513,38 @@ if check_password():
                     }).reset_index().sort_values('Player Load', ascending=False)
 
                     if not plot_sum.empty:
-                        # We build the HTML pieces in a list for reliability
+                        # Identify max values for highlighting
+                        max_load = plot_sum['Player Load'].max()
+                        max_efforts = plot_sum['Explosive Efforts'].max()
+                        max_jumps = plot_sum['Total Jumps'].max()
+                        max_dist = plot_sum['Estimated Distance (y)'].max()
+
                         html_output = []
-                        html_output.append(f'<div style="margin-bottom: 20px; border: 1px solid #E5E5E7; border-radius: 10px; overflow: hidden;">')
+                        html_output.append(f'<div style="margin-bottom: 25px; border: 1px solid #E5E5E7; border-radius: 10px; overflow: hidden;">')
                         html_output.append(f'<table class="scout-table" style="width:100%; border-collapse: collapse;">')
                         html_output.append(f'<thead><tr style="background-color: {header_color}; color: white;">')
                         html_output.append(f'<th style="text-align:left; padding: 12px 20px;">Phase</th>')
                         html_output.append(f'<th>Avg Player Load</th><th>Explosive Efforts</th><th>Total Jumps</th><th>Avg Distance (y)</th></tr></thead><tbody>')
                         
+                        # Helper for conditional styling
+                        def get_style(val, max_val):
+                            if val == max_val and val > 0:
+                                return "style='background-color: #FFF3E0; color: #E65100; font-weight: 800; border: 1px solid #FFCC80;'"
+                            return ""
+
                         for _, row in plot_sum.iterrows():
                             html_output.append(f"<tr>")
                             html_output.append(f"<td style='text-align:left; padding-left:20px; font-weight:700;'>{row['Phase']}</td>")
-                            html_output.append(f"<td>{row['Player Load']:.1f}</td>")
-                            html_output.append(f"<td>{row['Explosive Efforts']:.1f}</td>")
-                            html_output.append(f"<td>{row['Total Jumps']:.1f}</td>")
-                            html_output.append(f"<td>{row['Estimated Distance (y)']:.0f}</td>")
+                            
+                            # Apply Highlight to each metric cell
+                            html_output.append(f"<td {get_style(row['Player Load'], max_load)}>{row['Player Load']:.1f}</td>")
+                            html_output.append(f"<td {get_style(row['Explosive Efforts'], max_efforts)}>{row['Explosive Efforts']:.1f}</td>")
+                            html_output.append(f"<td {get_style(row['Total Jumps'], max_jumps)}>{row['Total Jumps']:.1f}</td>")
+                            html_output.append(f"<td {get_style(row['Estimated Distance (y)'], max_dist)}>{row['Estimated Distance (y)']:.0f}</td>")
+                            
                             html_output.append(f"</tr>")
                         
                         html_output.append('</tbody></table></div>')
-                        
-                        # JOIN AND RENDER
                         st.write("".join(html_output), unsafe_allow_html=True)
                     else:
                         st.info(f"No data for {group}")
