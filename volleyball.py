@@ -251,9 +251,10 @@ if check_password():
                 st.markdown('<div class="section-header">Match Comparison Selection</div>', unsafe_allow_html=True)
                 c_ts1, c_ts2 = st.columns([2, 1])
                 with c_ts1:
-                    # Pull list from match_df
+                    # Pull list of matches from match_df
                     match_list_t = match_df.sort_values(['Date', 'Sheet_Order'])['Session_Name'].unique()
-                    if "matches_state" not in st.session_state: st.session_state.matches_state = match_list_t[-3:] if len(match_list_t) >=3 else match_list_t
+                    if "matches_state" not in st.session_state: 
+                        st.session_state.matches_state = match_list_t[-3:] if len(match_list_t) >=3 else match_list_t
                     st.session_state.matches_state = st.multiselect("Select Matches", match_list_t, default=st.session_state.matches_state)
                 with c_ts2:
                     if "pos_state" not in st.session_state: st.session_state.pos_state = "All Positions"
@@ -267,11 +268,16 @@ if check_password():
             pos_filter_t = st.session_state.get("pos_state", "All Positions")
 
             if selected_matches:
-                c_pal = ['#4895DB', '#FF8200', '#515154']; m_map = {m: c_pal[idx % 3] for idx, m in enumerate(selected_matches)}
+                c_pal = ['#4895DB', '#FF8200', '#515154']
+                m_map = {m: c_pal[idx % 3] for idx, m in enumerate(selected_matches)}
                 st.markdown('<div class="section-header">Athlete Match Performance Breakdown</div>', unsafe_allow_html=True)
-                tourney_df = match_df[match_df['Session_Name'].isin(selected_matches)].sort_values(['Date', 'Sheet_Order'])
-                if pos_filter_t != "All Positions": tourney_df = tourney_df[tourney_df['Position'] == pos_filter_t]
                 
+                # Filter specifically from the new match_df source
+                tourney_df = match_df[match_df['Session_Name'].isin(selected_matches)].sort_values(['Date', 'Sheet_Order'])
+                if pos_filter_t != "All Positions": 
+                    tourney_df = tourney_df[tourney_df['Position'] == pos_filter_t]
+                
+                # --- CALC GLOBAL MAX FOR UNIFIED AXIS ---
                 global_max_primary = tourney_df[['Total Jumps', 'Player Load', 'Explosive Efforts']].max().max() * 1.1
                 global_max_dist = tourney_df['Estimated Distance (y)'].max() * 1.1
 
@@ -295,18 +301,46 @@ if check_password():
                             card_start += f"<tr><td style='font-weight:700; font-size:11px;'>{r['Session_Name']}</td><td>{int(r['Total Jumps'])}</td><td>{r['Player Load']:.0f}</td><td>{r['Explosive Efforts']:.0f}</td><td>{r['Estimated Distance (y)']:.0f}</td></tr>"
                         card_start += f"<tr style='background:#4895DB; color:white; font-weight:900;'><td>TOTAL</td><td>{int(ad['Total Jumps'].sum())}</td><td>{ad['Player Load'].sum():.0f}</td><td>{ad['Explosive Efforts'].sum():.0f}</td><td>{ad['Estimated Distance (y)'].sum():.0f}</td></tr></tbody></table></div>"
                         st.markdown(card_start, unsafe_allow_html=True)
+                    
                     with side_cols[1]:
-                        fig_ath = make_subplots(specs=[[{"secondary_y": True}]]);
+                        fig_ath = make_subplots(specs=[[{"secondary_y": True}]])
                         for _, r in ad.iterrows():
-                            fig_ath.add_trace(go.Bar(name=r['Session_Name'], x=['Total Jumps', 'Player Load', 'Explosive Efforts'], y=[r['Total Jumps'], r['Player Load'], r['Explosive Efforts']], marker_color=m_map[r['Session_Name']]), secondary_y=False)
-                            fig_ath.add_trace(go.Bar(name="Dist", x=['Estimated Distance'], y=[r['Estimated Distance (y)']], marker=dict(color=m_map[r['Session_Name']], opacity=0.4), showlegend=False), secondary_y=True)
-                        fig_ath.update_layout(barmode='group', height=260, margin=dict(l=10, r=10, t=10, b=80), template="simple_white", font=dict(color="#333333", size=10), legend=dict(orientation="h", yanchor="top", y=-0.3, xanchor="center", x=0.5), yaxis=dict(range=[0, global_max_primary]), yaxis2=dict(range=[0, global_max_dist]))
+                            # Primary Metrics
+                            fig_ath.add_trace(go.Bar(
+                                name=r['Session_Name'], 
+                                x=['Total Jumps', 'Player Load', 'Explosive Efforts'], 
+                                y=[r['Total Jumps'], r['Player Load'], r['Explosive Efforts']], 
+                                marker_color=m_map[r['Session_Name']],
+                                offsetgroup=r['Session_Name']
+                            ), secondary_y=False)
+                            
+                            # Ghost Distance Bar
+                            fig_ath.add_trace(go.Bar(
+                                name="Dist", 
+                                x=['Estimated Distance'], 
+                                y=[r['Estimated Distance (y)']], 
+                                marker=dict(color=m_map[r['Session_Name']], opacity=0.4), 
+                                showlegend=False,
+                                offsetgroup=r['Session_Name']
+                            ), secondary_y=True)
+                        
+                        fig_ath.update_layout(
+                            barmode='group', 
+                            height=260, 
+                            margin=dict(l=10, r=10, t=10, b=80), 
+                            template="simple_white", 
+                            font=dict(color="#333333", size=10),
+                            legend=dict(orientation="h", yanchor="top", y=-0.3, xanchor="center", x=0.5),
+                            yaxis=dict(range=[0, global_max_primary]),
+                            yaxis2=dict(range=[0, global_max_dist])
+                        )
                         st.plotly_chart(fig_ath, use_container_width=True, config=LOCKED_CONFIG)
                     st.markdown('</div>', unsafe_allow_html=True)
 
                 st.write("<br><br>", unsafe_allow_html=True)
                 st.markdown('<div class="section-header">Team Match Averages</div>', unsafe_allow_html=True)
                 team_avg_t = tourney_df.groupby('Session_Name')[['Total Jumps', 'Player Load', 'Explosive Efforts', 'Estimated Distance (y)']].mean().reset_index()
+                
                 metrics_to_plot = ['Total Jumps', 'Player Load', 'Explosive Efforts', 'Estimated Distance (y)']
                 rows = [st.columns(2), st.columns(2)]
                 for idx, m in enumerate(metrics_to_plot):
@@ -315,6 +349,5 @@ if check_password():
                         fig_t.add_trace(go.Bar(x=team_avg_t['Session_Name'], y=team_avg_t[m], marker_color=[m_map[g] for g in team_avg_t['Session_Name']]))
                         fig_t.update_layout(title=f"Avg {m}", height=300, template="simple_white", margin=dict(l=10, r=10, t=40, b=10))
                         st.plotly_chart(fig_t, use_container_width=True, config=LOCKED_CONFIG)
-
     except Exception as e:
         st.error(f"Sync Error: {e}")
