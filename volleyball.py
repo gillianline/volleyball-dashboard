@@ -131,10 +131,11 @@ if check_password():
         tabs = st.tabs(["Individual Profile", "Team Gallery", "Game v. Practice", "Position Analysis", "Match Summary"])
         session_list = df[['Date', 'Session_Name']].drop_duplicates().sort_values('Date', ascending=False)['Session_Name'].tolist()
 
-        with tabs[0]: # Tab 0: Individual
+        with tabs[0]: # Tab 0: Individual Profile
             c_f1, c_f2 = st.columns(2)
             with c_f1: selected_session = st.selectbox("Practice Selection", session_list, index=0, key="nav_sel_ind")
             with c_f2: pos_f = st.selectbox("Position Filter", ["All Positions"] + sorted([p for p in df['Position'].unique() if p != "N/A"]), key="nav_pos_ind")
+            
             day_df = df[df['Session_Name'] == selected_session].copy()
             if not day_df.empty:
                 curr_date = day_df['Date'].iloc[0]
@@ -142,7 +143,12 @@ if check_password():
                 if pos_f != "All Positions": dropdown_df = dropdown_df[dropdown_df['Position'] == pos_f]
                 sel_p = st.selectbox("Select Athlete", sorted(dropdown_df['Name'].unique()))
                 
+                # --- DATA GATHERING ---
                 p_full = df[df['Name'] == sel_p]
+                # Filter specific session row for the Photo/Position metadata
+                p_meta = day_df[day_df['Name'] == sel_p].iloc[0]
+                
+                # --- SUM LOGIC FOR TABLE ---
                 daily_sums = p_full.groupby('Date')[all_metrics].sum().reset_index()
                 lb = daily_sums[(daily_sums['Date'] >= curr_date - timedelta(days=30)) & (daily_sums['Date'] <= curr_date)]
                 p_today_total = daily_sums[daily_sums['Date'] == curr_date].iloc[0]
@@ -157,12 +163,48 @@ if check_password():
                     m_rows += f"<tr><td>{k}</td><td {h_class}>{val:.1f} {arr_val}</td><td>{mx:.1f}</td><td>{grade}</td></tr>"
                 
                 score = math.ceil(total_grade / count) if count > 0 else 0
-                p_orig = day_df[day_df['Name'] == sel_p].iloc[0]
+                
+                # --- UI DISPLAY ---
                 c1, c2, c3 = st.columns([1.2, 2.5, 1.2])
-                with c1: st.markdown(f'<div style="text-align:center;"><img src="{p_orig["PhotoURL"]}" class="player-photo-large"></div><h3 style="text-align:center;">{p_orig["Name"]}</h3>', unsafe_allow_html=True)
-                with c2: st.markdown(f'<table class="scout-table"><thead><tr><th>Metric</th><th>Today Total</th><th>30d Max Day</th><th>Grade</th></tr></thead><tbody>{m_rows}</tbody></table>', unsafe_allow_html=True)
-                with c3: st.markdown(f'<div style="display:flex; justify-content:center;"><div class="score-box" style="background-color:{get_flipped_gradient(score)};">{score}</div></div>', unsafe_allow_html=True)
+                with c1: 
+                    st.markdown(f'<div style="text-align:center;"><img src="{p_meta["PhotoURL"]}" class="player-photo-large"></div><h3 style="text-align:center;">{p_meta["Name"]}</h3>', unsafe_allow_html=True)
+                with c2: 
+                    st.markdown(f'<table class="scout-table"><thead><tr><th>Metric</th><th>Today Total</th><th>30d Max Day</th><th>Grade</th></tr></thead><tbody>{m_rows}</tbody></table>', unsafe_allow_html=True)
+                with c3: 
+                    st.markdown(f'<div style="display:flex; justify-content:center;"><div class="score-box" style="background-color:{get_flipped_gradient(score)};">{score}</div></div>', unsafe_allow_html=True)
 
+                # --- READINESS PROFILE (CMJ) ---
+                st.markdown('<div class="section-header">Weekly Readiness Profile</div>', unsafe_allow_html=True)
+                jc1, jc2 = st.columns([1.5, 3.5])
+                p_cmj_hist = cmj_df[(cmj_df['Athlete'] == sel_p) & (cmj_df['Test Date'] <= curr_date)].sort_values('Test Date')
+                
+                with jc1:
+                    sync_cmj = p_cmj_hist[(p_cmj_hist['Test Date'] > curr_date - timedelta(days=7))]
+                    if not sync_cmj.empty:
+                        latest = sync_cmj.iloc[-1]
+                        base_h = p_cmj_hist.tail(5).iloc[:-1]['Jump Height (in)'].mean()
+                        base_rsi = p_cmj_hist.tail(5).iloc[:-1]['RSI-modified [m/s]'].mean()
+                        cur_h, cur_rsi = latest['Jump Height (in)'], latest['RSI-modified [m/s]']
+                        p_diff = ((cur_h - base_h) / base_h) * 100 if base_h > 0 else 0
+                        label, color = ("ELITE", "#28a745") if cur_h >= base_h and cur_rsi >= base_rsi else ("FATIGUED", "#dc3545") if cur_h < base_h and cur_rsi < base_rsi else ("GRINDER", "#ffc107")
+                        st.markdown(f'<div style="text-align:center;"><div class="score-box" style="background-color:{color};">{p_diff:+.1f}%<span style="font-size:10px; display:block;">{label}</span></div></div><div class="info-box"><b>Today:</b> {cur_h:.1f}" | {cur_rsi:.2f} RSI</div>', unsafe_allow_html=True)
+                with jc2:
+                    if not p_cmj_hist.empty:
+                        fig = make_subplots(specs=[[{"secondary_y": True}]])
+                        fig.add_trace(go.Scatter(x=p_cmj_hist['Test Date'], y=p_cmj_hist['Jump Height (in)'], name="Height", line=dict(color='#FF8200', width=3)), secondary_y=False)
+                        fig.add_trace(go.Scatter(x=p_cmj_hist['Test Date'], y=p_cmj_hist['RSI-modified [m/s]'], name="RSI", line=dict(color='#4895DB', dash='dot')), secondary_y=True)
+                        fig.update_layout(height=280, margin=dict(l=0, r=0, t=20, b=0), showlegend=False, template="simple_white")
+                        st.plotly_chart(fig, use_container_width=True, config=LOCKED_CONFIG)
+                
+                # --- PRACTICE PHASE BREAKDOWN ---
+                p_ph = phase_df[(phase_df['Name'] == sel_p) & (phase_df['Date'] == curr_date)].copy()
+                if not p_ph.empty:
+                    st.markdown('<div class="section-header">Practice Phase Breakdown</div>', unsafe_allow_html=True)
+                    fig_ph = make_subplots(specs=[[{"secondary_y": True}]])
+                    fig_ph.add_trace(go.Bar(x=p_ph['Phase'], y=p_ph['Total Jumps'], name="Jumps", marker_color='#FF8200'), secondary_y=False)
+                    fig_ph.add_trace(go.Scatter(x=p_ph['Phase'], y=p_ph['Player Load'], name="Load", line=dict(color='#4895DB', width=4)), secondary_y=False)
+                    fig_ph.update_layout(height=350, showlegend=True, template="simple_white", legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
+                    st.plotly_chart(fig_ph, use_container_width=True, config=LOCKED_CONFIG)
         with tabs[1]: # Tab 1: Gallery
             c_gal1, c_gal2 = st.columns(2)
             with c_gal1: selected_session_gal = st.selectbox("Practice Selection", session_list, index=0, key="nav_sel_gal")
