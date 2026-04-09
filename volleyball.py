@@ -71,8 +71,8 @@ if check_password():
 
     def get_flipped_gradient(score):
         score = float(score)
-        return "#2D5A27" if score <= 40 else "#D4A017" if score <= 70 else "#A52A2A"
-
+        return "#2D5A27" if score <= 40 else "#D4A017" if score <= 70 else "#A52A2A"    
+        
     @st.cache_data(ttl=300)
     def load_all_data():
         df = pd.read_csv(st.secrets["GOOGLE_SHEET_URL"])
@@ -129,25 +129,32 @@ if check_password():
                 if pos_f != "All Positions": dropdown_df = dropdown_df[dropdown_df['Position'] == pos_f]
                 sel_p = st.selectbox("Select Athlete", sorted(dropdown_df['Name'].unique()))
                 
-                # FIXED: Max calculation pulls from full history to capture correct peak (e.g., 878.2 Player Load)
+                # --- START DAILY SUM LOGIC ---
                 p_full = df[df['Name'] == sel_p]
-                lb = p_full[(p_full['Date'] >= curr_date - timedelta(days=30)) & (p_full['Date'] <= curr_date)]
-                p = day_df[day_df['Name'] == sel_p].iloc[0]
+                # Group by date and sum metrics to handle multiple sessions per day
+                daily_sums = p_full.groupby('Date')[all_metrics].sum().reset_index()
                 
+                lb = daily_sums[(daily_sums['Date'] >= curr_date - timedelta(days=30)) & (daily_sums['Date'] <= curr_date)]
+                # Get the summed values for the current selected day
+                p_today = daily_sums[daily_sums['Date'] == curr_date].iloc[0]
+                # --- END DAILY SUM LOGIC ---
+                
+                # Metadata (Photo/Name) from any row belonging to that athlete
+                p_meta = p_full.iloc[0]
+
                 m_rows = ""; total_grade = 0; count = 0
                 for k in all_metrics:
-                    if k in p:
-                        val, mx, avg = p[k], lb[k].max(), lb[k].mean()
-                        grade = math.ceil((val / mx) * 100) if mx > 0 else 0
-                        total_grade += grade; count += 1; diff = (val - avg) / avg if avg != 0 else 0
-                        h_class = "class='bg-highlight-red'" if abs(diff) > 0.10 else ""
-                        arr_val = f"<span class='arrow-red'>{'↑' if diff > 0.10 else '↓'}</span>" if abs(diff) > 0.10 else ""
-                        m_rows += f"<tr><td>{k}</td><td {h_class}>{val} {arr_val}</td><td>{mx}</td><td>{grade}</td></tr>"
+                    val, mx, avg = p_today[k], lb[k].max(), lb[k].mean()
+                    grade = math.ceil((val / mx) * 100) if mx > 0 else 0
+                    total_grade += grade; count += 1; diff = (val - avg) / avg if avg != 0 else 0
+                    h_class = "class='bg-highlight-red'" if abs(diff) > 0.10 else ""
+                    arr_val = f"<span class='arrow-red'>{'↑' if diff > 0.10 else '↓'}</span>" if abs(diff) > 0.10 else ""
+                    m_rows += f"<tr><td>{k}</td><td {h_class}>{val:.1f} {arr_val}</td><td>{mx:.1f}</td><td>{grade}</td></tr>"
                 
                 score = math.ceil(total_grade / count) if count > 0 else 0
                 c1, c2, c3 = st.columns([1.2, 2.5, 1.2])
-                with c1: st.markdown(f'<div style="text-align:center;"><img src="{p["PhotoURL"]}" class="player-photo-large"></div><h3 style="text-align:center;">{p["Name"]}</h3>', unsafe_allow_html=True)
-                with c2: st.markdown(f'<table class="scout-table"><thead><tr><th>Metric</th><th>Today</th><th>30d Max</th><th>Grade</th></tr></thead><tbody>{m_rows}</tbody></table>', unsafe_allow_html=True)
+                with c1: st.markdown(f'<div style="text-align:center;"><img src="{p_meta["PhotoURL"]}" class="player-photo-large"></div><h3 style="text-align:center;">{p_meta["Name"]}</h3>', unsafe_allow_html=True)
+                with c2: st.markdown(f'<table class="scout-table"><thead><tr><th>Metric</th><th>Daily Total</th><th>30d Max Day</th><th>Grade</th></tr></thead><tbody>{m_rows}</tbody></table>', unsafe_allow_html=True)
                 with c3: st.markdown(f'<div style="display:flex; justify-content:center;"><div class="score-box" style="background-color:{get_flipped_gradient(score)};">{score}</div></div>', unsafe_allow_html=True)
                 
                 st.markdown('<div class="section-header">Weekly Readiness Profile</div>', unsafe_allow_html=True)
@@ -173,23 +180,37 @@ if check_password():
             c_gal1, c_gal2 = st.columns(2)
             with c_gal1: selected_session_gal = st.selectbox("Practice Selection", session_list, index=0, key="nav_sel_gal")
             with c_gal2: pos_f_gal = st.selectbox("Position Filter", ["All Positions"] + sorted([p for p in df['Position'].unique() if p != "N/A"]), key="nav_pos_gal")
-            gal_df = df[df['Session_Name'] == selected_session_gal].copy()
-            if pos_f_gal != "All Positions": gal_df = gal_df[gal_df['Position'] == pos_f_gal]
-            for i in range(0, len(gal_df), 2):
-                cols = st.columns(2)
-                for j in range(2):
-                    if i + j < len(gal_df):
-                        pd_row = gal_df.iloc[i + j]; p_full_g = df[df['Name'] == pd_row['Name']]
-                        lb_g = p_full_g[(p_full_g['Date'] >= pd_row['Date'] - timedelta(days=30)) & (p_full_g['Date'] <= pd_row['Date'])]
-                        r_html = ""; t_grade = 0; c_metrics = 0
-                        for k in all_metrics:
-                            if k in pd_row:
-                                v, mx, avg = pd_row[k], lb_g[k].max(), lb_g[k].mean(); g = math.ceil((v / mx) * 100) if mx > 0 else 0
-                                t_grade += g; c_metrics += 1; diff = (v - avg) / avg if avg != 0 else 0; h_class = "class='bg-highlight-red'" if abs(diff) > 0.10 else ""; arr_val = f"<span class='arrow-red'>{'↑' if diff > 0.10 else '↓'}</span>" if abs(diff) > 0.10 else ""
-                                r_html += f"<tr><td>{k}</td><td {h_class}>{v} {arr_val}</td><td>{mx}</td><td>{g}</td></tr>"
-                        sc_g = math.ceil(t_grade / c_metrics) if c_metrics > 0 else 0
-                        with cols[j]: st.markdown(f'<div style="border:1px solid #E5E5E7; border-radius:15px; padding:15px; margin-bottom:20px;"><div style="display:flex; align-items:center; gap:10px;"><div style="flex:1.2; text-align:center;"><img src="{pd_row["PhotoURL"]}" class="gallery-photo"><p style="font-weight:bold; font-size:15px; margin-top:8px;">{pd_row["Name"]}</p></div><div style="flex:3;"><table class="scout-table"><thead><tr><th>Metric</th><th>Val</th><th>Max</th><th>Grade</th></tr></thead><tbody>{r_html}</tbody></table></div><div style="flex:1; text-align:center;"><div style="background-color:{get_flipped_gradient(sc_g)}; color:white; padding:10px; border-radius:12px; font-size:32px; font-weight:900;">{sc_g}</div></div></div></div>', unsafe_allow_html=True)
+            gal_day_df = df[df['Session_Name'] == selected_session_gal].copy()
+            if not gal_day_df.empty:
+                curr_date_gal = gal_day_df['Date'].iloc[0]
+                if pos_f_gal != "All Positions": gal_day_df = gal_day_df[gal_day_df['Position'] == pos_f_gal]
+                
+                names_in_gal = sorted(gal_day_df['Name'].unique())
+                for i in range(0, len(names_in_gal), 2):
+                    cols = st.columns(2)
+                    for j in range(2):
+                        if i + j < len(names_in_gal):
+                            athlete_name = names_in_gal[i + j]
+                            p_full_g = df[df['Name'] == athlete_name]
                             
+                            # Group by date and sum for each athlete in the gallery
+                            daily_sums_g = p_full_g.groupby('Date')[all_metrics].sum().reset_index()
+                            lb_g = daily_sums_g[(daily_sums_g['Date'] >= curr_date_gal - timedelta(days=30)) & (daily_sums_g['Date'] <= curr_date_gal)]
+                            p_today_g = daily_sums_g[daily_sums_g['Date'] == curr_date_gal].iloc[0]
+                            
+                            r_html = ""; t_grade_gal = 0; c_metrics_gal = 0
+                            for k in all_metrics:
+                                v, mx, avg = p_today_g[k], lb_g[k].max(), lb_g[k].mean()
+                                g = math.ceil((v / mx) * 100) if mx > 0 else 0
+                                t_grade_gal += g; c_metrics_gal += 1; diff = (v - avg) / avg if avg != 0 else 0
+                                h_class = "class='bg-highlight-red'" if abs(diff) > 0.10 else ""
+                                arr_val = f"<span class='arrow-red'>{'↑' if diff > 0.10 else '↓'}</span>" if abs(diff) > 0.10 else ""
+                                r_html += f"<tr><td>{k}</td><td {h_class}>{v:.1f} {arr_val}</td><td>{mx:.1f}</td><td>{g}</td></tr>"
+                            
+                            sc_g = math.ceil(t_grade_gal / c_metrics_gal) if c_metrics_gal > 0 else 0
+                            p_meta_g = p_full_g.iloc[0]
+                            with cols[j]: st.markdown(f'<div style="border:1px solid #E5E5E7; border-radius:15px; padding:15px; margin-bottom:20px;"><div style="display:flex; align-items:center; gap:10px;"><div style="flex:1.2; text-align:center;"><img src="{p_meta_g["PhotoURL"]}" class="gallery-photo"><p style="font-weight:bold; font-size:15px; margin-top:8px;">{athlete_name}</p></div><div style="flex:3;"><table class="scout-table"><thead><tr><th>Metric</th><th>Total</th><th>Max Day</th><th>Grade</th></tr></thead><tbody>{r_html}</tbody></table></div><div style="flex:1; text-align:center;"><div style="background-color:{get_flipped_gradient(sc_g)}; color:white; padding:10px; border-radius:12px; font-size:32px; font-weight:900;">{sc_g}</div></div></div></div>', unsafe_allow_html=True)
+                                
         with tabs[2]: # Game v Practice
             st.markdown('<div class="section-header">Weekly Prep Intensity vs. Game Demands</div>', unsafe_allow_html=True)
             c_ga, c_gw, c_gg = st.columns(3)
