@@ -33,38 +33,41 @@ if check_password():
         st.session_state.is_printing = False
 
     # --- CSS: FORMATTING & PAGE BREAK CONTROLS ---
-    # --- FULL CSS CODE ---
-    # --- FULL CSS CODE ---
     st.markdown("""
-    <style>
-    /* ONLY targets the specific table class for Phase Analysis */
-    .scout-table { 
-        width: 100% !important; 
-        border-collapse: collapse !important; 
-    }
-    .scout-table th { 
-        background-color: #4895DB !important; 
-        color: white !important; 
-        padding: 10px !important; 
-    }
-    .scout-table td { 
-        padding: 10px !important; 
-        border-bottom: 1px solid #EEEEEE !important; 
-    }
+        <style>
+        .stApp { background-color: #FFFFFF; color: #1D1D1F; }
+        hr { display: none !important; }
+        .block-container { padding-top: 2rem !important; }
+        .viewerBadge_link__1S137, .main_heading_anchor__m6v0K, a.header-anchor { display: none !important; }
+        header a { display: none !important; }
+        .scout-table { width: 100%; border-collapse: collapse; text-align: center; table-layout: auto; }
+        .scout-table th { background-color: #4895DB; color: white; padding: 4px; border-bottom: 2px solid #FF8200; font-weight: 700; font-size: 11px; text-transform: uppercase; }
+        .scout-table td { padding: 4px; border-bottom: 1px solid #F5F5F7; font-size: 11px; color: #1D1D1F; }
+        .bg-highlight-red { background-color: #ffcccc !important; font-weight: 900; }
+        .arrow-red { color: #b30000 !important; font-weight: 900; margin-left: 4px; }
+        .player-photo-large { border-radius: 50%; width: 220px; height: 220px; object-fit: contain; border: 6px solid #FF8200; }
+        .score-box { padding: 12px 20px; border-radius: 12px; font-size: 28px; font-weight: 800; min-width: 100px; color: #FFFFFF; line-height: 1.2; text-align: center;}
+        .info-box { background-color: #f8f9fa; border-left: 5px solid #FF8200; padding: 12px; margin-top: 10px; font-size: 12px; color: #1D1D1F; font-weight: 600; line-height: 1.4; }
+        
+        .player-row-container { 
+            break-inside: avoid !important; 
+            page-break-inside: avoid !important; 
+            display: block !important; 
+            margin-bottom: 30px; 
+        }
+        
+        .player-divider { border: 0; height: 1px; background: #E5E5E7; margin-bottom: 15px; width: 100%; }
+        .gallery-photo { border-radius: 50%; width: 110px; height: 110px; object-fit: cover; border: 4px solid #FF8200; }
+        .section-header { font-size: 20px; font-weight: 800; color: #4895DB; border-bottom: 2px solid #FF8200; margin-top: 15px; margin-bottom: 10px; padding-bottom: 5px; text-transform: uppercase; }
 
-    /* ONLY targets the athlete photos in the Card view */
-    .gallery-photo { 
-        border-radius: 50% !important; 
-        width: 85px !important; 
-        height: 85px !important; 
-        object-fit: contain !important; 
-        background-color: white !important; 
-        border: 3px solid #FF8200 !important;
-        display: block !important;
-        margin: 0 auto !important;
-    }
-    </style>
-    """, unsafe_allow_html=True)
+        @media print {
+            .main-logo-container { display: block !important; margin-bottom: 0 !important; }
+            .stTabs [role="tablist"], [data-testid="stSidebar"], header, footer, button, .stButton { display: none !important; }
+            .main .block-container { padding: 0 !important; max-width: 100% !important; }
+            .scout-table td, p, span, div { color: #000000 !important; }
+        }
+        </style>
+        """, unsafe_allow_html=True)
     
     def get_flipped_gradient(score):
         score = float(score)
