@@ -484,24 +484,17 @@ if check_password():
                     "2 Ball (Set 3)": "2 Ball",
                     "2 Ball (Set 4)": "2 Ball",
                     "serving (2)": "serving",
-                    "2/3 Hitters (2)": "2/3 Hitters"
+                    "Serving (2)": "serving",
+                    "2/3 Hitters (2)": "2/3 Hitters",
+                    "5v5 (2)": "5v5",
+                    "Serve & Pass": "Serve and Pass"
                 }
                 
                 working_df = phase_df.copy()
                 working_df['Phase'] = working_df['Phase'].replace(phase_map)
 
-                # --- FILTER ---
-                # Added safety check to prevent Sync Error: 'Position'
-                if 'Position' in working_df.columns:
-                    pos_list_ph = sorted([p for p in working_df['Position'].unique() if p != "N/A"])
-                    ph_pos = st.selectbox("Position Filter", ["All Positions"] + pos_list_ph, key="ph_pos_final_v3")
-                    
-                    if ph_pos != "All Positions":
-                        working_df = working_df[working_df['Position'] == ph_pos]
-                else:
-                    st.error("Column 'Position' not found in Phases data.")
-
                 # --- AGGREGATION ---
+                # Grouping by the cleaned Phase names
                 p_sum = working_df.groupby('Phase').agg({
                     'Player Load': 'mean',
                     'Explosive Efforts': 'mean',
@@ -565,7 +558,7 @@ if check_password():
 
                     fig_ph.update_layout(
                         title=dict(text="Consolidated Phase Breakdown", font=dict(size=18, color='#4895DB', weight='bold'), x=0.5, xanchor='center'),
-                        barmode='group', height=450, template="simple_white",
+                        barmode='group', height=500, template="simple_white",
                         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
                         margin=dict(t=100)
                     )
