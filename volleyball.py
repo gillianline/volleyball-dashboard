@@ -477,7 +477,11 @@ if check_password():
             st.markdown('<div class="section-header">Practice Phase Intensity Breakdown</div>', unsafe_allow_html=True)
             
             if phase_df is not None and not phase_df.empty:
-                # --- 1. PHASE CONSOLIDATION ---
+                # --- 1. CAPTURE ORIGINAL SHEET ORDER ---
+                # This gets the phases in the exact order they appear in the Excel rows
+                original_order = phase_df['Phase'].unique().tolist()
+                
+                # --- 2. PHASE CONSOLIDATION ---
                 phase_map = {
                     "Brizo (2)": "Brizo",
                     "2 Ball (Set 1)": "2 Ball", "2 Ball (Set 2)": "2 Ball", 
@@ -489,31 +493,34 @@ if check_password():
 
                 working_df = phase_df.copy()
                 working_df['Phase'] = working_df['Phase'].replace(phase_map)
+                
+                # Update the order list to reflect consolidated names while maintaining sequence
+                # We use a list comprehension to keep the order but remove duplicates created by mapping
+                final_phase_order = []
+                for p in original_order:
+                    mapped_name = phase_map.get(p, p)
+                    if mapped_name not in final_phase_order:
+                        final_phase_order.append(mapped_name)
 
-                # --- 2. VIEW SELECTION & DATE FORMATTING ---
+                # --- 3. VIEW SELECTION ---
                 view_col1, view_col2 = st.columns([1, 2])
                 with view_col1:
                     view_type = st.radio("Select View", ["Overall", "By Specific Practice"], horizontal=True)
                 
                 if view_type == "By Specific Practice":
                     with view_col2:
-                        # Ensure Date is datetime and format it for the dropdown
                         working_df['Date'] = pd.to_datetime(working_df['Date'])
                         raw_dates = sorted(working_df['Date'].unique(), reverse=True)
-                        
-                        # Pretty date formatting: "Apr 09, 2026"
                         date_options = {d.strftime('%b %d, %Y'): d for d in raw_dates}
                         selected_date_str = st.selectbox("Select Practice Date", options=list(date_options.keys()))
-                        
-                        # Filter to specific date
                         actual_date = date_options[selected_date_str]
                         working_df = working_df[working_df['Date'] == actual_date]
 
-                # --- 3. DEFINE GROUPS ---
+                # --- 4. DEFINE GROUPS ---
                 pos_list = sorted([p for p in working_df['Position'].unique() if pd.notna(p) and p != "N/A"])
                 display_groups = ["Team Overall"] + pos_list
 
-                # --- 4. RENDER MATRIX ---
+                # --- 5. RENDER MATRIX ---
                 for group in display_groups:
                     header_color = "#4895DB" if group == "Team Overall" else "#FF8200"
                     
@@ -530,10 +537,14 @@ if check_password():
                         'Explosive Efforts': 'mean',
                         'Total Jumps': 'mean',
                         'Estimated Distance (y)': 'mean'
-                    }).reset_index().sort_values('Player Load', ascending=False)
+                    }).reset_index()
+                    
+                    # --- RE-APPLY THE LOCKED ORDER ---
+                    # Convert 'Phase' to a category with our fixed order and sort by it
+                    plot_sum['Phase'] = pd.Categorical(plot_sum['Phase'], categories=final_phase_order, ordered=True)
+                    plot_sum = plot_sum.sort_values('Phase').dropna(subset=['Phase'])
 
                     if not plot_sum.empty:
-                        # Identify max values for highlighting within THIS position
                         max_vals = {
                             'Player Load': plot_sum['Player Load'].max(),
                             'Explosive Efforts': plot_sum['Explosive Efforts'].max(),
@@ -548,7 +559,6 @@ if check_password():
                         html_output.append(f'<th style="text-align:left; padding: 12px 20px;">Phase</th>')
                         html_output.append(f'<th>Avg Player Load</th><th>Explosive Efforts</th><th>Total Jumps</th><th>Avg Distance (y)</th></tr></thead><tbody>')
                         
-                        # Highlight helper function
                         def get_highlight(val, col_name):
                             if val == max_vals[col_name] and val > 0:
                                 return "style='background-color: #FFF3E0; color: #E65100; font-weight: 800; border: 1px solid #FFCC80;'"
@@ -557,23 +567,14 @@ if check_password():
                         for _, row in plot_sum.iterrows():
                             html_output.append(f"<tr>")
                             html_output.append(f"<td style='text-align:left; padding-left:20px; font-weight:700;'>{row['Phase']}</td>")
-                            
-                            # Metric Columns with Dynamic Highlighting
                             html_output.append(f"<td {get_highlight(row['Player Load'], 'Player Load')}>{row['Player Load']:.1f}</td>")
                             html_output.append(f"<td {get_highlight(row['Explosive Efforts'], 'Explosive Efforts')}>{row['Explosive Efforts']:.1f}</td>")
                             html_output.append(f"<td {get_highlight(row['Total Jumps'], 'Total Jumps')}>{row['Total Jumps']:.1f}</td>")
                             html_output.append(f"<td {get_highlight(row['Estimated Distance (y)'], 'Estimated Distance (y)')}>{row['Estimated Distance (y)']:.0f}</td>")
-                            
                             html_output.append(f"</tr>")
                         
                         html_output.append('</tbody></table></div>')
-                        
-                        # Use join for most stable HTML rendering in Streamlit
                         st.write("".join(html_output), unsafe_allow_html=True)
-                    else:
-                        st.info(f"No phase data found for {group} in this view.")
-            else:
-                st.error("No phase data available. Please check the 'Phases' sheet in your data source.")
                 
     except Exception as e:
         st.error(f"Sync Error: {e}")
