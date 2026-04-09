@@ -472,7 +472,7 @@ if check_password():
                         )
                         st.plotly_chart(fig_ath, use_container_width=True, config=LOCKED_CONFIG)
                     st.markdown('</div>', unsafe_allow_html=True)
-            with tabs[5]: # Phase Analysis
+        with tabs[5]: # Phase Analysis
             st.markdown('<div class="section-header">Practice Phase Intensity Breakdown</div>', unsafe_allow_html=True)
             
             # --- FILTERS ---
