@@ -482,9 +482,8 @@ if check_password():
                     "Brizo (2)": "Brizo",
                     "2 Ball (Set 1)": "2 Ball", "2 Ball (Set 2)": "2 Ball", 
                     "2 Ball (Set 3)": "2 Ball", "2 Ball (Set 4)": "2 Ball",
-                    "serving (2)": "Serving", "serving": "Serving", "Serving (2)": "Serving",
-                    "2/3 Hitters (2)": "2/3 Hitters",
-                    "5v5 (2)": "5v5",
+                    "serving (2)": "serving", "serving": "serving", "Serving (2)": "serving",
+                    "2/3 Hitters (2)": "2/3 Hitters", "5v5 (2)": "5v5",
                     "Serve & Pass": "Serve and Pass"
                 }
 
@@ -500,21 +499,12 @@ if check_password():
                 }).reset_index().sort_values('Player Load', ascending=False)
 
                 if not p_sum.empty:
-                    # --- RENDER TABLE (Fixed Method) ---
-                    # Build rows as a list first to avoid string errors
-                    rows = []
-                    for _, row in p_sum.iterrows():
-                        rows.append(f"<tr><td style='text-align:left; padding-left:20px; font-weight:700;'>{row['Phase']}</td><td>{row['Player Load']:.1f}</td><td>{row['Explosive Efforts']:.1f}</td><td>{row['Total Jumps']:.1f}</td><td>{row['Estimated Distance (y)']:.0f}</td></tr>")
-                    
-                    # Combine into the full table string
-                    table_body = "".join(rows)
-                    
-                    full_html = f"""
-                    <div class="player-row-container" style="padding: 0px; border: 1px solid #E5E5E7;">
-                        <table class="scout-table" style="margin-top: 0px;">
+                    # --- SUMMARY TABLE ---
+                    t_html = """
+                        <table class="scout-table">
                             <thead>
-                                <tr style="background-color: #4895DB; color: white;">
-                                    <th style="text-align:left; padding-left:20px;">Practice Phase</th>
+                                <tr>
+                                    <th style='text-align:left; padding-left:20px;'>Practice Phase</th>
                                     <th>Avg Player Load</th>
                                     <th>Explosive Efforts</th>
                                     <th>Total Jumps</th>
@@ -522,29 +512,49 @@ if check_password():
                                 </tr>
                             </thead>
                             <tbody>
-                                {table_body}
-                            </tbody>
-                        </table>
-                    </div>
                     """
-                    # This is the line that renders the table
-                    st.write(full_html, unsafe_allow_html=True)
+                    for _, row in p_sum.iterrows():
+                        t_html += f"<tr><td style='text-align:left; padding-left:20px; font-weight:700;'>{row['Phase']}</td><td>{row['Player Load']:.1f}</td><td>{row['Explosive Efforts']:.1f}</td><td>{row['Total Jumps']:.1f}</td><td>{row['Estimated Distance (y)']:.0f}</td></tr>"
+                    st.markdown(t_html + "</tbody></table>", unsafe_allow_html=True)
 
-                    # --- PHASE CHART ---
+                    # --- NEW SPLIT CHART VIEW ---
                     st.write("<br>", unsafe_allow_html=True)
-                    fig_ph = make_subplots(specs=[[{"secondary_y": True}]])
-                    fig_ph.add_trace(go.Bar(x=p_sum['Phase'], y=p_sum['Total Jumps'], name="Jumps", marker_color='#FF8200'), secondary_y=False)
-                    fig_ph.add_trace(go.Bar(x=p_sum['Phase'], y=p_sum['Explosive Efforts'], name="Efforts", marker_color='#4895DB'), secondary_y=False)
-                    fig_ph.add_trace(go.Bar(x=p_sum['Phase'], y=p_sum['Player Load'], name="Load", marker=dict(color='#515154', opacity=0.25)), secondary_y=True)
-                    fig_ph.add_trace(go.Bar(x=p_sum['Phase'], y=p_sum['Estimated Distance (y)'], name="Distance", marker=dict(color='#A52A2A', opacity=0.25)), secondary_y=True)
+                    
+                    # Create two columns for side-by-side charts
+                    graph_col1, graph_col2 = st.columns(2)
+                    
+                    with graph_col1:
+                        # Chart 1: Explosive Actions (Jumps & Efforts)
+                        fig_vol = go.Figure()
+                        fig_vol.add_trace(go.Bar(x=p_sum['Phase'], y=p_sum['Total Jumps'], name="Jumps", marker_color='#FF8200'))
+                        fig_vol.add_trace(go.Bar(x=p_sum['Phase'], y=p_sum['Explosive Efforts'], name="Efforts", marker_color='#4895DB'))
+                        
+                        fig_vol.update_layout(
+                            title="<b>Phase Volume</b> (Jumps & Efforts)",
+                            barmode='group', height=400, template="simple_white",
+                            margin=dict(l=20, r=20, t=60, b=20),
+                            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+                        )
+                        st.plotly_chart(fig_vol, use_container_width=True, config=LOCKED_CONFIG)
 
-                    fig_ph.update_layout(
-                        title=dict(text="Phase Load vs Volume", font=dict(size=18, color='#4895DB', weight='bold'), x=0.5, xanchor='center'),
-                        barmode='group', height=450, template="simple_white",
-                        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-                        margin=dict(t=100)
-                    )
-                    st.plotly_chart(fig_ph, use_container_width=True, config=LOCKED_CONFIG)
+                    with graph_col2:
+                        # Chart 2: Overall Load (Load & Distance)
+                        fig_load = go.Figure()
+                        fig_load.add_trace(go.Bar(x=p_sum['Phase'], y=p_sum['Player Load'], name="Load", marker_color='#515154'))
+                        # Distance is usually 10x larger than load, so we'll just show Load here or use a line for Distance
+                        fig_load.add_trace(go.Scatter(x=p_sum['Phase'], y=p_sum['Estimated Distance (y)'], name="Distance (y)", 
+                                                   line=dict(color='#A52A2A', width=3), mode='lines+markers', yaxis="y2"))
+                        
+                        fig_load.update_layout(
+                            title="<b>Phase Intensity</b> (Load vs Dist)",
+                            height=400, template="simple_white",
+                            margin=dict(l=20, r=20, t=60, b=20),
+                            yaxis2=dict(overlaying='y', side='right', showgrid=False),
+                            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+                        )
+                        st.plotly_chart(fig_load, use_container_width=True, config=LOCKED_CONFIG)
+                else:
+                    st.warning("No data found in the phases sheet.")
                 
     except Exception as e:
         st.error(f"Sync Error: {e}")
