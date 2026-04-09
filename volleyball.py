@@ -276,15 +276,27 @@ if check_password():
                     tourney_df = tourney_df[tourney_df['Position'] == pos_filter_t]
 
                 ath_t = sorted(tourney_df['Name'].unique())
-                for name in ath_t:
+                for name in sorted(tourney_df['Name'].unique()):
                     ad = tourney_df[tourney_df['Name'] == name]
+                    
+                    # --- FIX: FORCE PHOTO TO PULL FROM THE WORKING DATASET (df) ---
+                    # This ignores whatever link is in the Match sheet and uses the one you know works.
+                    try:
+                        correct_photo = df[df['Name'] == name]['PhotoURL'].iloc[0]
+                    except:
+                        # Fallback if for some reason the name isn't in the other sheet
+                        correct_photo = "https://www.w3schools.com/howto/img_avatar.png"
+                    
                     st.markdown(f'<div class="player-row-container"><div class="player-divider"></div>', unsafe_allow_html=True)
                     side_cols = st.columns([1.5, 2])
                     with side_cols[0]:
                         card_start = f"""
                             <div style="display:flex; align-items:center; gap:12px; padding:10px; background:#f8f9fa; border-bottom:2px solid #FF8200;">
-                                <img src="{ad['PhotoURL'].iloc[0]}" class="gallery-photo" style="width:65px; height:65px;">
-                                <div><p style="margin:0; font-weight:900; color:#1D1D1F; font-size:18px;">{name}</p><p style="margin:0; color:#4895DB; font-weight:700; font-size:16px;">{ad['Position'].iloc[0]}</p></div>
+                                <img src="{correct_photo}" class="gallery-photo" style="width:65px; height:65px;">
+                                <div>
+                                    <p style="margin:0; font-weight:900; color:#1D1D1F; font-size:18px;">{name}</p>
+                                    <p style="margin:0; color:#4895DB; font-weight:700; font-size:16px;">{ad['Position'].iloc[0]}</p>
+                                </div>
                             </div>
                             <div style="padding:5px;">
                                 <table class="scout-table" style="margin-bottom:0;">
@@ -293,7 +305,14 @@ if check_password():
                         """
                         for _, r in ad.iterrows():
                             card_start += f"<tr><td style='font-weight:700; font-size:11px;'>{r['Session_Name']}</td><td>{int(r['Total Jumps'])}</td><td>{r['Player Load']:.0f}</td><td>{r['Explosive Efforts']:.0f}</td><td>{r['Estimated Distance (y)']:.0f}</td></tr>"
-                        card_start += f"<tr style='background:#4895DB; color:white; font-weight:900;'><td>TOTAL</td><td>{int(ad['Total Jumps'].sum())}</td><td>{ad['Player Load'].sum():.0f}</td><td>{ad['Explosive Efforts'].sum():.0f}</td><td>{ad['Estimated Distance (y)'].sum():.0f}</td></tr></tbody></table></div>"
+                        
+                        # Calculating Totals for the footer row
+                        total_j = int(ad['Total Jumps'].sum())
+                        total_pl = ad['Player Load'].sum()
+                        total_ee = ad['Explosive Efforts'].sum()
+                        total_dist = ad['Estimated Distance (y)'].sum()
+                        
+                        card_start += f"<tr style='background:#4895DB; color:white; font-weight:900;'><td>TOTAL</td><td>{total_j}</td><td>{total_pl:.0f}</td><td>{total_ee:.0f}</td><td>{total_dist:.0f}</td></tr></tbody></table></div>"
                         st.markdown(card_start, unsafe_allow_html=True)
                     
                     with side_cols[1]:
