@@ -472,6 +472,7 @@ if check_password():
                         )
                         st.plotly_chart(fig_ath, use_container_width=True, config=LOCKED_CONFIG)
                     st.markdown('</div>', unsafe_allow_html=True)
+                    
         with tabs[5]: # Phase Analysis
             st.markdown('<div class="section-header">Practice Phase Intensity Breakdown</div>', unsafe_allow_html=True)
             
@@ -483,8 +484,9 @@ if check_password():
                     "2 Ball (Set 2)": "2 Ball",
                     "2 Ball (Set 3)": "2 Ball",
                     "2 Ball (Set 4)": "2 Ball",
-                    "serving (2)": "serving",
-                    "Serving (2)": "serving",
+                    "serving (2)": "Serving",
+                    "serving": "Serving",
+                    "Serving (2)": "Serving",
                     "2/3 Hitters (2)": "2/3 Hitters",
                     "5v5 (2)": "5v5",
                     "Serve & Pass": "Serve and Pass"
@@ -495,7 +497,7 @@ if check_password():
                 working_df['Phase'] = working_df['Phase'].replace(phase_map)
 
                 # --- AGGREGATION ---
-                # Calculating the average metrics across all players/sessions for each phase
+                # Averages metrics across the entire squad for each consolidated phase
                 p_sum = working_df.groupby('Phase').agg({
                     'Player Load': 'mean',
                     'Explosive Efforts': 'mean',
