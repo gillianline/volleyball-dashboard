@@ -476,24 +476,44 @@ if check_password():
         with tabs[5]: # Phase Analysis
             st.markdown('<div class="section-header">Practice Phase Intensity Breakdown</div>', unsafe_allow_html=True)
             
+            # Check if phase_df actually has data from the URL
             if phase_df is not None and not phase_df.empty:
-                # --- PHASE CONSOLIDATION LOGIC ---
+                
+                # --- PHASE CONSOLIDATION ---
+                # Add this map to combine the variations you mentioned
                 phase_map = {
                     "Brizo (2)": "Brizo",
                     "2 Ball (Set 1)": "2 Ball",
                     "2 Ball (Set 2)": "2 Ball",
                     "2 Ball (Set 3)": "2 Ball",
                     "2 Ball (Set 4)": "2 Ball",
-                    "serving (2)": "Serving",
-                    "serving": "Serving",
-                    "Serving (2)": "Serving",
+                    "serving (2)": "serving",
+                    "Serving (2)": "serving",
                     "2/3 Hitters (2)": "2/3 Hitters",
                     "5v5 (2)": "5v5",
                     "Serve & Pass": "Serve and Pass"
                 }
-                
+
+                # --- FILTERS ---
+                c_ph1, c_ph2 = st.columns([1, 2])
+                with c_ph1:
+                    ph_period = st.selectbox("Analysis Period", ["Season to Date", "Last 4 Weeks"], key="ph_period_final")
+                with c_ph2:
+                    pos_list_ph = sorted([p for p in phase_df['Position'].unique() if p != "N/A"])
+                    ph_pos = st.selectbox("Position Filter", ["All Positions"] + pos_list_ph, key="ph_pos_final")
+
+                # --- FILTERING LOGIC ---
                 working_df = phase_df.copy()
+                
+                # Apply the name cleanup here so aggregation combines them
                 working_df['Phase'] = working_df['Phase'].replace(phase_map)
+                
+                if ph_pos != "All Positions":
+                    working_df = working_df[working_df['Position'] == ph_pos]
+                
+                if ph_period == "Last 4 Weeks":
+                    mx_w = working_df['Week'].max()
+                    working_df = working_df[working_df['Week'] > (mx_w - 4)]
 
                 # --- AGGREGATION ---
                 p_sum = working_df.groupby('Phase').agg({
@@ -505,13 +525,12 @@ if check_password():
 
                 if not p_sum.empty:
                     # --- SUMMARY TABLE ---
-                    # Wrapping the entire table in one string and one st.markdown call
+                    st.markdown('<div class="player-row-container" style="padding: 0; border: none;">', unsafe_allow_html=True)
                     t_html = """
-                    <div class="player-row-container" style="padding: 0; border: none;">
-                        <table class="scout-table" style="width:100%; border: 1px solid #E5E5E7; border-collapse: collapse;">
+                        <table class="scout-table" style="width:100%; border: 1px solid #E5E5E7;">
                             <thead>
                                 <tr style="background-color: #4895DB; color: white;">
-                                    <th style='text-align:left; padding: 20px;'>Practice Phase</th>
+                                    <th style='text-align:left; padding-left:20px;'>Practice Phase</th>
                                     <th>Avg Player Load</th>
                                     <th>Explosive Efforts</th>
                                     <th>Total Jumps</th>
@@ -520,7 +539,6 @@ if check_password():
                             </thead>
                             <tbody>
                     """
-                    
                     for _, row in p_sum.iterrows():
                         t_html += f"""
                             <tr>
@@ -531,11 +549,7 @@ if check_password():
                                 <td>{row['Estimated Distance (y)']:.0f}</td>
                             </tr>
                         """
-                    
-                    t_html += "</tbody></table></div>"
-                    
-                    # CRITICAL: This line renders the HTML instead of printing the text
-                    st.markdown(t_html, unsafe_allow_html=True)
+                    st.markdown(t_html + "</tbody></table></div>", unsafe_allow_html=True)
 
                     # --- PHASE CHART ---
                     st.write("<br>", unsafe_allow_html=True)
@@ -562,8 +576,10 @@ if check_password():
                     ), secondary_y=True)
 
                     fig_ph.update_layout(
-                        title=dict(text="Practice Phase Volume vs Intensity Breakdown", font=dict(size=18, color='#4895DB', weight='bold'), x=0.5, xanchor='center'),
-                        barmode='group', height=550, template="simple_white",
+                        title=dict(text="Phase Load vs Volume Breakdown", font=dict(size=18, color='#4895DB', weight='bold'), x=0.5, xanchor='center'),
+                        barmode='group',
+                        height=450,
+                        template="simple_white",
                         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
                         margin=dict(t=100)
                     )
@@ -572,8 +588,10 @@ if check_password():
                     fig_ph.update_yaxes(title_text="Load / Distance", secondary_y=True)
                     
                     st.plotly_chart(fig_ph, use_container_width=True, config=LOCKED_CONFIG)
+                else:
+                    st.warning("No data found for the selected filters.")
             else:
-                st.info("No phase data found. Check your sheet connection.")
+                st.error("Phase data could not be loaded from the URL. Please check your data connection.")
                 
     except Exception as e:
         st.error(f"Sync Error: {e}")
