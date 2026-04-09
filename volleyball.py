@@ -260,9 +260,6 @@ if check_password():
                     st.session_state.pos_state = st.selectbox("Filter by Position", ["All Positions"] + sorted(list(match_df['Position'].unique())), index=0)
                 st.markdown('</div>', unsafe_allow_html=True)
 
-            if st.session_state.is_printing:
-                st.markdown('<script>window.print();</script>', unsafe_allow_html=True)
-
             selected_matches = st.session_state.get("matches_state", [])
             pos_filter_t = st.session_state.get("pos_state", "All Positions")
 
@@ -275,16 +272,17 @@ if check_password():
                 if pos_filter_t != "All Positions": 
                     tourney_df = tourney_df[tourney_df['Position'] == pos_filter_t]
                 
-                # --- INDEPENDENT SCALING FOR NOTICEABILITY ---
-                # Focus Axis (Left): Player Load & Explosive Efforts
-                global_max_focus = tourney_df[['Player Load', 'Explosive Efforts']].max().max() * 1.2
-                # Background Axis (Right): Total Jumps & Distance
-                global_max_bg = max(tourney_df['Total Jumps'].max(), tourney_df['Estimated Distance (y)'].max() / 10) * 1.2
+                # --- INDEPENDENT SCALING ---
+                # Left Axis: Total Jumps & Explosive Efforts
+                global_max_primary = tourney_df[['Total Jumps', 'Explosive Efforts']].max().max() * 1.1
+                # Right Axis: Player Load & Distance
+                global_max_secondary = tourney_df[['Player Load', 'Estimated Distance (y)']].max().max() * 1.1
 
                 for name in sorted(tourney_df['Name'].unique()):
                     ad = tourney_df[tourney_df['Name'] == name]
                     st.markdown(f'<div class="player-row-container"><div class="player-divider"></div>', unsafe_allow_html=True)
                     side_cols = st.columns([1.5, 2])
+                    
                     with side_cols[0]:
                         card_html = f"""
                             <div style="display:flex; align-items:center; gap:12px; padding:10px; background:#f8f9fa; border-bottom:2px solid #FF8200;">
@@ -301,33 +299,35 @@ if check_password():
                     
                     with side_cols[1]:
                         fig_ath = make_subplots(specs=[[{"secondary_y": True}]])
+                        
                         for _, r in ad.iterrows():
-                            # NOTICEABLE METRICS (Primary Axis)
+                            # MAIN BARS (Primary Axis - Left)
                             fig_ath.add_trace(go.Bar(
-                                name=f"{r['Session_Name']} (Main)", 
-                                x=['Player Load', 'Explosive Efforts'], 
-                                y=[r['Player Load'], r['Explosive Efforts']], 
+                                name=r['Session_Name'], 
+                                x=['Total Jumps', 'Explosive Efforts'], 
+                                y=[r['Total Jumps'], r['Explosive Efforts']], 
                                 marker_color=m_map[r['Session_Name']],
                                 offsetgroup=r['Session_Name']
                             ), secondary_y=False)
                             
-                            # REFERENCE METRICS (Secondary Axis - Ghosted)
+                            # GHOST BARS (Secondary Axis - Right)
                             fig_ath.add_trace(go.Bar(
-                                name=f"{r['Session_Name']} (Ref)", 
-                                x=['Total Jumps', 'Estimated Distance'], 
-                                y=[r['Total Jumps'], r['Estimated Distance (y)']], 
-                                marker=dict(color=m_map[r['Session_Name']], opacity=0.2),
+                                name=f"Ref {r['Session_Name']}", 
+                                x=['Player Load', 'Estimated Distance'], 
+                                y=[r['Player Load'], r['Estimated Distance (y)']], 
+                                marker=dict(color=m_map[r['Session_Name']], opacity=0.25),
                                 showlegend=False,
                                 offsetgroup=r['Session_Name']
                             ), secondary_y=True)
                         
                         fig_ath.update_layout(
-                            barmode='group', height=260, margin=dict(l=0, r=0, t=10, b=80), 
+                            barmode='group', height=280, margin=dict(l=0, r=0, t=10, b=80), 
                             template="simple_white", font=dict(size=10),
                             legend=dict(orientation="h", yanchor="top", y=-0.3, xanchor="center", x=0.5),
-                            yaxis=dict(range=[0, global_max_focus], title="Focus Metrics", showgrid=False),
-                            yaxis2=dict(range=[0, global_max_bg * 10], showgrid=False, overlaying='y', side='right', showticklabels=False)
+                            yaxis=dict(range=[0, global_max_primary], title="Jumps / Efforts", showgrid=False),
+                            yaxis2=dict(range=[0, global_max_secondary], title="Load / Dist", showgrid=False, overlaying='y', side='right')
                         )
                         st.plotly_chart(fig_ath, use_container_width=True, config=LOCKED_CONFIG)
+                    st.markdown('</div>', unsafe_allow_html=True)
     except Exception as e:
         st.error(f"Sync Error: {e}")
