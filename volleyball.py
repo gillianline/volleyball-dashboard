@@ -78,12 +78,17 @@ if check_password():
         df.columns = df.columns.str.strip()
         df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
         df = df.dropna(subset=['Date']) 
+        
         rename_map = {
             'Total Jumps': 'Total Jumps', 'IMA Jump Count Med Band': 'Moderate Jumps', 'IMA Jump Count High Band': 'High Jumps', 
             'BMP Jumping Load': 'Jump Load', 'Total Player Load': 'Player Load', 'Estimated Distance (y)': 'Estimated Distance (y)', 
             'Explosive Efforts': 'Explosive Efforts', 'High Intensity Movement': 'High Intensity Movement'
         }
         df = df.rename(columns=rename_map)
+        
+        # --- RE-ADDED SESSION TYPE LOGIC ---
+        df['Session_Type'] = df['Activity'].apply(lambda x: 'Game' if any(w in str(x).lower() for w in ['game', 'match', 'v.']) else 'Practice')
+        
         all_metrics = list(rename_map.values())
         for col in [c for c in all_metrics if c in df.columns]:
             df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
@@ -106,7 +111,6 @@ if check_password():
     try:
         df, cmj_df, phase_df = load_all_data()
         all_metrics = ['Total Jumps', 'Moderate Jumps', 'High Jumps', 'Jump Load', 'Player Load', 'Estimated Distance (y)', 'Explosive Efforts', 'High Intensity Movement']
-        LOCKED_CONFIG = {'staticPlot': True, 'displayModeBar': False}
 
         tabs = st.tabs(["Individual Profile", "Team Gallery", "Game v. Practice", "Position Analysis", "Match Summary"])
         session_list = df[['Date', 'Session_Name']].drop_duplicates().sort_values('Date', ascending=False)['Session_Name'].tolist()
@@ -124,7 +128,7 @@ if check_password():
                 if pos_f != "All Positions": dropdown_df = dropdown_df[dropdown_df['Position'] == pos_f]
                 sel_p = st.selectbox("Select Athlete", sorted(dropdown_df['Name'].unique()))
                 
-                # Handling Daily Totals (Summing multiple practices/lifts)
+                # Daily Totals Logic
                 p_full_hist = df[df['Name'] == sel_p]
                 daily_sums = p_full_hist.groupby('Date')[all_metrics].sum().reset_index()
                 lb = daily_sums[(daily_sums['Date'] >= curr_date - timedelta(days=30)) & (daily_sums['Date'] <= curr_date)]
@@ -156,12 +160,9 @@ if check_password():
             
             gal_day_df = df[df['Session_Name'] == selected_session_gal].copy()
             curr_date_gal = gal_day_df['Date'].iloc[0] if not gal_day_df.empty else None
-            
             if pos_f_gal != "All Positions": gal_day_df = gal_day_df[gal_day_df['Position'] == pos_f_gal]
             
-            # Group by Name because an athlete might have multiple rows (practices) in the same day
             display_names = sorted(gal_day_df['Name'].unique())
-            
             for i in range(0, len(display_names), 2):
                 cols = st.columns(2)
                 for j in range(2):
@@ -170,7 +171,6 @@ if check_password():
                         p_full_g = df[df['Name'] == name]
                         daily_sums_g = p_full_g.groupby('Date')[all_metrics].sum().reset_index()
                         lb_g = daily_sums_g[(daily_sums_g['Date'] >= curr_date_gal - timedelta(days=30)) & (daily_sums_g['Date'] <= curr_date_gal)]
-                        
                         today_g = daily_sums_g[daily_sums_g['Date'] == curr_date_gal].iloc[0]
                         avg_g = lb_g[all_metrics].mean()
                         
@@ -186,7 +186,6 @@ if check_password():
                         sc_total = math.ceil(t_grade_g / c_metrics_g) if c_metrics_g > 0 else 0
                         photo = p_full_g['PhotoURL'].iloc[0]
                         with cols[j]: st.markdown(f'<div style="border:1px solid #E5E5E7; border-radius:15px; padding:15px; margin-bottom:20px;"><div style="display:flex; align-items:center; gap:10px;"><div style="flex:1.2; text-align:center;"><img src="{photo}" class="gallery-photo"><p style="font-weight:bold; font-size:15px; margin-top:8px;">{name}</p></div><div style="flex:3;"><table class="scout-table"><thead><tr><th>Metric</th><th>Total</th><th>Max Day</th><th>Grade</th></tr></thead><tbody>{r_html}</tbody></table></div><div style="flex:1; text-align:center;"><div style="background-color:{get_flipped_gradient(sc_total)}; color:white; padding:10px; border-radius:12px; font-size:32px; font-weight:900;">{sc_total}</div></div></div></div>', unsafe_allow_html=True)
-
         with tabs[2]: # Game v Practice
             st.markdown('<div class="section-header">Weekly Prep Intensity vs. Game Demands</div>', unsafe_allow_html=True)
             c_ga, c_gw, c_gg = st.columns(3)
