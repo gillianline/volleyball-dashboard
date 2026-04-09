@@ -493,7 +493,7 @@ if check_password():
                 # --- 2. VIEW SELECTION ---
                 view_col1, view_col2 = st.columns([1, 2])
                 with view_col1:
-                    view_type = st.radio("Select View", ["Overall (Season)", "By Specific Practice"], horizontal=True)
+                    view_type = st.radio("Select View", ["Overall)", "By Specific Practice"], horizontal=True)
                 
                 if view_type == "By Specific Practice":
                     with view_col2:
