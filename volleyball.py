@@ -119,16 +119,24 @@ if check_password():
         
         tabs = st.tabs(["Individual Profile", "Team Gallery", "Game v. Practice", "Position Analysis", "Match Summary"])
         session_list = df[['Date', 'Session_Name']].drop_duplicates().sort_values('Date', ascending=False)['Session_Name'].tolist()
-        with tabs[0]: # Individual Profile
-            c_f1, c_f2 = st.columns(2)
-            with c_f1: selected_session = st.selectbox("Practice Selection", session_list, index=0, key="nav_sel_ind")
-            with c_f2: pos_f = st.selectbox("Position Filter", ["All Positions"] + sorted([p for p in df['Position'].unique() if p != "N/A"]), key="nav_pos_ind")
-            day_df = df[df['Session_Name'] == selected_session].copy()
-            if not day_df.empty:
-                curr_date = day_df['Date'].iloc[0]
-                if pos_f != "All Positions": day_df = day_df[day_df['Position'] == pos_f]
-                sel_p = st.selectbox("Select Athlete", sorted(day_df['Name'].unique()))
-                p = day_df[day_df['Name'] == sel_p].iloc[0]
+        # --- TAB 0: INDIVIDUAL PROFILE ---
+with tabs[0]:
+    c_f1, c_f2 = st.columns(2)
+    with c_f1: selected_session = st.selectbox("Practice Selection", session_list, index=0, key="nav_sel_ind")
+    with c_f2: pos_f = st.selectbox("Position Filter", ["All Positions"] + sorted([p for p in df['Position'].unique() if p != "N/A"]), key="nav_pos_ind")
+    
+    # 1. Get the athlete's name first (or allow selection from full list)
+    all_names = sorted(df['Name'].unique())
+    sel_p = st.selectbox("Select Athlete", all_names)
+    
+    # 2. CALCULATE LB FROM ENTIRE DF (Ignoring position filters)
+    p_full_hist = df[df['Name'] == sel_p]
+    curr_date = df[df['Session_Name'] == selected_session]['Date'].iloc[0]
+    
+    lb = p_full_hist[(p_full_hist['Date'] >= curr_date - timedelta(days=30)) & (p_full_hist['Date'] <= curr_date)]
+    
+    # 3. Now pull today's specific data
+    p = lb[lb['Session_Name'] == selected_session].iloc[0]
                 lb = df[(df['Name'] == sel_p) & (df['Date'] >= curr_date - timedelta(days=30)) & (df['Date'] <= curr_date)]
                 m_rows = ""; total_grade = 0; count = 0
                 for k in all_metrics:
