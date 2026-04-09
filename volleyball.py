@@ -281,55 +281,56 @@ if check_password():
             # --- PRIMARY FILTER ---
             pos_filter_an = st.selectbox("Select Position to Analyze", sorted([p for p in df['Position'].unique() if p != "N/A"]), key="pos_an_filt_main")
             
-            # Filter data for the entire position group
             max_wk = df['Week'].max()
             rec_4 = list(range(int(max_wk) - 3, int(max_wk) + 1))
             tr_df = df[(df['Week'].isin(rec_4)) & (df['Position'] == pos_filter_an)]
             
-            # Get list of unique players in this position
             players_in_pos = sorted(tr_df['Name'].unique())
             
             if players_in_pos:
                 tr_metrics = ["Player Load", "Estimated Distance (y)", "Total Jumps"]
-                
-                # Calculate Group Average once for the whole tab
                 pos_4wk_avg = tr_df[tr_metrics].mean()
 
                 for name in players_in_pos:
                     p_data = tr_df[tr_df['Name'] == name]
                     
-                    # Sync Photo from Master
                     try:
                         correct_photo = df[df['Name'] == name]['PhotoURL'].iloc[0]
                     except:
                         correct_photo = p_data['PhotoURL'].iloc[0]
 
-                    # --- ATHLETE SCOUT CARD ---
-                    st.markdown(f'<div class="player-row-container">', unsafe_allow_html=True)
-                    c_card1, c_card2 = st.columns([2, 3], gap="medium")
+                    st.markdown(f'<div class="player-row-container" style="padding: 20px; margin-bottom: 30px;">', unsafe_allow_html=True)
+                    # Adjusted ratio to give the photo and table more breathing room
+                    c_card1, c_card2 = st.columns([1.5, 3], gap="large")
                     
                     with c_card1:
-                        # Header
+                        # Inline styles to ensure NO cropping/zooming on this specific tab
                         st.markdown(f"""
-                            <div style="display:flex; align-items:center; gap:12px; padding:10px; background:#f8f9fa; border-bottom:2px solid #FF8200; border-radius: 10px 10px 0 0;">
-                                <img src="{correct_photo}" class="gallery-photo" style="width:70px; height:70px; object-fit: cover;">
-                                <div>
-                                    <p style="margin:0; font-weight:900; color:#1D1D1F; font-size:18px;">{name}</p>
-                                    <p style="margin:0; color:#4895DB; font-weight:700; font-size:14px;">{pos_filter_an} | 4-Week Summary</p>
-                                </div>
+                            <div style="text-align:center; padding:15px; background:#f8f9fa; border-bottom:2px solid #FF8200; border-radius: 12px;">
+                                <img src="{correct_photo}" style="
+                                    border-radius: 50%; 
+                                    width: 90px; 
+                                    height: 90px; 
+                                    object-fit: contain; 
+                                    background-color: white; 
+                                    border: 3px solid #FF8200;
+                                    display: block;
+                                    margin: 0 auto 10px auto;
+                                ">
+                                <p style="margin:0; font-weight:900; color:#1D1D1F; font-size:18px;">{name}</p>
+                                <p style="margin:0; color:#4895DB; font-weight:700; font-size:13px;">{pos_filter_an} Unit</p>
                             </div>
                         """, unsafe_allow_html=True)
                         
-                        # Athlete vs Group Table
                         p_4wk_avg = p_data[tr_metrics].mean()
                         table_html = f"""
-                            <table class="scout-table" style="width:100%; margin-top:10px;">
+                            <table class="scout-table" style="width:100%; margin-top:15px;">
                                 <thead>
-                                    <tr><th>Metric</th><th>{name}</th><th>Group Avg</th></tr>
+                                    <tr><th>Metric</th><th>{name[:3]}.</th><th>Unit</th></tr>
                                 </thead>
                                 <tbody>
-                                    <tr><td style="font-weight:700;">Player Load</td><td>{p_4wk_avg['Player Load']:.1f}</td><td>{pos_4wk_avg['Player Load']:.1f}</td></tr>
-                                    <tr><td style="font-weight:700;">Distance (y)</td><td>{p_4wk_avg['Estimated Distance (y)']:.0f}</td><td>{pos_4wk_avg['Estimated Distance (y)']:.0f}</td></tr>
+                                    <tr><td style="font-weight:700;">Player Load</td><td>{p_4wk_avg['Player Load']:.0f}</td><td>{pos_4wk_avg['Player Load']:.0f}</td></tr>
+                                    <tr><td style="font-weight:700;">Distance</td><td>{p_4wk_avg['Estimated Distance (y)']:.0f}</td><td>{pos_4wk_avg['Estimated Distance (y)']:.0f}</td></tr>
                                     <tr><td style="font-weight:700;">Total Jumps</td><td>{p_4wk_avg['Total Jumps']:.0f}</td><td>{pos_4wk_avg['Total Jumps']:.0f}</td></tr>
                                 </tbody>
                             </table>
@@ -337,29 +338,27 @@ if check_password():
                         st.markdown(table_html, unsafe_allow_html=True)
 
                     with c_card2:
-                        # Trend Graphs - Simplified for the Card view
+                        # Aligning the graphs vertically to match the table height
+                        st.write("<div style='height: 10px;'></div>", unsafe_allow_html=True)
                         t_cols = st.columns(3)
                         for i, m in enumerate(tr_metrics):
                             with t_cols[i]:
                                 fig_t = go.Figure()
-                                # Athlete Line
                                 p_t = p_data.groupby('Week')[m].mean().reset_index()
-                                fig_t.add_trace(go.Scatter(x=p_t['Week'], y=p_t[m], name=name, line=dict(color='#4895DB', width=3), mode='lines+markers'))
-                                # Group Avg Line
+                                fig_t.add_trace(go.Scatter(x=p_t['Week'], y=p_t[m], name=name, line=dict(color='#4895DB', width=4), mode='lines+markers'))
                                 g_t = tr_df.groupby('Week')[m].mean().reset_index()
                                 fig_t.add_trace(go.Scatter(x=g_t['Week'], y=g_t[m], name="Avg", line=dict(color='#FF8200', dash='dash', width=2), mode='lines'))
                                 
                                 fig_t.update_layout(
-                                    title=dict(text=m, font=dict(size=12, weight='bold'), x=0.5, xanchor='center'),
-                                    xaxis=dict(dtick=1, showgrid=False), height=180, 
-                                    margin=dict(l=5, r=5, t=30, b=5), showlegend=False, template="simple_white"
+                                    title=dict(text=f"<b>{m}</b>", font=dict(size=13, color='#4895DB'), x=0.5, xanchor='center'),
+                                    xaxis=dict(dtick=1, showgrid=False, title="Week"), 
+                                    yaxis=dict(showgrid=True, gridcolor='#F5F5F7'),
+                                    height=250, 
+                                    margin=dict(l=10, r=10, t=40, b=10), showlegend=False, template="simple_white"
                                 )
                                 st.plotly_chart(fig_t, use_container_width=True, config=LOCKED_CONFIG)
                     
                     st.markdown('</div>', unsafe_allow_html=True)
-            else:
-                st.warning(f"No data found for the {pos_filter_an} position in the last 4 weeks.")
-                            
                         
         with tabs[4]: # Match Summary
             if st.session_state.is_printing:
