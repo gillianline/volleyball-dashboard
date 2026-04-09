@@ -72,7 +72,7 @@ if check_password():
     def get_flipped_gradient(score):
         score = float(score)
         return "#2D5A27" if score <= 40 else "#D4A017" if score <= 70 else "#A52A2A"    
-        
+
     @st.cache_data(ttl=300)
     def load_all_data():
         df = pd.read_csv(st.secrets["GOOGLE_SHEET_URL"])
@@ -113,8 +113,6 @@ if check_password():
         df, cmj_df, phase_df = load_all_data()
         all_metrics = ['Total Jumps', 'Moderate Jumps', 'High Jumps', 'Jump Load', 'Player Load', 'Estimated Distance (y)', 'Explosive Efforts', 'High Intensity Movement']
 
-        st.markdown('<div class="main-logo-container" style="text-align: center; margin-top: 10px; margin-bottom: 15px;"><img src="https://upload.wikimedia.org/wikipedia/commons/thumb/f/fc/Tennessee_Lady_Volunteers_logo.svg/1280px-Tennessee_Lady_Volunteers_logo.svg.png" width="120"><div style="color: #FF8200; font-size: 2rem; font-weight: 900; margin-top: 10px;">LADY VOLS VOLLEYBALL PERFORMANCE</div></div>', unsafe_allow_html=True)
-        
         tabs = st.tabs(["Individual Profile", "Team Gallery", "Game v. Practice", "Position Analysis", "Match Summary"])
         session_list = df[['Date', 'Session_Name']].drop_duplicates().sort_values('Date', ascending=False)['Session_Name'].tolist()
 
@@ -129,22 +127,19 @@ if check_password():
                 if pos_f != "All Positions": dropdown_df = dropdown_df[dropdown_df['Position'] == pos_f]
                 sel_p = st.selectbox("Select Athlete", sorted(dropdown_df['Name'].unique()))
                 
-                # --- START DAILY SUM LOGIC ---
+                # GET ATHLETE DATA
                 p_full = df[df['Name'] == sel_p]
-                # Group by date and sum metrics to handle multiple sessions per day
+                p = day_df[day_df['Name'] == sel_p].iloc[0]
+                
+                # --- GROUP BY DATE TO SUM MULTIPLE SESSIONS ---
                 daily_sums = p_full.groupby('Date')[all_metrics].sum().reset_index()
-                
                 lb = daily_sums[(daily_sums['Date'] >= curr_date - timedelta(days=30)) & (daily_sums['Date'] <= curr_date)]
-                # Get the summed values for the current selected day
-                p_today = daily_sums[daily_sums['Date'] == curr_date].iloc[0]
-                # --- END DAILY SUM LOGIC ---
-                
-                # Metadata (Photo/Name) from any row belonging to that athlete
-                p_meta = p_full.iloc[0]
+                p_today_total = daily_sums[daily_sums['Date'] == curr_date].iloc[0]
+                # ----------------------------------------------
 
                 m_rows = ""; total_grade = 0; count = 0
                 for k in all_metrics:
-                    val, mx, avg = p_today[k], lb[k].max(), lb[k].mean()
+                    val, mx, avg = p_today_total[k], lb[k].max(), lb[k].mean()
                     grade = math.ceil((val / mx) * 100) if mx > 0 else 0
                     total_grade += grade; count += 1; diff = (val - avg) / avg if avg != 0 else 0
                     h_class = "class='bg-highlight-red'" if abs(diff) > 0.10 else ""
@@ -153,63 +148,47 @@ if check_password():
                 
                 score = math.ceil(total_grade / count) if count > 0 else 0
                 c1, c2, c3 = st.columns([1.2, 2.5, 1.2])
-                with c1: st.markdown(f'<div style="text-align:center;"><img src="{p_meta["PhotoURL"]}" class="player-photo-large"></div><h3 style="text-align:center;">{p_meta["Name"]}</h3>', unsafe_allow_html=True)
-                with c2: st.markdown(f'<table class="scout-table"><thead><tr><th>Metric</th><th>Daily Total</th><th>30d Max Day</th><th>Grade</th></tr></thead><tbody>{m_rows}</tbody></table>', unsafe_allow_html=True)
+                with c1: st.markdown(f'<div style="text-align:center;"><img src="{p["PhotoURL"]}" class="player-photo-large"></div><h3 style="text-align:center;">{p["Name"]}</h3>', unsafe_allow_html=True)
+                with c2: st.markdown(f'<table class="scout-table"><thead><tr><th>Metric</th><th>Today Total</th><th>30d Max Day</th><th>Grade</th></tr></thead><tbody>{m_rows}</tbody></table>', unsafe_allow_html=True)
                 with c3: st.markdown(f'<div style="display:flex; justify-content:center;"><div class="score-box" style="background-color:{get_flipped_gradient(score)};">{score}</div></div>', unsafe_allow_html=True)
-                
-                st.markdown('<div class="section-header">Weekly Readiness Profile</div>', unsafe_allow_html=True)
-                jc1, jc2 = st.columns([1.5, 3.5])
-                with jc1:
-                    p_cmj_hist = cmj_df[(cmj_df['Athlete'] == sel_p) & (cmj_df['Test Date'] <= curr_date)].sort_values('Test Date')
-                    sync_cmj = p_cmj_hist[(p_cmj_hist['Test Date'] > curr_date - timedelta(days=7))]
-                    if not sync_cmj.empty:
-                        latest = sync_cmj.iloc[-1]; base_h = p_cmj_hist.tail(5).iloc[:-1]['Jump Height (in)'].mean(); base_rsi = p_cmj_hist.tail(5).iloc[:-1]['RSI-modified [m/s]'].mean(); cur_h, cur_rsi = latest['Jump Height (in)'], latest['RSI-modified [m/s]']; p_diff = ((cur_h - base_h) / base_h) * 100
-                        label, color = ("ELITE", "#28a745") if cur_h >= base_h and cur_rsi >= base_rsi else ("FATIGUED", "#dc3545") if cur_h < base_h and cur_rsi < base_rsi else ("GRINDER", "#ffc107")
-                        st.markdown(f'<div style="text-align:center;"><div class="score-box" style="background-color:{color};">{p_diff:+.1f}%<span style="font-size:10px; display:block;">{label}</span></div></div><div class="info-box"><b>Today:</b> {cur_h:.1f}" | {cur_rsi:.2f} RSI</div>', unsafe_allow_html=True)
-                with jc2:
-                    if not p_cmj_hist.empty:
-                        fig = make_subplots(specs=[[{"secondary_y": True}]]); fig.add_trace(go.Scatter(x=p_cmj_hist['Test Date'], y=p_cmj_hist['Jump Height (in)'], name="Height", line=dict(color='#FF8200', width=3)), secondary_y=False); fig.add_trace(go.Scatter(x=p_cmj_hist['Test Date'], y=p_cmj_hist['RSI-modified [m/s]'], name="RSI", line=dict(color='#4895DB', dash='dot')), secondary_y=True); fig.update_layout(height=280, margin=dict(l=0, r=0, t=20, b=0), showlegend=False); st.plotly_chart(fig, use_container_width=True, config=LOCKED_CONFIG)
-                
-                p_ph = phase_df[(phase_df['Name'] == sel_p) & (phase_df['Date'] == curr_date)].copy()
-                if not p_ph.empty:
-                    st.markdown('<div class="section-header">Practice Phase Breakdown</div>', unsafe_allow_html=True)
-                    fig_ph = make_subplots(specs=[[{"secondary_y": True}]]); fig_ph.add_trace(go.Bar(x=p_ph['Phase'], y=p_ph['Total Jumps'], name="Jumps", marker_color='#FF8200'), secondary_y=False); fig_ph.add_trace(go.Scatter(x=p_ph['Phase'], y=p_ph['Player Load'], name="Load", line=dict(color='#4895DB', width=4)), secondary_y=False)
-                    fig_ph.update_layout(height=350, showlegend=True, legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)); st.plotly_chart(fig_ph, use_container_width=True, config=LOCKED_CONFIG)
 
         with tabs[1]: # Tab 1: Gallery
             c_gal1, c_gal2 = st.columns(2)
             with c_gal1: selected_session_gal = st.selectbox("Practice Selection", session_list, index=0, key="nav_sel_gal")
             with c_gal2: pos_f_gal = st.selectbox("Position Filter", ["All Positions"] + sorted([p for p in df['Position'].unique() if p != "N/A"]), key="nav_pos_gal")
-            gal_day_df = df[df['Session_Name'] == selected_session_gal].copy()
-            if not gal_day_df.empty:
-                curr_date_gal = gal_day_df['Date'].iloc[0]
-                if pos_f_gal != "All Positions": gal_day_df = gal_day_df[gal_day_df['Position'] == pos_f_gal]
+            gal_df = df[df['Session_Name'] == selected_session_gal].copy()
+            if not gal_df.empty:
+                curr_date_gal = gal_df['Date'].iloc[0]
+                if pos_f_gal != "All Positions": gal_df = gal_df[gal_df['Position'] == pos_f_gal]
                 
-                names_in_gal = sorted(gal_day_df['Name'].unique())
-                for i in range(0, len(names_in_gal), 2):
+                # Ensure we iterate over unique names so photos don't duplicate or cross over
+                athlete_names = sorted(gal_df['Name'].unique())
+                for i in range(0, len(athlete_names), 2):
                     cols = st.columns(2)
                     for j in range(2):
-                        if i + j < len(names_in_gal):
-                            athlete_name = names_in_gal[i + j]
-                            p_full_g = df[df['Name'] == athlete_name]
+                        if i + j < len(athlete_names):
+                            name = athlete_names[i + j]
+                            p_full_g = df[df['Name'] == name]
                             
-                            # Group by date and sum for each athlete in the gallery
+                            # --- GROUP BY DATE TO SUM MULTIPLE SESSIONS ---
                             daily_sums_g = p_full_g.groupby('Date')[all_metrics].sum().reset_index()
                             lb_g = daily_sums_g[(daily_sums_g['Date'] >= curr_date_gal - timedelta(days=30)) & (daily_sums_g['Date'] <= curr_date_gal)]
                             p_today_g = daily_sums_g[daily_sums_g['Date'] == curr_date_gal].iloc[0]
+                            # ----------------------------------------------
                             
-                            r_html = ""; t_grade_gal = 0; c_metrics_gal = 0
+                            r_html = ""; t_grade = 0; c_metrics = 0
                             for k in all_metrics:
                                 v, mx, avg = p_today_g[k], lb_g[k].max(), lb_g[k].mean()
                                 g = math.ceil((v / mx) * 100) if mx > 0 else 0
-                                t_grade_gal += g; c_metrics_gal += 1; diff = (v - avg) / avg if avg != 0 else 0
+                                t_grade += g; c_metrics += 1; diff = (v - avg) / avg if avg != 0 else 0
                                 h_class = "class='bg-highlight-red'" if abs(diff) > 0.10 else ""
                                 arr_val = f"<span class='arrow-red'>{'↑' if diff > 0.10 else '↓'}</span>" if abs(diff) > 0.10 else ""
                                 r_html += f"<tr><td>{k}</td><td {h_class}>{v:.1f} {arr_val}</td><td>{mx:.1f}</td><td>{g}</td></tr>"
                             
-                            sc_g = math.ceil(t_grade_gal / c_metrics_gal) if c_metrics_gal > 0 else 0
-                            p_meta_g = p_full_g.iloc[0]
-                            with cols[j]: st.markdown(f'<div style="border:1px solid #E5E5E7; border-radius:15px; padding:15px; margin-bottom:20px;"><div style="display:flex; align-items:center; gap:10px;"><div style="flex:1.2; text-align:center;"><img src="{p_meta_g["PhotoURL"]}" class="gallery-photo"><p style="font-weight:bold; font-size:15px; margin-top:8px;">{athlete_name}</p></div><div style="flex:3;"><table class="scout-table"><thead><tr><th>Metric</th><th>Total</th><th>Max Day</th><th>Grade</th></tr></thead><tbody>{r_html}</tbody></table></div><div style="flex:1; text-align:center;"><div style="background-color:{get_flipped_gradient(sc_g)}; color:white; padding:10px; border-radius:12px; font-size:32px; font-weight:900;">{sc_g}</div></div></div></div>', unsafe_allow_html=True)
+                            sc_g = math.ceil(t_grade / c_metrics) if c_metrics > 0 else 0
+                            # Pull photo/position from the original gal_df for this athlete
+                            p_info = gal_df[gal_df['Name'] == name].iloc[0]
+                            with cols[j]: st.markdown(f'<div style="border:1px solid #E5E5E7; border-radius:15px; padding:15px; margin-bottom:20px;"><div style="display:flex; align-items:center; gap:10px;"><div style="flex:1.2; text-align:center;"><img src="{p_info["PhotoURL"]}" class="gallery-photo"><p style="font-weight:bold; font-size:15px; margin-top:8px;">{name}</p></div><div style="flex:3;"><table class="scout-table"><thead><tr><th>Metric</th><th>Total</th><th>Max Day</th><th>Grade</th></tr></thead><tbody>{r_html}</tbody></table></div><div style="flex:1; text-align:center;"><div style="background-color:{get_flipped_gradient(sc_g)}; color:white; padding:10px; border-radius:12px; font-size:32px; font-weight:900;">{sc_g}</div></div></div></div>', unsafe_allow_html=True)
                                 
         with tabs[2]: # Game v Practice
             st.markdown('<div class="section-header">Weekly Prep Intensity vs. Game Demands</div>', unsafe_allow_html=True)
