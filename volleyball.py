@@ -275,113 +275,108 @@ if check_password():
                     for _, r in sub.iterrows(): is_sel = (r['Session_Name'] == gp_g); fig_tr.add_trace(go.Scatter(x=[r['Day_Label']], y=[r['Player Load']], name=r['Session_Name'] if s_t == 'Game' else s_t, mode='markers', marker=dict(color=clr, size=16 if is_sel else 10, line=dict(width=3 if is_sel else 1, color='black' if is_sel else 'white')), showlegend=True if s_t == 'Game' else (True if _ == sub.index[0] else False)))
                 fig_tr.update_layout(height=350, margin=dict(l=0, r=0, t=20, b=0), yaxis_title="Avg Player Load"); st.plotly_chart(fig_tr, use_container_width=True, config=LOCKED_CONFIG)
                 
-        with tabs[3]: # Position Analysis
+       with tabs[3]: # Position Analysis
             st.markdown('<div class="section-header">Positional Performance Trends</div>', unsafe_allow_html=True)
-            sel_p_pos = st.selectbox("Select Athlete for Comparative Trend", sorted(df['Name'].unique()), key="pos_analysis_sel")
             
-            # --- DATA GATHERING ---
-            p_pos_meta = df[df['Name'] == sel_p_pos].iloc[0]
-            pos_label = p_pos_meta['Position']
-            max_wk = df['Week'].max()
-            rec_4 = list(range(int(max_wk) - 3, int(max_wk) + 1))
-            tr_df = df[df['Week'].isin(rec_4)]
-            
-            # Sync Photo from Master
-            try:
-                athlete_photo_pos = df[df['Name'] == sel_p_pos]['PhotoURL'].iloc[0]
-            except:
-                athlete_photo_pos = p_pos_meta['PhotoURL']
-
-            # --- ATHLETE CARD & TABLE ---
-            st.markdown(f'<div class="player-row-container">', unsafe_allow_html=True)
-            c_ath1, c_ath2 = st.columns([2, 3], gap="medium")
-            
-            with c_ath1:
-                st.markdown(f"""
-                    <div style="display:flex; align-items:center; gap:12px; padding:10px; background:#f8f9fa; border-bottom:2px solid #FF8200; border-radius: 10px 10px 0 0;">
-                        <img src="{athlete_photo_pos}" class="gallery-photo" style="width:70px; height:70px; object-fit: cover;">
-                        <div>
-                            <p style="margin:0; font-weight:900; color:#1D1D1F; font-size:18px;">{sel_p_pos}</p>
-                            <p style="margin:0; color:#4895DB; font-weight:700; font-size:14px;">{pos_label} | 4-Week Average</p>
-                        </div>
-                    </div>
-                """, unsafe_allow_html=True)
+            # --- FILTERS ROW ---
+            c_p1, c_p2 = st.columns([1, 2])
+            with c_p1:
+                pos_filter_an = st.selectbox("Filter Names by Position", ["All Positions"] + sorted([p for p in df['Position'].unique() if p != "N/A"]), key="pos_an_filt")
+            with c_p2:
+                # Filter name list based on position selection
+                if pos_filter_an != "All Positions":
+                    available_names = sorted(df[df['Position'] == pos_filter_an]['Name'].unique())
+                else:
+                    available_names = sorted(df['Name'].unique())
                 
-                # Calculate 4-week averages
+                sel_p_list = st.multiselect("Select Athletes for Comparison", available_names, default=[available_names[0]], key="pos_analysis_sel_multi")
+            
+            if sel_p_list:
+                # --- DATA GATHERING ---
+                max_wk = df['Week'].max()
+                rec_4 = list(range(int(max_wk) - 3, int(max_wk) + 1))
+                tr_df = df[df['Week'].isin(rec_4)]
+                
+                # Get the position label from the first selected athlete for the "Group Avg" comparison
+                primary_pos = df[df['Name'] == sel_p_list[0]]['Position'].iloc[0]
+                
+                # --- FULL WIDTH TABLE SECTION ---
+                st.markdown('<div class="player-row-container" style="padding: 0;">', unsafe_allow_html=True)
+                
                 tr_metrics = ["Player Load", "Estimated Distance (y)", "Total Jumps"]
-                p_4wk_avg = tr_df[tr_df['Name'] == sel_p_pos][tr_metrics].mean()
-                pos_4wk_avg = tr_df[tr_df['Position'] == pos_label][tr_metrics].mean()
-                
-                table_html = f"""
-                    <div style="min-height: 200px;">
-                        <table class="scout-table" style="width:100%; margin-top:10px;">
-                            <thead>
-                                <tr><th>Metric</th><th>{sel_p_pos}</th><th>{pos_label} Group</th></tr>
-                            </thead>
-                            <tbody>
-                                <tr><td style="font-weight:700;">Player Load</td><td>{p_4wk_avg['Player Load']:.1f}</td><td>{pos_4wk_avg['Player Load']:.1f}</td></tr>
-                                <tr><td style="font-weight:700;">Distance (y)</td><td>{p_4wk_avg['Estimated Distance (y)']:.0f}</td><td>{pos_4wk_avg['Estimated Distance (y)']:.0f}</td></tr>
-                                <tr><td style="font-weight:700;">Total Jumps</td><td>{p_4wk_avg['Total Jumps']:.0f}</td><td>{pos_4wk_avg['Total Jumps']:.0f}</td></tr>
-                            </tbody>
-                        </table>
-                    </div>
-                """
-                st.markdown(table_html, unsafe_allow_html=True)
+                pos_4wk_avg = tr_df[df['Position'] == primary_pos][tr_metrics].mean()
 
-            with c_ath2:
+                # Build Dynamic Table Header
+                table_head = f"<tr><th>Metric</th>"
+                for name in sel_p_list:
+                    table_head += f"<th>{name}</th>"
+                table_head += f"<th>{primary_pos} Group Avg</th></tr>"
+
+                # Build Table Rows
+                rows_html = ""
+                for m in tr_metrics:
+                    row = f"<tr><td style='font-weight:700;'>{m}</td>"
+                    for name in sel_p_list:
+                        val = tr_df[tr_df['Name'] == name][m].mean()
+                        row += f"<td>{val:.1f}</td>"
+                    row += f"<td style='background:#f8f9fa; font-weight:700;'>{pos_4wk_avg[m]:.1f}</td></tr>"
+                    rows_html += row
+
                 st.markdown(f"""
-                    <div style="padding: 20px; background: #ffffff; border: 1px dashed #E5E5E7; border-radius: 10px; height: 100%;">
-                        <p style="color: #515154; font-size: 13px; font-style: italic;">
-                            Showing comparison data for <b>Week {rec_4[0]} through Week {rec_4[-1]}</b>. 
-                            Charts below display the specific trend of individual output vs. positional norms.
-                        </p>
-                    </div>
+                    <table class="scout-table" style="width:100%;">
+                        <thead>{table_head}</thead>
+                        <tbody>{rows_html}</tbody>
+                    </table>
                 """, unsafe_allow_html=True)
-            st.markdown('</div>', unsafe_allow_html=True)
-            
-            # --- TREND GRAPHS ---
-            st.write("<br>", unsafe_allow_html=True)
-            t_col1, t_col2, t_col3 = st.columns(3)
-            cols = [t_col1, t_col2, t_col3]
-            
-            for i, m in enumerate(tr_metrics):
-                if m in df.columns:
-                    with cols[i]:
-                        fig_t = go.Figure()
-                        
-                        # Athlete Trend
-                        p_t = tr_df[tr_df['Name'] == sel_p_pos].groupby('Week')[m].mean().reset_index()
-                        fig_t.add_trace(go.Scatter(
-                            x=p_t['Week'], y=p_t[m], 
-                            name=sel_p_pos, 
-                            line=dict(color='#4895DB', width=4), 
-                            mode='lines+markers'
-                        ))
-                        
-                        # Position Avg Trend
-                        pos_t = tr_df[tr_df['Position'] == pos_label].groupby('Week')[m].mean().reset_index()
-                        fig_t.add_trace(go.Scatter(
-                            x=pos_t['Week'], y=pos_t[m], 
-                            name=f"{pos_label} Avg", 
-                            line=dict(color='#FF8200', dash='dash'),
-                            mode='lines'
-                        ))
-                        
-                        fig_t.update_layout(
-                            # FIXED FONT PROPERTY HERE
-                            title=dict(
-                                text=f"4-Week {m}", 
-                                font=dict(size=14, color='#4895DB', weight='bold')
-                            ),
-                            xaxis=dict(dtick=1, title="Week", showgrid=False), 
-                            yaxis=dict(showgrid=True, gridcolor='#F5F5F7'),
-                            height=280, 
-                            margin=dict(l=10, r=10, t=50, b=10), 
-                            showlegend=True,
-                            template="simple_white",
-                            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
-                        )
-                        st.plotly_chart(fig_t, use_container_width=True, config=LOCKED_CONFIG)
+                st.markdown('</div>', unsafe_allow_html=True)
+
+                # --- TREND GRAPHS ---
+                st.write("<br>", unsafe_allow_html=True)
+                t_col1, t_col2, t_col3 = st.columns(3)
+                cols = [t_col1, t_col2, t_col3]
+                
+                # Use a standard color palette for multiple athletes
+                colors = ['#4895DB', '#FF8200', '#2D5A27', '#A52A2A', '#515154']
+
+                for i, m in enumerate(tr_metrics):
+                    if m in df.columns:
+                        with cols[i]:
+                            fig_t = go.Figure()
+                            
+                            # Add line for each selected athlete
+                            for idx, name in enumerate(sel_p_list):
+                                p_t = tr_df[tr_df['Name'] == name].groupby('Week')[m].mean().reset_index()
+                                fig_t.add_trace(go.Scatter(
+                                    x=p_t['Week'], y=p_t[m], 
+                                    name=name, 
+                                    line=dict(color=colors[idx % len(colors)], width=4), 
+                                    mode='lines+markers'
+                                ))
+                            
+                            # Add Position Average reference line
+                            pos_t = tr_df[tr_df['Position'] == primary_pos].groupby('Week')[m].mean().reset_index()
+                            fig_t.add_trace(go.Scatter(
+                                x=pos_t['Week'], y=pos_t[m], 
+                                name=f"{primary_pos} Avg", 
+                                line=dict(color='#000000', dash='dash', width=2),
+                                mode='lines'
+                            ))
+                            
+                            fig_t.update_layout(
+                                title=dict(
+                                    text=f"4-Week {m} Trend", 
+                                    font=dict(size=14, color='#4895DB', weight='bold')
+                                ),
+                                xaxis=dict(dtick=1, title="Week", showgrid=False), 
+                                yaxis=dict(showgrid=True, gridcolor='#F5F5F7'),
+                                height=320, 
+                                margin=dict(l=10, r=10, t=50, b=10), 
+                                showlegend=True,
+                                template="simple_white",
+                                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+                            )
+                            st.plotly_chart(fig_t, use_container_width=True, config=LOCKED_CONFIG)
+                            
                         
         with tabs[4]: # Match Summary
             if st.session_state.is_printing:
