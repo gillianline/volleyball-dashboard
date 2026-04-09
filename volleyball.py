@@ -498,56 +498,44 @@ if check_password():
                 for group in display_groups:
                     header_color = "#4895DB" if group == "Team Overall" else "#FF8200"
                     
-                    # Force a clean container for each position to prevent HTML spillover
-                    with st.container():
-                        st.markdown(f"{group} Breakdown")
+                    st.markdown(f"{group} Breakdown")
+                    
+                    if group == "Team Overall":
+                        plot_df = working_df.copy()
+                    else:
+                        plot_df = working_df[working_df['Position'] == group]
+
+                    plot_sum = plot_df.groupby('Phase').agg({
+                        'Player Load': 'mean',
+                        'Explosive Efforts': 'mean',
+                        'Total Jumps': 'mean',
+                        'Estimated Distance (y)': 'mean'
+                    }).reset_index().sort_values('Player Load', ascending=False)
+
+                    if not plot_sum.empty:
+                        # We build the HTML pieces in a list for reliability
+                        html_output = []
+                        html_output.append(f'<div style="margin-bottom: 20px; border: 1px solid #E5E5E7; border-radius: 10px; overflow: hidden;">')
+                        html_output.append(f'<table class="scout-table" style="width:100%; border-collapse: collapse;">')
+                        html_output.append(f'<thead><tr style="background-color: {header_color}; color: white;">')
+                        html_output.append(f'<th style="text-align:left; padding: 12px 20px;">Phase</th>')
+                        html_output.append(f'<th>Avg Player Load</th><th>Explosive Efforts</th><th>Total Jumps</th><th>Avg Distance (y)</th></tr></thead><tbody>')
                         
-                        if group == "Team Overall":
-                            plot_df = working_df.copy()
-                        else:
-                            plot_df = working_df[working_df['Position'] == group]
-
-                        plot_sum = plot_df.groupby('Phase').agg({
-                            'Player Load': 'mean',
-                            'Explosive Efforts': 'mean',
-                            'Total Jumps': 'mean',
-                            'Estimated Distance (y)': 'mean'
-                        }).reset_index().sort_values('Player Load', ascending=False)
-
-                        if not plot_sum.empty:
-                            # Start table string
-                            t_html = f"""
-                            <div style="margin-bottom: 20px; border: 1px solid #E5E5E7; border-radius: 10px; overflow: hidden;">
-                                <table class="scout-table" style="width:100%; border-collapse: collapse;">
-                                    <thead>
-                                        <tr style="background-color: {header_color}; color: white;">
-                                            <th style='text-align:left; padding: 12px 20px;'>Phase</th>
-                                            <th>Avg Player Load</th>
-                                            <th>Explosive Efforts</th>
-                                            <th>Total Jumps</th>
-                                            <th>Avg Distance (y)</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                            """
-                            # Add rows
-                            for _, row in plot_sum.iterrows():
-                                t_html += f"""
-                                    <tr>
-                                        <td style='text-align:left; padding-left:20px; font-weight:700;'>{row['Phase']}</td>
-                                        <td>{row['Player Load']:.1f}</td>
-                                        <td>{row['Explosive Efforts']:.1f}</td>
-                                        <td>{row['Total Jumps']:.1f}</td>
-                                        <td>{row['Estimated Distance (y)']:.0f}</td>
-                                    </tr>
-                                """
-                            
-                            t_html += "</tbody></table></div>"
-                            
-                            # CRITICAL: Render the HTML for this specific position
-                            st.markdown(t_html, unsafe_allow_html=True)
-                        else:
-                            st.info(f"No data for {group}")
+                        for _, row in plot_sum.iterrows():
+                            html_output.append(f"<tr>")
+                            html_output.append(f"<td style='text-align:left; padding-left:20px; font-weight:700;'>{row['Phase']}</td>")
+                            html_output.append(f"<td>{row['Player Load']:.1f}</td>")
+                            html_output.append(f"<td>{row['Explosive Efforts']:.1f}</td>")
+                            html_output.append(f"<td>{row['Total Jumps']:.1f}</td>")
+                            html_output.append(f"<td>{row['Estimated Distance (y)']:.0f}</td>")
+                            html_output.append(f"</tr>")
+                        
+                        html_output.append('</tbody></table></div>')
+                        
+                        # JOIN AND RENDER
+                        st.write("".join(html_output), unsafe_allow_html=True)
+                    else:
+                        st.info(f"No data for {group}")
             else:
                 st.info("Phase data is loading...")
                 
