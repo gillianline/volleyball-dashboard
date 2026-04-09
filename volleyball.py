@@ -69,62 +69,6 @@ if check_password():
         </style>
         """, unsafe_allow_html=True)
 
-    I have updated the code to handle multiple sessions per day by grouping by date and athlete name, then summing the metrics. This ensures that if an athlete has a lift and a practice on the same day, they are combined into one "Daily Total" for both today's values and the 30-day Max calculation.
-
-I have also ensured that the Max is pulled from the full 30-day window (ignoring position filters) to keep your grades accurate to your Excel sheet.
-
-Python
-import streamlit as st
-import pandas as pd
-import plotly.express as px
-import plotly.graph_objects as go
-from plotly.subplots import make_subplots
-import math 
-from datetime import timedelta
-
-# --- PAGE CONFIG ---
-st.set_page_config(page_title="Lady Vols VB Performance", layout="wide")
-
-# --- PASSWORD PROTECTION ---
-def check_password():
-    def password_entered():
-        if st.session_state["password"] == st.secrets["PASSWORD"]:
-            st.session_state["password_correct"] = True
-            del st.session_state["password"]
-        else:
-            st.session_state["password_correct"] = False
-    if "password_correct" not in st.session_state:
-        st.text_input("Enter Password", type="password", on_change=password_entered, key="password")
-        return False
-    elif not st.session_state["password_correct"]:
-        st.text_input("Enter Password", type="password", on_change=password_entered, key="password")
-        st.error("Incorrect Password")
-        return False
-    else:
-        return True
-
-if check_password():
-    # --- CSS: FORMATTING & PAGE BREAK CONTROLS ---
-    st.markdown("""
-        <style>
-        .stApp { background-color: #FFFFFF; color: #1D1D1F; }
-        hr { display: none !important; }
-        .block-container { padding-top: 2rem !important; }
-        .viewerBadge_link__1S137, .main_heading_anchor__m6v0K, a.header-anchor { display: none !important; }
-        header a { display: none !important; }
-        .scout-table { width: 100%; border-collapse: collapse; text-align: center; table-layout: auto; }
-        .scout-table th { background-color: #4895DB; color: white; padding: 6px; border-bottom: 2px solid #FF8200; font-weight: 700; font-size: 14px; text-transform: uppercase; }
-        .scout-table td { padding: 6px; border-bottom: 1px solid #F5F5F7; font-size: 14px; color: #1D1D1F; }
-        .bg-highlight-red { background-color: #ffcccc !important; font-weight: 900; }
-        .arrow-red { color: #b30000 !important; font-weight: 900; margin-left: 4px; }
-        .player-photo-large { border-radius: 50%; width: 220px; height: 220px; object-fit: cover; border: 6px solid #FF8200; }
-        .score-box { padding: 12px 20px; border-radius: 12px; font-size: 28px; font-weight: 800; min-width: 100px; color: #FFFFFF; line-height: 1.2; text-align: center;}
-        .info-box { background-color: #f8f9fa; border-left: 5px solid #FF8200; padding: 12px; margin-top: 10px; font-size: 12px; color: #1D1D1F; font-weight: 600; line-height: 1.4; }
-        .section-header { font-size: 24px; font-weight: 800; color: #4895DB; border-bottom: 2px solid #FF8200; margin-top: 20px; margin-bottom: 15px; padding-bottom: 5px; text-transform: uppercase; }
-        .gallery-photo { border-radius: 50%; width: 110px; height: 110px; object-fit: cover; border: 4px solid #FF8200; }
-        </style>
-        """, unsafe_allow_html=True)
-
     def get_flipped_gradient(score):
         score = float(score); return "#2D5A27" if score <= 40 else "#D4A017" if score <= 70 else "#A52A2A"
 
