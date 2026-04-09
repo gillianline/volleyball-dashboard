@@ -69,6 +69,8 @@ if check_password():
         </style>
         """, unsafe_allow_html=True)
 
+    LOCKED_CONFIG = {'staticPlot': True, 'displayModeBar': False}
+
     def get_flipped_gradient(score):
         score = float(score); return "#2D5A27" if score <= 40 else "#D4A017" if score <= 70 else "#A52A2A"
 
