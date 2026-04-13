@@ -215,7 +215,7 @@ if check_password():
                         latest = p_cmj_hist.iloc[-1]
                         st.info(f"First test recorded: {latest['Jump Height (in)']:.1f}\"")
                         
-                        with jc2:
+                with jc2:
                     if not p_cmj_hist.empty:
                         fig = make_subplots(specs=[[{"secondary_y": True}]])
                         fig.add_trace(go.Scatter(x=p_cmj_hist['Test Date'], y=p_cmj_hist['Jump Height (in)'], name="Height", line=dict(color='#FF8200', width=3)), secondary_y=False)
