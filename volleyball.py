@@ -361,15 +361,15 @@ if check_password():
                     st.markdown('</div>', unsafe_allow_html=True)
                         
         with tabs[4]: # Match Summary
-        custom_colors = [
-        '#4895DB', # Blue
-        '#FF8200', # Orange
-        '#515154', # Grey
-        '#A52A2A', # Brown/Red
-        '#008080', # Teal
-        '#6A1B9A', # Purple
-        '#2E7D32'  # Green
-        ]
+            custom_colors = [
+            '#4895DB', # Blue
+            '#FF8200', # Orange
+            '#515154', # Grey
+            '#A52A2A', # Brown/Red
+            '#008080', # Teal
+            '#6A1B9A', # Purple
+            '#2E7D32'  # Green
+            ]
             if st.session_state.is_printing:
                 if st.button("Back to Editor (Show Filters)"):
                     st.session_state.is_printing = False
