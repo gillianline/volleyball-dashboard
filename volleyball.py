@@ -180,15 +180,42 @@ if check_password():
                 
                 with jc1:
                     sync_cmj = p_cmj_hist[(p_cmj_hist['Test Date'] > curr_date - timedelta(days=7))]
-                    if not sync_cmj.empty:
-                        latest = sync_cmj.iloc[-1]
-                        base_h = p_cmj_hist.tail(5).iloc[:-1]['Jump Height (in)'].mean()
-                        base_rsi = p_cmj_hist.tail(5).iloc[:-1]['RSI-modified [m/s]'].mean()
+                    
+                    # We need at least 2 tests in history to show a "change"
+                    if len(p_cmj_hist) >= 2:
+                        latest = p_cmj_hist.iloc[-1]   # The most recent test
+                        previous = p_cmj_hist.iloc[-2] # The test immediately before it
+                        
                         cur_h, cur_rsi = latest['Jump Height (in)'], latest['RSI-modified [m/s]']
-                        p_diff = ((cur_h - base_h) / base_h) * 100 if base_h > 0 else 0
-                        label, color = ("ELITE", "#28a745") if cur_h >= base_h and cur_rsi >= base_rsi else ("FATIGUED", "#dc3545") if cur_h < base_h and cur_rsi < base_rsi else ("GRINDER", "#ffc107")
-                        st.markdown(f'<div style="text-align:center;"><div class="score-box" style="background-color:{color};">{p_diff:+.1f}%<span style="font-size:10px; display:block;">{label}</span></div></div><div class="info-box"><b>Today:</b> {cur_h:.1f}" | {cur_rsi:.2f} RSI</div>', unsafe_allow_html=True)
-                with jc2:
+                        prev_h, prev_rsi = previous['Jump Height (in)'], previous['RSI-modified [m/s]']
+                        
+                        # Calculate % change from the previous jump
+                        p_diff = ((cur_h - prev_h) / prev_h) * 100 if prev_h > 0 else 0
+                        
+                        # Status Logic: Compared to the jump right before
+                        label, color = ("ELITE", "#28a745") if cur_h >= prev_h and cur_rsi >= prev_rsi else \
+                                       ("FATIGUED", "#dc3545") if cur_h < prev_h and cur_rsi < prev_rsi else \
+                                       ("GRINDER", "#ffc107")
+                        
+                        # UI Display
+                        st.markdown(f"""
+                            <div style="text-align:center;">
+                                <div class="score-box" style="background-color:{color}; line-height:1.2; padding-top:15px; height:80px; width:80px;">
+                                    <span style="font-size:18px;">{p_diff:+.1f}%</span>
+                                    <span style="font-size:10px; display:block; font-weight:bold; margin-top:2px;">{label}</span>
+                                </div>
+                            </div>
+                            <div class="info-box" style="text-align:center; margin-top:10px;">
+                                <p style="margin:0; font-size:12px;"><b>Vs. Prev:</b> {prev_h:.1f}" | {prev_rsi:.2f}</p>
+                                <p style="margin:0; font-size:13px; color:#4895DB;"><b>Today:</b> {cur_h:.1f}" | {cur_rsi:.2f}</p>
+                            </div>
+                        """, unsafe_allow_html=True)
+                    elif not p_cmj_hist.empty:
+                        # Fallback if they only have 1 test ever
+                        latest = p_cmj_hist.iloc[-1]
+                        st.info(f"First test recorded: {latest['Jump Height (in)']:.1f}\"")
+                        
+                        with jc2:
                     if not p_cmj_hist.empty:
                         fig = make_subplots(specs=[[{"secondary_y": True}]])
                         fig.add_trace(go.Scatter(x=p_cmj_hist['Test Date'], y=p_cmj_hist['Jump Height (in)'], name="Height", line=dict(color='#FF8200', width=3)), secondary_y=False)
