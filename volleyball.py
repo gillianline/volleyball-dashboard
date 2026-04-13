@@ -345,7 +345,7 @@ if check_password():
                                     margin: 0 auto 10px auto;
                                 ">
                                 <p style="margin:0; font-weight:900; color:#1D1D1F; font-size:18px;">{name}</p>
-                                <p style="margin:0; color:#4895DB; font-weight:700; font-size:13px;">{pos_filter_an} Unit</p>
+                                <p style="margin:0; color:#4895DB; font-weight:700; font-size:13px;">{pos_filter_an}</p>
                             </div>
                         """, unsafe_allow_html=True)
                         
@@ -353,7 +353,7 @@ if check_password():
                         table_html = f"""
                             <table class="scout-table" style="width:100%; margin-top:15px;">
                                 <thead>
-                                    <tr><th>Metric</th><th>{name[:3]}.</th><th>Unit</th></tr>
+                                    <tr><th>Metric</th><th>{name}.</th><th>Position</th></tr>
                                 </thead>
                                 <tbody>
                                     <tr><td style="font-weight:700;">Player Load</td><td>{p_4wk_avg['Player Load']:.0f}</td><td>{pos_4wk_avg['Player Load']:.0f}</td></tr>
