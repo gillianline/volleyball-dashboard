@@ -361,123 +361,123 @@ if check_password():
                     st.markdown('</div>', unsafe_allow_html=True)
                         
         with tabs[4]: # Match Summary
-    custom_colors = [
-        '#4895DB', # Blue
-        '#FF8200', # Orange
-        '#515154', # Grey
-        '#A52A2A', # Brown/Red
-        '#008080', # Teal
-        '#6A1B9A', # Purple
-        '#2E7D32'  # Green
-    ]
+            custom_colors = [
+            '#4895DB', # Blue
+            '#FF8200', # Orange
+            '#515154', # Grey
+            '#A52A2A', # Brown/Red
+            '#008080', # Teal
+            '#6A1B9A', # Purple
+            '#2E7D32'  # Green
+        ]
     
-    if st.session_state.is_printing:
-        if st.button("Back to Editor (Show Filters)"):
-            st.session_state.is_printing = False
-            st.rerun()
-    else:
-        st.markdown('<div class="print-hide">', unsafe_allow_html=True)
-        if st.button("Prepare PDF for Printing"):
-            st.session_state.is_printing = True
-            st.rerun()
-        st.markdown('<div class="section-header">Match Comparison Selection</div>', unsafe_allow_html=True)
-        c_ts1, c_ts2 = st.columns([2, 1])
-        with c_ts1:
-            match_list_t = match_df.sort_values(['Date', 'Sheet_Order'])['Session_Name'].unique()
-            if "matches_state" not in st.session_state: 
-                st.session_state.matches_state = match_list_t[-3:] if len(match_list_t) >=3 else match_list_t
-            st.session_state.matches_state = st.multiselect("Select Matches", match_list_t, default=st.session_state.matches_state)
-        with c_ts2:
-            if "pos_state" not in st.session_state: st.session_state.pos_state = "All Positions"
-            st.session_state.pos_state = st.selectbox("Filter by Position", ["All Positions"] + sorted(list(match_df['Position'].unique())), index=0)
-        st.markdown('</div>', unsafe_allow_html=True)
+            if st.session_state.is_printing:
+                if st.button("Back to Editor (Show Filters)"):
+                    st.session_state.is_printing = False
+                    st.rerun()
+            else:
+                st.markdown('<div class="print-hide">', unsafe_allow_html=True)
+                if st.button("Prepare PDF for Printing"):
+                    st.session_state.is_printing = True
+                    st.rerun()
+                st.markdown('<div class="section-header">Match Comparison Selection</div>', unsafe_allow_html=True)
+                c_ts1, c_ts2 = st.columns([2, 1])
+                with c_ts1:
+                    match_list_t = match_df.sort_values(['Date', 'Sheet_Order'])['Session_Name'].unique()
+                    if "matches_state" not in st.session_state: 
+                        st.session_state.matches_state = match_list_t[-3:] if len(match_list_t) >=3 else match_list_t
+                    st.session_state.matches_state = st.multiselect("Select Matches", match_list_t, default=st.session_state.matches_state)
+                with c_ts2:
+                    if "pos_state" not in st.session_state: st.session_state.pos_state = "All Positions"
+                    st.session_state.pos_state = st.selectbox("Filter by Position", ["All Positions"] + sorted(list(match_df['Position'].unique())), index=0)
+                st.markdown('</div>', unsafe_allow_html=True)
 
-    if st.session_state.is_printing:
-        st.markdown('<script>window.print();</script>', unsafe_allow_html=True)
+            if st.session_state.is_printing:
+                st.markdown('<script>window.print();</script>', unsafe_allow_html=True)
 
-    selected_matches = st.session_state.get("matches_state", [])
-    pos_filter_t = st.session_state.get("pos_state", "All Positions")
+            selected_matches = st.session_state.get("matches_state", [])
+            pos_filter_t = st.session_state.get("pos_state", "All Positions")
 
-    if selected_matches:
-        # --- FIX: Map the expanded custom_colors to the matches ---
-        # Using % len(custom_colors) ensures it never runs out of index
-        m_map = {m: custom_colors[idx % len(custom_colors)] for idx, m in enumerate(selected_matches)}
+            if selected_matches:
+                # --- FIX: Map the expanded custom_colors to the matches ---
+                # Using % len(custom_colors) ensures it never runs out of index
+                m_map = {m: custom_colors[idx % len(custom_colors)] for idx, m in enumerate(selected_matches)}
         
-        st.markdown('<div class="section-header">Athlete Match Performance Breakdown</div>', unsafe_allow_html=True)
+                st.markdown('<div class="section-header">Athlete Match Performance Breakdown</div>', unsafe_allow_html=True)
         
-        tourney_df = match_df[match_df['Session_Name'].isin(selected_matches)].sort_values(['Date', 'Sheet_Order'])
-        if pos_filter_t != "All Positions": 
-            tourney_df = tourney_df[tourney_df['Position'] == pos_filter_t]
+                tourney_df = match_df[match_df['Session_Name'].isin(selected_matches)].sort_values(['Date', 'Sheet_Order'])
+                if pos_filter_t != "All Positions": 
+                    tourney_df = tourney_df[tourney_df['Position'] == pos_filter_t]
 
-        for name in sorted(tourney_df['Name'].unique()):
-            ad = tourney_df[tourney_df['Name'] == name]
+                for name in sorted(tourney_df['Name'].unique()):
+                    ad = tourney_df[tourney_df['Name'] == name]
             
-            try:
-                correct_photo = df[df['Name'] == name]['PhotoURL'].iloc[0]
-            except:
-                correct_photo = "https://www.w3schools.com/howto/img_avatar.png"
+                    try:
+                        correct_photo = df[df['Name'] == name]['PhotoURL'].iloc[0]
+                    except:
+                        correct_photo = "https://www.w3schools.com/howto/img_avatar.png"
             
-            st.markdown(f'<div class="player-row-container"><div class="player-divider"></div>', unsafe_allow_html=True)
-            side_cols = st.columns([1.5, 2])
-            with side_cols[0]:
-                card_start = f"""
-                    <div style="display:flex; align-items:center; gap:12px; padding:10px; background:#f8f9fa; border-bottom:2px solid #FF8200;">
-                        <img src="{correct_photo}" class="gallery-photo" style="width:65px; height:65px;">
-                        <div>
-                            <p style="margin:0; font-weight:900; color:#1D1D1F; font-size:18px;">{name}</p>
-                            <p style="margin:0; color:#4895DB; font-weight:700; font-size:16px;">{ad['Position'].iloc[0]}</p>
-                        </div>
-                    </div>
-                    <div style="padding:5px;">
-                        <table class="scout-table" style="margin-bottom:0;">
-                            <thead><tr><th>Match</th><th>Total Jumps</th><th>Player Load</th><th>Explosive Efforts</th><th>Estimated Distance</th></tr></thead>
-                            <tbody>
-                """
-                for _, r in ad.iterrows():
-                    card_start += f"<tr><td style='font-weight:700; font-size:11px;'>{r['Session_Name']}</td><td>{int(r['Total Jumps'])}</td><td>{r['Player Load']:.0f}</td><td>{r['Explosive Efforts']:.0f}</td><td>{r['Estimated Distance (y)']:.0f}</td></tr>"
+                    st.markdown(f'<div class="player-row-container"><div class="player-divider"></div>', unsafe_allow_html=True)
+                    side_cols = st.columns([1.5, 2])
+                    with side_cols[0]:
+                        card_start = f"""
+                            <div style="display:flex; align-items:center; gap:12px; padding:10px; background:#f8f9fa; border-bottom:2px solid #FF8200;">
+                                <img src="{correct_photo}" class="gallery-photo" style="width:65px; height:65px;">
+                                <div>
+                                    <p style="margin:0; font-weight:900; color:#1D1D1F; font-size:18px;">{name}</p>
+                                    <p style="margin:0; color:#4895DB; font-weight:700; font-size:16px;">{ad['Position'].iloc[0]}</p>
+                                </div>
+                            </div>
+                            <div style="padding:5px;">
+                                <table class="scout-table" style="margin-bottom:0;">
+                                    <thead><tr><th>Match</th><th>Total Jumps</th><th>Player Load</th><th>Explosive Efforts</th><th>Estimated Distance</th></tr></thead>
+                                    <tbody>
+                        """
+                        for _, r in ad.iterrows():
+                            card_start += f"<tr><td style='font-weight:700; font-size:11px;'>{r['Session_Name']}</td><td>{int(r['Total Jumps'])}</td><td>{r['Player Load']:.0f}</td><td>{r['Explosive Efforts']:.0f}</td><td>{r['Estimated Distance (y)']:.0f}</td></tr>"
                 
-                total_j = int(ad['Total Jumps'].sum())
-                total_pl = ad['Player Load'].sum()
-                total_ee = ad['Explosive Efforts'].sum()
-                total_dist = ad['Estimated Distance (y)'].sum()
+                        total_j = int(ad['Total Jumps'].sum())
+                        total_pl = ad['Player Load'].sum()
+                        total_ee = ad['Explosive Efforts'].sum()
+                        total_dist = ad['Estimated Distance (y)'].sum()
                 
-                card_start += f"<tr style='background:#4895DB; color:white; font-weight:900;'><td>TOTAL</td><td>{total_j}</td><td>{total_pl:.0f}</td><td>{total_ee:.0f}</td><td>{total_dist:.0f}</td></tr></tbody></table></div>"
-                st.markdown(card_start, unsafe_allow_html=True)
+                        card_start += f"<tr style='background:#4895DB; color:white; font-weight:900;'><td>TOTAL</td><td>{total_j}</td><td>{total_pl:.0f}</td><td>{total_ee:.0f}</td><td>{total_dist:.0f}</td></tr></tbody></table></div>"
+                        st.markdown(card_start, unsafe_allow_html=True)
             
-            with side_cols[1]:
-                fig_ath = make_subplots(specs=[[{"secondary_y": True}]])
-                for _, r in ad.iterrows():
-                    # Main Bars
-                    fig_ath.add_trace(go.Bar(
-                        name=r['Session_Name'], 
-                        x=['Total Jumps', 'Explosive Efforts'], 
-                        y=[r['Total Jumps'], r['Explosive Efforts']], 
-                        marker_color=m_map[r['Session_Name']],
-                        offsetgroup=r['Session_Name']
-                    ), secondary_y=False)
+                    with side_cols[1]:
+                        fig_ath = make_subplots(specs=[[{"secondary_y": True}]])
+                        for _, r in ad.iterrows():
+                            # Main Bars
+                            fig_ath.add_trace(go.Bar(
+                                name=r['Session_Name'], 
+                                x=['Total Jumps', 'Explosive Efforts'], 
+                                y=[r['Total Jumps'], r['Explosive Efforts']], 
+                                marker_color=m_map[r['Session_Name']],
+                                offsetgroup=r['Session_Name']
+                            ), secondary_y=False)
                     
-                    # Ghost Player Load Bar
-                    fig_ath.add_trace(go.Bar(
-                        name=f"Load ({r['Session_Name']})", 
-                        x=['Player Load'], 
-                        y=[r['Player Load']], 
-                        marker=dict(color=m_map[r['Session_Name']], opacity=0.3), 
-                        showlegend=False,
-                        offsetgroup=r['Session_Name']
-                    ), secondary_y=True)
+                            # Ghost Player Load Bar
+                            fig_ath.add_trace(go.Bar(
+                                name=f"Load ({r['Session_Name']})", 
+                                x=['Player Load'], 
+                                y=[r['Player Load']], 
+                                marker=dict(color=m_map[r['Session_Name']], opacity=0.3), 
+                                showlegend=False,
+                                offsetgroup=r['Session_Name']
+                            ), secondary_y=True)
                 
-                fig_ath.update_layout(
-                    barmode='group', 
-                    height=260, 
-                    margin=dict(l=10, r=10, t=10, b=80), 
-                    template="simple_white", 
-                    font=dict(color="#333333", size=10),
-                    legend=dict(orientation="h", yanchor="top", y=-0.3, xanchor="center", x=0.5),
-                    yaxis=dict(showgrid=False, title="Jumps / Efforts"),
-                    yaxis2=dict(showgrid=False, title="Player Load", overlaying='y', side='right')
-                )
-                st.plotly_chart(fig_ath, use_container_width=True, config=LOCKED_CONFIG)
-            st.markdown('</div>', unsafe_allow_html=True)
+                        fig_ath.update_layout(
+                            barmode='group', 
+                            height=260, 
+                            margin=dict(l=10, r=10, t=10, b=80), 
+                            template="simple_white", 
+                            font=dict(color="#333333", size=10),
+                            legend=dict(orientation="h", yanchor="top", y=-0.3, xanchor="center", x=0.5),
+                            yaxis=dict(showgrid=False, title="Jumps / Efforts"),
+                            yaxis2=dict(showgrid=False, title="Player Load", overlaying='y', side='right')
+                        )
+                        st.plotly_chart(fig_ath, use_container_width=True, config=LOCKED_CONFIG)
+                    st.markdown('</div>', unsafe_allow_html=True)
                     
         with tabs[5]: # Phase Analysis
             st.markdown('<div class="section-header">Practice Phase Intensity Breakdown</div>', unsafe_allow_html=True)
