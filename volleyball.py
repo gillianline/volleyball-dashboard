@@ -200,7 +200,7 @@ if check_password():
                         # UI Display
                         st.markdown(f"""
                             <div style="text-align:center;">
-                                <div class="score-box" style="background-color:{color}; line-height:1.2; padding-top:15px; height:80px; width:120px;">
+                                <div class="score-box" style="background-color:{color}; line-height:1.2; padding-top:15px; height:80px; width:400px;">
                                     <span style="font-size:18px;">{p_diff:+.1f}%</span>
                                     <span style="font-size:10px; display:block; font-weight:bold; margin-top:2px;">{label}</span>
                                 </div>
