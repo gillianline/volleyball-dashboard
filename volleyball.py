@@ -10,16 +10,18 @@ from datetime import timedelta
 st.set_page_config(page_title="Lady Vols VB Performance", layout="wide")
 
 
+# --- 1. GLOBAL SYSTEM CONTROLS ---
+import datetime as dt # Added this local alias to be safe
+
 with st.sidebar:
     st.markdown('<div class="section-header" style="font-size:16px;">System Controls</div>', unsafe_allow_html=True)
     
-    # This button handles the entire app's data refresh
-    if st.button('🔄 Sync Fresh Data', use_container_width=True, help="Click this after updating your Excel sheet"):
-        st.cache_data.clear() # Clears the @st.cache_data memory
-        st.rerun()           # Restarts the script from line 1
+    if st.button('🔄 Sync Fresh Data', use_container_width=True):
+        st.cache_data.clear()
+        st.rerun()
     
-    # Shows you exactly when the data was last pulled from Excel
-    st.caption(f"Last Sync: {datetime.now().strftime('%I:%M:%S %p')}")
+    # Using dt.datetime ensures we don't get that "module is not callable" error
+    st.caption(f"Last Sync: {dt.datetime.now().strftime('%I:%M:%S %p')}")
     st.markdown("---")
 
 # --- PASSWORD PROTECTION ---
