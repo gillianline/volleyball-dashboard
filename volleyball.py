@@ -9,21 +9,6 @@ from datetime import timedelta
 # --- PAGE CONFIG ---
 st.set_page_config(page_title="Lady Vols VB Performance", layout="wide")
 
-
-# --- 1. GLOBAL SYSTEM CONTROLS ---
-import datetime as dt # Added this local alias to be safe
-
-with st.sidebar:
-    st.markdown('<div class="section-header" style="font-size:16px;">System Controls</div>', unsafe_allow_html=True)
-    
-    if st.button('🔄 Sync Fresh Data', use_container_width=True):
-        st.cache_data.clear()
-        st.rerun()
-    
-    # Using dt.datetime ensures we don't get that "module is not callable" error
-    st.caption(f"Last Sync: {dt.datetime.now().strftime('%I:%M:%S %p')}")
-    st.markdown("---")
-
 # --- PASSWORD PROTECTION ---
 def check_password():
     def password_entered():
@@ -144,7 +129,7 @@ if check_password():
         st.markdown('<div class="main-logo-container" style="text-align: center; margin-top: 10px; margin-bottom: 15px;"><img src="https://upload.wikimedia.org/wikipedia/commons/thumb/f/fc/Tennessee_Lady_Volunteers_logo.svg/1280px-Tennessee_Lady_Volunteers_logo.svg.png" width="120"><div style="color: #FF8200; font-size: 2rem; font-weight: 900; margin-top: 10px;">LADY VOLS VOLLEYBALL PERFORMANCE</div></div>', unsafe_allow_html=True)
 
         
-        tabs = st.tabs(["Individual Profile", "Team Gallery", "Match v. Practice", "Position Analysis", "Match Summary", "Phase Analysis"])
+        tabs = st.tabs(["Individual Profile", "Team Gallery", "Match v. Practice", "Position Analysis", "Match Summary", "Phase Analysis", "Practice Planner"])
         session_list = df[['Date', 'Session_Name']].drop_duplicates().sort_values('Date', ascending=False)['Session_Name'].tolist()
 
         with tabs[0]: # Tab 0: Individual Profile
