@@ -120,8 +120,18 @@ if check_password():
         
         try:
             thresh_df = pd.read_csv(st.secrets["THRESH_SHEET_URL"])
-            thresh_df.columns = thresh_df.columns.str.strip()
-        except:
+            
+            # This line removes any hidden spaces and fixes casing issues
+            thresh_df.columns = thresh_df.columns.str.strip().str.title() 
+            
+            # Map specific internal names if your sheet uses underscores
+            thresh_df = thresh_df.rename(columns={
+                'Load Limit': 'Load_Limit',
+                'Jump Limit': 'Jump_Limit',
+                'Effort Limit': 'Effort_Limit'
+            })
+        except Exception as e:
+            st.error(f"Error loading Thresholds: {e}")
             thresh_df = None
         
         # UPDATE THE RETURN TO INCLUDE thresh_df
