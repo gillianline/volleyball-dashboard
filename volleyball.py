@@ -759,7 +759,6 @@ if check_password():
                 # --- 1. SETUP THRESHOLDS ---
                 c1, c2 = st.columns(2)
                 
-                # Standardize casing to avoid "MB" vs "mb" issues
                 working_risk = phase_df.copy()
                 working_risk['Position'] = working_risk['Position'].str.strip()
                 t_lookup = thresh_df.copy()
@@ -773,11 +772,10 @@ if check_password():
                 with c2:
                     sel_pos = st.selectbox("Select Position Group", day_thresh['Position'].unique(), key="risk_pos_v4")
 
-                # Get the Red Lines
                 active_limits = day_thresh[day_thresh['Position'] == sel_pos].iloc[0]
                 L_LIM, J_LIM = active_limits['Load_Limit'], active_limits['Jump_Limit']
 
-                st.info(f"Targeting {sel_day} Limits -- Max Load: {L_LIM} | Max Jumps: {J_LIM}")
+                st.info(f"Targeting {sel_day} Limits -- Max Load: {int(L_LIM)} | Max Jumps: {int(J_LIM)}")
 
                 # --- 2. DATA PREP ---
                 time_col = 'Duration'
@@ -813,7 +811,7 @@ if check_password():
                             target_risk_df = working_risk[working_risk['Position'] == sel_pos]
 
                         if target_risk_df.empty:
-                            st.warning(f"No athletes found with the position name '{sel_pos}'. Check Thresholds sheet vs. Main data naming.")
+                            st.warning(f"No athletes found with the position name '{sel_pos}'.")
                         else:
                             ath_rates = target_risk_df.groupby(['Name', 'Phase'])[[f'{m}_Rate' for m in risk_metrics]].mean().reset_index()
                             
@@ -830,15 +828,17 @@ if check_password():
                                 
                                 if sum(a_totals.values()) > 0:
                                     status = "CLEAR"
-                                    if a_totals['Player Load'] >= L_LIM or a_totals['Total Jumps'] >= J_LIM:
+                                    # Use int() here for clean comparison logic
+                                    if int(a_totals['Player Load']) >= L_LIM or int(a_totals['Total Jumps']) >= J_LIM:
                                         status = "WATCH"
 
                                     ath_projections.append({
                                         'Athlete': athlete,
                                         'Status': status,
-                                        'Proj. Load': round(a_totals['Player Load'], 1),
-                                        'Proj. Jumps': int(a_totals['Total Jumps']),
-                                        'Proj. Efforts': int(a_totals['Explosive Efforts'])
+                                        # Convert all to integers for the list
+                                        'Proj. Load': int(round(a_totals['Player Load'], 0)),
+                                        'Proj. Jumps': int(round(a_totals['Total Jumps'], 0)),
+                                        'Proj. Efforts': int(round(a_totals['Explosive Efforts'], 0))
                                     })
 
                             # --- 5. RENDER THE TABLE ---
@@ -857,9 +857,17 @@ if check_password():
                                         styles[proj_df.columns.get_loc('Proj. Jumps')] = 'color: #cc0000; font-weight: 900; border: 1px solid red;'
                                     return styles
 
-                                st.dataframe(proj_df.style.apply(apply_risk_styles, axis=1), use_container_width=True, hide_index=True)
+                                # Display with no decimal points
+                                st.dataframe(
+                                    proj_df.style.apply(apply_risk_styles, axis=1).format({
+                                        'Proj. Load': '{:d}', 
+                                        'Proj. Jumps': '{:d}', 
+                                        'Proj. Efforts': '{:d}'
+                                    }), 
+                                    use_container_width=True, 
+                                    hide_index=True
+                                )
                                 
-                                # Final Action Alert
                                 watch_list = proj_df[proj_df['Status'] == "WATCH"]['Athlete'].tolist()
                                 if watch_list:
                                     st.error(f"Action Needed: {', '.join(watch_list)} are projected to exceed limits for {sel_day}.")
