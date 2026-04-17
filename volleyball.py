@@ -623,17 +623,24 @@ if check_password():
                 if time_col not in working_planner.columns:
                     st.error(f"Column '{time_col}' not found. Please add a 'Duration' column to your Phases sheet.")
                 else:
+                    # Clean up phases and drop invalid time entries
                     working_planner['Phase'] = working_planner['Phase'].replace(phase_map)
                     working_planner = working_planner[working_planner[time_col] > 0].dropna(subset=[time_col])
                     
+                    # Calculate Work Rates (Intensity per Minute)
                     plan_metrics = ['Player Load', 'Estimated Distance (y)', 'Total Jumps', 'Explosive Efforts']
                     for m in plan_metrics:
                         working_planner[f'{m}_Rate'] = working_planner[m] / working_planner[time_col]
 
-                # --- 2. HIERARCHICAL SELECTORS ---
+                # --- 2. HIERARCHICAL SELECTORS (Team -> Position -> Athlete) ---
                 s_col1, s_col2 = st.columns(2)
                 with s_col1:
-                    plan_level = st.radio("Select Planning Level", ["Team Overall", "By Position", "By Athlete"], horizontal=True)
+                    plan_level = st.radio(
+                        "Select Planning Level", 
+                        ["Team Overall", "By Position", "By Athlete"], 
+                        horizontal=True,
+                        key="planner_level_radio_v1"
+                    )
                 
                 # Dynamic filtering based on radio selection
                 if plan_level == "Team Overall":
@@ -642,22 +649,34 @@ if check_password():
                 
                 elif plan_level == "By Position":
                     with s_col2:
-                        pos_choice = st.selectbox("Select Position", sorted([p for p in working_planner['Position'].unique() if pd.notna(p)]))
+                        pos_choice = st.selectbox(
+                            "Select Position", 
+                            sorted([p for p in working_planner['Position'].unique() if pd.notna(p)]),
+                            key="planner_pos_selection_v1"
+                        )
                     planner_target_df = working_planner[working_planner['Position'] == pos_choice]
                     display_label = f"Position: {pos_choice}"
                 
                 else: # By Athlete
                     with s_col2:
-                        ath_choice = st.selectbox("Select Athlete", sorted(working_planner['Name'].unique()))
+                        ath_choice = st.selectbox(
+                            "Select Athlete", 
+                            sorted(working_planner['Name'].unique()),
+                            key="planner_ath_selection_v1"
+                        )
                     planner_target_df = working_planner[working_planner['Name'] == ath_choice]
                     display_label = f"Athlete: {ath_choice}"
 
                 # --- 3. DRILL SELECTION ---
                 available_phases = sorted(planner_target_df['Phase'].unique())
-                selected_build = st.multiselect(f"Select Drills for {display_label}", available_phases)
+                selected_build = st.multiselect(
+                    f"Select Drills for {display_label}", 
+                    available_phases,
+                    key="planner_drill_multiselect_v1"
+                )
 
                 if selected_build:
-                    # Get historical averages for durations
+                    # Get historical averages for durations to set default inputs
                     phase_stats = planner_target_df.groupby('Phase').agg({time_col: 'mean'}).reset_index()
                     build_stats = phase_stats[phase_stats['Phase'].isin(selected_build)]
                     
@@ -666,14 +685,16 @@ if check_password():
                     durations = {}
                     for idx, phase in enumerate(selected_build):
                         with dur_cols[idx % 4]:
+                            # Default value is the historical average duration for that drill
                             avg_t = build_stats[build_stats['Phase'] == phase][time_col].iloc[0]
-                            durations[phase] = st.number_input(f"{phase}", value=float(round(avg_t, 0)), step=1.0, key=f"dur_{phase}")
+                            durations[phase] = st.number_input(f"{phase}", value=float(round(avg_t, 0)), step=1.0, key=f"dur_input_{phase}")
 
                     # --- 4. CALCULATE PROJECTION ---
-                    # Aggregate rates for the specific target (Team, Pos, or Athlete)
+                    # Aggregate rates for the specific target
                     target_rates = planner_target_df.groupby('Phase')[[f'{m}_Rate' for m in plan_metrics]].mean().reset_index()
                     t_build = target_rates[target_rates['Phase'].isin(selected_build)]
                     
+                    # Math: Duration * Average Rate/Minute
                     total_pl = sum(durations[p] * t_build[t_build['Phase'] == p]['Player Load_Rate'].iloc[0] for p in selected_build)
                     total_j = sum(durations[p] * t_build[t_build['Phase'] == p]['Total Jumps_Rate'].iloc[0] for p in selected_build)
                     total_ee = sum(durations[p] * t_build[t_build['Phase'] == p]['Explosive Efforts_Rate'].iloc[0] for p in selected_build)
@@ -683,8 +704,8 @@ if check_password():
                     # --- 5. DISPLAY RESULTS ---
                     st.markdown(f"### Practice Projection: {display_label}")
                     
-                    # Summary Boxes
-                    st.markdown('<div style="background:#f8f9fa; padding:15px; border-radius:10px; border:1px solid #E5E5E7;">', unsafe_allow_html=True)
+                    # Summary Metrics Boxes
+                    st.markdown('<div style="background:#f8f9fa; padding:20px; border-radius:15px; border:1px solid #E5E5E7;">', unsafe_allow_html=True)
                     m1, m2, m3, m4, m5 = st.columns(5)
                     m1.metric("Total Time", f"{total_time:.0f} min")
                     m2.metric("Proj. Load", f"{total_pl:.1f}")
@@ -693,7 +714,7 @@ if check_password():
                     m5.metric("Proj. Distance", f"{int(total_dist)}y")
                     st.markdown('</div>', unsafe_allow_html=True)
 
-                    # Intensity Graph
+                    # Intensity Visualization
                     st.markdown("#### Work Rate Comparison (Intensity per Minute)")
                     fig_rate = go.Figure()
                     colors = ['#515154', '#A52A2A', '#FF8200', '#4895DB']
@@ -708,13 +729,14 @@ if check_password():
                     fig_rate.update_layout(
                         barmode='group', height=350, template="simple_white",
                         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-                        margin=dict(l=10, r=10, t=30, b=10)
+                        margin=dict(l=10, r=10, t=30, b=10),
+                        yaxis_title="Units per Minute"
                     )
                     st.plotly_chart(fig_rate, use_container_width=True, config=LOCKED_CONFIG)
                 else:
-                    st.info(f"Select drills to calculate the projected output for {display_label}.")
+                    st.info(f"Select drills from your library to calculate the projected output for {display_label}.")
             else:
-                st.warning("No phase data detected.")
+                st.warning("No phase data detected. Ensure your 'Phases' sheet is correctly formatted.")
                 
     except Exception as e:
         st.error(f"Sync Error: {e}")
