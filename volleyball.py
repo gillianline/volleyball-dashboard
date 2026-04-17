@@ -9,6 +9,19 @@ from datetime import timedelta
 # --- PAGE CONFIG ---
 st.set_page_config(page_title="Lady Vols VB Performance", layout="wide")
 
+
+with st.sidebar:
+    st.markdown('<div class="section-header" style="font-size:16px;">System Controls</div>', unsafe_allow_html=True)
+    
+    # This button handles the entire app's data refresh
+    if st.button('🔄 Sync Fresh Data', use_container_width=True, help="Click this after updating your Excel sheet"):
+        st.cache_data.clear() # Clears the @st.cache_data memory
+        st.rerun()           # Restarts the script from line 1
+    
+    # Shows you exactly when the data was last pulled from Excel
+    st.caption(f"Last Sync: {datetime.now().strftime('%I:%M:%S %p')}")
+    st.markdown("---")
+
 # --- PASSWORD PROTECTION ---
 def check_password():
     def password_entered():
@@ -128,16 +141,6 @@ if check_password():
 
         st.markdown('<div class="main-logo-container" style="text-align: center; margin-top: 10px; margin-bottom: 15px;"><img src="https://upload.wikimedia.org/wikipedia/commons/thumb/f/fc/Tennessee_Lady_Volunteers_logo.svg/1280px-Tennessee_Lady_Volunteers_logo.svg.png" width="120"><div style="color: #FF8200; font-size: 2rem; font-weight: 900; margin-top: 10px;">LADY VOLS VOLLEYBALL PERFORMANCE</div></div>', unsafe_allow_html=True)
 
-    # --- SIDEBAR CONTROLS ---
-    with st.sidebar:
-        st.markdown('<div class="section-header" style="font-size:16px;">System Controls</div>', unsafe_allow_html=True)
-        if st.button('🔄 Sync Fresh Data', use_container_width=True):
-            st.cache_data.clear()
-            st.rerun()
-    
-        # Show the last time the data was successfully pulled
-        st.caption(f"Last Sync: {datetime.now().strftime('%I:%M:%S %p')}")
-        st.markdown("---")
         
         tabs = st.tabs(["Individual Profile", "Team Gallery", "Match v. Practice", "Position Analysis", "Match Summary", "Phase Analysis"])
         session_list = df[['Date', 'Session_Name']].drop_duplicates().sort_values('Date', ascending=False)['Session_Name'].tolist()
