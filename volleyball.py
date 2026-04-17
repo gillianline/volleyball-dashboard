@@ -753,121 +753,118 @@ if check_password():
                 st.warning("No phase data detected.")
                 
         with tabs[7]: # Risk Monitor
-            st.markdown('<div class="section-header">🚩 Practice Risk Monitor</div>', unsafe_allow_html=True)
+            st.markdown('<div class="section-header">Practice Risk Monitor</div>', unsafe_allow_html=True)
             
             if phase_df is not None and thresh_df is not None:
                 # --- 1. SETUP THRESHOLDS ---
                 c1, c2 = st.columns(2)
-                with c1:
-                    sel_day = st.selectbox("Select Training Day", thresh_df['Day'].unique(), key="risk_day_sel")
                 
-                day_thresh = thresh_df[thresh_df['Day'] == sel_day]
+                # Standardize casing to avoid "MB" vs "mb" issues
+                working_risk = phase_df.copy()
+                working_risk['Position'] = working_risk['Position'].str.strip()
+                t_lookup = thresh_df.copy()
+                t_lookup['Position'] = t_lookup['Position'].str.strip()
+
+                with c1:
+                    sel_day = st.selectbox("Select Training Day", t_lookup['Day'].unique(), key="risk_day_v4")
+                
+                day_thresh = t_lookup[t_lookup['Day'] == sel_day]
                 
                 with c2:
-                    # Pull positions directly from your Threshold sheet
-                    sel_pos = st.selectbox("Select Position Group", day_thresh['Position'].unique(), key="risk_pos_sel")
+                    sel_pos = st.selectbox("Select Position Group", day_thresh['Position'].unique(), key="risk_pos_v4")
 
-                # Get the "Red Lines" from your Excel sheet
+                # Get the Red Lines
                 active_limits = day_thresh[day_thresh['Position'] == sel_pos].iloc[0]
-                L_LIM = active_limits['Load_Limit']
-                J_LIM = active_limits['Jump_Limit']
-                E_LIM = active_limits['Effort_Limit']
+                L_LIM, J_LIM = active_limits['Load_Limit'], active_limits['Jump_Limit']
 
-                st.info(f"📋 **{sel_day} Limits:** Max Load: {L_LIM} | Max Jumps: {J_LIM}")
+                st.info(f"Targeting {sel_day} Limits -- Max Load: {L_LIM} | Max Jumps: {J_LIM}")
 
-                # --- 2. PREP DATA (Exactly like Tab 6) ---
-                working_risk = phase_df.copy()
-                time_col = 'Duration' # Ensure this matches your Phases tab column name
-                
+                # --- 2. DATA PREP ---
+                time_col = 'Duration'
                 if time_col not in working_risk.columns:
-                    st.error(f"Need '{time_col}' column in Phases sheet to calculate projections.")
+                    st.error(f"Missing '{time_col}' column in Phases sheet.")
                 else:
                     working_risk['Phase'] = working_risk['Phase'].replace(phase_map)
                     working_risk = working_risk[working_risk[time_col] > 0].dropna(subset=[time_col])
                     
-                    # Calculate Intensity Rates (Metric per Minute)
                     risk_metrics = ['Player Load', 'Total Jumps', 'Explosive Efforts']
                     for m in risk_metrics:
                         working_risk[f'{m}_Rate'] = working_risk[m] / working_risk[time_col]
 
                     # --- 3. DRILL SELECTION ---
                     all_phases = sorted(working_risk['Phase'].unique())
-                    selected_drills = st.multiselect("Select Drills for the Session", all_phases, key="risk_drills_sel")
+                    selected_drills = st.multiselect("Select Drills for the Session", all_phases, key="risk_drills_v4")
 
                     if selected_drills:
-                        # Duration Inputs
                         st.write("Set Minutes per Drill:")
                         d_cols = st.columns(min(len(selected_drills), 5))
                         durations = {}
-                        # Get historical average durations for defaults
                         avg_durs = working_risk.groupby('Phase')[time_col].mean()
 
                         for idx, phase in enumerate(selected_drills):
                             with d_cols[idx % 5]:
                                 def_t = float(round(avg_durs.get(phase, 10.0), 0))
-                                durations[phase] = st.number_input(f"{phase}", value=def_t, step=1.0, key=f"risk_dur_{phase}")
+                                durations[phase] = st.number_input(f"{phase}", value=def_t, step=1.0, key=f"risk_dur_v4_{phase}")
 
                         # --- 4. CALCULATE PROJECTIONS ---
-                        # Filter to just the selected position
                         if sel_pos == "Team Overall":
                             target_risk_df = working_risk.copy()
                         else:
                             target_risk_df = working_risk[working_risk['Position'] == sel_pos]
 
-                        # Group by Athlete and Phase to get their unique intensity rates
-                        ath_rates = target_risk_df.groupby(['Name', 'Phase'])[[f'{m}_Rate' for m in risk_metrics]].mean().reset_index()
-                        
-                        ath_projections = []
-                        for athlete in sorted(target_risk_df['Name'].unique()):
-                            a_data = ath_rates[ath_rates['Name'] == athlete]
-                            a_totals = {m: 0.0 for m in risk_metrics}
-                            
-                            for phase in selected_drills:
-                                p_rate = a_data[a_data['Phase'] == phase]
-                                if not p_rate.empty:
-                                    for m in risk_metrics:
-                                        a_totals[m] += durations[phase] * p_rate[f'{m}_Rate'].iloc[0]
-                            
-                            if sum(a_totals.values()) > 0:
-                                # Determine Status
-                                status = "CLEAR"
-                                if a_totals['Player Load'] >= L_LIM or a_totals['Total Jumps'] >= J_LIM:
-                                    status = "WATCH"
-
-                                ath_projections.append({
-                                    'Athlete': athlete,
-                                    'Status': status,
-                                    'Proj. Load': round(a_totals['Player Load'], 1),
-                                    'Proj. Jumps': int(a_totals['Total Jumps']),
-                                    'Proj. Efforts': int(a_totals['Explosive Efforts'])
-                                })
-
-                        # --- 5. RENDER THE TABLE ---
-                        if ath_projections:
-                            proj_df = pd.DataFrame(ath_projections).sort_values('Proj. Load', ascending=False)
-                            
-                            def apply_risk_styles(row):
-                                styles = [''] * len(row)
-                                # Red row for Watch status
-                                if row['Status'] == "WATCH":
-                                    styles[proj_df.columns.get_loc('Athlete')] = 'background-color: #ffcccc; color: #cc0000; font-weight: bold;'
-                                    styles[proj_df.columns.get_loc('Status')] = 'background-color: #ffcccc; color: #cc0000; font-weight: bold;'
-                                
-                                # Cell-specific highlights
-                                if row['Proj. Load'] >= L_LIM:
-                                    styles[proj_df.columns.get_loc('Proj. Load')] = 'color: #cc0000; font-weight: 900; border: 1px solid red;'
-                                if row['Proj. Jumps'] >= J_LIM:
-                                    styles[proj_df.columns.get_loc('Proj. Jumps')] = 'color: #cc0000; font-weight: 900; border: 1px solid red;'
-                                return styles
-
-                            st.dataframe(proj_df.style.apply(apply_risk_styles, axis=1), use_container_width=True, hide_index=True)
-                            
-                            # Summary Alert
-                            watch_list = proj_df[proj_df['Status'] == " WATCH"]['Athlete'].tolist()
-                            if watch_list:
-                                st.error(f"**Action Needed:** {', '.join(watch_list)} are projected to exceed limits for {sel_day}.")
+                        if target_risk_df.empty:
+                            st.warning(f"No athletes found with the position name '{sel_pos}'. Check Thresholds sheet vs. Main data naming.")
                         else:
-                            st.info("No historical data available for this position in these drills.")
+                            ath_rates = target_risk_df.groupby(['Name', 'Phase'])[[f'{m}_Rate' for m in risk_metrics]].mean().reset_index()
+                            
+                            ath_projections = []
+                            for athlete in sorted(target_risk_df['Name'].unique()):
+                                a_data = ath_rates[ath_rates['Name'] == athlete]
+                                a_totals = {m: 0.0 for m in risk_metrics}
+                                
+                                for phase in selected_drills:
+                                    p_rate = a_data[a_data['Phase'] == phase]
+                                    if not p_rate.empty:
+                                        for m in risk_metrics:
+                                            a_totals[m] += durations[phase] * p_rate[f'{m}_Rate'].iloc[0]
+                                
+                                if sum(a_totals.values()) > 0:
+                                    status = "CLEAR"
+                                    if a_totals['Player Load'] >= L_LIM or a_totals['Total Jumps'] >= J_LIM:
+                                        status = "WATCH"
+
+                                    ath_projections.append({
+                                        'Athlete': athlete,
+                                        'Status': status,
+                                        'Proj. Load': round(a_totals['Player Load'], 1),
+                                        'Proj. Jumps': int(a_totals['Total Jumps']),
+                                        'Proj. Efforts': int(a_totals['Explosive Efforts'])
+                                    })
+
+                            # --- 5. RENDER THE TABLE ---
+                            if ath_projections:
+                                proj_df = pd.DataFrame(ath_projections).sort_values('Proj. Load', ascending=False)
+                                
+                                def apply_risk_styles(row):
+                                    styles = [''] * len(row)
+                                    if row['Status'] == "WATCH":
+                                        styles[proj_df.columns.get_loc('Athlete')] = 'background-color: #ffcccc; color: #cc0000; font-weight: bold;'
+                                        styles[proj_df.columns.get_loc('Status')] = 'background-color: #ffcccc; color: #cc0000; font-weight: bold;'
+                                    
+                                    if row['Proj. Load'] >= L_LIM:
+                                        styles[proj_df.columns.get_loc('Proj. Load')] = 'color: #cc0000; font-weight: 900; border: 1px solid red;'
+                                    if row['Proj. Jumps'] >= J_LIM:
+                                        styles[proj_df.columns.get_loc('Proj. Jumps')] = 'color: #cc0000; font-weight: 900; border: 1px solid red;'
+                                    return styles
+
+                                st.dataframe(proj_df.style.apply(apply_risk_styles, axis=1), use_container_width=True, hide_index=True)
+                                
+                                # Final Action Alert
+                                watch_list = proj_df[proj_df['Status'] == "WATCH"]['Athlete'].tolist()
+                                if watch_list:
+                                    st.error(f"Action Needed: {', '.join(watch_list)} are projected to exceed limits for {sel_day}.")
+                            else:
+                                st.info("Drills selected, but no historical data matches this position for these specific drills.")
             else:
                 st.warning("Please ensure 'Phases' and 'Thresholds' sheets are properly loaded.")
                 
