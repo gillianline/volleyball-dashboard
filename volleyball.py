@@ -623,56 +623,36 @@ if check_password():
                 if time_col not in working_planner.columns:
                     st.error(f"Column '{time_col}' not found. Please add a 'Duration' column to your Phases sheet.")
                 else:
-                    # Clean up phases and drop invalid time entries
                     working_planner['Phase'] = working_planner['Phase'].replace(phase_map)
                     working_planner = working_planner[working_planner[time_col] > 0].dropna(subset=[time_col])
                     
-                    # Calculate Work Rates (Intensity per Minute)
-                    plan_metrics = ['Player Load', 'Estimated Distance (y)', 'Total Jumps', 'Explosive Efforts']
+                    # Focus metrics (Removed Distance from logic)
+                    plan_metrics = ['Player Load', 'Total Jumps', 'Explosive Efforts']
                     for m in plan_metrics:
                         working_planner[f'{m}_Rate'] = working_planner[m] / working_planner[time_col]
 
-                # --- 2. HIERARCHICAL SELECTORS (Team -> Position -> Athlete) ---
+                # --- 2. HIERARCHICAL SELECTORS ---
                 s_col1, s_col2 = st.columns(2)
                 with s_col1:
-                    plan_level = st.radio(
-                        "Select Planning Level", 
-                        ["Team Overall", "By Position", "By Athlete"], 
-                        horizontal=True,
-                        key="planner_level_final"
-                    )
+                    plan_level = st.radio("Select Planning Level", ["Team Overall", "By Position", "By Athlete"], horizontal=True, key="planner_level_refined")
                 
                 if plan_level == "Team Overall":
                     planner_target_df = working_planner.copy()
                     display_label = "Team Overall"
-                
                 elif plan_level == "By Position":
                     with s_col2:
-                        pos_choice = st.selectbox(
-                            "Select Position", 
-                            sorted([p for p in working_planner['Position'].unique() if pd.notna(p)]),
-                            key="planner_pos_final"
-                        )
+                        pos_choice = st.selectbox("Select Position", sorted([p for p in working_planner['Position'].unique() if pd.notna(p)]), key="planner_pos_refined")
                     planner_target_df = working_planner[working_planner['Position'] == pos_choice]
                     display_label = f"Position: {pos_choice}"
-                
-                else: # By Athlete
+                else:
                     with s_col2:
-                        ath_choice = st.selectbox(
-                            "Select Athlete", 
-                            sorted(working_planner['Name'].unique()),
-                            key="planner_ath_final"
-                        )
+                        ath_choice = st.selectbox("Select Athlete", sorted(working_planner['Name'].unique()), key="planner_ath_refined")
                     planner_target_df = working_planner[working_planner['Name'] == ath_choice]
                     display_label = f"Athlete: {ath_choice}"
 
                 # --- 3. DRILL SELECTION ---
                 available_phases = sorted(planner_target_df['Phase'].unique())
-                selected_build = st.multiselect(
-                    f"Select Drills for {display_label}", 
-                    available_phases,
-                    key="planner_multiselect_final"
-                )
+                selected_build = st.multiselect(f"Select Drills for {display_label}", available_phases, key="planner_multi_refined")
 
                 if selected_build:
                     # Duration Inputs
@@ -685,33 +665,31 @@ if check_password():
                     for idx, phase in enumerate(selected_build):
                         with dur_cols[idx % 4]:
                             avg_t = build_stats[build_stats['Phase'] == phase][time_col].iloc[0]
-                            durations[phase] = st.number_input(f"{phase}", value=float(round(avg_t, 0)), step=1.0, key=f"dur_final_{phase}")
+                            durations[phase] = st.number_input(f"{phase}", value=float(round(avg_t, 0)), step=1.0, key=f"dur_ref_{phase}")
 
-                    # --- 4. CALCULATE PROJECTION ---
-                    target_rates = planner_target_df.groupby('Phase')[[f'{m}_Rate' for m in plan_metrics]].mean().reset_index()
-                    # Re-indexing ensures the graph and math follow the order selected in the multiselect
-                    t_build = target_rates.set_index('Phase').loc[selected_build].reset_index()
-                    
-                    total_pl = sum(durations[p] * t_build[t_build['Phase'] == p]['Player Load_Rate'].iloc[0] for p in selected_build)
-                    total_j = sum(durations[p] * t_build[t_build['Phase'] == p]['Total Jumps_Rate'].iloc[0] for p in selected_build)
-                    total_ee = sum(durations[p] * t_build[t_build['Phase'] == p]['Explosive Efforts_Rate'].iloc[0] for p in selected_build)
-                    total_dist = sum(durations[p] * t_build[t_build['Phase'] == p]['Estimated Distance (y)_Rate'].iloc[0] for p in selected_build)
-                    total_time = sum(durations.values())
+                    # --- 4. DISPLAY RESULTS ---
+                    # Only show the Total Projection Box if we are NOT in Team Overall mode
+                    if plan_level != "Team Overall":
+                        target_rates = planner_target_df.groupby('Phase')[[f'{m}_Rate' for m in plan_metrics]].mean().reset_index()
+                        t_build = target_rates.set_index('Phase').loc[selected_build].reset_index()
+                        
+                        total_pl = sum(durations[p] * t_build[t_build['Phase'] == p]['Player Load_Rate'].iloc[0] for p in selected_build)
+                        total_j = sum(durations[p] * t_build[t_build['Phase'] == p]['Total Jumps_Rate'].iloc[0] for p in selected_build)
+                        total_ee = sum(durations[p] * t_build[t_build['Phase'] == p]['Explosive Efforts_Rate'].iloc[0] for p in selected_build)
+                        total_time = sum(durations.values())
 
-                    # --- 5. RESULTS SUMMARY ---
-                    st.markdown(f"### Practice Projection: {display_label}")
-                    st.markdown('<div style="background:#f8f9fa; padding:20px; border-radius:15px; border:1px solid #E5E5E7;">', unsafe_allow_html=True)
-                    m1, m2, m3, m4, m5 = st.columns(5)
-                    m1.metric("Total Time", f"{total_time:.0f} min")
-                    m2.metric("Proj. Load", f"{total_pl:.1f}")
-                    m3.metric("Proj. Jumps", f"{int(total_j)}")
-                    m4.metric("Proj. Efforts", f"{int(total_ee)}")
-                    m5.metric("Proj. Distance", f"{int(total_dist)}y")
-                    st.markdown('</div>', unsafe_allow_html=True)
+                        st.markdown(f"### Practice Projection: {display_label}")
+                        st.markdown('<div style="background:#f8f9fa; padding:20px; border-radius:15px; border:1px solid #E5E5E7;">', unsafe_allow_html=True)
+                        m1, m2, m3, m4 = st.columns(4)
+                        m1.metric("Total Time", f"{total_time:.0f} min")
+                        m2.metric("Proj. Load", f"{total_pl:.1f}")
+                        m3.metric("Proj. Jumps", f"{int(total_j)}")
+                        m4.metric("Proj. Efforts", f"{int(total_ee)}")
+                        st.markdown('</div>', unsafe_allow_html=True)
 
-                    # --- 6. INDIVIDUAL BREAKDOWN (For Position/Team) ---
+                    # --- 5. INDIVIDUAL BREAKDOWN (Crucial for Team View) ---
                     if plan_level != "By Athlete":
-                        st.markdown(f"#### Individual Athlete Projections ({display_label})")
+                        st.markdown(f"#### Individual Athlete Projections")
                         ath_rates = planner_target_df.groupby(['Name', 'Phase'])[[f'{m}_Rate' for m in plan_metrics]].mean().reset_index()
                         
                         ath_projections = []
@@ -729,7 +707,6 @@ if check_password():
                                     'Athlete': athlete,
                                     'Proj. Load': round(a_totals['Player Load'], 1),
                                     'Proj. Jumps': int(a_totals['Total Jumps']),
-                                    'Proj. Distance': int(a_totals['Estimated Distance (y)']),
                                     'Proj. Efforts': int(a_totals['Explosive Efforts'])
                                 })
                         
@@ -737,43 +714,32 @@ if check_password():
                             proj_df = pd.DataFrame(ath_projections).sort_values('Proj. Load', ascending=False)
                             st.dataframe(proj_df, use_container_width=True, hide_index=True)
 
-                    # --- 7. PRACTICE INTENSITY FLOW (Line Chart) ---
-                    st.markdown("#### Practice Intensity Flow")
-                    from plotly.subplots import make_subplots
-                    fig_flow = make_subplots(specs=[[{"secondary_y": True}]])
-                    
-                    colors = {
-                        'Player Load': '#515154', 'Total Jumps': '#FF8200', 
-                        'Explosive Efforts': '#A52A2A', 'Estimated Distance (y)': '#4895DB'
-                    }
+                    # --- 6. INTENSITY FLOW GRAPH (Removed Distance) ---
+                    st.markdown("#### Practice Intensity Flow (Rate per Minute)")
+                    # Re-calculating rates for the graph target
+                    graph_rates = planner_target_df.groupby('Phase')[[f'{m}_Rate' for m in plan_metrics]].mean().reset_index()
+                    g_build = graph_rates.set_index('Phase').loc[selected_build].reset_index()
 
-                    # Energy Peaks (Left Axis)
-                    for m in ['Player Load', 'Total Jumps', 'Explosive Efforts']:
+                    fig_flow = go.Figure()
+                    colors = {'Player Load': '#515154', 'Total Jumps': '#FF8200', 'Explosive Efforts': '#A52A2A'}
+
+                    for m in plan_metrics:
                         fig_flow.add_trace(go.Scatter(
-                            x=t_build['Phase'], y=t_build[f'{m}_Rate'], 
+                            x=g_build['Phase'], y=g_build[f'{m}_Rate'], 
                             name=m, mode='lines+markers',
                             line=dict(color=colors[m], width=3, shape='spline'),
                             marker=dict(size=8)
-                        ), secondary_y=False)
-                    
-                    # Volume Foundation (Right Axis - Ghost Shaded)
-                    fig_flow.add_trace(go.Scatter(
-                        x=t_build['Phase'], y=t_build['Estimated Distance (y)_Rate'], 
-                        name="Distance (yds)", mode='lines', fill='tozeroy',
-                        line=dict(color=colors['Estimated Distance (y)'], width=1),
-                        opacity=0.2, hovertemplate='%{y:.1f} yds/min'
-                    ), secondary_y=True)
+                        ))
                     
                     fig_flow.update_layout(
-                        height=450, template="simple_white",
+                        height=400, template="simple_white",
                         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
                         margin=dict(l=10, r=10, t=30, b=10),
-                        yaxis=dict(title="Intensity (per Minute)", showgrid=True),
-                        yaxis2=dict(title="Volume (Yards/Min)", showgrid=False, overlaying='y', side='right')
+                        yaxis_title="Intensity per Minute"
                     )
                     st.plotly_chart(fig_flow, use_container_width=True, config=LOCKED_CONFIG)
                 else:
-                    st.info(f"Select drills from your library to visualize the practice flow for {display_label}.")
+                    st.info(f"Select drills to visualize the intensity flow for {display_label}.")
             else:
                 st.warning("No phase data detected.")
                 
