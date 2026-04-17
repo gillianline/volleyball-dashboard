@@ -751,14 +751,9 @@ if check_password():
                     st.info(f"Select drills to visualize the intensity flow for {display_label}.")
             else:
                 st.warning("No phase data detected.")
-        That is exactly what this updated code for Tab 7 does. It acts as your "Early Warning System."
-
-I have refined the logic to make it more "coach-friendly." It pulls the limits from your Excel sheet based on the Day and Position you choose, then scans the roster. If a player is projected to hit their "Red Line" for that specific day, their name and the dangerous metric will highlight in red.
-
-Final Code for Tab 7 (The Load Monitor)
-Python
+                
         with tabs[7]: # Load Monitor & Flagging
-            st.markdown('<div class="section-header">🚩 Practice Risk Monitor</div>', unsafe_allow_html=True)
+            st.markdown('<div class="section-header">Practice Risk Monitor</div>', unsafe_allow_html=True)
             
             if phase_df is not None and thresh_df is not None:
                 # --- 1. SET THE TARGET CONTEXT ---
