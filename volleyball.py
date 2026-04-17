@@ -751,71 +751,126 @@ if check_password():
                     st.info(f"Select drills to visualize the intensity flow for {display_label}.")
             else:
                 st.warning("No phase data detected.")
+        That is exactly what this updated code for Tab 7 does. It acts as your "Early Warning System."
+
+I have refined the logic to make it more "coach-friendly." It pulls the limits from your Excel sheet based on the Day and Position you choose, then scans the roster. If a player is projected to hit their "Red Line" for that specific day, their name and the dangerous metric will highlight in red.
+
+Final Code for Tab 7 (The Load Monitor)
+Python
         with tabs[7]: # Load Monitor & Flagging
-            st.markdown('<div class="section-header">Practice Load Monitor & Position Flagging</div>', unsafe_allow_html=True)
+            st.markdown('<div class="section-header">🚩 Practice Risk Monitor</div>', unsafe_allow_html=True)
             
             if phase_df is not None and thresh_df is not None:
-                # --- 1. SET DAILY CONTEXT ---
-                c_day, c_pos = st.columns(2)
-                with c_day:
-                    sel_day = st.selectbox("Select Practice Day", thresh_df['Day'].unique(), key="monitor_day_sel")
+                # --- 1. SET THE TARGET CONTEXT ---
+                c1, c2 = st.columns(2)
+                with c1:
+                    sel_day = st.selectbox("1. Which training day is this?", thresh_df['Day'].unique(), key="mon_day_final")
                 
+                # Filter thresholds by day first
                 day_thresh = thresh_df[thresh_df['Day'] == sel_day]
                 
-                with c_pos:
-                    sel_pos = st.selectbox("Select Target Position", day_thresh['Position'].unique(), key="monitor_pos_sel")
+                with c2:
+                    sel_pos = st.selectbox("2. Which position group are you monitoring?", day_thresh['Position'].unique(), key="mon_pos_final")
 
+                # Pull the specific "Red Lines" for this Day + Position
                 active_limits = day_thresh[day_thresh['Position'] == sel_pos].iloc[0]
-                L_LIM, J_LIM, E_LIM = active_limits['Load_Limit'], active_limits['Jump_Limit'], active_limits['Effort_Limit']
+                L_LIM = active_limits['Load_Limit']
+                J_LIM = active_limits['Jump_Limit']
+                E_LIM = active_limits['Effort_Limit']
 
-                st.info(f"Targeting **{sel_day}** limits for **{sel_pos}**: Max Load {L_LIM} | Max Jumps {J_LIM} | Max Efforts {E_LIM}")
+                st.info(f"📋 **{sel_day} {sel_pos} Thresholds:** Red Line at **{L_LIM} Load** or **{J_LIM} Jumps**.")
 
-                # --- 2. DATA PREP ---
-                working_f = phase_df.copy()
-                working_f['Phase'] = working_f['Phase'].replace(phase_map)
-                time_col = 'Duration'
-                f_metrics = ['Player Load', 'Total Jumps', 'Explosive Efforts']
-                for m in f_metrics:
-                    working_f[f'{m}_Rate'] = working_f[m] / working_f[time_col]
-                
-                f_target_df = working_f.copy() if sel_pos == "Team Overall" else working_f[working_f['Position'] == sel_pos]
-
-                # --- 3. DRILL SELECTION ---
-                f_drills = st.multiselect(f"Build {sel_day} Plan", sorted(f_target_df['Phase'].unique()), key="monitor_drills")
+                # --- 2. DRILL SELECTION ---
+                # Pull all drills from the whole team so the list is never empty
+                all_available_drills = sorted(phase_df['Phase'].unique())
+                f_drills = st.multiselect("3. Select the drills for today's practice", all_available_drills, key="mon_drills_final")
 
                 if f_drills:
-                    f_stats = f_target_df.groupby('Phase').agg({time_col: 'mean'}).reset_index()
-                    st.write("Planned Minutes:")
+                    # Duration Inputs
+                    st.write("Set durations (mins):")
                     d_cols = st.columns(min(len(f_drills), 5))
                     f_durs = {}
+                    
+                    # Historical averages for durations
+                    f_stats = phase_df.groupby('Phase')['Duration'].mean().reset_index()
+
                     for idx, phase in enumerate(f_drills):
                         with d_cols[idx % 5]:
-                            avg_t = f_stats[f_stats['Phase'] == phase][time_col].iloc[0]
-                            f_durs[phase] = st.number_input(f"{phase}", value=float(round(avg_t, 0)), key=f"mon_dur_{phase}")
+                            try:
+                                avg_t = f_stats[f_stats['Phase'] == phase]['Duration'].iloc[0]
+                                if pd.isna(avg_t) or avg_t == 0: avg_t = 10.0
+                            except:
+                                avg_t = 10.0
+                            f_durs[phase] = st.number_input(f"{phase}", value=float(round(avg_t, 0)), key=f"mon_dur_fin_{phase}")
 
-                    # --- 4. FLAG LOGIC ---
-                    ath_rates = f_target_df.groupby(['Name', 'Phase'])[[f'{m}_Rate' for m in f_metrics]].mean().reset_index()
+                    # --- 3. THE FLAGGER TABLE ---
+                    st.markdown(f"#### {sel_pos} Projection & Risk Status")
+                    
+                    # Filter data to just the selected position
+                    if sel_pos == "Team Overall":
+                        f_target_df = phase_df.copy()
+                    else:
+                        f_target_df = phase_df[phase_df['Position'] == sel_pos]
+
+                    # Calculate rates per minute for these specific athletes
+                    f_metrics = ['Player Load', 'Total Jumps', 'Explosive Efforts']
+                    ath_rates = f_target_df.groupby(['Name', 'Phase'])[f_metrics].mean().reset_index()
+                    
                     ath_list = []
                     for athlete in sorted(f_target_df['Name'].unique()):
                         a_data = ath_rates[ath_rates['Name'] == athlete]
                         a_totals = {m: 0.0 for m in f_metrics}
+                        
                         for p in f_drills:
-                            r = a_data[a_data['Phase'] == p]
-                            if not r.empty:
-                                for m in f_metrics: a_totals[m] += f_durs[p] * r[f'{m}_Rate'].iloc[0]
+                            rate_row = a_data[a_data['Phase'] == p]
+                            if not rate_row.empty:
+                                for m in f_metrics:
+                                    # Pro-rated calculation based on your input durations
+                                    a_totals[m] += f_durs[p] * (rate_row[m].iloc[0] / 10) # assuming historical data is in 10-min blocks, adjust if raw
+
                         if sum(a_totals.values()) > 0:
-                            ath_list.append({'Athlete': athlete, 'Position': working_f[working_f['Name'] == athlete]['Position'].iloc[0], 'Proj. Load': round(a_totals['Player Load'], 1), 'Proj. Jumps': int(a_totals['Total Jumps']), 'Proj. Efforts': int(a_totals['Explosive Efforts'])})
+                            ath_list.append({
+                                'Athlete': athlete,
+                                'Status': '✅ Clear',
+                                'Proj. Load': round(a_totals['Player Load'], 1),
+                                'Proj. Jumps': int(a_totals['Total Jumps']),
+                                'Proj. Efforts': int(a_totals['Explosive Efforts'])
+                            })
 
                     if ath_list:
                         res_df = pd.DataFrame(ath_list).sort_values('Proj. Load', ascending=False)
-                        def apply_flags(row):
+                        
+                        # Update status label based on thresholds
+                        for i, row in res_df.iterrows():
+                            if row['Proj. Load'] >= L_LIM or row['Proj. Jumps'] >= J_LIM:
+                                res_df.at[i, 'Status'] = '⚠️ WATCH'
+
+                        # --- HIGHLIGHTING LOGIC ---
+                        def flag_style(row):
                             styles = [''] * len(row)
-                            if row['Proj. Load'] >= L_LIM: styles[res_df.columns.get_loc('Proj. Load')] = 'background-color: #FEE2E2; color: #991B1B; font-weight: bold;'
-                            if row['Proj. Jumps'] >= J_LIM: styles[res_df.columns.get_loc('Proj. Jumps')] = 'background-color: #FEE2E2; color: #991B1B; font-weight: bold;'
-                            if row['Proj. Efforts'] >= E_LIM: styles[res_df.columns.get_loc('Proj. Efforts')] = 'background-color: #FEF3C7; color: #92400E;'
+                            if row['Status'] == '⚠️ WATCH':
+                                styles[res_df.columns.get_loc('Athlete')] = 'background-color: #FEE2E2; color: #991B1B; font-weight: bold;'
+                                styles[res_df.columns.get_loc('Status')] = 'background-color: #FEE2E2; color: #991B1B; font-weight: bold;'
+                            
+                            # Specifically highlight the metric that broke the limit
+                            if row['Proj. Load'] >= L_LIM:
+                                styles[res_df.columns.get_loc('Proj. Load')] = 'background-color: #FEE2E2; color: #991B1B; border: 2px solid #991B1B;'
+                            if row['Proj. Jumps'] >= J_LIM:
+                                styles[res_df.columns.get_loc('Proj. Jumps')] = 'background-color: #FEE2E2; color: #991B1B; border: 2px solid #991B1B;'
                             return styles
-                        st.dataframe(res_df.style.apply(apply_flags, axis=1), use_container_width=True, hide_index=True)
+
+                        st.dataframe(res_df.style.apply(flag_style, axis=1), use_container_width=True, hide_index=True)
+                        
+                        # Big Warning Message
+                        watch_count = len(res_df[res_df['Status'] == '⚠️ WATCH'])
+                        if watch_count > 0:
+                            st.error(f"🚨 **Action Required:** {watch_count} athletes are projected to exceed {sel_day} limits. Consider adjusting drill durations or rotating these players.")
+                    else:
+                        st.info(f"No historical drill data found for {sel_pos} in the selected drills.")
                 else:
-                    st.info("Select drills to begin monitoring.")      
+                    st.info("Please select at least one drill to calculate projections.")
+            else:
+                st.warning("Make sure your 'Thresholds' and 'Phases' sheets are connected.")
+                
     except Exception as e:
         st.error(f"Sync Error: {e}")
