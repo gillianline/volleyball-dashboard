@@ -630,95 +630,89 @@ if check_password():
                     for m in plan_metrics:
                         working_planner[f'{m}_Rate'] = working_planner[m] / working_planner[time_col]
 
-                    # --- 2. SELECTOR FILTERS ---
-                    c1, c2 = st.columns(2)
-                    with c1:
-                        target_group = st.selectbox("Select Target Position", ["Team Overall"] + sorted([p for p in working_planner['Position'].unique() if pd.notna(p)]), key="plan_pos")
-                    with c2:
-                        available_phases = sorted(working_planner['Phase'].unique())
-                        selected_build = st.multiselect("Drill Library (Select to Build Practice)", available_phases, key="practice_builder")
+                # --- 2. HIERARCHICAL SELECTORS ---
+                s_col1, s_col2 = st.columns(2)
+                with s_col1:
+                    plan_level = st.radio("Select Planning Level", ["Team Overall", "By Position", "By Athlete"], horizontal=True)
+                
+                # Dynamic filtering based on radio selection
+                if plan_level == "Team Overall":
+                    planner_target_df = working_planner.copy()
+                    display_label = "Team Overall"
+                
+                elif plan_level == "By Position":
+                    with s_col2:
+                        pos_choice = st.selectbox("Select Position", sorted([p for p in working_planner['Position'].unique() if pd.notna(p)]))
+                    planner_target_df = working_planner[working_planner['Position'] == pos_choice]
+                    display_label = f"Position: {pos_choice}"
+                
+                else: # By Athlete
+                    with s_col2:
+                        ath_choice = st.selectbox("Select Athlete", sorted(working_planner['Name'].unique()))
+                    planner_target_df = working_planner[working_planner['Name'] == ath_choice]
+                    display_label = f"Athlete: {ath_choice}"
 
-                    plan_df = working_planner.copy() if target_group == "Team Overall" else working_planner[working_planner['Position'] == target_group]
+                # --- 3. DRILL SELECTION ---
+                available_phases = sorted(planner_target_df['Phase'].unique())
+                selected_build = st.multiselect(f"Select Drills for {display_label}", available_phases)
 
-                    if selected_build:
-                        # --- 3. DURATION INPUTS ---
-                        st.markdown(f"### Practice Projection: {target_group}")
-                        phase_stats = plan_df.groupby('Phase').agg({time_col: 'mean'}).reset_index()
-                        build_stats = phase_stats[phase_stats['Phase'].isin(selected_build)]
-                        
-                        st.write("Plan drill durations (minutes):")
-                        dur_cols = st.columns(min(len(selected_build), 4))
-                        durations = {}
-                        for idx, phase in enumerate(selected_build):
-                            with dur_cols[idx % 4]:
-                                avg_t = build_stats[build_stats['Phase'] == phase][time_col].iloc[0]
-                                durations[phase] = st.number_input(f"{phase}", value=float(round(avg_t, 0)), step=1.0, key=f"dur_{phase}")
+                if selected_build:
+                    # Get historical averages for durations
+                    phase_stats = planner_target_df.groupby('Phase').agg({time_col: 'mean'}).reset_index()
+                    build_stats = phase_stats[phase_stats['Phase'].isin(selected_build)]
+                    
+                    st.write("Set planned drill durations (minutes):")
+                    dur_cols = st.columns(min(len(selected_build), 4))
+                    durations = {}
+                    for idx, phase in enumerate(selected_build):
+                        with dur_cols[idx % 4]:
+                            avg_t = build_stats[build_stats['Phase'] == phase][time_col].iloc[0]
+                            durations[phase] = st.number_input(f"{phase}", value=float(round(avg_t, 0)), step=1.0, key=f"dur_{phase}")
 
-                        # --- 4. INDIVIDUAL ATHLETE PROJECTIONS ---
-                        st.markdown("#### Individual Athlete Projections")
-                        ath_rates = plan_df.groupby(['Name', 'Phase'])[ [f'{m}_Rate' for m in plan_metrics] ].mean().reset_index()
-                        
-                        ath_projections = []
-                        for athlete in sorted(plan_df['Name'].unique()):
-                            a_data = ath_rates[ath_rates['Name'] == athlete]
-                            a_totals = {m: 0.0 for m in plan_metrics}
-                            
-                            for phase in selected_build:
-                                p_rate = a_data[a_data['Phase'] == phase]
-                                if not p_rate.empty:
-                                    for m in plan_metrics:
-                                        a_totals[m] += durations[phase] * p_rate[f'{m}_Rate'].iloc[0]
-                            
-                            if sum(a_totals.values()) > 0:
-                                ath_projections.append({
-                                    'Athlete': athlete,
-                                    'Proj. Load': round(a_totals['Player Load'], 1),
-                                    'Proj. Jumps': int(a_totals['Total Jumps']),
-                                    'Proj. Distance': int(a_totals['Estimated Distance (y)']),
-                                    'Proj. Efforts': int(a_totals['Explosive Efforts'])
-                                })
+                    # --- 4. CALCULATE PROJECTION ---
+                    # Aggregate rates for the specific target (Team, Pos, or Athlete)
+                    target_rates = planner_target_df.groupby('Phase')[[f'{m}_Rate' for m in plan_metrics]].mean().reset_index()
+                    t_build = target_rates[target_rates['Phase'].isin(selected_build)]
+                    
+                    total_pl = sum(durations[p] * t_build[t_build['Phase'] == p]['Player Load_Rate'].iloc[0] for p in selected_build)
+                    total_j = sum(durations[p] * t_build[t_build['Phase'] == p]['Total Jumps_Rate'].iloc[0] for p in selected_build)
+                    total_ee = sum(durations[p] * t_build[t_build['Phase'] == p]['Explosive Efforts_Rate'].iloc[0] for p in selected_build)
+                    total_dist = sum(durations[p] * t_build[t_build['Phase'] == p]['Estimated Distance (y)_Rate'].iloc[0] for p in selected_build)
+                    total_time = sum(durations.values())
 
-                        if ath_projections:
-                            proj_df = pd.DataFrame(ath_projections).sort_values('Proj. Load', ascending=False)
-                            st.dataframe(proj_df, use_container_width=True, hide_index=True)
+                    # --- 5. DISPLAY RESULTS ---
+                    st.markdown(f"### Practice Projection: {display_label}")
+                    
+                    # Summary Boxes
+                    st.markdown('<div style="background:#f8f9fa; padding:15px; border-radius:10px; border:1px solid #E5E5E7;">', unsafe_allow_html=True)
+                    m1, m2, m3, m4, m5 = st.columns(5)
+                    m1.metric("Total Time", f"{total_time:.0f} min")
+                    m2.metric("Proj. Load", f"{total_pl:.1f}")
+                    m3.metric("Proj. Jumps", f"{int(total_j)}")
+                    m4.metric("Proj. Efforts", f"{int(total_ee)}")
+                    m5.metric("Proj. Distance", f"{int(total_dist)}y")
+                    st.markdown('</div>', unsafe_allow_html=True)
 
-                        # --- 5. WORK RATE INTENSITY GRAPH ---
-                        st.markdown("#### Intensity Breakdown (Rate per Minute)")
-                        unit_rates = plan_df.groupby('Phase')[[f'{m}_Rate' for m in plan_metrics]].mean().reset_index()
-                        u_build = unit_rates[unit_rates['Phase'].isin(selected_build)]
-                        
-                        fig_rate = go.Figure()
-                        colors = ['#515154', '#A52A2A', '#FF8200', '#4895DB']
-                        for i, m in enumerate(plan_metrics):
-                            fig_rate.add_trace(go.Bar(
-                                x=u_build['Phase'], 
-                                y=u_build[f'{m}_Rate'], 
-                                name=m,
-                                marker_color=colors[i]
-                            ))
-                        
-                        fig_rate.update_layout(
-                            barmode='group', height=350, template="simple_white",
-                            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-                            margin=dict(l=10, r=10, t=30, b=10)
-                        )
-                        st.plotly_chart(fig_rate, use_container_width=True, config=LOCKED_CONFIG)
-
-                        # --- 6. POSITION TOTALS ---
-                        total_pl = sum(durations[p] * u_build[u_build['Phase'] == p]['Player Load_Rate'].iloc[0] for p in selected_build)
-                        total_j = sum(durations[p] * u_build[u_build['Phase'] == p]['Total Jumps_Rate'].iloc[0] for p in selected_build)
-                        total_time = sum(durations.values())
-
-                        st.markdown(f"#### Average {target_group} Totals")
-                        st.markdown('<div style="background:#f8f9fa; padding:15px; border-radius:10px; border:1px solid #E5E5E7;">', unsafe_allow_html=True)
-                        m1, m2, m3 = st.columns(3)
-                        m1.metric("Total Time", f"{total_time:.0f} min")
-                        m2.metric("Avg Position Load", f"{total_pl:.1f}")
-                        m3.metric("Avg Position Jumps", f"{int(total_j)}")
-                        st.markdown('</div>', unsafe_allow_html=True)
-
-                    else:
-                        st.info("Select drills from the library above to begin planning.")
+                    # Intensity Graph
+                    st.markdown("#### Work Rate Comparison (Intensity per Minute)")
+                    fig_rate = go.Figure()
+                    colors = ['#515154', '#A52A2A', '#FF8200', '#4895DB']
+                    for i, m in enumerate(plan_metrics):
+                        fig_rate.add_trace(go.Bar(
+                            x=t_build['Phase'], 
+                            y=t_build[f'{m}_Rate'], 
+                            name=m,
+                            marker_color=colors[i]
+                        ))
+                    
+                    fig_rate.update_layout(
+                        barmode='group', height=350, template="simple_white",
+                        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+                        margin=dict(l=10, r=10, t=30, b=10)
+                    )
+                    st.plotly_chart(fig_rate, use_container_width=True, config=LOCKED_CONFIG)
+                else:
+                    st.info(f"Select drills to calculate the projected output for {display_label}.")
             else:
                 st.warning("No phase data detected.")
                 
