@@ -121,15 +121,28 @@ if check_password():
         try:
             thresh_df = pd.read_csv(st.secrets["THRESH_SHEET_URL"])
             
-            # This line removes any hidden spaces and fixes casing issues
-            thresh_df.columns = thresh_df.columns.str.strip().str.title() 
+            # This is the "Magic Fix" line
+            thresh_df.columns = [str(c).strip() for c in thresh_df.columns]
             
-            # Map specific internal names if your sheet uses underscores
-            thresh_df = thresh_df.rename(columns={
-                'Load Limit': 'Load_Limit',
-                'Jump Limit': 'Jump_Limit',
-                'Effort Limit': 'Effort_Limit'
-            })
+            # --- DEBUGGING OUTPUT ---
+            # This will show you exactly what Python sees in the sidebar or at the top
+            # st.sidebar.write("Columns found:", thresh_df.columns.tolist())
+            
+            # Force standard names even if they are slightly off in Google Sheets
+            rename_dict = {}
+            for col in thresh_df.columns:
+                if 'day' in col.lower(): rename_dict[col] = 'Day'
+                if 'pos' in col.lower(): rename_dict[col] = 'Position'
+                if 'load' in col.lower(): rename_dict[col] = 'Load_Limit'
+                if 'jump' in col.lower(): rename_dict[col] = 'Jump_Limit'
+                if 'effort' in col.lower(): rename_dict[col] = 'Effort_Limit'
+            
+            thresh_df = thresh_df.rename(columns=rename_dict)
+            
+            # Final check to ensure 'Day' exists after the force-rename
+            if 'Day' not in thresh_df.columns:
+                st.error(f"Critical Error: 'Day' column missing. Found: {thresh_df.columns.tolist()}")
+
         except Exception as e:
             st.error(f"Error loading Thresholds: {e}")
             thresh_df = None
