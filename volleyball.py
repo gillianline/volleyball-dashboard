@@ -129,15 +129,15 @@ if check_password():
         st.markdown('<div class="main-logo-container" style="text-align: center; margin-top: 10px; margin-bottom: 15px;"><img src="https://upload.wikimedia.org/wikipedia/commons/thumb/f/fc/Tennessee_Lady_Volunteers_logo.svg/1280px-Tennessee_Lady_Volunteers_logo.svg.png" width="120"><div style="color: #FF8200; font-size: 2rem; font-weight: 900; margin-top: 10px;">LADY VOLS VOLLEYBALL PERFORMANCE</div></div>', unsafe_allow_html=True)
 
         # --- MANUAL REFRESH BUTTON ---
-    with st.sidebar:
-        st.markdown("---")
-        st.markdown("### 🛠️ Data Controls")
-        if st.button('🔄 Sync Fresh Data'):
-            # This clears all cached data across the entire app
-            st.cache_data.clear()
-            # This forces the app to rerun from the top
-            st.rerun()
-        st.caption("Last Sync: " + datetime.now().strftime("%I:%M %p"))
+        with st.sidebar:
+            st.markdown("---")
+            st.markdown("### 🛠️ Data Controls")
+            if st.button('🔄 Sync Fresh Data'):
+                # This clears all cached data across the entire app
+                st.cache_data.clear()
+                # This forces the app to rerun from the top
+                st.rerun()
+            st.caption("Last Sync: " + datetime.now().strftime("%I:%M %p"))
         
         tabs = st.tabs(["Individual Profile", "Team Gallery", "Match v. Practice", "Position Analysis", "Match Summary", "Phase Analysis"])
         session_list = df[['Date', 'Session_Name']].drop_duplicates().sort_values('Date', ascending=False)['Session_Name'].tolist()
