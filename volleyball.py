@@ -118,18 +118,27 @@ if check_password():
         phase_df['Date'] = pd.to_datetime(phase_df['Date'], errors='coerce')
         phase_df = phase_df.rename(columns=rename_map)
         
-        return df, match_df, cmj_df, phase_df
+        try:
+            thresh_df = pd.read_csv(st.secrets["THRESH_SHEET_URL"])
+            thresh_df.columns = thresh_df.columns.str.strip()
+        except:
+            thresh_df = None
+        
+        # UPDATE THE RETURN TO INCLUDE thresh_df
+        return df, match_df, cmj_df, phase_df, thresh_df
 
     LOCKED_CONFIG = {'staticPlot': True, 'displayModeBar': False}
 
     try:
-        df, match_df, cmj_df, phase_df = load_all_data()
+        # UPDATE THIS LINE TO INCLUDE thresh_df
+        df, match_df, cmj_df, phase_df, thresh_df = load_all_data()
+        
         all_metrics = ['Total Jumps', 'Moderate Jumps', 'High Jumps', 'Jump Load', 'Player Load', 'Estimated Distance (y)', 'Explosive Efforts', 'High Intensity Movement']
-
+        
         st.markdown('<div class="main-logo-container" style="text-align: center; margin-top: 10px; margin-bottom: 15px;"><img src="https://upload.wikimedia.org/wikipedia/commons/thumb/f/fc/Tennessee_Lady_Volunteers_logo.svg/1280px-Tennessee_Lady_Volunteers_logo.svg.png" width="120"><div style="color: #FF8200; font-size: 2rem; font-weight: 900; margin-top: 10px;">LADY VOLS VOLLEYBALL PERFORMANCE</div></div>', unsafe_allow_html=True)
 
         
-        tabs = st.tabs(["Individual Profile", "Team Gallery", "Match v. Practice", "Position Analysis", "Match Summary", "Phase Analysis", "Practice Planner"])
+        tabs = st.tabs(["Individual Profile", "Team Gallery", "Match v. Practice", "Position Analysis", "Match Summary", "Phase Analysis", "Practice Planner", "Practice Red Flags (TESTING]")
         session_list = df[['Date', 'Session_Name']].drop_duplicates().sort_values('Date', ascending=False)['Session_Name'].tolist()
 
         with tabs[0]: # Tab 0: Individual Profile
@@ -742,6 +751,71 @@ if check_password():
                     st.info(f"Select drills to visualize the intensity flow for {display_label}.")
             else:
                 st.warning("No phase data detected.")
+        with tabs[7]: # Load Monitor & Flagging
+            st.markdown('<div class="section-header">Practice Load Monitor & Position Flagging</div>', unsafe_allow_html=True)
+            
+            if phase_df is not None and thresh_df is not None:
+                # --- 1. SET DAILY CONTEXT ---
+                c_day, c_pos = st.columns(2)
+                with c_day:
+                    sel_day = st.selectbox("Select Practice Day", thresh_df['Day'].unique(), key="monitor_day_sel")
                 
+                day_thresh = thresh_df[thresh_df['Day'] == sel_day]
+                
+                with c_pos:
+                    sel_pos = st.selectbox("Select Target Position", day_thresh['Position'].unique(), key="monitor_pos_sel")
+
+                active_limits = day_thresh[day_thresh['Position'] == sel_pos].iloc[0]
+                L_LIM, J_LIM, E_LIM = active_limits['Load_Limit'], active_limits['Jump_Limit'], active_limits['Effort_Limit']
+
+                st.info(f"Targeting **{sel_day}** limits for **{sel_pos}**: Max Load {L_LIM} | Max Jumps {J_LIM} | Max Efforts {E_LIM}")
+
+                # --- 2. DATA PREP ---
+                working_f = phase_df.copy()
+                working_f['Phase'] = working_f['Phase'].replace(phase_map)
+                time_col = 'Duration'
+                f_metrics = ['Player Load', 'Total Jumps', 'Explosive Efforts']
+                for m in f_metrics:
+                    working_f[f'{m}_Rate'] = working_f[m] / working_f[time_col]
+                
+                f_target_df = working_f.copy() if sel_pos == "Team Overall" else working_f[working_f['Position'] == sel_pos]
+
+                # --- 3. DRILL SELECTION ---
+                f_drills = st.multiselect(f"Build {sel_day} Plan", sorted(f_target_df['Phase'].unique()), key="monitor_drills")
+
+                if f_drills:
+                    f_stats = f_target_df.groupby('Phase').agg({time_col: 'mean'}).reset_index()
+                    st.write("Planned Minutes:")
+                    d_cols = st.columns(min(len(f_drills), 5))
+                    f_durs = {}
+                    for idx, phase in enumerate(f_drills):
+                        with d_cols[idx % 5]:
+                            avg_t = f_stats[f_stats['Phase'] == phase][time_col].iloc[0]
+                            f_durs[phase] = st.number_input(f"{phase}", value=float(round(avg_t, 0)), key=f"mon_dur_{phase}")
+
+                    # --- 4. FLAG LOGIC ---
+                    ath_rates = f_target_df.groupby(['Name', 'Phase'])[[f'{m}_Rate' for m in f_metrics]].mean().reset_index()
+                    ath_list = []
+                    for athlete in sorted(f_target_df['Name'].unique()):
+                        a_data = ath_rates[ath_rates['Name'] == athlete]
+                        a_totals = {m: 0.0 for m in f_metrics}
+                        for p in f_drills:
+                            r = a_data[a_data['Phase'] == p]
+                            if not r.empty:
+                                for m in f_metrics: a_totals[m] += f_durs[p] * r[f'{m}_Rate'].iloc[0]
+                        if sum(a_totals.values()) > 0:
+                            ath_list.append({'Athlete': athlete, 'Position': working_f[working_f['Name'] == athlete]['Position'].iloc[0], 'Proj. Load': round(a_totals['Player Load'], 1), 'Proj. Jumps': int(a_totals['Total Jumps']), 'Proj. Efforts': int(a_totals['Explosive Efforts'])})
+
+                    if ath_list:
+                        res_df = pd.DataFrame(ath_list).sort_values('Proj. Load', ascending=False)
+                        def apply_flags(row):
+                            styles = [''] * len(row)
+                            if row['Proj. Load'] >= L_LIM: styles[res_df.columns.get_loc('Proj. Load')] = 'background-color: #FEE2E2; color: #991B1B; font-weight: bold;'
+                            if row['Proj. Jumps'] >= J_LIM: styles[res_df.columns.get_loc('Proj. Jumps')] = 'background-color: #FEE2E2; color: #991B1B; font-weight: bold;'
+                            if row['Proj. Efforts'] >= E_LIM: styles[res_df.columns.get_loc('Proj. Efforts')] = 'background-color: #FEF3C7; color: #92400E;'
+                            return styles
+                        st.dataframe(res_df.style.apply(apply_flags, axis=1), use_container_width=True, hide_index=True)
+                else:
+                    st.info("Select drills to begin monitoring.")      
     except Exception as e:
         st.error(f"Sync Error: {e}")
