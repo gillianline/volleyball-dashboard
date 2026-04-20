@@ -517,6 +517,16 @@ if check_password():
                     st.markdown('</div>', unsafe_allow_html=True)
                     
         with tabs[5]: # Phase Analysis
+
+            phase_map = {
+                "Brizo (2)": "Brizo",
+                "2 Ball (Set 1)": "2 Ball", "2 Ball (Set 2)": "2 Ball", 
+                "2 Ball (Set 3)": "2 Ball", "2 Ball (Set 4)": "2 Ball",
+                "serving (2)": "Serving", "serving": "Serving", "Serving (2)": "Serving",
+                "2/3 Hitters (2)": "2/3 Hitters", "5v5 (2)": "5v5",
+                "Serve & Pass": "Serve and Pass"
+            }
+            
             st.markdown('<div class="section-header">Practice Phase Work Index (Intensity per Minute)</div>', unsafe_allow_html=True)
             
             if phase_df is not None and not phase_df.empty:
