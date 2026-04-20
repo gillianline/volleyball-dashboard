@@ -506,32 +506,42 @@ if check_password():
                         fig_ath.update_layout(barmode='group', height=240, margin=dict(l=10, r=10, t=10, b=40), template="simple_white")
                         st.plotly_chart(fig_ath, use_container_width=True, config=LOCKED_CONFIG)
 
-                    # --- SET BREAKDOWN: ACTIVITY ONLY ---
+                    # --- THE DOUBLE-LOCK FILTER ---
                     if 'Activity' in phase_df.columns and load_col_phases:
                         c_name = str(name).strip()
-                        # Get this player's sets
-                        p_sets = phase_df[
+                        
+                        # 1. First, get ONLY rows for this player that are labeled as "Sets"
+                        # This prevents practice drills (like '2 Ball') from showing up
+                        p_sets_only = phase_df[
                             (phase_df['Name'].astype(str).str.strip() == c_name) & 
                             (phase_df['Phase'].astype(str).str.contains('Set', case=False, na=False))
                         ].copy()
 
+                        # 2. Loop through the specific matches currently showing for this player
                         for _, m_row in ad.iterrows():
-                            # EXACT STRING MATCH ON ACTIVITY
-                            target = str(m_row['Activity']).strip()
-                            spec_data = p_sets[p_sets['Activity'].astype(str).str.strip() == target].sort_values('Phase')
+                            # This is the specific match name, e.g., "Match v. EKU 4-18-26"
+                            current_match_name = str(m_row['Activity']).strip()
+                            
+                            # 3. Apply the SECOND LOCK: Match the Activity column exactly
+                            # This ensures EKU sets don't show up in a Florida match
+                            spec_match_data = p_sets_only[
+                                p_sets_only['Activity'].astype(str).str.strip() == current_match_name
+                            ].sort_values('Phase')
 
-                            if not spec_data.empty:
-                                with st.expander(f"View Set Breakdown: {target}"):
+                            if not spec_match_data.empty:
+                                with st.expander(f"View Set Breakdown: {current_match_name}"):
                                     fig_s = px.bar(
-                                        spec_data, x='Phase', y=load_col_phases, color='Total Jumps',
-                                        title=f"Set-by-Set: {target}",
+                                        spec_match_data, 
+                                        x='Phase', 
+                                        y=load_col_phases, 
+                                        color='Total Jumps',
+                                        title=f"Set-by-Set Performance: {current_match_name}",
                                         labels={load_col_phases: 'Load', 'Phase': 'Set'},
-                                        color_continuous_scale='Reds', text='Total Jumps'
+                                        color_continuous_scale='Reds', 
+                                        text='Total Jumps'
                                     )
                                     fig_s.update_traces(textposition='outside')
-                                    st.plotly_chart(fig_s, use_container_width=True)
-                    
-                    st.markdown('</div>', unsafe_allow_html=True)
+                                    st.plotly_chart(fig_s, use_container_width=True, config=LOCKED_CONFIG)
                     
                     
         with tabs[5]: # Tab 5: Work Index Matrix
