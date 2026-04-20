@@ -520,28 +520,29 @@ if check_password():
                         )
                         st.plotly_chart(fig_ath, use_container_width=True, config=LOCKED_CONFIG)
                     
-                    if 'Match_ID' in phase_df.columns:
-                        # Find all sets for this specific player
+                    if 'Activity' in phase_df.columns:
+                        # Find all sets for this specific player across the whole sheet
                         all_player_sets = phase_df[
                             (phase_df['Name'] == name) & 
-                            (phase_df['Phase'].str.contains('Set', case=False, na=False))
+                            (phase_df['Phase'].str.contains('Set', case=True, na=False))
                         ].copy()
 
-                        # Now, we only loop through the matches actually displayed in 'ad'
+                        # Loop through the specific matches displayed in the card above (ad)
                         for _, match_row in ad.iterrows():
-                            current_session = match_row['Session_Name']
+                            # This is the "vs Florida" or "vs Georgia" string
+                            current_activity = match_row['Activity']
                             
-                            # Filter sets that belong ONLY to this specific match session
-                            specific_match_sets = all_player_sets[all_player_sets['Match_ID'] == current_session].sort_values('Phase')
+                            # Filter sets that belong ONLY to this specific Activity
+                            specific_match_sets = all_player_sets[all_player_sets['Activity'] == current_activity].sort_values('Phase')
 
                             if not specific_match_sets.empty:
-                                with st.expander(f"View Sets for {current_session} ({name})"):
+                                with st.expander(f"View Set Breakdown: {current_activity}"):
                                     fig_sets = px.bar(
                                         specific_match_sets, 
                                         x='Phase', 
                                         y='Player Load', 
                                         color='Total Jumps',
-                                        title=f"Set Breakdown: {current_session}",
+                                        title=f"Set-by-Set: {current_activity}",
                                         labels={'Player Load': 'Load', 'Phase': 'Set'},
                                         color_continuous_scale='Reds', 
                                         text='Total Jumps'
@@ -550,8 +551,7 @@ if check_password():
                                     fig_sets.update_layout(height=280, margin=dict(t=40, b=0))
                                     st.plotly_chart(fig_sets, use_container_width=True, config=LOCKED_CONFIG)
                     else:
-                        # Fallback if you haven't added the Match_ID column yet
-                        st.caption("Add a 'Match_ID' column to your Phases sheet to separate multi-match days.")
+                        st.caption("Ensure both your Matches and Phases sheets have an 'Activity' column to link multi-match days.")
                         
         with tabs[5]: # Tab 5: Work Index Matrix
             st.markdown('<div class="section-header">Practice Phase Volume & Avg Duration</div>', unsafe_allow_html=True)
