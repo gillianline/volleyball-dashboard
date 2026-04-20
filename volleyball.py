@@ -506,44 +506,39 @@ if check_password():
                         fig_ath.update_layout(barmode='group', height=240, margin=dict(l=10, r=10, t=10, b=40), template="simple_white")
                         st.plotly_chart(fig_ath, use_container_width=True, config=LOCKED_CONFIG)
 
-                    # --- THE DOUBLE-LOCK FILTER ---
+                    # --- THE ACTIVITY-STRICT FILTER ---
                     if 'Activity' in phase_df.columns and load_col_phases:
-                        c_name = str(name).strip()
-                        
-                        # 1. First, get ONLY rows for this player that are labeled as "Sets"
-                        # This prevents practice drills (like '2 Ball') from showing up
-                        p_sets_only = phase_df[
-                            (phase_df['Name'].astype(str).str.strip() == c_name) & 
-                            (phase_df['Phase'].astype(str).str.contains('Set', case=False, na=False))
-                        ].copy()
+                        # 1. Narrow down to the specific athlete first
+                        p_name = str(name).strip()
+                        p_data = phase_df[phase_df['Name'].astype(str).str.strip() == p_name].copy()
 
-                        # 2. Loop through the specific matches currently showing for this player
+                        # 2. We loop through the matches shown in this card (ad)
                         for _, m_row in ad.iterrows():
-                            # This is the specific match name, e.g., "Match v. EKU 4-18-26"
-                            current_match_name = str(m_row['Activity']).strip()
+                            # This is exactly "Match v. EKU 4-18-26"
+                            m_id = str(m_row['Activity']).strip()
                             
-                            # 3. Apply the SECOND LOCK: Match the Activity column exactly
-                            # This ensures EKU sets don't show up in a Florida match
-                            spec_match_data = p_sets_only[
-                                p_sets_only['Activity'].astype(str).str.strip() == current_match_name
+                            # 3. FILTER: Must have "Set" in Phase AND Activity must match m_id EXACTLY
+                            spec_match_sets = p_data[
+                                (p_data['Phase'].astype(str).str.contains('Set', case=False, na=False)) & 
+                                (p_data['Activity'].astype(str).str.strip() == m_id)
                             ].sort_values('Phase')
 
-                            if not spec_match_data.empty:
-                                with st.expander(f"View Set Breakdown: {current_match_name}"):
+                            # 4. Only display if it found sets for THIS SPECIFIC Match ID
+                            if not spec_match_sets.empty:
+                                with st.expander(f"View Set Breakdown: {m_id}"):
                                     fig_s = px.bar(
-                                        spec_match_data, 
+                                        spec_match_sets, 
                                         x='Phase', 
                                         y=load_col_phases, 
                                         color='Total Jumps',
-                                        title=f"Set-by-Set Performance: {current_match_name}",
+                                        title=f"Set-by-Set: {m_id}",
                                         labels={load_col_phases: 'Load', 'Phase': 'Set'},
                                         color_continuous_scale='Reds', 
                                         text='Total Jumps'
                                     )
                                     fig_s.update_traces(textposition='outside')
                                     st.plotly_chart(fig_s, use_container_width=True, config=LOCKED_CONFIG)
-                    
-                    
+                                    
         with tabs[5]: # Tab 5: Work Index Matrix
             st.markdown('<div class="section-header">Practice Phase Volume & Avg Duration</div>', unsafe_allow_html=True)
             
