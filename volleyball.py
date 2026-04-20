@@ -535,46 +535,55 @@ if check_password():
                 working_matrix = phase_df.copy()
                 time_col = 'Duration'
                 
-                # Apply global phase map (Mini Games, etc.)
+                # Strip spaces and handle potential "Merged" cell issues from Google Sheets
+                for col in ['Position', 'Name', 'Phase']:
+                    if col in working_matrix.columns:
+                        working_matrix[col] = working_matrix[col].astype(str).str.strip()
+
+                # Group Mini Games and other phases
                 if 'Phase' in working_matrix.columns:
                     working_matrix['Phase'] = working_matrix['Phase'].replace(phase_map)
                 
-                # Numeric cleanup
-                working_matrix[time_col] = pd.to_numeric(working_matrix[time_col], errors='coerce')
-                working_matrix = working_matrix[working_matrix[time_col] > 0].dropna(subset=[time_col])
-
+                # Force Duration to be a number - replace empty strings with 0
+                working_matrix[time_col] = pd.to_numeric(working_matrix[time_col], errors='coerce').fillna(0)
+                
+                # --- 2. WORK INDEX CALCULATION ---
                 index_metrics = ['Player Load', 'Total Jumps', 'Explosive Efforts']
                 
-                # Calculate Work Index
                 for m in index_metrics:
                     if m in working_matrix.columns:
-                        working_matrix[f'{m}_Rate'] = working_matrix[m] / working_matrix[time_col]
+                        # Safety check: if duration is 0, work rate is 0 to avoid "inf" errors
+                        working_matrix[f'{m}_Rate'] = working_matrix.apply(
+                            lambda x: x[m] / x[time_col] if x[time_col] > 0 else 0, axis=1
+                        )
 
-                # --- 2. UI FILTERS ---
+                # --- 3. UI FILTERS ---
                 f_col1, f_col2 = st.columns(2)
                 with f_col1:
-                    view_mode = st.radio("Table View", ["By Position", "By Individual Player"], horizontal=True, key="wi_view_mode_v2")
+                    view_mode = st.radio("Table View", ["By Position", "By Individual Player"], horizontal=True, key="wi_view_final")
                 with f_col2:
-                    date_opts = ["Season Average"] + sorted(working_matrix['Date'].dt.strftime('%Y-%m-%d').unique(), reverse=True)
-                    sel_date = st.selectbox("Select Date Scope", date_opts, key="wi_date_scope_v2")
+                    # Filter out null dates and sort
+                    valid_dates = working_matrix['Date'].dropna().unique()
+                    date_opts = ["Season Average"] + sorted([d.strftime('%Y-%m-%d') for d in valid_dates], reverse=True)
+                    sel_date = st.selectbox("Select Date Scope", date_opts, key="wi_date_final")
 
                 if sel_date != "Season Average":
                     working_matrix = working_matrix[working_matrix['Date'] == pd.to_datetime(sel_date)]
 
-                # --- 3. AGGREGATION LOGIC ---
+                # --- 4. AGGREGATION LOGIC ---
                 rate_cols = [f'{m}_Rate' for m in index_metrics]
-                # We add the original time_col ('Duration') to the list of columns to average
                 agg_cols = rate_cols + [time_col]
                 
                 if view_mode == "By Position":
-                    matrix_df = working_matrix.groupby(['Position', 'Phase'])[agg_cols].mean().reset_index()
+                    # Filter out rows where position is empty or "N/A"
+                    mask = (working_matrix['Position'] != 'nan') & (working_matrix['Position'] != '') & (working_matrix['Position'] != 'N/A')
+                    matrix_df = working_matrix[mask].groupby(['Position', 'Phase'])[agg_cols].mean().reset_index()
                     sort_col = 'Position'
                 else:
                     matrix_df = working_matrix.groupby(['Name', 'Position', 'Phase'])[agg_cols].mean().reset_index()
                     sort_col = 'Name'
 
-                # --- 4. FORMATTING & DISPLAY ---
-                # Rename columns for the table headers
+                # --- 5. FORMATTING & DISPLAY ---
                 display_df = matrix_df.rename(columns={
                     'Duration': 'Avg Mins',
                     'Player Load_Rate': 'Load/Min',
@@ -582,9 +591,10 @@ if check_password():
                     'Explosive Efforts_Rate': 'Efforts/Min'
                 })
 
+                # Ensure all positions from your list (Middle Blocker, Libero, etc.) are sorted together
                 display_df = display_df.sort_values([sort_col, 'Phase'])
 
-                # Style logic
+                # Style logic for clean presentation
                 def style_table(styler):
                     styler.format({
                         'Avg Mins': '{:.1f}',
@@ -598,11 +608,11 @@ if check_password():
                     display_df.style.pipe(style_table),
                     use_container_width=True,
                     hide_index=True,
-                    height=500
+                    height=600
                 )
             else:
-                st.warning("No phase data detected.")
-
+                st.warning("No data found in the Phases sheet.")
+                
         with tabs[6]: # Practice Planner
             st.markdown('<div class="section-header">Practice Phase Analysis & Planner</div>', unsafe_allow_html=True)
             
