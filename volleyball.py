@@ -134,6 +134,8 @@ if check_password():
         df, match_df, cmj_df, phase_df, thresh_df = load_all_data()
 
         phase_map = {
+                "Mini Games (set 1)": "Mini Games", 
+                "Mini Games (set 2)": "Mini Games",
                 "Brizo (2)": "Brizo",
                 "2 Ball (Set 1)": "2 Ball", "2 Ball (Set 2)": "2 Ball", 
                 "2 Ball (Set 3)": "2 Ball", "2 Ball (Set 4)": "2 Ball",
