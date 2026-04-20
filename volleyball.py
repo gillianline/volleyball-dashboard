@@ -447,6 +447,7 @@ if check_password():
             pos_filter_t = st.session_state.get("pos_state", "All Positions")
 
             if selected_matches:
+                # Map colors to the selected activities
                 m_map = {m: custom_colors[idx % len(custom_colors)] for idx, m in enumerate(selected_matches)}
                 st.markdown('<div class="section-header">Athlete Match Performance Breakdown</div>', unsafe_allow_html=True)
         
@@ -454,75 +455,8 @@ if check_password():
                 if pos_filter_t != "All Positions": 
                     tourney_df = tourney_df[tourney_df['Position'] == pos_filter_t]
 
-                # LOOP THROUGH EACH PLAYER
+                # --- START PLAYER LOOP ---
                 for name in sorted(tourney_df['Name'].unique()):
-                    ad = tourney_df[tourney_df['Name'] == name]
-            
-                    try:
-                        correct_photo = df[df['Name'] == name]['PhotoURL'].iloc[0]
-                    except:
-                        correct_photo = "https://www.w3schools.com/howto/img_avatar.png"
-            
-                    st.markdown(f'<div class="player-row-container"><div class="player-divider"></div>', unsafe_allow_html=True)
-                    side_cols = st.columns([1.5, 2])
-                    
-                    with side_cols[0]:
-                        card_start = f"""
-                            <div style="display:flex; align-items:center; gap:12px; padding:10px; background:#f8f9fa; border-bottom:2px solid #FF8200;">
-                                <img src="{correct_photo}" class="gallery-photo" style="width:65px; height:65px;">
-                                <div>
-                                    <p style="margin:0; font-weight:900; color:#1D1D1F; font-size:18px;">{name}</p>
-                                    <p style="margin:0; color:#4895DB; font-weight:700; font-size:16px;">{ad['Position'].iloc[0]}</p>
-                                </div>
-                            </div>
-                            <div style="padding:5px;">
-                                <table class="scout-table" style="margin-bottom:0;">
-                                    <thead><tr><th>Match</th><th>Jumps</th><th>Load</th><th>Efforts</th><th>Distance</th></tr></thead>
-                                    <tbody>
-                        """
-                        for _, r in ad.iterrows():
-                            card_start += f"<tr><td style='font-weight:700; font-size:11px;'>{r['Session_Name']}</td><td>{int(r['Total Jumps'])}</td><td>{r['Player Load']:.0f}</td><td>{r['Explosive Efforts']:.0f}</td><td>{r['Estimated Distance (y)']:.0f}</td></tr>"
-                
-                        total_j = int(ad['Total Jumps'].sum())
-                        total_pl = ad['Player Load'].sum()
-                        total_ee = ad['Explosive Efforts'].sum()
-                        total_dist = ad['Estimated Distance (y)'].sum()
-                
-                        card_start += f"<tr style='background:#4895DB; color:white; font-weight:900;'><td>TOTAL</td><td>{total_j}</td><td>{total_pl:.0f}</td><td>{total_ee:.0f}</td><td>{total_dist:.0f}</td></tr></tbody></table></div>"
-                        st.markdown(card_start, unsafe_allow_html=True)
-            
-                    with side_cols[1]:
-                        fig_ath = make_subplots(specs=[[{"secondary_y": True}]])
-                        for _, r in ad.iterrows():
-                            fig_ath.add_trace(go.Bar(
-                                name=r['Session_Name'], 
-                                x=['Total Jumps', 'Explosive Efforts'], 
-                                y=[r['Total Jumps'], r['Explosive Efforts']], 
-                                marker_color=m_map[r['Session_Name']],
-                                offsetgroup=r['Session_Name']
-                            ), secondary_y=False)
-                    
-                            fig_ath.add_trace(go.Bar(
-                                name=f"Load ({r['Session_Name']})", 
-                                x=['Player Load'], 
-                                y=[r['Player Load']], 
-                                marker=dict(color=m_map[r['Session_Name']], opacity=0.3), 
-                                showlegend=False,
-                                offsetgroup=r['Session_Name']
-                            ), secondary_y=True)
-                
-                        fig_ath.update_layout(
-                            barmode='group', height=260, margin=dict(l=10, r=10, t=10, b=80), 
-                            template="simple_white", font=dict(color="#333333", size=10),
-                            legend=dict(orientation="h", yanchor="top", y=-0.3, xanchor="center", x=0.5),
-                            yaxis=dict(showgrid=False, title="Jumps / Efforts"),
-                            yaxis2=dict(showgrid=False, title="Player Load", overlaying='y', side='right')
-                        )
-                        st.plotly_chart(fig_ath, use_container_width=True, config=LOCKED_CONFIG)
-                    
-                    # 1. Start the loop
-                for name in sorted(tourney_df['Name'].unique()):
-                    # ALL CODE BELOW MUST BE INDENTED LIKE THIS
                     ad = tourney_df[tourney_df['Name'] == name]
             
                     try:
@@ -561,17 +495,22 @@ if check_password():
                         fig_ath = make_subplots(specs=[[{"secondary_y": True}]])
                         for _, r in ad.iterrows():
                             act_color = m_map.get(r['Activity'], '#A52A2A')
+                            
                             fig_ath.add_trace(go.Bar(
-                                name=r['Activity'], x=['Total Jumps', 'Explosive Efforts'], 
+                                name=r['Activity'], 
+                                x=['Total Jumps', 'Explosive Efforts'], 
                                 y=[r['Total Jumps'], r['Explosive Efforts']], 
-                                marker_color=act_color, offsetgroup=r['Activity']
+                                marker_color=act_color,
+                                offsetgroup=r['Activity']
                             ), secondary_y=False)
                     
                             fig_ath.add_trace(go.Bar(
-                                name=f"Load ({r['Activity']})", x=['Total Player Load'], 
+                                name=f"Load ({r['Activity']})", 
+                                x=['Total Player Load'], 
                                 y=[r['Total Player Load']], 
                                 marker=dict(color=act_color, opacity=0.3), 
-                                showlegend=False, offsetgroup=r['Activity']
+                                showlegend=False,
+                                offsetgroup=r['Activity']
                             ), secondary_y=True)
                 
                         fig_ath.update_layout(
@@ -583,38 +522,39 @@ if check_password():
                         )
                         st.plotly_chart(fig_ath, use_container_width=True, config=LOCKED_CONFIG)
 
-                    # --- THE "ANYTHING GOES" MATCH LOGIC ---
+                    # --- SET-BY-SET ACTIVITY LOCK ---
                     if 'Activity' in phase_df.columns:
-                        # 1. Clean the name
                         c_name = str(name).strip()
-                        
-                        # 2. Find ALL sets for this player
-                        all_sets = phase_df[
+                        # Pre-filter all 'Set' rows for this athlete to keep it fast
+                        player_sets_pool = phase_df[
                             (phase_df['Name'].astype(str).str.strip() == c_name) & 
                             (phase_df['Phase'].astype(str).str.contains('Set', case=False, na=False))
                         ].copy()
 
-                        for _, m_row in ad.iterrows():
-                            # This is "Match v. EKU 4-18-26"
-                            m_act = str(m_row['Activity']).strip()
+                        # Loop through the matches currently being displayed for this player
+                        for _, match_row in ad.iterrows():
+                            target_act = str(match_row['Activity']).strip()
                             
-                            # 3. Match if the Activity column contains the match name AT ALL
-                            # This handles "EKU- Set 4" vs "Match v. EKU" automatically
-                            match_sets = all_sets[all_sets['Activity'].astype(str).str.strip() == m_act].sort_values('Phase')
+                            # Filter sets that match the specific activity in the card
+                            specific_match_sets = player_sets_pool[
+                                player_sets_pool['Activity'].astype(str).str.strip() == target_act
+                            ].sort_values('Phase')
 
-                            if not match_sets.empty:
-                                with st.expander(f"View Set Breakdown: {m_act}"):
-                                    fig_s = px.bar(
-                                        match_sets, x='Phase', y='Total Player Load', color='Total Jumps',
-                                        title=f"Set-by-Set: {m_act}",
+                            if not specific_match_sets.empty:
+                                with st.expander(f"View Set Breakdown: {target_act}"):
+                                    fig_sets = px.bar(
+                                        specific_match_sets, 
+                                        x='Phase', 
+                                        y='Total Player Load', 
+                                        color='Total Jumps',
+                                        title=f"Set-by-Set: {target_act}",
                                         labels={'Total Player Load': 'Load', 'Phase': 'Set'},
-                                        color_continuous_scale='Reds', text='Total Jumps'
+                                        color_continuous_scale='Reds', 
+                                        text='Total Jumps'
                                     )
-                                    fig_s.update_traces(textposition='outside')
-                                    st.plotly_chart(fig_s, use_container_width=True, config=LOCKED_CONFIG)
-                            else:
-                                # DEBUG HELPER: If it's still failing, this tells you why
-                                st.caption(f"No Phase rows found where Activity is exactly '{m_act}'")
+                                    fig_sets.update_traces(textposition='outside')
+                                    fig_sets.update_layout(height=280, margin=dict(t=40, b=0))
+                                    st.plotly_chart(fig_sets, use_container_width=True, config=LOCKED_CONFIG)
                     
                     st.markdown('</div>', unsafe_allow_html=True)
                     
