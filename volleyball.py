@@ -445,12 +445,7 @@ if check_password():
 
                 for name in sorted(tourney_df['Name'].unique()):
                     ad = tourney_df[tourney_df['Name'] == name]
-                    
-                    # --- AUTO-DETECT THE LOAD COLUMN ---
-                    # This finds the column even if it has an extra space at the end
-                    load_col_matches = next((c for c in ad.columns if "Player Load" in c), None)
-                    load_col_phases = next((c for c in phase_df.columns if "Player Load" in c), None)
-
+            
                     try:
                         correct_photo = df[df['Name'] == name]['PhotoURL'].iloc[0]
                     except:
@@ -474,11 +469,10 @@ if check_password():
                                     <tbody>
                         """
                         for _, r in ad.iterrows():
-                            val_load = r[load_col_matches] if load_col_matches else 0
-                            card_start += f"<tr><td style='font-weight:700; font-size:11px;'>{r['Activity']}</td><td>{int(r['Total Jumps'])}</td><td>{val_load:.0f}</td><td>{r['Explosive Efforts']:.0f}</td></tr>"
+                            card_start += f"<tr><td style='font-weight:700; font-size:11px;'>{r['Activity']}</td><td>{int(r['Total Jumps'])}</td><td>{r['Total Player Load']:.0f}</td><td>{r['Explosive Efforts']:.0f}</td></tr>"
                 
                         total_j = int(ad['Total Jumps'].sum())
-                        total_pl = ad[load_col_matches].sum() if load_col_matches else 0
+                        total_pl = ad['Total Player Load'].sum()
                         total_ee = ad['Explosive Efforts'].sum()
                 
                         card_start += f"<tr style='background:#4895DB; color:white; font-weight:900;'><td>TOTAL</td><td>{total_j}</td><td>{total_pl:.0f}</td><td>{total_ee:.0f}</td></tr></tbody></table></div>"
@@ -488,8 +482,6 @@ if check_password():
                         fig_ath = make_subplots(specs=[[{"secondary_y": True}]])
                         for _, r in ad.iterrows():
                             act_color = m_map.get(r['Activity'], '#A52A2A')
-                            val_load = r[load_col_matches] if load_col_matches else 0
-                            
                             fig_ath.add_trace(go.Bar(
                                 name=r['Activity'], x=['Total Jumps', 'Explosive Efforts'], 
                                 y=[r['Total Jumps'], r['Explosive Efforts']], 
@@ -497,48 +489,45 @@ if check_password():
                             ), secondary_y=False)
                     
                             fig_ath.add_trace(go.Bar(
-                                name=f"Load ({r['Activity']})", x=['Load'], 
-                                y=[val_load], 
+                                name=f"Load ({r['Activity']})", x=['Total Player Load'], 
+                                y=[r['Total Player Load']], 
                                 marker=dict(color=act_color, opacity=0.3), 
                                 showlegend=False, offsetgroup=r['Activity']
                             ), secondary_y=True)
                 
-                        fig_ath.update_layout(barmode='group', height=240, margin=dict(l=10, r=10, t=10, b=40), template="simple_white")
+                        fig_ath.update_layout(barmode='group', height=260, margin=dict(l=10, r=10, t=10, b=80), template="simple_white")
                         st.plotly_chart(fig_ath, use_container_width=True, config=LOCKED_CONFIG)
 
-                    # --- THE ACTIVITY-STRICT FILTER ---
-                    if 'Activity' in phase_df.columns and load_col_phases:
-                        # 1. Narrow down to the specific athlete first
-                        p_name = str(name).strip()
-                        p_data = phase_df[phase_df['Name'].astype(str).str.strip() == p_name].copy()
+                    # --- THE HARD LOCK FIX ---
+                    # We look ONLY at the Activity selected for this specific expander
+                    if 'Activity' in phase_df.columns:
+                        # Pre-filter for just this athlete's sets across the whole sheet
+                        ath_sets = phase_df[
+                            (phase_df['Name'].astype(str).str.strip() == str(name).strip()) & 
+                            (phase_df['Phase'].astype(str).str.contains('Set', case=False, na=False))
+                        ].copy()
 
-                        # 2. We loop through the matches shown in this card (ad)
+                        # Loop through each match entry for this player
                         for _, m_row in ad.iterrows():
-                            # This is exactly "Match v. EKU 4-18-26"
-                            m_id = str(m_row['Activity']).strip()
+                            # This is the unique ID from your Matches sheet (e.g. "Match v. EKU 4-18-26")
+                            match_id = str(m_row['Activity']).strip()
                             
-                            # 3. FILTER: Must have "Set" in Phase AND Activity must match m_id EXACTLY
-                            spec_match_sets = p_data[
-                                (p_data['Phase'].astype(str).str.contains('Set', case=False, na=False)) & 
-                                (p_data['Activity'].astype(str).str.strip() == m_id)
-                            ].sort_values('Phase')
+                            # Filter the athlete's sets to ONLY match this specific Activity string
+                            final_sets = ath_sets[ath_sets['Activity'].astype(str).str.strip() == match_id].sort_values('Phase')
 
-                            # 4. Only display if it found sets for THIS SPECIFIC Match ID
-                            if not spec_match_sets.empty:
-                                with st.expander(f"View Set Breakdown: {m_id}"):
+                            if not final_sets.empty:
+                                with st.expander(f"View Sets: {match_id}"):
                                     fig_s = px.bar(
-                                        spec_match_sets, 
-                                        x='Phase', 
-                                        y=load_col_phases, 
-                                        color='Total Jumps',
-                                        title=f"Set-by-Set: {m_id}",
-                                        labels={load_col_phases: 'Load', 'Phase': 'Set'},
-                                        color_continuous_scale='Reds', 
-                                        text='Total Jumps'
+                                        final_sets, x='Phase', y='Total Player Load', color='Total Jumps',
+                                        title=f"Set-by-Set Breakdown: {match_id}",
+                                        labels={'Total Player Load': 'Load', 'Phase': 'Set'},
+                                        color_continuous_scale='Reds', text='Total Jumps'
                                     )
                                     fig_s.update_traces(textposition='outside')
                                     st.plotly_chart(fig_s, use_container_width=True, config=LOCKED_CONFIG)
                                     
+                    st.markdown('</div>', unsafe_allow_html=True)
+                    
         with tabs[5]: # Tab 5: Work Index Matrix
             st.markdown('<div class="section-header">Practice Phase Volume & Avg Duration</div>', unsafe_allow_html=True)
             
