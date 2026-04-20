@@ -410,14 +410,14 @@ if check_password():
                         
         with tabs[4]: # Match Summary
             custom_colors = [
-            '#4895DB', # Blue
-            '#FF8200', # Orange
-            '#515154', # Grey
-            '#A52A2A', # Brown/Red
-            '#008080', # Teal
-            '#6A1B9A', # Purple
-            '#2E7D32'  # Green
-        ]
+                '#4895DB', # Blue
+                '#FF8200', # Orange
+                '#515154', # Grey
+                '#A52A2A', # Brown/Red
+                '#008080', # Teal
+                '#6A1B9A', # Purple
+                '#2E7D32'  # Green
+            ]
     
             if st.session_state.is_printing:
                 if st.button("Back to Editor (Show Filters)"):
@@ -447,16 +447,14 @@ if check_password():
             pos_filter_t = st.session_state.get("pos_state", "All Positions")
 
             if selected_matches:
-                # --- FIX: Map the expanded custom_colors to the matches ---
-                # Using % len(custom_colors) ensures it never runs out of index
                 m_map = {m: custom_colors[idx % len(custom_colors)] for idx, m in enumerate(selected_matches)}
-        
                 st.markdown('<div class="section-header">Athlete Match Performance Breakdown</div>', unsafe_allow_html=True)
         
                 tourney_df = match_df[match_df['Session_Name'].isin(selected_matches)].sort_values(['Date', 'Sheet_Order'])
                 if pos_filter_t != "All Positions": 
                     tourney_df = tourney_df[tourney_df['Position'] == pos_filter_t]
 
+                # LOOP THROUGH EACH PLAYER
                 for name in sorted(tourney_df['Name'].unique()):
                     ad = tourney_df[tourney_df['Name'] == name]
             
@@ -467,6 +465,7 @@ if check_password():
             
                     st.markdown(f'<div class="player-row-container"><div class="player-divider"></div>', unsafe_allow_html=True)
                     side_cols = st.columns([1.5, 2])
+                    
                     with side_cols[0]:
                         card_start = f"""
                             <div style="display:flex; align-items:center; gap:12px; padding:10px; background:#f8f9fa; border-bottom:2px solid #FF8200;">
@@ -478,7 +477,7 @@ if check_password():
                             </div>
                             <div style="padding:5px;">
                                 <table class="scout-table" style="margin-bottom:0;">
-                                    <thead><tr><th>Match</th><th>Total Jumps</th><th>Player Load</th><th>Explosive Efforts</th><th>Estimated Distance</th></tr></thead>
+                                    <thead><tr><th>Match</th><th>Jumps</th><th>Load</th><th>Efforts</th><th>Distance</th></tr></thead>
                                     <tbody>
                         """
                         for _, r in ad.iterrows():
@@ -495,7 +494,6 @@ if check_password():
                     with side_cols[1]:
                         fig_ath = make_subplots(specs=[[{"secondary_y": True}]])
                         for _, r in ad.iterrows():
-                            # Main Bars
                             fig_ath.add_trace(go.Bar(
                                 name=r['Session_Name'], 
                                 x=['Total Jumps', 'Explosive Efforts'], 
@@ -504,7 +502,6 @@ if check_password():
                                 offsetgroup=r['Session_Name']
                             ), secondary_y=False)
                     
-                            # Ghost Player Load Bar
                             fig_ath.add_trace(go.Bar(
                                 name=f"Load ({r['Session_Name']})", 
                                 x=['Player Load'], 
@@ -515,63 +512,38 @@ if check_password():
                             ), secondary_y=True)
                 
                         fig_ath.update_layout(
-                            barmode='group', 
-                            height=260, 
-                            margin=dict(l=10, r=10, t=10, b=80), 
-                            template="simple_white", 
-                            font=dict(color="#333333", size=10),
+                            barmode='group', height=260, margin=dict(l=10, r=10, t=10, b=80), 
+                            template="simple_white", font=dict(color="#333333", size=10),
                             legend=dict(orientation="h", yanchor="top", y=-0.3, xanchor="center", x=0.5),
                             yaxis=dict(showgrid=False, title="Jumps / Efforts"),
                             yaxis2=dict(showgrid=False, title="Player Load", overlaying='y', side='right')
                         )
                         st.plotly_chart(fig_ath, use_container_width=True, config=LOCKED_CONFIG)
+                    
+                    # --- NEW: SET-BY-SET BREAKDOWN (Nested inside Player Loop) ---
+                    player_sets = phase_df[
+                        (phase_df['Name'] == name) & 
+                        (phase_df['Phase'].str.contains('Set', case=False, na=False)) &
+                        (phase_df['Date'].isin(ad['Date'])) # Only show sets for matches currently selected
+                    ].copy()
+
+                    if not player_sets.empty:
+                        with st.expander(f"View Set-by-Set Breakdown for {name}"):
+                            # If they played multiple matches, group by date
+                            for match_date in sorted(player_sets['Date'].unique()):
+                                day_sets = player_sets[player_sets['Date'] == match_date].sort_values('Phase')
+                                
+                                fig_match = px.bar(
+                                    day_sets, x='Phase', y='Player Load', color='Total Jumps',
+                                    title=f"Match on {match_date.strftime('%m/%d/%Y')}",
+                                    labels={'Player Load': 'Load', 'Phase': 'Set'},
+                                    color_continuous_scale='Reds', text='Total Jumps'
+                                )
+                                fig_match.update_traces(textposition='outside')
+                                fig_match.update_layout(height=300)
+                                st.plotly_chart(fig_match, use_container_width=True)
+                    
                     st.markdown('</div>', unsafe_allow_html=True)
-
-                    # --- MATCH SET TRACKER (Bottom of Tab 4) ---
-            st.markdown("---")
-        
-            # 1. Filter for all Match Sets for this player
-            match_pool = phase_df[
-                (phase_df['Name'] == sel_player) & 
-                (phase_df['Phase'].str.contains('Set', case=False, na=False))
-            ].copy()
-
-            if not match_pool.empty:
-                st.markdown("### Match-Specific Breakdown")
-            
-                # 2. Create a selector for the specific Match/Date
-                # We use 'Date' to group sets into a single "Match" option
-                match_dates = sorted(match_pool['Date'].dt.strftime('%Y-%m-%d').unique(), reverse=True)
-                sel_match_date = st.selectbox("Select a Match Date to view set data", match_dates, key="match_view_sel")
-
-                # 3. Filter data to ONLY the selected match day
-                current_match_data = match_pool[match_pool['Date'] == pd.to_datetime(sel_match_date)]
-                current_match_data = current_match_data.sort_values('Phase') # Sort Set 1, Set 2...
-
-                # 4. Create the Set-by-Set Bar Chart
-                fig_match = px.bar(
-                    current_match_data,
-                    x='Phase',
-                    y='Player Load',
-                    color='Total Jumps',
-                    title=f"Set-by-Set Performance: {sel_match_date}",
-                    labels={'Player Load': 'Player Load', 'Phase': 'Set'},
-                    color_continuous_scale='Reds',
-                    text='Total Jumps'
-                )
-            
-                fig_match.update_traces(textposition='outside')
-                st.plotly_chart(fig_match, use_container_width=True)
-            
-                # 5. Display a small summary table for that specific match
-                match_total_load = current_match_data['Player Load'].sum()
-                match_total_jumps = current_match_data['Total Jumps'].sum()
-            
-                st.write(f"**Match Totals:** {int(match_total_load)} Load | {int(match_total_jumps)} Jumps")
-            
-            else:
-                # If the player has no 'Set' data, the section remains empty or shows this note
-                st.caption("No match set data recorded for this player.")
                     
         with tabs[5]: # Tab 5: Work Index Matrix
             st.markdown('<div class="section-header">Practice Phase Volume & Avg Duration</div>', unsafe_allow_html=True)
