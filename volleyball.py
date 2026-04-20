@@ -73,7 +73,7 @@ if check_password():
         score = float(score)
         return "#2D5A27" if score <= 40 else "#D4A017" if score <= 70 else "#A52A2A"    
 
-    @st.cache_data(ttl=300)
+    @st.cache_data(ttl=10)
     def load_all_data():
         # Load Primary Sheet
         df = pd.read_csv(st.secrets["GOOGLE_SHEET_URL"])
