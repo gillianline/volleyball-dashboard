@@ -517,109 +517,74 @@ if check_password():
                     st.markdown('</div>', unsafe_allow_html=True)
                     
         with tabs[5]: # Phase Analysis
-            st.markdown('<div class="section-header">Practice Phase Intensity Breakdown</div>', unsafe_allow_html=True)
+            st.markdown('<div class="section-header">Practice Phase Work Index (Intensity per Minute)</div>', unsafe_allow_html=True)
             
             if phase_df is not None and not phase_df.empty:
-                # --- 1. DEFINE & LOCK PHASE ORDER ---
-                # We start with your required sequence
-                priority_phases = ["Pre-Practice", "Warm Up"]
+                # --- 1. DATA PREPARATION ---
+                working_matrix = phase_df.copy()
+                time_col = 'Duration'
                 
-                # Consolidate names for the order list first
-                phase_map = {
-                    "Brizo (2)": "Brizo",
-                    "2 Ball (Set 1)": "2 Ball", "2 Ball (Set 2)": "2 Ball", 
-                    "2 Ball (Set 3)": "2 Ball", "2 Ball (Set 4)": "2 Ball",
-                    "serving (2)": "Serving", "serving": "Serving", "Serving (2)": "Serving",
-                    "2/3 Hitters (2)": "2/3 Hitters", "5v5 (2)": "5v5",
-                    "Serve & Pass": "Serve and Pass"
-                }
-
-                # Get all unique phases from sheet, apply the map, and filter out duplicates
-                raw_sheet_phases = phase_df['Phase'].unique().tolist()
-                mapped_sheet_phases = []
-                for p in raw_sheet_phases:
-                    m = phase_map.get(p, p)
-                    if m not in mapped_sheet_phases:
-                        mapped_sheet_phases.append(m)
-
-                # Build final order: Priority first, then the rest of the sheet order
-                final_phase_order = priority_phases + [p for p in mapped_sheet_phases if p not in priority_phases]
-
-                # --- 2. DATA PROCESSING ---
-                working_df = phase_df.copy()
-                working_df['Phase'] = working_df['Phase'].replace(phase_map)
-
-                # --- 3. VIEW SELECTION ---
-                view_col1, view_col2 = st.columns([1, 2])
-                with view_col1:
-                    view_type = st.radio("Select View", ["Overall", "By Specific Practice"], horizontal=True)
+                # Consolidate Phase Names (using your existing map)
+                working_matrix['Phase'] = working_matrix['Phase'].replace(phase_map)
                 
-                if view_type == "By Specific Practice":
-                    with view_col2:
-                        working_df['Date'] = pd.to_datetime(working_df['Date'])
-                        raw_dates = sorted(working_df['Date'].unique(), reverse=True)
-                        date_options = {d.strftime('%b %d, %Y'): d for d in raw_dates}
-                        selected_date_str = st.selectbox("Select Practice Date", options=list(date_options.keys()))
-                        actual_date = date_options[selected_date_str]
-                        working_df = working_df[working_df['Date'] == actual_date]
+                # Filter out rows with no time to avoid division by zero
+                working_matrix = working_matrix[working_matrix[time_col] > 0].dropna(subset=[time_col])
 
-                # --- 4. DEFINE GROUPS ---
-                pos_list = sorted([p for p in working_df['Position'].unique() if pd.notna(p) and p != "N/A"])
-                display_groups = ["Team Overall"] + pos_list
+                # Define Work Index Metrics
+                index_metrics = ['Player Load', 'Total Jumps', 'Explosive Efforts']
+                
+                # Calculate the Work Index (Value / Minutes)
+                for m in index_metrics:
+                    working_matrix[f'{m}_Rate'] = working_matrix[m] / working_matrix[time_col]
 
-                # --- 5. RENDER MATRIX ---
-                for group in display_groups:
-                    header_color = "#4895DB" if group == "Team Overall" else "#FF8200"
-                    st.markdown(f"{group} Breakdown")
-                    
-                    if group == "Team Overall":
-                        plot_df = working_df.copy()
-                    else:
-                        plot_df = working_df[working_df['Position'] == group]
+                # --- 2. FILTERS ---
+                f_col1, f_col2 = st.columns(2)
+                with f_col1:
+                    view_mode = st.radio("Table View", ["By Position", "By Individual Player"], horizontal=True)
+                with f_col2:
+                    # Allow filtering by a specific practice date or looking at season averages
+                    date_opts = ["Season Average"] + sorted(working_matrix['Date'].dt.strftime('%Y-%m-%d').unique(), reverse=True)
+                    sel_date = st.selectbox("Select Date Scope", date_opts)
 
-                    # Aggregate Metrics
-                    plot_sum = plot_df.groupby('Phase').agg({
-                        'Player Load': 'mean',
-                        'Explosive Efforts': 'mean',
-                        'Total Jumps': 'mean',
-                        'Estimated Distance (y)': 'mean'
-                    }).reset_index()
-                    
-                    # Re-Apply Locked Categorical Order
-                    plot_sum['Phase'] = pd.Categorical(plot_sum['Phase'], categories=final_phase_order, ordered=True)
-                    plot_sum = plot_sum.sort_values('Phase').dropna(subset=['Phase'])
+                if sel_date != "Season Average":
+                    working_matrix = working_matrix[working_matrix['Date'] == pd.to_datetime(sel_date)]
 
-                    if not plot_sum.empty:
-                        max_vals = {
-                            'Player Load': plot_sum['Player Load'].max(),
-                            'Explosive Efforts': plot_sum['Explosive Efforts'].max(),
-                            'Total Jumps': plot_sum['Total Jumps'].max(),
-                            'Estimated Distance (y)': plot_sum['Estimated Distance (y)'].max()
-                        }
+                # --- 3. RENDER WORK INDEX TABLE ---
+                if view_mode == "By Position":
+                    # Aggregate by Position and Phase
+                    matrix_df = working_matrix.groupby(['Position', 'Phase'])[[f'{m}_Rate' for m in index_metrics]].mean().reset_index()
+                    sort_col = 'Position'
+                else:
+                    # Aggregate by Individual Player and Phase
+                    matrix_df = working_matrix.groupby(['Name', 'Position', 'Phase'])[[f'{m}_Rate' for m in index_metrics]].mean().reset_index()
+                    sort_col = 'Name'
 
-                        html_output = []
-                        html_output.append(f'<div style="margin-bottom: 25px; border: 1px solid #E5E5E7; border-radius: 10px; overflow: hidden;">')
-                        html_output.append(f'<table class="scout-table" style="width:100%; border-collapse: collapse;">')
-                        html_output.append(f'<thead><tr style="background-color: {header_color}; color: white;">')
-                        html_output.append(f'<th style="text-align:left; padding: 12px 20px;">Phase</th>')
-                        html_output.append(f'<th>Avg Player Load</th><th>Explosive Efforts</th><th>Total Jumps</th><th>Avg Distance (y)</th></tr></thead><tbody>')
-                        
-                        def get_highlight(val, col_name):
-                            if val == max_vals[col_name] and val > 0:
-                                return "style='background-color: #FFF3E0; color: #E65100; font-weight: 800; border: 1px solid #FFCC80;'"
-                            return ""
+                # Rename columns for the UI
+                display_df = matrix_df.rename(columns={
+                    'Player Load_Rate': 'Load/Min',
+                    'Total Jumps_Rate': 'Jumps/Min',
+                    'Explosive Efforts_Rate': 'Efforts/Min'
+                })
 
-                        for _, row in plot_sum.iterrows():
-                            html_output.append(f"<tr>")
-                            html_output.append(f"<td style='text-align:left; padding-left:20px; font-weight:700;'>{row['Phase']}</td>")
-                            html_output.append(f"<td {get_highlight(row['Player Load'], 'Player Load')}>{row['Player Load']:.1f}</td>")
-                            html_output.append(f"<td {get_highlight(row['Explosive Efforts'], 'Explosive Efforts')}>{row['Explosive Efforts']:.1f}</td>")
-                            html_output.append(f"<td {get_highlight(row['Total Jumps'], 'Total Jumps')}>{row['Total Jumps']:.1f}</td>")
-                            html_output.append(f"<td {get_highlight(row['Estimated Distance (y)'], 'Estimated Distance (y)')}>{row['Estimated Distance (y)']:.0f}</td>")
-                            html_output.append(f"</tr>")
-                        
-                        html_output.append('</tbody></table></div>')
-                        st.write("".join(html_output), unsafe_allow_html=True)
+                # Sort for readability
+                display_df = display_df.sort_values([sort_col, 'Phase'])
+
+                # Apply conditional formatting (Heatmap) to see high intensity drills instantly
+                def style_index(styler):
+                    styler.background_gradient(axis=0, subset=['Load/Min', 'Jumps/Min', 'Efforts/Min'], cmap="YlOrRd")
+                    styler.format({'Load/Min': '{:.2f}', 'Jumps/Min': '{:.2f}', 'Efforts/Min': '{:.2f}'})
+                    return styler
+
+                st.dataframe(
+                    display_df.style.pipe(style_index),
+                    use_container_width=True,
+                    hide_index=True,
+                    height=600
+                )
+
+                st.caption("Note: Work Index is calculated as (Total Metric / Duration in Minutes). Higher values (Darker Red) indicate higher intensity drills.")
+            else:
+                st.warning("No phase data detected in the Google Sheet.")
 
         with tabs[6]: # Practice Planner
             st.markdown('<div class="section-header">Practice Phase Analysis & Planner</div>', unsafe_allow_html=True)
