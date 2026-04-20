@@ -409,7 +409,15 @@ if check_password():
                     st.markdown('</div>', unsafe_allow_html=True)
                         
         with tabs[4]: # Match Summary
-            custom_colors = ['#4895DB', '#FF8200', '#515154', '#A52A2A', '#008080', '#6A1B9A', '#2E7D32']
+            custom_colors = [
+                '#4895DB', # Blue
+                '#FF8200', # Orange
+                '#515154', # Grey
+                '#A52A2A', # Brown/Red
+                '#008080', # Teal
+                '#6A1B9A', # Purple
+                '#2E7D32'  # Green
+            ]
     
             if st.session_state.is_printing:
                 if st.button("Back to Editor (Show Filters)"):
@@ -431,6 +439,9 @@ if check_password():
                     if "pos_state" not in st.session_state: st.session_state.pos_state = "All Positions"
                     st.session_state.pos_state = st.selectbox("Filter by Position", ["All Positions"] + sorted(list(match_df['Position'].unique())), index=0)
                 st.markdown('</div>', unsafe_allow_html=True)
+
+            if st.session_state.is_printing:
+                st.markdown('<script>window.print();</script>', unsafe_allow_html=True)
 
             selected_matches = st.session_state.get("matches_state", [])
             pos_filter_t = st.session_state.get("pos_state", "All Positions")
@@ -469,10 +480,10 @@ if check_password():
                                     <tbody>
                         """
                         for _, r in ad.iterrows():
-                            card_start += f"<tr><td style='font-weight:700; font-size:11px;'>{r['Activity']}</td><td>{int(r['Total Jumps'])}</td><td>{r['Total Player Load']:.0f}</td><td>{r['Explosive Efforts']:.0f}</td></tr>"
+                            card_start += f"<tr><td style='font-weight:700; font-size:11px;'>{r['Session_Name']}</td><td>{int(r['Total Jumps'])}</td><td>{r['Player Load']:.0f}</td><td>{r['Explosive Efforts']:.0f}</td></tr>"
                 
                         total_j = int(ad['Total Jumps'].sum())
-                        total_pl = ad['Total Player Load'].sum()
+                        total_pl = ad['Player Load'].sum()
                         total_ee = ad['Explosive Efforts'].sum()
                 
                         card_start += f"<tr style='background:#4895DB; color:white; font-weight:900;'><td>TOTAL</td><td>{total_j}</td><td>{total_pl:.0f}</td><td>{total_ee:.0f}</td></tr></tbody></table></div>"
@@ -481,52 +492,33 @@ if check_password():
                     with side_cols[1]:
                         fig_ath = make_subplots(specs=[[{"secondary_y": True}]])
                         for _, r in ad.iterrows():
-                            act_color = m_map.get(r['Activity'], '#A52A2A')
                             fig_ath.add_trace(go.Bar(
-                                name=r['Activity'], x=['Total Jumps', 'Explosive Efforts'], 
+                                name=r['Session_Name'], 
+                                x=['Total Jumps', 'Explosive Efforts'], 
                                 y=[r['Total Jumps'], r['Explosive Efforts']], 
-                                marker_color=act_color, offsetgroup=r['Activity']
+                                marker_color=m_map[r['Session_Name']],
+                                offsetgroup=r['Session_Name']
                             ), secondary_y=False)
                     
                             fig_ath.add_trace(go.Bar(
-                                name=f"Load ({r['Activity']})", x=['Total Player Load'], 
-                                y=[r['Total Player Load']], 
-                                marker=dict(color=act_color, opacity=0.3), 
-                                showlegend=False, offsetgroup=r['Activity']
+                                name=f"Load ({r['Session_Name']})", 
+                                x=['Player Load'], 
+                                y=[r['Player Load']], 
+                                marker=dict(color=m_map[r['Session_Name']], opacity=0.3), 
+                                showlegend=False,
+                                offsetgroup=r['Session_Name']
                             ), secondary_y=True)
                 
-                        fig_ath.update_layout(barmode='group', height=260, margin=dict(l=10, r=10, t=10, b=80), template="simple_white")
+                        fig_ath.update_layout(
+                            barmode='group', height=260, margin=dict(l=10, r=10, t=10, b=80), 
+                            template="simple_white", font=dict(color="#333333", size=10),
+                            legend=dict(orientation="h", yanchor="top", y=-0.3, xanchor="center", x=0.5),
+                            yaxis=dict(showgrid=False, title="Jumps / Efforts"),
+                            yaxis2=dict(showgrid=False, title="Player Load", overlaying='y', side='right')
+                        )
                         st.plotly_chart(fig_ath, use_container_width=True, config=LOCKED_CONFIG)
-
-                    # --- THE HARD LOCK FIX ---
-                    # We look ONLY at the Activity selected for this specific expander
-                    if 'Activity' in phase_df.columns:
-                        # Pre-filter for just this athlete's sets across the whole sheet
-                        ath_sets = phase_df[
-                            (phase_df['Name'].astype(str).str.strip() == str(name).strip()) & 
-                            (phase_df['Phase'].astype(str).str.contains('Set', case=False, na=False))
-                        ].copy()
-
-                        # Loop through each match entry for this player
-                        for _, m_row in ad.iterrows():
-                            # This is the unique ID from your Matches sheet (e.g. "Match v. EKU 4-18-26")
-                            match_id = str(m_row['Activity']).strip()
-                            
-                            # Filter the athlete's sets to ONLY match this specific Activity string
-                            final_sets = ath_sets[ath_sets['Activity'].astype(str).str.strip() == match_id].sort_values('Phase')
-
-                            if not final_sets.empty:
-                                with st.expander(f"View Sets: {match_id}"):
-                                    fig_s = px.bar(
-                                        final_sets, x='Phase', y='Total Player Load', color='Total Jumps',
-                                        title=f"Set-by-Set Breakdown: {match_id}",
-                                        labels={'Total Player Load': 'Load', 'Phase': 'Set'},
-                                        color_continuous_scale='Reds', text='Total Jumps'
-                                    )
-                                    fig_s.update_traces(textposition='outside')
-                                    st.plotly_chart(fig_s, use_container_width=True, config=LOCKED_CONFIG)
-                                    
                     st.markdown('</div>', unsafe_allow_html=True)
+                    
                     
         with tabs[5]: # Tab 5: Work Index Matrix
             st.markdown('<div class="section-header">Practice Phase Volume & Avg Duration</div>', unsafe_allow_html=True)
