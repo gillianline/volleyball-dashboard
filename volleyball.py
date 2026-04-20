@@ -526,6 +526,52 @@ if check_password():
                         )
                         st.plotly_chart(fig_ath, use_container_width=True, config=LOCKED_CONFIG)
                     st.markdown('</div>', unsafe_allow_html=True)
+
+                    # --- MATCH SET TRACKER (Bottom of Tab 4) ---
+        st.markdown("---")
+        
+        # 1. Filter for all Match Sets for this player
+        match_pool = phase_df[
+            (phase_df['Name'] == sel_player) & 
+            (phase_df['Phase'].str.contains('Set', case=False, na=False))
+        ].copy()
+
+        if not match_pool.empty:
+            st.markdown("### Match-Specific Breakdown")
+            
+            # 2. Create a selector for the specific Match/Date
+            # We use 'Date' to group sets into a single "Match" option
+            match_dates = sorted(match_pool['Date'].dt.strftime('%Y-%m-%d').unique(), reverse=True)
+            sel_match_date = st.selectbox("Select a Match Date to view set data", match_dates, key="match_view_sel")
+
+            # 3. Filter data to ONLY the selected match day
+            current_match_data = match_pool[match_pool['Date'] == pd.to_datetime(sel_match_date)]
+            current_match_data = current_match_data.sort_values('Phase') # Sort Set 1, Set 2...
+
+            # 4. Create the Set-by-Set Bar Chart
+            fig_match = px.bar(
+                current_match_data,
+                x='Phase',
+                y='Player Load',
+                color='Total Jumps',
+                title=f"Set-by-Set Performance: {sel_match_date}",
+                labels={'Player Load': 'Player Load', 'Phase': 'Set'},
+                color_continuous_scale='Reds',
+                text='Total Jumps'
+            )
+            
+            fig_match.update_traces(textposition='outside')
+            st.plotly_chart(fig_match, use_container_width=True)
+            
+            # 5. Display a small summary table for that specific match
+            match_total_load = current_match_data['Player Load'].sum()
+            match_total_jumps = current_match_data['Total Jumps'].sum()
+            
+            st.write(f"**Match Totals:** {int(match_total_load)} Load | {int(match_total_jumps)} Jumps")
+            
+        else:
+            # If the player has no 'Set' data, the section remains empty or shows this note
+            st.caption("No match set data recorded for this player.")
                     
         with tabs[5]: # Tab 5: Work Index Matrix
             st.markdown('<div class="section-header">Practice Phase Volume & Avg Duration</div>', unsafe_allow_html=True)
