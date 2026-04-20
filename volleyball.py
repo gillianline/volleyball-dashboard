@@ -594,7 +594,6 @@ if check_password():
                     height=600
                 )
 
-                st.caption("Note: Work Index is calculated as (Total Metric / Duration in Minutes). Higher values (Darker Red) indicate higher intensity drills.")
             else:
                 st.warning("No phase data detected in the Google Sheet.")
 
