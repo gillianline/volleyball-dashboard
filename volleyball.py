@@ -520,30 +520,40 @@ if check_password():
                         )
                         st.plotly_chart(fig_ath, use_container_width=True, config=LOCKED_CONFIG)
                     
-                    # --- NEW: SET-BY-SET BREAKDOWN (Nested inside Player Loop) ---
+                    # --- NEW: SET-BY-SET BREAKDOWN (Displaying only for matches shown in the table above) ---
+                    # We filter phase_df to ONLY sets that match the dates of the matches selected for THIS athlete
+                    current_athlete_match_dates = ad['Date'].unique()
+                    
                     player_sets = phase_df[
                         (phase_df['Name'] == name) & 
                         (phase_df['Phase'].str.contains('Set', case=False, na=False)) &
-                        (phase_df['Date'].isin(ad['Date'])) # Only show sets for matches currently selected
+                        (phase_df['Date'].isin(current_athlete_match_dates))
                     ].copy()
 
                     if not player_sets.empty:
-                        with st.expander(f"View Set-by-Set Breakdown for {name}"):
-                            # If they played multiple matches, group by date
-                            for match_date in sorted(player_sets['Date'].unique()):
+                        with st.expander(f"View Set Breakdown for {name}"):
+                            # Iterate through the matches actually displayed in the table above
+                            for match_date in sorted(current_athlete_match_dates):
+                                # Filter sets for THIS specific day
                                 day_sets = player_sets[player_sets['Date'] == match_date].sort_values('Phase')
                                 
-                                fig_match = px.bar(
-                                    day_sets, x='Phase', y='Player Load', color='Total Jumps',
-                                    title=f"Match on {match_date.strftime('%m/%d/%Y')}",
-                                    labels={'Player Load': 'Load', 'Phase': 'Set'},
-                                    color_continuous_scale='Reds', text='Total Jumps'
-                                )
-                                fig_match.update_traces(textposition='outside')
-                                fig_match.update_layout(height=300)
-                                st.plotly_chart(fig_match, use_container_width=True)
-                    
-                    st.markdown('</div>', unsafe_allow_html=True)
+                                if not day_sets.empty:
+                                    # Get the Opponent name for the title from our 'ad' dataframe
+                                    opp = ad[ad['Date'] == match_date]['Session_Name'].iloc[0]
+                                    
+                                    fig_match = px.bar(
+                                        day_sets, 
+                                        x='Phase', 
+                                        y='Player Load', 
+                                        color='Total Jumps',
+                                        title=f"Set Breakdown: {opp} ({match_date.strftime('%m/%d')})",
+                                        labels={'Player Load': 'Load', 'Phase': 'Set'},
+                                        color_continuous_scale='Reds', 
+                                        text='Total Jumps'
+                                    )
+                                    fig_match.update_traces(textposition='outside')
+                                    fig_match.update_layout(height=300, margin=dict(t=40, b=0))
+                                    st.plotly_chart(fig_match, use_container_width=True, config=LOCKED_CONFIG)
                     
         with tabs[5]: # Tab 5: Work Index Matrix
             st.markdown('<div class="section-header">Practice Phase Volume & Avg Duration</div>', unsafe_allow_html=True)
