@@ -800,14 +800,6 @@ if check_password():
                             proj_df = pd.DataFrame(ath_projections).sort_values('Proj. Load', ascending=False)
                             st.dataframe(proj_df, use_container_width=True, hide_index=True)
 
-                    That makes total sense. Because Estimated Distance is measured in thousands of yards while Player Load and Jumps are in double or triple digits, putting them on the same axis would "squash" the other lines to the bottom of the graph.
-
-I have updated the code to put Estimated Distance (y) on a secondary y-axis (on the right side). I also adjusted the legend so it’s clear which metric belongs to which axis.
-
-Updated Intensity Flow Graph (Dual Axis)
-Replace Section 6 in your Practice Planner with this:
-
-Python
                     # --- 6. INTENSITY FLOW GRAPH (Dual Axis for Distance) ---
                     st.markdown("#### Practice Intensity Flow (Rate per Minute)")
                     graph_rates = planner_target_df.groupby('Phase')[[f'{m}_Rate' for m in plan_metrics]].mean().reset_index()
