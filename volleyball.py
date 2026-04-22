@@ -981,7 +981,7 @@ if check_password():
             hist_df = df[df['Name'] == selected_ath_hist].copy()
             hist_df['Date'] = pd.to_datetime(hist_df['Date'])
             
-            # Filter out the metrics you want to exclude
+            # Filter metrics to match your updated scoring criteria
             metrics_to_score = [m for m in all_metrics if m not in ['High Jumps', 'Moderate Jumps', 'High Intensity Movement']]
             
             scores_list = []
@@ -995,13 +995,9 @@ if check_password():
                 
                 session_score = sum(row_grades) / len(row_grades) if row_grades else 0
                 
-                # Format the date for the display (e.g., "Apr 22")
-                clean_date = row['Date'].strftime('%b %d')
-                
                 scores_list.append({
-                    'Date_Sort': row['Date'], # Used for sorting
-                    'Display_Date': clean_date,
-                    'Session': row['Session_Name'],
+                    'Date_Sort': row['Date'], 
+                    'Session': row['Session_Name'], # This will be our X-axis
                     'Score': round(session_score, 1),
                     'Week': row['Week']
                 })
@@ -1016,36 +1012,34 @@ if check_password():
                     week_data = score_final_df[score_final_df['Week'] == week_val]
                     
                     with st.container():
-                        st.subheader(f"Timeline: {week_val}")
+                        # FIXED: Header now says "Week X"
+                        st.subheader(f"Week {week_val}")
                         
-                        # Use a Line chart for "Flow"
+                        # FIXED: X-axis now uses 'Session' name instead of Date
                         fig_week = px.line(
                             week_data, 
-                            x='Display_Date', 
+                            x='Session', 
                             y='Score',
                             markers=True,
                             text='Score',
-                            hover_data=['Session'],
                             range_y=[0, 115]
                         )
                         
-                        # Update the flow aesthetics
                         fig_week.update_traces(
-                            line=dict(color='#FF8200', width=4, shape='linear'), # Tennessee Orange line
-                            marker=dict(size=12, color='#4895DB', line=dict(width=2, color='white')), # Blue dots
+                            line=dict(color='#FF8200', width=4, shape='linear'),
+                            marker=dict(size=12, color='#4895DB', line=dict(width=2, color='white')),
                             textposition='top center'
                         )
                         
                         fig_week.update_layout(
                             height=380,
                             template="simple_white",
-                            xaxis=dict(title="Session Date", tickangle=0),
+                            xaxis=dict(title="Session Name", tickangle=-15), # Slight tilt helps if names are long
                             yaxis=dict(title="Performance Score", showgrid=True, gridcolor='#f0f0f0'),
-                            margin=dict(l=10, r=10, t=20, b=20)
+                            margin=dict(l=10, r=10, t=20, b=50)
                         )
                         
-                        # This ensures if there are 2 matches on one date, 
-                        # they appear as two separate points on the line.
+                        # Ensure every session is treated as its own point
                         fig_week.update_xaxes(type='category') 
                         
                         st.plotly_chart(fig_week, use_container_width=True, config=LOCKED_CONFIG)
