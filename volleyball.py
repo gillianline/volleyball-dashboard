@@ -245,13 +245,13 @@ if check_password():
                         """, unsafe_allow_html=True)
                     elif not p_cmj_hist.empty:
                         latest = p_cmj_hist.iloc[-1]
-                        st.info(f"First test recorded: {latest['Jump Height (cm)']:.1f} cm")
+                        st.info(f"First test recorded: {latest['Jump Height (Imp-Mom) [cm]']:.1f} cm")
                         
                 with jc2:
                     if not p_cmj_hist.empty:
                         fig = make_subplots(specs=[[{"secondary_y": True}]])
                         # UPDATED: Mapping to 'Jump Height (cm)' and labeling 'Height (cm)'
-                        fig.add_trace(go.Scatter(x=p_cmj_hist['Test Date'], y=p_cmj_hist['Jump Height (cm)'], name="Height (cm)", line=dict(color='#FF8200', width=3)), secondary_y=False)
+                        fig.add_trace(go.Scatter(x=p_cmj_hist['Test Date'], y=p_cmj_hist['Jump Height (Imp-Mom) [cm]'], name="Height (cm)", line=dict(color='#FF8200', width=3)), secondary_y=False)
                         fig.add_trace(go.Scatter(x=p_cmj_hist['Test Date'], y=p_cmj_hist['RSI-modified [m/s]'], name="RSI", line=dict(color='#4895DB', dash='dot')), secondary_y=True)
                         fig.update_layout(height=280, margin=dict(l=0, r=0, t=20, b=0), showlegend=False, template="simple_white")
                         st.plotly_chart(fig, use_container_width=True, config=LOCKED_CONFIG)
