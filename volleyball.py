@@ -695,6 +695,11 @@ if check_password():
             else:
                 st.warning("No data found in the Phases sheet.")
                 
+        To add Estimated Distance back into the Practice Planner intensity flow, we need to update three sections: the plan_metrics list, the projection logic, and the graph trace colors.
+
+Here is the updated Tab 6 code with Estimated Distance (y) integrated:
+
+Python
         with tabs[6]: # Practice Planner
             st.markdown('<div class="section-header">Practice Phase Analysis & Planner</div>', unsafe_allow_html=True)
             
@@ -709,8 +714,8 @@ if check_password():
                     working_planner['Phase'] = working_planner['Phase'].replace(phase_map)
                     working_planner = working_planner[working_planner[time_col] > 0].dropna(subset=[time_col])
                     
-                    # Focus metrics (Removed Distance from logic)
-                    plan_metrics = ['Player Load', 'Total Jumps', 'Explosive Efforts']
+                    # --- ADDED: Estimated Distance (y) to metrics ---
+                    plan_metrics = ['Player Load', 'Total Jumps', 'Explosive Efforts', 'Estimated Distance (y)']
                     for m in plan_metrics:
                         working_planner[f'{m}_Rate'] = working_planner[m] / working_planner[time_col]
 
@@ -751,7 +756,6 @@ if check_password():
                             durations[phase] = st.number_input(f"{phase}", value=float(round(avg_t, 0)), step=1.0, key=f"dur_ref_{phase}")
 
                     # --- 4. DISPLAY RESULTS ---
-                    # Only show the Total Projection Box if we are NOT in Team Overall mode
                     if plan_level != "Team Overall":
                         target_rates = planner_target_df.groupby('Phase')[[f'{m}_Rate' for m in plan_metrics]].mean().reset_index()
                         t_build = target_rates.set_index('Phase').loc[selected_build].reset_index()
@@ -759,18 +763,21 @@ if check_password():
                         total_pl = sum(durations[p] * t_build[t_build['Phase'] == p]['Player Load_Rate'].iloc[0] for p in selected_build)
                         total_j = sum(durations[p] * t_build[t_build['Phase'] == p]['Total Jumps_Rate'].iloc[0] for p in selected_build)
                         total_ee = sum(durations[p] * t_build[t_build['Phase'] == p]['Explosive Efforts_Rate'].iloc[0] for p in selected_build)
+                        # Added Distance Projection
+                        total_dist = sum(durations[p] * t_build[t_build['Phase'] == p]['Estimated Distance (y)_Rate'].iloc[0] for p in selected_build)
                         total_time = sum(durations.values())
 
                         st.markdown(f"### Practice Projection: {display_label}")
                         st.markdown('<div style="background:#f8f9fa; padding:20px; border-radius:15px; border:1px solid #E5E5E7;">', unsafe_allow_html=True)
-                        m1, m2, m3, m4 = st.columns(4)
+                        m1, m2, m3, m4, m5 = st.columns(5) # Expanded to 5 columns
                         m1.metric("Total Time", f"{total_time:.0f} min")
                         m2.metric("Proj. Load", f"{total_pl:.1f}")
                         m3.metric("Proj. Jumps", f"{int(total_j)}")
                         m4.metric("Proj. Efforts", f"{int(total_ee)}")
+                        m5.metric("Proj. Dist (y)", f"{int(total_dist)}")
                         st.markdown('</div>', unsafe_allow_html=True)
 
-                    # --- 5. INDIVIDUAL BREAKDOWN (Crucial for Team View) ---
+                    # --- 5. INDIVIDUAL BREAKDOWN ---
                     if plan_level != "By Athlete":
                         st.markdown(f"#### Individual Athlete Projections")
                         ath_rates = planner_target_df.groupby(['Name', 'Phase'])[[f'{m}_Rate' for m in plan_metrics]].mean().reset_index()
@@ -790,21 +797,27 @@ if check_password():
                                     'Athlete': athlete,
                                     'Proj. Load': round(a_totals['Player Load'], 1),
                                     'Proj. Jumps': int(a_totals['Total Jumps']),
-                                    'Proj. Efforts': int(a_totals['Explosive Efforts'])
+                                    'Proj. Efforts': int(a_totals['Explosive Efforts']),
+                                    'Proj. Dist (y)': int(a_totals['Estimated Distance (y)'])
                                 })
                         
                         if ath_projections:
                             proj_df = pd.DataFrame(ath_projections).sort_values('Proj. Load', ascending=False)
                             st.dataframe(proj_df, use_container_width=True, hide_index=True)
 
-                    # --- 6. INTENSITY FLOW GRAPH (Removed Distance) ---
+                    # --- 6. INTENSITY FLOW GRAPH (Now with Distance) ---
                     st.markdown("#### Practice Intensity Flow (Rate per Minute)")
-                    # Re-calculating rates for the graph target
                     graph_rates = planner_target_df.groupby('Phase')[[f'{m}_Rate' for m in plan_metrics]].mean().reset_index()
                     g_build = graph_rates.set_index('Phase').loc[selected_build].reset_index()
 
                     fig_flow = go.Figure()
-                    colors = {'Player Load': '#515154', 'Total Jumps': '#FF8200', 'Explosive Efforts': '#A52A2A'}
+                    # Updated color map
+                    colors = {
+                        'Player Load': '#515154', 
+                        'Total Jumps': '#FF8200', 
+                        'Explosive Efforts': '#A52A2A',
+                        'Estimated Distance (y)': '#4895DB' # Blue for Distance
+                    }
 
                     for m in plan_metrics:
                         fig_flow.add_trace(go.Scatter(
