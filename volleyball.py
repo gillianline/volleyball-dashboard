@@ -152,16 +152,23 @@ if check_password():
         tabs = st.tabs(["Individual Profile", "Team Gallery", "Match v. Practice", "Position Analysis", "Match Summary", "Phase Analysis", "Practice Planner", "Practice Red Flags-TESTING"])
         session_list = df[['Date', 'Session_Name']].drop_duplicates().sort_values('Date', ascending=False)['Session_Name'].tolist()
 
+        Here is the complete code for Tab 0. I have incorporated the logic to exclude High Jumps, Moderate Jumps, and High Intensity Movement so they no longer appear in your table or factor into the athlete's daily score.
+
+Python
         with tabs[0]: # Tab 0: Individual Profile
             c_f1, c_f2 = st.columns(2)
-            with c_f1: selected_session = st.selectbox("Practice Selection", session_list, index=0, key="nav_sel_ind")
-            with c_f2: pos_f = st.selectbox("Position Filter", ["All Positions"] + sorted([p for p in df['Position'].unique() if p != "N/A"]), key="nav_pos_ind")
+            with c_f1: 
+                selected_session = st.selectbox("Practice Selection", session_list, index=0, key="nav_sel_ind")
+            with c_f2: 
+                pos_f = st.selectbox("Position Filter", ["All Positions"] + sorted([p for p in df['Position'].unique() if p != "N/A"]), key="nav_pos_ind")
             
             day_df = df[df['Session_Name'] == selected_session].copy()
             if not day_df.empty:
                 curr_date = day_df['Date'].iloc[0]
                 dropdown_df = day_df.copy()
-                if pos_f != "All Positions": dropdown_df = dropdown_df[dropdown_df['Position'] == pos_f]
+                if pos_f != "All Positions": 
+                    dropdown_df = dropdown_df[dropdown_df['Position'] == pos_f]
+                
                 sel_p = st.selectbox("Select Athlete", sorted(dropdown_df['Name'].unique()))
                 
                 # --- DATA GATHERING ---
@@ -174,13 +181,22 @@ if check_password():
                 lb = daily_sums[(daily_sums['Date'] >= curr_date - timedelta(days=30)) & (daily_sums['Date'] <= curr_date)]
                 p_today_total = daily_sums[daily_sums['Date'] == curr_date].iloc[0]
 
+                # --- METRIC FILTERING ---
+                # Removing the metrics you requested to hide
+                metrics_to_exclude = ['High Jumps', 'Moderate Jumps', 'High Intensity Movement']
+                filtered_metrics = [m for m in all_metrics if m not in metrics_to_exclude]
+
                 m_rows = ""; total_grade = 0; count = 0
-                for k in all_metrics:
+                for k in filtered_metrics:
                     val, mx, avg = p_today_total[k], lb[k].max(), lb[k].mean()
                     grade = math.ceil((val / mx) * 100) if mx > 0 else 0
-                    total_grade += grade; count += 1; diff = (val - avg) / avg if avg != 0 else 0
+                    total_grade += grade
+                    count += 1
+                    
+                    diff = (val - avg) / avg if avg != 0 else 0
                     h_class = "class='bg-highlight-red'" if abs(diff) > 0.10 else ""
                     arr_val = f"<span class='arrow-red'>{'↑' if diff > 0.10 else '↓'}</span>" if abs(diff) > 0.10 else ""
+                    
                     m_rows += f"<tr><td>{k}</td><td {h_class}>{val:.1f} {arr_val}</td><td>{mx:.1f}</td><td>{grade}</td></tr>"
                 
                 score = math.ceil(total_grade / count) if count > 0 else 0
@@ -200,25 +216,19 @@ if check_password():
                 p_cmj_hist = cmj_df[(cmj_df['Athlete'] == sel_p) & (cmj_df['Test Date'] <= curr_date)].sort_values('Test Date')
                 
                 with jc1:
-                    sync_cmj = p_cmj_hist[(p_cmj_hist['Test Date'] > curr_date - timedelta(days=7))]
-                    
-                    # We need at least 2 tests in history to show a "change"
                     if len(p_cmj_hist) >= 2:
-                        latest = p_cmj_hist.iloc[-1]   # The most recent test
-                        previous = p_cmj_hist.iloc[-2] # The test immediately before it
+                        latest = p_cmj_hist.iloc[-1]   
+                        previous = p_cmj_hist.iloc[-2] 
                         
                         cur_h, cur_rsi = latest['Jump Height (in)'], latest['RSI-modified [m/s]']
                         prev_h, prev_rsi = previous['Jump Height (in)'], previous['RSI-modified [m/s]']
                         
-                        # Calculate % change from the previous jump
                         p_diff = ((cur_h - prev_h) / prev_h) * 100 if prev_h > 0 else 0
                         
-                        # Status Logic: Compared to the jump right before
                         label, color = ("ELITE", "#28a745") if cur_h >= prev_h and cur_rsi >= prev_rsi else \
                                        ("FATIGUED", "#dc3545") if cur_h < prev_h and cur_rsi < prev_rsi else \
                                        ("GRINDER", "#ffc107")
                         
-                        # UI Display
                         st.markdown(f"""
                             <div style="text-align:center;">
                                 <div class="score-box" style="background-color:{color}; line-height:1.2; padding-top:15px; height:80px; width:390px;">
@@ -232,7 +242,6 @@ if check_password():
                             </div>
                         """, unsafe_allow_html=True)
                     elif not p_cmj_hist.empty:
-                        # Fallback if they only have 1 test ever
                         latest = p_cmj_hist.iloc[-1]
                         st.info(f"First test recorded: {latest['Jump Height (in)']:.1f}\"")
                         
@@ -253,38 +262,90 @@ if check_password():
                     fig_ph.add_trace(go.Scatter(x=p_ph['Phase'], y=p_ph['Player Load'], name="Load", line=dict(color='#4895DB', width=4)), secondary_y=False)
                     fig_ph.update_layout(height=350, showlegend=True, template="simple_white", legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
                     st.plotly_chart(fig_ph, use_container_width=True, config=LOCKED_CONFIG)
+        
         with tabs[1]: # Tab 1: Gallery
             c_gal1, c_gal2 = st.columns(2)
-            with c_gal1: selected_session_gal = st.selectbox("Practice Selection", session_list, index=0, key="nav_sel_gal")
-            with c_gal2: pos_f_gal = st.selectbox("Position Filter", ["All Positions"] + sorted([p for p in df['Position'].unique() if p != "N/A"]), key="nav_pos_gal")
+            with c_gal1: 
+                selected_session_gal = st.selectbox("Practice Selection", session_list, index=0, key="nav_sel_gal")
+            with c_gal2: 
+                pos_f_gal = st.selectbox("Position Filter", ["All Positions"] + sorted([p for p in df['Position'].unique() if p != "N/A"]), key="nav_pos_gal")
+            
             gal_df = df[df['Session_Name'] == selected_session_gal].copy()
             if not gal_df.empty:
                 curr_date_gal = gal_df['Date'].iloc[0]
-                if pos_f_gal != "All Positions": gal_df = gal_df[gal_df['Position'] == pos_f_gal]
+                if pos_f_gal != "All Positions": 
+                    gal_df = gal_df[gal_df['Position'] == pos_f_gal]
+                
                 athlete_names = sorted(gal_df['Name'].unique())
+                
+                # Metric filtering setup
+                metrics_to_exclude = ['High Jumps', 'Moderate Jumps', 'High Intensity Movement']
+                filtered_metrics_gal = [m for m in all_metrics if m not in metrics_to_exclude]
+
                 for i in range(0, len(athlete_names), 2):
                     cols = st.columns(2)
                     for j in range(2):
                         if i + j < len(athlete_names):
                             name = athlete_names[i + j]
                             p_full_g = df[df['Name'] == name]
+                            
+                            # Data gathering for the specific athlete
                             daily_sums_g = p_full_g.groupby('Date')[all_metrics].sum().reset_index()
                             lb_g = daily_sums_g[(daily_sums_g['Date'] >= curr_date_gal - timedelta(days=30)) & (daily_sums_g['Date'] <= curr_date_gal)]
                             p_today_g = daily_sums_g[daily_sums_g['Date'] == curr_date_gal].iloc[0]
                             
                             r_html = ""; t_grade = 0; c_metrics = 0
-                            for k in all_metrics:
+                            
+                            # Loop through filtered metrics only
+                            for k in filtered_metrics_gal:
                                 v, mx, avg = p_today_g[k], lb_g[k].max(), lb_g[k].mean()
                                 g = math.ceil((v / mx) * 100) if mx > 0 else 0
-                                t_grade += g; c_metrics += 1; diff = (v - avg) / avg if avg != 0 else 0
+                                t_grade += g
+                                c_metrics += 1
+                                
+                                diff = (v - avg) / avg if avg != 0 else 0
                                 h_class = "class='bg-highlight-red'" if abs(diff) > 0.10 else ""
                                 arr_val = f"<span class='arrow-red'>{'↑' if diff > 0.10 else '↓'}</span>" if abs(diff) > 0.10 else ""
+                                
                                 r_html += f"<tr><td>{k}</td><td {h_class}>{v:.1f} {arr_val}</td><td>{mx:.1f}</td><td>{g}</td></tr>"
                             
+                            # Calculate the final score based on filtered metrics
                             sc_g = math.ceil(t_grade / c_metrics) if c_metrics > 0 else 0
                             p_info = gal_df[gal_df['Name'] == name].iloc[0]
-                            with cols[j]: st.markdown(f'<div style="border:1px solid #E5E5E7; border-radius:15px; padding:15px; margin-bottom:20px;"><div style="display:flex; align-items:center; gap:10px;"><div style="flex:1.2; text-align:center;"><img src="{p_info["PhotoURL"]}" class="gallery-photo"><p style="font-weight:bold; font-size:15px; margin-top:8px;">{name}</p></div><div style="flex:3;"><table class="scout-table"><thead><tr><th>Metric</th><th>Total</th><th>Max Day</th><th>Grade</th></tr></thead><tbody>{r_html}</tbody></table></div><div style="flex:1; text-align:center;"><div style="background-color:{get_flipped_gradient(sc_g)}; color:white; padding:10px; border-radius:12px; font-size:32px; font-weight:900;">{sc_g}</div></div></div></div>', unsafe_allow_html=True)
-
+                            
+                            # Gallery Card Display
+                            with cols[j]: 
+                                st.markdown(f"""
+                                    <div style="border:1px solid #E5E5E7; border-radius:15px; padding:15px; margin-bottom:20px;">
+                                        <div style="display:flex; align-items:center; gap:10px;">
+                                            <div style="flex:1.2; text-align:center;">
+                                                <img src="{p_info["PhotoURL"]}" class="gallery-photo">
+                                                <p style="font-weight:bold; font-size:15px; margin-top:8px;">{name}</p>
+                                            </div>
+                                            <div style="flex:3;">
+                                                <table class="scout-table">
+                                                    <thead>
+                                                        <tr>
+                                                            <th>Metric</th>
+                                                            <th>Total</th>
+                                                            <th>Max Day</th>
+                                                            <th>Grade</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        {r_html}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                            <div style="flex:1; text-align:center;">
+                                                <div style="background-color:{get_flipped_gradient(sc_g)}; color:white; padding:10px; border-radius:12px; font-size:32px; font-weight:900;">
+                                                    {sc_g}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                """, unsafe_allow_html=True)
+                                
         with tabs[2]: # Game v Practice
             st.markdown('<div class="section-header">Weekly Prep Intensity vs. Match Demands</div>', unsafe_allow_html=True)
             c_ga, c_gw, c_gg = st.columns(3)
