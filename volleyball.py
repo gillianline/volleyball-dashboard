@@ -324,21 +324,28 @@ if check_password():
                             
                             # Loop through filtered metrics only
                             for k in filtered_metrics_gal:
-                                v, mx, avg = p_today_g[k], lb_g[k].max(), lb_g[k].mean()
+                                # GET THE SPECIFIC VALUE FOR THIS MATCH
+                                v = p_today_g[k] 
+                                
+                                # GET THE MAX VALUE FROM THE LAST 30 DAYS (The Baseline)
+                                # We filter the athlete's full history to find their peak performance
+                                lb_g = p_full_g[(p_full_g['Date'] >= curr_date_gal - timedelta(days=30)) & 
+                                                (p_full_g['Date'] <= curr_date_gal)]
+                                mx = lb_g[k].max()
+                                
+                                # GRADE CALCULATION
                                 g = math.ceil((v / mx) * 100) if mx > 0 else 0
                                 t_grade += g
                                 c_metrics += 1
                                 
+                                # Logic for highlighting (red arrow if > 10% from average)
+                                avg = lb_g[k].mean()
                                 diff = (v - avg) / avg if avg != 0 else 0
                                 h_class = "class='bg-highlight-red'" if abs(diff) > 0.10 else ""
                                 arr_val = f"<span class='arrow-red'>{'↑' if diff > 0.10 else '↓'}</span>" if abs(diff) > 0.10 else ""
                                 
                                 r_html += f"<tr><td>{k}</td><td {h_class}>{v:.1f} {arr_val}</td><td>{mx:.1f}</td><td>{g}</td></tr>"
-                            
-                            # Calculate the final score based on filtered metrics
-                            sc_g = math.ceil(t_grade / c_metrics) if c_metrics > 0 else 0
-                            p_info = gal_df[gal_df['Name'] == name].iloc[0]
-                            
+                                
                             # Gallery Card Display
                             with cols[j]: 
                                 st.markdown(f"""
