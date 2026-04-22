@@ -148,7 +148,7 @@ if check_password():
         st.markdown('<div class="main-logo-container" style="text-align: center; margin-top: 10px; margin-bottom: 15px;"><img src="https://upload.wikimedia.org/wikipedia/commons/thumb/f/fc/Tennessee_Lady_Volunteers_logo.svg/1280px-Tennessee_Lady_Volunteers_logo.svg.png" width="120"><div style="color: #FF8200; font-size: 2rem; font-weight: 900; margin-top: 10px;">LADY VOLS VOLLEYBALL PERFORMANCE</div></div>', unsafe_allow_html=True)
 
         
-        tabs = st.tabs(["Individual Profile", "Team Gallery", "Match v. Practice", "Position Analysis", "Match Summary", "Phase Analysis", "Practice Planner", "Practice Red Flags-TESTING"])
+        tabs = st.tabs(["Individual Profile", "Practice Scores", "Match v. Practice", "Position Analysis", "Match Summary", "Phase Analysis", "Practice Planner", "Practice Red Flags-TESTING", "Practice Score History"])
         raw_sessions = df[df['Session_Name'].notna()]
         session_list = raw_sessions.sort_values('Date', ascending=False)['Session_Name'].unique().tolist()
 
@@ -970,6 +970,101 @@ if check_password():
                                 st.info("Drills selected, but no historical data matches this position for these specific drills.")
             else:
                 st.warning("Please ensure 'Phases' and 'Thresholds' sheets are properly loaded.")
+        with tabs[8]: # Performance History
+            st.markdown('<div class="section-header">Athlete Score History & Weekly Trends</div>', unsafe_allow_html=True)
+            
+            # 1. Athlete Selection
+            all_athletes = sorted(df['Name'].unique())
+            selected_ath_hist = st.selectbox("Select Athlete to View History", all_athletes, key="hist_ath_sel")
+            
+            # 2. Data Preparation
+            # Get all data for this athlete and ensure Date is datetime
+            hist_df = df[df['Name'] == selected_ath_hist].copy()
+            hist_df['Date'] = pd.to_datetime(hist_df['Date'])
+            
+            # Calculate the score for EVERY row (Match or Practice) in history
+            # This ensures multiple matches on the same day are handled individually
+            metrics_to_score = [m for m in all_metrics if m not in ['High Jumps', 'Moderate Jumps', 'High Intensity Movement']]
+            
+            scores_list = []
+            for idx, row in hist_df.iterrows():
+                row_grades = []
+                for m in metrics_to_score:
+                    # Compare session value to the athlete's 30-day rolling max for that metric
+                    # (Using a simpler version of your Tab 0 grading logic)
+                    recent_max = hist_df[(hist_df['Date'] <= row['Date']) & 
+                                         (hist_df['Date'] >= row['Date'] - timedelta(days=30))][m].max()
+                    
+                    g = math.ceil((row[m] / recent_max) * 100) if recent_max > 0 else 0
+                    row_grades.append(g)
+                
+                # Final Score for this specific session
+                session_score = sum(row_grades) / len(row_grades) if row_grades else 0
+                
+                scores_list.append({
+                    'Date': row['Date'],
+                    'Session': row['Session_Name'],
+                    'Score': round(session_score, 1),
+                    'Week': f"Week {row['Date'].isocalendar()[1]}" # ISO Week Number
+                })
+            
+            score_final_df = pd.DataFrame(scores_list).sort_values('Date')
+
+            if not score_final_df.empty:
+                # 3. The Performance Graph
+                st.markdown(f"#### Score Trend: {selected_ath_hist}")
+                
+                fig_hist = px.line(
+                    score_final_df, 
+                    x='Date', 
+                    y='Score',
+                    color='Week', # This breaks the line into weekly segments visually
+                    markers=True,
+                    hover_data=['Session'],
+                    title=f"Performance Scores by Session",
+                    color_discrete_sequence=px.colors.qualitative.Vivid
+                )
+                
+                fig_hist.update_traces(line=dict(width=3), marker=dict(size=10))
+                
+                # Add a dashed line for the season average
+                season_avg = score_final_df['Score'].mean()
+                fig_hist.add_hline(y=season_avg, line_dash="dash", line_color="red", annotation_text="Season Avg")
+                
+                fig_hist.update_layout(
+                    height=450,
+                    template="simple_white",
+                    yaxis=dict(title="Calculated Performance Score", range=[0, 105]),
+                    xaxis=dict(title="Date"),
+                    legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+                )
+                
+                st.plotly_chart(fig_hist, use_container_width=True, config=LOCKED_CONFIG)
+                
+                # 4. Weekly Summary Table
+                st.markdown("#### Weekly Score Breakdown")
+                
+                # Grouping for the table view
+                weekly_tab = score_final_df.groupby(['Week', 'Date', 'Session'])['Score'].mean().reset_index()
+                
+                # Pivot or display as a clean list
+                st.dataframe(
+                    weekly_tab.sort_values('Date', ascending=False),
+                    use_container_width=True,
+                    hide_index=True,
+                    column_config={
+                        "Score": st.column_config.ProgressColumn(
+                            "Session Score",
+                            help="Performance grade based on 30-day metrics",
+                            format="%f",
+                            min_value=0,
+                            max_value=100,
+                        ),
+                        "Date": st.column_config.DateColumn("Date", format="MM/DD/YYYY")
+                    }
+                )
+            else:
+                st.info("No history found for this athlete.")
                 
     except Exception as e:
         st.error(f"Sync Error: {e}")
