@@ -989,7 +989,7 @@ if check_password():
                 st.warning("Please ensure 'Phases' and 'Thresholds' sheets are properly loaded.")
 
                 
-        with tabs[8]: # Performance History
+       with tabs[8]: # Performance History
             st.markdown('<div class="section-header">Season History & Team Weekly Review</div>', unsafe_allow_html=True)
             
             sub_tabs = st.tabs(["Individual Season Path", "Team Weekly Review"])
@@ -1008,7 +1008,7 @@ if check_password():
                 # Consolidate raw metrics by Date and Week
                 daily_raw = p_full.groupby(['Date', 'Week'])[metrics_to_score].sum().reset_index()
                 
-                # Dynamic Naming Logic (Applied to Master & Weekly)
+                # Dynamic Naming Logic
                 display_names = []
                 for idx, row in daily_raw.iterrows():
                     orig = p_full[p_full['Date'] == row['Date']]
@@ -1016,7 +1016,6 @@ if check_password():
                         display_names.append(f"Match Day {row['Date'].strftime('%m/%d')}")
                     else:
                         display_names.append(orig['Session_Name'].iloc[0])
-                
                 daily_raw['Display'] = display_names
                 
                 # Scoring Logic
@@ -1034,7 +1033,7 @@ if check_password():
                 
                 master_df = pd.DataFrame(scores_list).sort_values('Date')
 
-                # A. Master Timeline with Week Separators
+                # A. Master Timeline
                 st.markdown("### Full Season Performance Path")
                 fig_master = px.line(master_df, x='Display', y='Score', markers=True, text='Score', range_y=[0, 135])
                 for i in range(1, len(master_df)):
@@ -1044,10 +1043,13 @@ if check_password():
 
                 fig_master.update_traces(line=dict(color='#FF8200', width=3), marker=dict(size=10, color='#4895DB'), textposition='top center')
                 fig_master.update_layout(template="simple_white", height=450, xaxis=dict(type='category', tickangle=-45))
-                st.plotly_chart(fig_master, use_container_width=True, config=LOCKED_CONFIG)
+                
+                # ADDED KEY HERE
+                st.plotly_chart(fig_master, use_container_width=True, config=LOCKED_CONFIG, key=f"master_chart_{sel_ath_hist}")
 
-                # B. Weekly Breakdowns (Using Dynamic Labels)
+                # B. Weekly Breakdowns
                 st.markdown("---")
+                st.markdown("### Weekly Progressions")
                 unique_weeks = sorted(master_df['Week'].unique(), key=int, reverse=True)
                 for w_val in unique_weeks:
                     w_data = master_df[master_df['Week'] == w_val]
@@ -1055,7 +1057,9 @@ if check_password():
                     fig_w = px.line(w_data, x='Display', y='Score', markers=True, text='Score', range_y=[0, 115])
                     fig_w.update_traces(line=dict(color='#FF8200', width=4), marker=dict(size=12, color='#4895DB'), textposition='top center')
                     fig_w.update_layout(height=350, template="simple_white", xaxis=dict(type='category'))
-                    st.plotly_chart(fig_w, use_container_width=True)
+                    
+                    # ADDED DYNAMIC KEY HERE
+                    st.plotly_chart(fig_w, use_container_width=True, key=f"week_chart_{sel_ath_hist}_{w_val}")
 
             # ---------------------------------------------------------
             # SUB-TAB 2: TEAM WEEKLY REVIEW
@@ -1076,7 +1080,6 @@ if check_password():
                             p_all = df[df['Name'] == name].copy()
                             p_all['Date'] = pd.to_datetime(p_all['Date'])
                             
-                            # Consolidate Daily Data
                             p_daily = p_all.groupby(['Date', 'Week'])[metrics_to_score].sum().reset_index()
                             w_daily = p_daily[p_daily['Week'].astype(str) == str(sel_week)].sort_values('Date')
                             
@@ -1088,10 +1091,9 @@ if check_password():
                                     mx = lb[m].max()
                                     r_grades.append(math.ceil((r[m] / mx) * 100) if mx > 0 else 0)
                                 
-                                # Dynamic Labeling for Cards
                                 orig_day = p_all[p_all['Date'] == r['Date']]
                                 label = f"Match Day {r['Date'].strftime('%m/%d')}" if len(orig_day) > 1 else orig_day['Session_Name'].iloc[0]
-                                card_scores.append({'Display': label, 'Score': round(sum(row_grades)/len(row_grades), 0)})
+                                card_scores.append({'Display': label, 'Score': round(sum(r_grades)/len(r_grades), 0)})
                             
                             p_meta = p_all.iloc[0]
                             with cols[j]:
@@ -1107,7 +1109,9 @@ if check_password():
                                 fig_p = px.line(pd.DataFrame(card_scores), x='Display', y='Score', markers=True, text='Score', range_y=[0, 115])
                                 fig_p.update_traces(line=dict(color='#FF8200', width=3), marker=dict(size=8, color='#4895DB'), textposition='top center')
                                 fig_p.update_layout(height=220, margin=dict(l=20, r=20, t=30, b=20), template="simple_white", xaxis=dict(type='category', title=None))
-                                st.plotly_chart(fig_p, use_container_width=True, config={'displayModeBar': False})
+                                
+                                # ADDED DYNAMIC KEY HERE
+                                st.plotly_chart(fig_p, use_container_width=True, config={'displayModeBar': False}, key=f"team_card_{name}_{sel_week}")
                                 
     except Exception as e:
         st.error(f"Sync Error: {e}")
