@@ -971,98 +971,77 @@ if check_password():
             else:
                 st.warning("Please ensure 'Phases' and 'Thresholds' sheets are properly loaded.")
         with tabs[8]: # Performance History
-            st.markdown('<div class="section-header">Athlete Score History & Weekly Trends</div>', unsafe_allow_html=True)
+            st.markdown('<div class="section-header">Weekly Athlete Performance Trends</div>', unsafe_allow_html=True)
             
             # 1. Athlete Selection
             all_athletes = sorted(df['Name'].unique())
-            selected_ath_hist = st.selectbox("Select Athlete to View History", all_athletes, key="hist_ath_sel")
+            selected_ath_hist = st.selectbox("Select Athlete", all_athletes, key="hist_ath_sel")
             
             # 2. Data Preparation
-            # Get all data for this athlete and ensure Date is datetime
             hist_df = df[df['Name'] == selected_ath_hist].copy()
             hist_df['Date'] = pd.to_datetime(hist_df['Date'])
             
-            # Calculate the score for EVERY row (Match or Practice) in history
-            # This ensures multiple matches on the same day are handled individually
+            # Metrics to include in the Score
             metrics_to_score = [m for m in all_metrics if m not in ['High Jumps', 'Moderate Jumps', 'High Intensity Movement']]
             
             scores_list = []
             for idx, row in hist_df.iterrows():
                 row_grades = []
                 for m in metrics_to_score:
-                    # Compare session value to the athlete's 30-day rolling max for that metric
-                    # (Using a simpler version of your Tab 0 grading logic)
                     recent_max = hist_df[(hist_df['Date'] <= row['Date']) & 
                                          (hist_df['Date'] >= row['Date'] - timedelta(days=30))][m].max()
                     
                     g = math.ceil((row[m] / recent_max) * 100) if recent_max > 0 else 0
                     row_grades.append(g)
                 
-                # Final Score for this specific session
                 session_score = sum(row_grades) / len(row_grades) if row_grades else 0
                 
                 scores_list.append({
                     'Date': row['Date'],
                     'Session': row['Session_Name'],
                     'Score': round(session_score, 1),
-                    'Week': f"Week {row['Date'].isocalendar()[1]}" # ISO Week Number
+                    'Week': row['Week'] # Using your existing Week column
                 })
             
-            score_final_df = pd.DataFrame(scores_list).sort_values('Date')
+            score_final_df = pd.DataFrame(scores_list).sort_values('Date', ascending=False)
 
             if not score_final_df.empty:
-                # 3. The Performance Graph
-                st.markdown(f"#### Score Trend: {selected_ath_hist}")
+                # 3. Loop through each week to create individual graphs
+                unique_weeks = sorted(score_final_df['Week'].unique(), reverse=True)
                 
-                fig_hist = px.line(
-                    score_final_df, 
-                    x='Date', 
-                    y='Score',
-                    color='Week', # This breaks the line into weekly segments visually
-                    markers=True,
-                    hover_data=['Session'],
-                    title=f"Performance Scores by Session",
-                    color_discrete_sequence=px.colors.qualitative.Vivid
-                )
-                
-                fig_hist.update_traces(line=dict(width=3), marker=dict(size=10))
-                
-                # Add a dashed line for the season average
-                season_avg = score_final_df['Score'].mean()
-                fig_hist.add_hline(y=season_avg, line_dash="dash", line_color="red", annotation_text="Season Avg")
-                
-                fig_hist.update_layout(
-                    height=450,
-                    template="simple_white",
-                    yaxis=dict(title="Calculated Performance Score", range=[0, 105]),
-                    xaxis=dict(title="Date"),
-                    legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
-                )
-                
-                st.plotly_chart(fig_hist, use_container_width=True, config=LOCKED_CONFIG)
-                
-                # 4. Weekly Summary Table
-                st.markdown("#### Weekly Score Breakdown")
-                
-                # Grouping for the table view
-                weekly_tab = score_final_df.groupby(['Week', 'Date', 'Session'])['Score'].mean().reset_index()
-                
-                # Pivot or display as a clean list
-                st.dataframe(
-                    weekly_tab.sort_values('Date', ascending=False),
-                    use_container_width=True,
-                    hide_index=True,
-                    column_config={
-                        "Score": st.column_config.ProgressColumn(
-                            "Session Score",
-                            help="Performance grade based on 30-day metrics",
-                            format="%f",
-                            min_value=0,
-                            max_value=100,
-                        ),
-                        "Date": st.column_config.DateColumn("Date", format="MM/DD/YYYY")
-                    }
-                )
+                for week_val in unique_weeks:
+                    week_data = score_final_df[score_final_df['Week'] == week_val].sort_values('Date')
+                    
+                    with st.container():
+                        st.markdown(f"### {week_val}")
+                        
+                        # Create the weekly graph
+                        fig_week = px.bar(
+                            week_data, 
+                            x='Date', 
+                            y='Score',
+                            color='Score',
+                            text='Score',
+                            hover_data=['Session'],
+                            title=f"Performance Scores: {week_val}",
+                            color_continuous_scale='RdYlGn', # Red to Green scale
+                            range_y=[0, 110]
+                        )
+                        
+                        # Update layout to handle multiple matches on the same day
+                        # 'group' barmode ensures side-by-side bars if Dates are identical
+                        fig_week.update_layout(
+                            barmode='group',
+                            height=350,
+                            template="simple_white",
+                            showlegend=False,
+                            xaxis=dict(type='category', title="Date / Session") # Categorical axis helps see multiple matches clearly
+                        )
+                        
+                        fig_week.update_traces(textposition='outside')
+                        
+                        st.plotly_chart(fig_week, use_container_width=True, config=LOCKED_CONFIG)
+                        st.markdown("---") # Visual divider between weeks
             else:
                 st.info("No history found for this athlete.")
                 
