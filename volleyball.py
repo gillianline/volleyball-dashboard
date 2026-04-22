@@ -981,7 +981,7 @@ if check_password():
             hist_df = df[df['Name'] == selected_ath_hist].copy()
             hist_df['Date'] = pd.to_datetime(hist_df['Date'])
             
-            # Metrics to include in the Score
+            # Filter out the metrics you want to exclude
             metrics_to_score = [m for m in all_metrics if m not in ['High Jumps', 'Moderate Jumps', 'High Intensity Movement']]
             
             scores_list = []
@@ -990,60 +990,68 @@ if check_password():
                 for m in metrics_to_score:
                     recent_max = hist_df[(hist_df['Date'] <= row['Date']) & 
                                          (hist_df['Date'] >= row['Date'] - timedelta(days=30))][m].max()
-                    
                     g = math.ceil((row[m] / recent_max) * 100) if recent_max > 0 else 0
                     row_grades.append(g)
                 
                 session_score = sum(row_grades) / len(row_grades) if row_grades else 0
                 
+                # Format the date for the display (e.g., "Apr 22")
+                clean_date = row['Date'].strftime('%b %d')
+                
                 scores_list.append({
-                    'Date': row['Date'],
+                    'Date_Sort': row['Date'], # Used for sorting
+                    'Display_Date': clean_date,
                     'Session': row['Session_Name'],
                     'Score': round(session_score, 1),
-                    'Week': row['Week'] # Using your existing Week column
+                    'Week': row['Week']
                 })
             
-            score_final_df = pd.DataFrame(scores_list).sort_values('Date', ascending=False)
+            score_final_df = pd.DataFrame(scores_list).sort_values('Date_Sort', ascending=True)
 
             if not score_final_df.empty:
-                # 3. Loop through each week to create individual graphs
+                # 3. Loop through each week
                 unique_weeks = sorted(score_final_df['Week'].unique(), reverse=True)
                 
                 for week_val in unique_weeks:
-                    week_data = score_final_df[score_final_df['Week'] == week_val].sort_values('Date')
+                    week_data = score_final_df[score_final_df['Week'] == week_val]
                     
                     with st.container():
-                        st.markdown(f"### {week_val}")
+                        st.subheader(f"Timeline: {week_val}")
                         
-                        # Create the weekly graph
-                        fig_week = px.bar(
+                        # Use a Line chart for "Flow"
+                        fig_week = px.line(
                             week_data, 
-                            x='Date', 
+                            x='Display_Date', 
                             y='Score',
-                            color='Score',
+                            markers=True,
                             text='Score',
                             hover_data=['Session'],
-                            title=f"Performance Scores: {week_val}",
-                            color_continuous_scale='RdYlGn', # Red to Green scale
-                            range_y=[0, 110]
+                            range_y=[0, 115]
                         )
                         
-                        # Update layout to handle multiple matches on the same day
-                        # 'group' barmode ensures side-by-side bars if Dates are identical
+                        # Update the flow aesthetics
+                        fig_week.update_traces(
+                            line=dict(color='#FF8200', width=4, shape='linear'), # Tennessee Orange line
+                            marker=dict(size=12, color='#4895DB', line=dict(width=2, color='white')), # Blue dots
+                            textposition='top center'
+                        )
+                        
                         fig_week.update_layout(
-                            barmode='group',
-                            height=350,
+                            height=380,
                             template="simple_white",
-                            showlegend=False,
-                            xaxis=dict(type='category', title="Date / Session") # Categorical axis helps see multiple matches clearly
+                            xaxis=dict(title="Session Date", tickangle=0),
+                            yaxis=dict(title="Performance Score", showgrid=True, gridcolor='#f0f0f0'),
+                            margin=dict(l=10, r=10, t=20, b=20)
                         )
                         
-                        fig_week.update_traces(textposition='outside')
+                        # This ensures if there are 2 matches on one date, 
+                        # they appear as two separate points on the line.
+                        fig_week.update_xaxes(type='category') 
                         
                         st.plotly_chart(fig_week, use_container_width=True, config=LOCKED_CONFIG)
-                        st.markdown("---") # Visual divider between weeks
+                        st.markdown("---")
             else:
-                st.info("No history found for this athlete.")
+                st.info("No performance history available for this athlete.")
                 
     except Exception as e:
         st.error(f"Sync Error: {e}")
