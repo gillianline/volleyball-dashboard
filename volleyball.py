@@ -973,42 +973,46 @@ if check_password():
         with tabs[8]: # Performance History
             st.markdown('<div class="section-header">Season History & Team Weekly Review</div>', unsafe_allow_html=True)
             
-            # --- 1. MODE SELECTION ---
             view_mode = st.radio("View Mode", ["Individual Season Path", "Team Weekly Review"], horizontal=True)
 
             if view_mode == "Individual Season Path":
-                # Athlete Selection
                 all_athletes = sorted(df['Name'].unique())
                 sel_ath_hist = st.selectbox("Select Athlete", all_athletes, key="master_ath_sel")
                 
                 # Data Prep
                 hist_df = df[df['Name'] == sel_ath_hist].copy()
                 hist_df['Date'] = pd.to_datetime(hist_df['Date'])
-                metrics_to_score = [m for m in all_metrics if m not in ['High Jumps', 'Moderate Jumps', 'High Intensity Movement']]
                 
-                # Calculation Loop (same as previous)
+                # --- FIXED: Column names matched to your error message ---
+                metrics_to_score = ['Player Load', 'Total Jumps', 'Explosive Efforts', 'Estimated Distance (y)', 'Jump Load']
+                
                 scores_list = []
                 for idx, row in hist_df.iterrows():
                     row_grades = []
                     for m in metrics_to_score:
                         recent_max = hist_df[(hist_df['Date'] <= row['Date']) & (hist_df['Date'] >= row['Date'] - timedelta(days=30))][m].max()
                         row_grades.append(math.ceil((row[m] / recent_max) * 100) if recent_max > 0 else 0)
-                    scores_list.append({'Date': row['Date'], 'Session': row['Session_Name'], 'Score': round(sum(row_grades)/len(row_grades), 1), 'Week': row['Week']})
+                    
+                    scores_list.append({
+                        'Date': row['Date'], 
+                        'Session': row['Session_Name'], 
+                        'Score': round(sum(row_grades)/len(row_grades), 1) if row_grades else 0, 
+                        'Week': row['Week']
+                    })
                 
                 master_df = pd.DataFrame(scores_list).sort_values('Date')
 
                 # --- MASTER GRAPH ---
-                fig_master = px.line(master_df, x='Session', y='Score', markers=True, text='Score', range_y=[0, 120], title=f"Full Season Path: {sel_ath_hist}")
+                fig_master = px.line(master_df, x='Session', y='Score', markers=True, text='Score', range_y=[0, 125], title=f"Full Season Path: {sel_ath_hist}")
                 
                 # Add Dashed Lines for Week Breaks
                 for i in range(1, len(master_df)):
                     if master_df.iloc[i]['Week'] != master_df.iloc[i-1]['Week']:
                         fig_master.add_vline(x=i-0.5, line_dash="dash", line_color="rgba(0,0,0,0.2)")
-                        fig_master.add_annotation(x=i-0.5, y=115, text=f"{master_df.iloc[i]['Week']}", showarrow=False, font=dict(size=10, color="grey"))
 
-                fig_master.update_traces(line=dict(color='#FF8200', width=4), marker=dict(size=10, color='#4895DB'))
+                fig_master.update_traces(line=dict(color='#FF8200', width=4), marker=dict(size=10, color='#4895DB'), textposition='top center')
                 fig_master.update_layout(template="simple_white", height=450, xaxis=dict(type='category', tickangle=-45))
-                st.plotly_chart(fig_master, use_container_width=True)
+                st.plotly_chart(fig_master, use_container_width=True, config=LOCKED_CONFIG)
 
             else:
                 # --- TEAM WEEKLY REVIEW MODE ---
@@ -1018,7 +1022,6 @@ if check_password():
                 week_df = df[df['Week'] == sel_week].copy()
                 week_df['Date'] = pd.to_datetime(week_df['Date'])
                 
-                # Display in Card Style (2 per row)
                 ath_names = sorted(week_df['Name'].unique())
                 for i in range(0, len(ath_names), 2):
                     cols = st.columns(2)
@@ -1027,26 +1030,22 @@ if check_password():
                             name = ath_names[i+j]
                             a_week_data = week_df[week_df['Name'] == name].sort_values('Date')
                             
-                            # Calculate average week score
-                            # (Simplifying: Average of the sessions in this specific week)
-                            avg_score = 85 # Replace with your scoring logic if needed
+                            # Calculate simple week average for the card
+                            # Using 'Player Load' instead of 'Total Player Load'
+                            avg_week_load = a_week_data['Player Load'].mean()
                             
                             with cols[j]:
-                                # Card Container
                                 st.markdown(f"""
                                 <div style="border:1px solid #E5E5E7; border-radius:15px; padding:15px; margin-bottom:10px; background:white;">
-                                    <div style="display:flex; justify-content:space-between; align-items:center;">
-                                        <h4 style="margin:0;">{name}</h4>
-                                        <div style="background:{get_flipped_gradient(avg_score)}; color:white; padding:5px 10px; border-radius:8px; font-weight:bold;">{avg_score}</div>
-                                    </div>
-                                    <p style="font-size:12px; color:grey;">{sel_week} Performance</p>
+                                    <h4 style="margin:0;">{name}</h4>
+                                    <p style="font-size:12px; color:grey; margin:0;">Week {sel_week} Review</p>
                                 </div>
                                 """, unsafe_allow_html=True)
                                 
-                                # Sparkline for the week
-                                fig_spark = px.line(a_week_data, x='Session_Name', y='Total Player Load', markers=True)
-                                fig_spark.update_layout(height=150, margin=dict(l=0,r=0,t=0,b=0), xaxis_visible=False, yaxis_visible=False, template="simple_white")
-                                fig_spark.update_traces(line_color='#FF8200')
+                                # FIXED: y='Player Load' to match your column headers
+                                fig_spark = px.line(a_week_data, x='Session_Name', y='Player Load', markers=True)
+                                fig_spark.update_layout(height=160, margin=dict(l=10,r=10,t=10,b=10), template="simple_white")
+                                fig_spark.update_traces(line_color='#4895DB', marker_color='#FF8200')
                                 st.plotly_chart(fig_spark, use_container_width=True, config={'displayModeBar': False})
                                 
     except Exception as e:
