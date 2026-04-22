@@ -979,12 +979,12 @@ if check_password():
                 all_athletes = sorted(df['Name'].unique())
                 sel_ath_hist = st.selectbox("Select Athlete", all_athletes, key="master_ath_sel")
                 
-                # Data Prep
+                # 1. Data Prep & Scoring
                 hist_df = df[df['Name'] == sel_ath_hist].copy()
                 hist_df['Date'] = pd.to_datetime(hist_df['Date'])
                 
-                # --- FIXED: Column names matched to your error message ---
-                metrics_to_score = ['Player Load', 'Total Jumps', 'Explosive Efforts', 'Estimated Distance (y)', 'Jump Load']
+                # Exclude the three metrics as requested
+                metrics_to_score = [m for m in all_metrics if m not in ['High Jumps', 'Moderate Jumps', 'High Intensity Movement']]
                 
                 scores_list = []
                 for idx, row in hist_df.iterrows():
@@ -997,56 +997,79 @@ if check_password():
                         'Date': row['Date'], 
                         'Session': row['Session_Name'], 
                         'Score': round(sum(row_grades)/len(row_grades), 1) if row_grades else 0, 
-                        'Week': row['Week']
+                        'Week': str(row['Week']) # Ensure string for labeling
                     })
                 
                 master_df = pd.DataFrame(scores_list).sort_values('Date')
 
-                # --- MASTER GRAPH ---
-                fig_master = px.line(master_df, x='Session', y='Score', markers=True, text='Score', range_y=[0, 125], title=f"Full Season Path: {sel_ath_hist}")
-                
-                # Add Dashed Lines for Week Breaks
+                # 2. Building the Season Graph
+                fig_master = px.line(
+                    master_df, x='Session', y='Score', 
+                    markers=True, text='Score', range_y=[0, 130],
+                    title=f"All-Session Practice Scores: {sel_ath_hist}"
+                )
+
+                # 3. VERTICAL DASHED LINES & WEEK LABELS
+                # We iterate through the dataframe and drop a line whenever the Week value changes
                 for i in range(1, len(master_df)):
                     if master_df.iloc[i]['Week'] != master_df.iloc[i-1]['Week']:
-                        fig_master.add_vline(x=i-0.5, line_dash="dash", line_color="rgba(0,0,0,0.2)")
+                        # Draw the dashed line between the two sessions
+                        fig_master.add_vline(x=i-0.5, line_dash="dash", line_color="#515154", line_width=1, opacity=0.5)
+                        
+                        # Add the "Week X" label at the top of the line
+                        fig_master.add_annotation(
+                            x=i-0.5, y=125, 
+                            text=f"Week {master_df.iloc[i]['Week']}", 
+                            showarrow=False, font=dict(color="#515154", size=10),
+                            bgcolor="white"
+                        )
 
-                fig_master.update_traces(line=dict(color='#FF8200', width=4), marker=dict(size=10, color='#4895DB'), textposition='top center')
-                fig_master.update_layout(template="simple_white", height=450, xaxis=dict(type='category', tickangle=-45))
+                # Styling
+                fig_master.update_traces(
+                    line=dict(color='#FF8200', width=3), 
+                    marker=dict(size=10, color='#4895DB', line=dict(width=2, color='white')),
+                    textposition='top center'
+                )
+                
+                fig_master.update_layout(
+                    template="simple_white", height=500,
+                    xaxis=dict(type='category', title="Session Name", tickangle=-45),
+                    yaxis=dict(title="Practice Score", showgrid=True, gridcolor="#f0f0f0"),
+                    margin=dict(l=10, r=10, t=50, b=100)
+                )
+                
                 st.plotly_chart(fig_master, use_container_width=True, config=LOCKED_CONFIG)
 
             else:
-                # --- TEAM WEEKLY REVIEW MODE ---
+                # --- TEAM WEEKLY REVIEW ---
+                # Selecting the week to view everyone at once
                 avail_weeks = sorted(df['Week'].unique(), reverse=True)
-                sel_week = st.selectbox("Select Week to Review", avail_weeks)
+                sel_week = st.selectbox("Select Week", avail_weeks)
                 
                 week_df = df[df['Week'] == sel_week].copy()
-                week_df['Date'] = pd.to_datetime(week_df['Date'])
-                
                 ath_names = sorted(week_df['Name'].unique())
+                
                 for i in range(0, len(ath_names), 2):
                     cols = st.columns(2)
                     for j in range(2):
                         if i + j < len(ath_names):
                             name = ath_names[i+j]
-                            a_week_data = week_df[week_df['Name'] == name].sort_values('Date')
-                            
-                            # Calculate simple week average for the card
-                            # Using 'Player Load' instead of 'Total Player Load'
-                            avg_week_load = a_week_data['Player Load'].mean()
+                            # Simple card showing their sessions for that specific week
+                            a_week = week_df[week_df['Name'] == name].sort_values('Date')
                             
                             with cols[j]:
                                 st.markdown(f"""
-                                <div style="border:1px solid #E5E5E7; border-radius:15px; padding:15px; margin-bottom:10px; background:white;">
+                                <div style="border:1px solid #E5E5E7; border-radius:15px; padding:15px; margin-bottom:10px;">
                                     <h4 style="margin:0;">{name}</h4>
-                                    <p style="font-size:12px; color:grey; margin:0;">Week {sel_week} Review</p>
+                                    <p style="font-size:12px; color:grey;">Week {sel_week} Sessions</p>
                                 </div>
                                 """, unsafe_allow_html=True)
                                 
-                                # FIXED: y='Player Load' to match your column headers
-                                fig_spark = px.line(a_week_data, x='Session_Name', y='Player Load', markers=True)
-                                fig_spark.update_layout(height=160, margin=dict(l=10,r=10,t=10,b=10), template="simple_white")
-                                fig_spark.update_traces(line_color='#4895DB', marker_color='#FF8200')
-                                st.plotly_chart(fig_spark, use_container_width=True, config={'displayModeBar': False})
+                                # Mini line chart for their week
+                                fig_mini = px.line(a_week, x='Session_Name', y='Player Load', markers=True)
+                                fig_mini.update_layout(height=180, margin=dict(l=5,r=5,t=5,b=5), template="simple_white", xaxis_visible=False)
+                                fig_mini.update_traces(line_color='#FF8200')
+                                st.plotly_chart(fig_mini, use_container_width=True, config={'displayModeBar': False})
                                 
     except Exception as e:
         st.error(f"Sync Error: {e}")
