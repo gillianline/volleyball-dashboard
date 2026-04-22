@@ -149,7 +149,8 @@ if check_password():
 
         
         tabs = st.tabs(["Individual Profile", "Team Gallery", "Match v. Practice", "Position Analysis", "Match Summary", "Phase Analysis", "Practice Planner", "Practice Red Flags-TESTING"])
-        session_list = df[['Date', 'Session_Name']].drop_duplicates().sort_values('Date', ascending=False)['Session_Name'].tolist()
+        raw_sessions = df[df['Session_Name'].notna()]
+        session_list = raw_sessions.sort_values('Date', ascending=False)['Session_Name'].unique().tolist()
 
         with tabs[0]: # Tab 0: Individual Profile
             c_f1, c_f2 = st.columns(2)
