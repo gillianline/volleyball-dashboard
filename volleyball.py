@@ -148,7 +148,7 @@ if check_password():
         st.markdown('<div class="main-logo-container" style="text-align: center; margin-top: 10px; margin-bottom: 15px;"><img src="https://upload.wikimedia.org/wikipedia/commons/thumb/f/fc/Tennessee_Lady_Volunteers_logo.svg/1280px-Tennessee_Lady_Volunteers_logo.svg.png" width="120"><div style="color: #FF8200; font-size: 2rem; font-weight: 900; margin-top: 10px;">LADY VOLS VOLLEYBALL PERFORMANCE</div></div>', unsafe_allow_html=True)
 
         
-        tabs = st.tabs(["Individual Profile", "Practice Scores", "Match v. Practice", "Position Analysis", "Match Summary", "Phase Analysis", "Practice Planner", "Practice Red Flags-TESTING", "Practice Score History"])
+        tabs = st.tabs(["Individual Profile", "Practice Scores", "Practice Score History", "Match v. Practice", "Position Analysis", "Match Summary", "Phase Analysis", "Practice Planner", "Practice Red Flags-TESTING"])
         raw_sessions = df[df['Session_Name'].notna()]
         session_list = raw_sessions.sort_values('Date', ascending=False)['Session_Name'].unique().tolist()
 
@@ -389,7 +389,7 @@ if check_password():
             else:
                 st.info("No data found for the selected session.")
                 
-        with tabs[2]: # Game v Practice
+        with tabs[3]: # Game v Practice
             st.markdown('<div class="section-header">Weekly Prep Intensity vs. Match Demands</div>', unsafe_allow_html=True)
             c_ga, c_gw, c_gg = st.columns(3)
             with c_ga: gp_p = st.selectbox("Athlete", sorted(df['Name'].unique()), key="gp_p_vf")
@@ -427,7 +427,7 @@ if check_password():
                     for _, r in sub.iterrows(): is_sel = (r['Session_Name'] == gp_g); fig_tr.add_trace(go.Scatter(x=[r['Day_Label']], y=[r['Player Load']], name=r['Session_Name'] if s_t == 'Game' else s_t, mode='markers', marker=dict(color=clr, size=16 if is_sel else 10, line=dict(width=3 if is_sel else 1, color='black' if is_sel else 'white')), showlegend=True if s_t == 'Game' else (True if _ == sub.index[0] else False)))
                 fig_tr.update_layout(height=350, margin=dict(l=0, r=0, t=20, b=0), yaxis_title="Avg Player Load"); st.plotly_chart(fig_tr, use_container_width=True, config=LOCKED_CONFIG)
                 
-        with tabs[3]: # Position Analysis
+        with tabs[4]: # Position Analysis
             st.markdown('<div class="section-header">Positional Performance Trends</div>', unsafe_allow_html=True)
             
             # --- PRIMARY FILTER ---
@@ -512,7 +512,7 @@ if check_password():
                     
                     st.markdown('</div>', unsafe_allow_html=True)
                         
-        with tabs[4]: # Match Summary
+        with tabs[5]: # Match Summary
             custom_colors = [
                 '#4895DB', # Blue
                 '#FF8200', # Orange
@@ -624,7 +624,7 @@ if check_password():
                     st.markdown('</div>', unsafe_allow_html=True)
                     
                     
-        with tabs[5]: # Tab 5: Work Index Matrix
+        with tabs[6]: # Tab 5: Work Index Matrix
             st.markdown('<div class="section-header">Practice Phase Volume & Avg Duration</div>', unsafe_allow_html=True)
             
             if phase_df is not None and not phase_df.empty:
@@ -713,7 +713,7 @@ if check_password():
             else:
                 st.warning("No data found in the Phases sheet.")
 
-        with tabs[6]: # Practice Planner
+        with tabs[7]: # Practice Planner
             st.markdown('<div class="section-header">Practice Phase Analysis & Planner</div>', unsafe_allow_html=True)
             
             if phase_df is not None and not phase_df.empty:
@@ -864,7 +864,7 @@ if check_password():
                     st.plotly_chart(fig_flow, use_container_width=True, config=LOCKED_CONFIG)
                     
                 
-        with tabs[7]: # Risk Monitor
+        with tabs[8]: # Risk Monitor
             st.markdown('<div class="section-header">Practice Risk Monitor</div>', unsafe_allow_html=True)
             
             if phase_df is not None and thresh_df is not None:
@@ -989,7 +989,7 @@ if check_password():
                 st.warning("Please ensure 'Phases' and 'Thresholds' sheets are properly loaded.")
 
                 
-        with tabs[8]: # Performance History
+        with tabs[2]: # Performance History
             st.markdown('<div class="section-header">Season History & Team Weekly Review</div>', unsafe_allow_html=True)
             
             sub_tabs = st.tabs(["Individual Season Path", "Team Weekly Review"])
