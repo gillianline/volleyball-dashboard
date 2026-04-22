@@ -970,14 +970,15 @@ if check_password():
                                 st.info("Drills selected, but no historical data matches this position for these specific drills.")
             else:
                 st.warning("Please ensure 'Phases' and 'Thresholds' sheets are properly loaded.")
+
+                
         with tabs[8]: # Performance History
             st.markdown('<div class="section-header">Season History & Team Weekly Review</div>', unsafe_allow_html=True)
             
             view_mode = st.radio("View Mode", ["Individual Season Path", "Team Weekly Review"], horizontal=True)
 
             if view_mode == "Individual Season Path":
-                # ... [Keep the Individual Season Path code exactly as it is above] ...
-                # (Includes the full timeline with dashed week lines)
+                # ... [Keep Individual Season Path code as previously provided] ...
                 pass 
 
             else:
@@ -985,13 +986,10 @@ if check_password():
                 avail_weeks = sorted(df['Week'].unique(), reverse=True)
                 sel_week = st.selectbox("Select Week to Review", avail_weeks)
                 
-                # Filter to the selected week
                 week_df = df[df['Week'] == sel_week].copy()
                 week_df['Date'] = pd.to_datetime(week_df['Date'])
                 
-                # Metrics to include in the Score (excluding the 3 requested)
                 metrics_to_score = [m for m in all_metrics if m not in ['High Jumps', 'Moderate Jumps', 'High Intensity Movement']]
-                
                 ath_names = sorted(week_df['Name'].unique())
                 
                 for i in range(0, len(ath_names), 2):
@@ -1001,13 +999,10 @@ if check_password():
                             name = ath_names[i+j]
                             a_week_data = week_df[week_df['Name'] == name].sort_values('Date')
                             
-                            # Calculate scores for each session in this week
-                            session_rows_html = ""
-                            week_scores = []
-                            
+                            # Calculate Scores for the Week
+                            week_scores_data = []
                             for _, row in a_week_data.iterrows():
                                 row_grades = []
-                                # Using the 30-day max logic for consistency
                                 p_full = df[df['Name'] == name]
                                 for m in metrics_to_score:
                                     recent_max = p_full[(p_full['Date'] <= row['Date']) & 
@@ -1015,42 +1010,53 @@ if check_password():
                                     row_grades.append(math.ceil((row[m] / recent_max) * 100) if recent_max > 0 else 0)
                                 
                                 s_score = round(sum(row_grades)/len(row_grades), 0) if row_grades else 0
-                                week_scores.append(s_score)
-                                
-                                # Add row to the mini-table
-                                session_rows_html += f"<tr><td>{row['Session_Name']}</td><td style='font-weight:bold; color:#4895DB;'>{int(s_score)}</td></tr>"
+                                week_scores_data.append({'Session': row['Session_Name'], 'Score': s_score})
                             
-                            avg_week_score = math.ceil(sum(week_scores)/len(week_scores)) if week_scores else 0
+                            # Convert to DF for plotting
+                            week_plot_df = pd.DataFrame(week_scores_data)
                             p_info = week_df[week_df['Name'] == name].iloc[0]
 
                             with cols[j]:
-                                # Full Card Style matching Tabs 0/1
+                                # 1. The Athlete Header (Card Style)
                                 st.markdown(f"""
-                                <div style="border:1px solid #E5E5E7; border-radius:15px; padding:15px; margin-bottom:20px; background:white;">
-                                    <div style="display:flex; align-items:center; gap:15px;">
-                                        <div style="flex:1; text-align:center;">
-                                            <img src="{p_info["PhotoURL"]}" style="width:60px; height:60px; border-radius:50%; border:2px solid #FF8200;">
-                                            <p style="font-weight:bold; font-size:14px; margin-top:5px;">{name}</p>
-                                        </div>
-                                        <div style="flex:2.5;">
-                                            <table style="width:100%; font-size:11px; border-collapse:collapse;">
-                                                <thead style="border-bottom:1px solid #eee;">
-                                                    <tr><th style="text-align:left;">Session</th><th>Score</th></tr>
-                                                </thead>
-                                                <tbody>
-                                                    {session_rows_html}
-                                                </tbody>
-                                            </table>
-                                        </div>
-                                        <div style="flex:1; text-align:center;">
-                                            <div style="background-color:{get_flipped_gradient(avg_week_score)}; color:white; padding:10px; border-radius:10px; font-size:24px; font-weight:900;">
-                                                {avg_week_score}
-                                            </div>
-                                            <p style="font-size:9px; color:grey; margin-top:4px; font-weight:bold;">WEEK AVG</p>
+                                <div style="border:1px solid #E5E5E7; border-top:4px solid #FF8200; border-radius:10px 10px 0 0; padding:10px; background:white;">
+                                    <div style="display:flex; align-items:center; gap:12px;">
+                                        <img src="{p_info["PhotoURL"]}" style="width:45px; height:45px; border-radius:50%;">
+                                        <div>
+                                            <p style="margin:0; font-weight:900; font-size:16px;">{name}</p>
+                                            <p style="margin:0; font-size:11px; color:grey;">Week {sel_week} Progression</p>
                                         </div>
                                     </div>
                                 </div>
                                 """, unsafe_allow_html=True)
+                                
+                                # 2. The Line Chart (Showing Score progression)
+                                fig_prog = px.line(
+                                    week_plot_df, 
+                                    x='Session', 
+                                    y='Score', 
+                                    markers=True, 
+                                    text='Score',
+                                    range_y=[0, 115]
+                                )
+                                
+                                fig_prog.update_traces(
+                                    line=dict(color='#FF8200', width=3), 
+                                    marker=dict(size=8, color='#4895DB'),
+                                    textposition='top center'
+                                )
+                                
+                                fig_prog.update_layout(
+                                    height=200, 
+                                    margin=dict(l=20, r=20, t=30, b=20), 
+                                    template="simple_white",
+                                    xaxis=dict(showgrid=False, title=None, tickfont=dict(size=9)),
+                                    yaxis=dict(showgrid=True, gridcolor="#f0f0f0", title=None, tickfont=dict(size=9))
+                                )
+                                
+                                # 3. Closing the container with the chart
+                                st.plotly_chart(fig_prog, use_container_width=True, config={'displayModeBar': False})
+                                st.markdown('<div style="margin-bottom:20px;"></div>', unsafe_allow_html=True)
                                 
     except Exception as e:
         st.error(f"Sync Error: {e}")
