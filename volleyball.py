@@ -1038,19 +1038,67 @@ if check_password():
                 
                 master_df = pd.DataFrame(scores_list)
 
-                # A. Master Season Timeline
+                # --- MASTER SEASON TIMELINE ---
                 st.markdown("### Full Season Performance Path (Daily Totals)")
-                fig_master = px.line(master_df, x='Display', y='Score', markers=True, text='Score', range_y=[0, 135])
                 
+                # Ensure the data is sorted by date so the lines appear in the correct gaps
+                master_df = master_df.sort_values('Date')
+                
+                fig_master = px.line(
+                    master_df, 
+                    x='Display', 
+                    y='Score', 
+                    markers=True, 
+                    text='Score', 
+                    range_y=[0, 135]
+                )
+
+                # --- ADDING WEEK SEPARATORS ---
+                # We loop through the master_df and find where the Week changes
                 for i in range(1, len(master_df)):
-                    if master_df.iloc[i]['Week'] != master_df.iloc[i-1]['Week']:
-                        fig_master.add_vline(x=i-0.5, line_dash="dash", line_color="#515154", opacity=0.4)
-                        fig_master.add_annotation(x=i-0.5, y=130, text=f"Week {master_df.iloc[i]['Week']}", showarrow=False, font=dict(color="#515154", size=10), bgcolor="white")
+                    current_week = master_df.iloc[i]['Week']
+                    previous_week = master_df.iloc[i-1]['Week']
+                    
+                    if current_week != previous_week:
+                        # Add a vertical dashed line between the sessions
+                        fig_master.add_vline(
+                            x=i-0.5, 
+                            line_dash="dash", 
+                            line_color="#515154", 
+                            opacity=0.4,
+                            line_width=1
+                        )
+                        
+                        # Add a text label at the top of the separator
+                        fig_master.add_annotation(
+                            x=i-0.5, 
+                            y=130, 
+                            text=f"Week {current_week}", 
+                            showarrow=False, 
+                            font=dict(color="#515154", size=10),
+                            bgcolor="white",
+                            bordercolor="#515154",
+                            borderwidth=1,
+                            borderpad=2
+                        )
 
-                fig_master.update_traces(line=dict(color='#FF8200', width=3), marker=dict(size=10, color='#4895DB'), textposition='top center')
-                fig_master.update_layout(template="simple_white", height=450, xaxis=dict(type='category', title="Date / Match Day"))
+                # Styling the flow and markers
+                fig_master.update_traces(
+                    line=dict(color='#FF8200', width=3), 
+                    marker=dict(size=10, color='#4895DB', line=dict(width=2, color='white')),
+                    textposition='top center'
+                )
+                
+                fig_master.update_layout(
+                    template="simple_white", 
+                    height=450, 
+                    xaxis=dict(type='category', title="Date / Match Day", tickangle=-45),
+                    yaxis=dict(title="Daily Practice Score", showgrid=True, gridcolor="#f0f0f0"),
+                    margin=dict(l=10, r=10, t=50, b=100)
+                )
+                
                 st.plotly_chart(fig_master, use_container_width=True, config=LOCKED_CONFIG)
-
+                
                 # B. Weekly Breakdown
                 st.markdown("---")
                 unique_weeks = sorted(master_df['Week'].unique(), key=int, reverse=True)
