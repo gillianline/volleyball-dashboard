@@ -1028,32 +1028,58 @@ if check_password():
                         row_grades.append(math.ceil((row[m] / mx) * 100) if mx > 0 else 0)
                     scores_list.append({
                         'Date': row['Date'], 'Display': row['Display'], 
-                        'Score': round(sum(row_grades)/len(row_grades), 1), 'Week': str(row['Week'])
+                        'Score': round(sum(row_grades)/len(row_grades), 1), 
+                        'Week': str(row['Week']) # Kept as string for comparison
                     })
                 
                 master_df = pd.DataFrame(scores_list).sort_values('Date')
 
                 # A. Master Timeline
                 st.markdown("### Full Season Performance Path")
-                fig_master = px.line(master_df, x='Display', y='Score', markers=True, text='Score', range_y=[0, 135])
+                fig_master = px.line(master_df, x='Display', y='Score', markers=True, text='Score', range_y=[0, 140])
+                
+                # --- RE-ADDED WEEK SEPARATOR LINES ---
                 for i in range(1, len(master_df)):
                     if master_df.iloc[i]['Week'] != master_df.iloc[i-1]['Week']:
-                        fig_master.add_vline(x=i-0.5, line_dash="dash", line_color="#515154", opacity=0.4)
-                        fig_master.add_annotation(x=i-0.5, y=130, text=f"Week {master_df.iloc[i]['Week']}", showarrow=False, font=dict(size=10))
+                        # Vertical dashed line
+                        fig_master.add_vline(
+                            x=i-0.5, 
+                            line_dash="dash", 
+                            line_color="#515154", 
+                            opacity=0.4
+                        )
+                        # Week Label at the top
+                        fig_master.add_annotation(
+                            x=i-0.5, 
+                            y=132, 
+                            text=f"Week {master_df.iloc[i]['Week']}", 
+                            showarrow=False, 
+                            font=dict(color="#515154", size=10),
+                            bgcolor="white"
+                        )
 
-                fig_master.update_traces(line=dict(color='#FF8200', width=3), marker=dict(size=10, color='#4895DB'), textposition='top center')
-                fig_master.update_layout(template="simple_white", height=450, xaxis=dict(type='category', tickangle=-45))
+                fig_master.update_traces(
+                    line=dict(color='#FF8200', width=3), 
+                    marker=dict(size=10, color='#4895DB', line=dict(width=2, color='white')),
+                    textposition='top center'
+                )
                 
-                # ADDED KEY HERE
+                fig_master.update_layout(
+                    template="simple_white", 
+                    height=450, 
+                    xaxis=dict(type='category', tickangle=-45),
+                    yaxis=dict(showgrid=True, gridcolor="#f5f5f5")
+                )
+                
+                # Unique Key maintained
                 st.plotly_chart(fig_master, use_container_width=True, config=LOCKED_CONFIG, key=f"master_chart_{sel_ath_hist}")
 
-                # B. Weekly Breakdowns
                 st.markdown("---")
                 st.markdown("### Weekly Progressions")
                 unique_weeks = sorted(master_df['Week'].unique(), key=int, reverse=True)
                 for w_val in unique_weeks:
                     w_data = master_df[master_df['Week'] == w_val]
-                    st.subheader(f"Week {w_val} Progression")
+                    st.subheader(f"Week {w_val}")
                     fig_w = px.line(w_data, x='Display', y='Score', markers=True, text='Score', range_y=[0, 115])
                     fig_w.update_traces(line=dict(color='#FF8200', width=4), marker=dict(size=12, color='#4895DB'), textposition='top center')
                     fig_w.update_layout(height=350, template="simple_white", xaxis=dict(type='category'))
