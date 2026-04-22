@@ -109,7 +109,6 @@ if check_password():
 
         cmj_df = pd.read_csv(st.secrets["CMJ_SHEET_URL"])
         cmj_df.columns = cmj_df.columns.str.strip()
-        cmj_df['Jump Height (in)'] = cmj_df['Jump Height (Imp-Mom) [cm]'] * 0.3937
         cmj_df['Test Date'] = pd.to_datetime(cmj_df['Test Date'], errors='coerce')
         
         phase_df = pd.read_csv(st.secrets["PHASES_SHEET_URL"])
@@ -210,17 +209,24 @@ if check_password():
                 # --- READINESS PROFILE (CMJ) ---
                 st.markdown('<div class="section-header">Weekly Readiness Profile</div>', unsafe_allow_html=True)
                 jc1, jc2 = st.columns([1.5, 3.5])
+                
+                # Filtering history for the selected athlete
                 p_cmj_hist = cmj_df[(cmj_df['Athlete'] == sel_p) & (cmj_df['Test Date'] <= curr_date)].sort_values('Test Date')
                 
+                # EXACT COLUMN NAME FROM YOUR SHEET
+                cmj_col = 'Jump Height (Imp-Mom) [cm]'
+
                 with jc1:
-                    # We need at least 2 tests in history to show a "change"
                     if len(p_cmj_hist) >= 2:
-                        latest = p_cmj_hist.iloc[-1]   # The most recent test
-                        previous = p_cmj_hist.iloc[-2] # The test immediately before it
+                        latest = p_cmj_hist.iloc[-1]   
+                        previous = p_cmj_hist.iloc[-2] 
                         
-                        # UPDATED: Pulling raw CM values and updating labels to (cm)
-                        cur_h, cur_rsi = latest['Jump Height (cm)'], latest['RSI-modified [m/s]']
-                        prev_h, prev_rsi = previous['Jump Height (cm)'], previous['RSI-modified [m/s]']
+                        # Pulling the exact column name
+                        cur_h = latest[cmj_col]
+                        cur_rsi = latest['RSI-modified [m/s]']
+                        
+                        prev_h = previous[cmj_col]
+                        prev_rsi = previous['RSI-modified [m/s]']
                         
                         # Calculate % change
                         p_diff = ((cur_h - prev_h) / prev_h) * 100 if prev_h > 0 else 0
@@ -230,7 +236,6 @@ if check_password():
                                        ("FATIGUED", "#dc3545") if cur_h < prev_h and cur_rsi < prev_rsi else \
                                        ("GRINDER", "#ffc107")
                         
-                        # UI Display (Updated units to cm)
                         st.markdown(f"""
                             <div style="text-align:center;">
                                 <div class="score-box" style="background-color:{color}; line-height:1.2; padding-top:15px; height:80px; width:390px;">
@@ -245,15 +250,32 @@ if check_password():
                         """, unsafe_allow_html=True)
                     elif not p_cmj_hist.empty:
                         latest = p_cmj_hist.iloc[-1]
-                        st.info(f"First test recorded: {latest['Jump Height (Imp-Mom) [cm]']:.1f} cm")
+                        st.info(f"First test recorded: {latest[cmj_col]:.1f} cm")
                         
                 with jc2:
                     if not p_cmj_hist.empty:
                         fig = make_subplots(specs=[[{"secondary_y": True}]])
-                        # UPDATED: Mapping to 'Jump Height (cm)' and labeling 'Height (cm)'
-                        fig.add_trace(go.Scatter(x=p_cmj_hist['Test Date'], y=p_cmj_hist['Jump Height (Imp-Mom) [cm]'], name="Height (cm)", line=dict(color='#FF8200', width=3)), secondary_y=False)
-                        fig.add_trace(go.Scatter(x=p_cmj_hist['Test Date'], y=p_cmj_hist['RSI-modified [m/s]'], name="RSI", line=dict(color='#4895DB', dash='dot')), secondary_y=True)
-                        fig.update_layout(height=280, margin=dict(l=0, r=0, t=20, b=0), showlegend=False, template="simple_white")
+                        # Graphing the CM column
+                        fig.add_trace(go.Scatter(
+                            x=p_cmj_hist['Test Date'], 
+                            y=p_cmj_hist[cmj_col], 
+                            name="Height (cm)", 
+                            line=dict(color='#FF8200', width=3)
+                        ), secondary_y=False)
+                        
+                        fig.add_trace(go.Scatter(
+                            x=p_cmj_hist['Test Date'], 
+                            y=p_cmj_hist['RSI-modified [m/s]'], 
+                            name="RSI", 
+                            line=dict(color='#4895DB', dash='dot')
+                        ), secondary_y=True)
+                        
+                        fig.update_layout(
+                            height=280, 
+                            margin=dict(l=0, r=0, t=20, b=0), 
+                            showlegend=False, 
+                            template="simple_white"
+                        )
                         st.plotly_chart(fig, use_container_width=True, config=LOCKED_CONFIG)
                         
                 # --- PRACTICE PHASE BREAKDOWN ---
