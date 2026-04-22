@@ -296,13 +296,18 @@ if check_password():
             with c_gal2: 
                 pos_f_gal = st.selectbox("Position Filter", ["All Positions"] + sorted([p for p in df['Position'].unique() if p != "N/A"]), key="nav_pos_gal")
             
+            # Filter main data to the specific session selected in the dropdown
             gal_df = df[df['Session_Name'] == selected_session_gal].copy()
+            
             if not gal_df.empty:
                 curr_date_gal = gal_df['Date'].iloc[0]
-                if pos_f_gal != "All Positions": 
-                    gal_df = gal_df[gal_df['Position'] == pos_f_gal]
                 
-                athlete_names = sorted(gal_df['Name'].unique())
+                # Apply Position Filter
+                display_df = gal_df.copy()
+                if pos_f_gal != "All Positions": 
+                    display_df = display_df[display_df['Position'] == pos_f_gal]
+                
+                athlete_names = sorted(display_df['Name'].unique())
                 
                 # Metric filtering setup
                 metrics_to_exclude = ['High Jumps', 'Moderate Jumps', 'High Intensity Movement']
@@ -313,47 +318,50 @@ if check_password():
                     for j in range(2):
                         if i + j < len(athlete_names):
                             name = athlete_names[i + j]
+                            
+                            # 1. Get the RAW row for THIS specific athlete in THIS specific session
+                            # This prevents multiple matches on the same day from being summed together
+                            p_session_row = display_df[display_df['Name'] == name].iloc[0]
+                            
+                            # 2. Get the athlete's full history for baseline calculations
                             p_full_g = df[df['Name'] == name]
                             
-                            # Data gathering for the specific athlete
+                            # We calculate the "Max Day" using daily sums (the athlete's peak 1-day output)
                             daily_sums_g = p_full_g.groupby('Date')[all_metrics].sum().reset_index()
-                            lb_g = daily_sums_g[(daily_sums_g['Date'] >= curr_date_gal - timedelta(days=30)) & (daily_sums_g['Date'] <= curr_date_gal)]
-                            p_today_g = daily_sums_g[daily_sums_g['Date'] == curr_date_gal].iloc[0]
+                            lb_sums = daily_sums_g[(daily_sums_g['Date'] >= curr_date_gal - timedelta(days=30)) & 
+                                                   (daily_sums_g['Date'] <= curr_date_gal)]
                             
                             r_html = ""; t_grade = 0; c_metrics = 0
                             
-                            # Loop through filtered metrics only
+                            # 3. Loop through metrics to build the table
                             for k in filtered_metrics_gal:
-                                # GET THE SPECIFIC VALUE FOR THIS MATCH
-                                v = p_today_g[k] 
+                                val = p_session_row[k] # Specific session value
+                                mx = lb_sums[k].max()  # 30-day peak day value
+                                avg = lb_sums[k].mean() # 30-day average day
                                 
-                                # GET THE MAX VALUE FROM THE LAST 30 DAYS (The Baseline)
-                                # We filter the athlete's full history to find their peak performance
-                                lb_g = p_full_g[(p_full_g['Date'] >= curr_date_gal - timedelta(days=30)) & 
-                                                (p_full_g['Date'] <= curr_date_gal)]
-                                mx = lb_g[k].max()
-                                
-                                # GRADE CALCULATION
-                                g = math.ceil((v / mx) * 100) if mx > 0 else 0
+                                # Grade relative to their 30-day max
+                                g = math.ceil((val / mx) * 100) if mx > 0 else 0
                                 t_grade += g
                                 c_metrics += 1
                                 
-                                # Logic for highlighting (red arrow if > 10% from average)
-                                avg = lb_g[k].mean()
-                                diff = (v - avg) / avg if avg != 0 else 0
+                                # Comparison logic for red highlight/arrows
+                                diff = (val - avg) / avg if avg != 0 else 0
                                 h_class = "class='bg-highlight-red'" if abs(diff) > 0.10 else ""
                                 arr_val = f"<span class='arrow-red'>{'↑' if diff > 0.10 else '↓'}</span>" if abs(diff) > 0.10 else ""
                                 
-                                r_html += f"<tr><td>{k}</td><td {h_class}>{v:.1f} {arr_val}</td><td>{mx:.1f}</td><td>{g}</td></tr>"
-                                
-                            # Gallery Card Display
+                                r_html += f"<tr><td>{k}</td><td {h_class}>{val:.1f} {arr_val}</td><td>{mx:.1f}</td><td>{g}</td></tr>"
+                            
+                            # Final Grade for the card
+                            sc_g = math.ceil(t_grade / c_metrics) if c_metrics > 0 else 0
+                            
+                            # 4. Display the Card
                             with cols[j]: 
                                 st.markdown(f"""
-                                    <div style="border:1px solid #E5E5E7; border-radius:15px; padding:15px; margin-bottom:20px;">
+                                    <div style="border:1px solid #E5E5E7; border-radius:15px; padding:15px; margin-bottom:20px; background-color:white;">
                                         <div style="display:flex; align-items:center; gap:10px;">
                                             <div style="flex:1.2; text-align:center;">
-                                                <img src="{p_info["PhotoURL"]}" class="gallery-photo">
-                                                <p style="font-weight:bold; font-size:15px; margin-top:8px;">{name}</p>
+                                                <img src="{p_session_row["PhotoURL"]}" class="gallery-photo">
+                                                <p style="font-weight:bold; font-size:15px; margin-top:8px; color:#333;">{name}</p>
                                             </div>
                                             <div style="flex:3;">
                                                 <table class="scout-table">
@@ -378,7 +386,9 @@ if check_password():
                                         </div>
                                     </div>
                                 """, unsafe_allow_html=True)
-                                
+            else:
+                st.info("No data found for the selected session.")
+                
         with tabs[2]: # Game v Practice
             st.markdown('<div class="section-header">Weekly Prep Intensity vs. Match Demands</div>', unsafe_allow_html=True)
             c_ga, c_gw, c_gg = st.columns(3)
