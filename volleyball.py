@@ -800,39 +800,59 @@ if check_password():
                             proj_df = pd.DataFrame(ath_projections).sort_values('Proj. Load', ascending=False)
                             st.dataframe(proj_df, use_container_width=True, hide_index=True)
 
-                    # --- 6. INTENSITY FLOW GRAPH (Now with Distance) ---
+                    That makes total sense. Because Estimated Distance is measured in thousands of yards while Player Load and Jumps are in double or triple digits, putting them on the same axis would "squash" the other lines to the bottom of the graph.
+
+I have updated the code to put Estimated Distance (y) on a secondary y-axis (on the right side). I also adjusted the legend so it’s clear which metric belongs to which axis.
+
+Updated Intensity Flow Graph (Dual Axis)
+Replace Section 6 in your Practice Planner with this:
+
+Python
+                    # --- 6. INTENSITY FLOW GRAPH (Dual Axis for Distance) ---
                     st.markdown("#### Practice Intensity Flow (Rate per Minute)")
                     graph_rates = planner_target_df.groupby('Phase')[[f'{m}_Rate' for m in plan_metrics]].mean().reset_index()
                     g_build = graph_rates.set_index('Phase').loc[selected_build].reset_index()
 
-                    fig_flow = go.Figure()
-                    # Updated color map
+                    # Create figure with secondary y-axis
+                    fig_flow = make_subplots(specs=[[{"secondary_y": True}]])
+                    
                     colors = {
                         'Player Load': '#515154', 
                         'Total Jumps': '#FF8200', 
                         'Explosive Efforts': '#A52A2A',
-                        'Estimated Distance (y)': '#4895DB' # Blue for Distance
+                        'Estimated Distance (y)': '#4895DB' 
                     }
 
                     for m in plan_metrics:
-                        fig_flow.add_trace(go.Scatter(
-                            x=g_build['Phase'], y=g_build[f'{m}_Rate'], 
-                            name=m, mode='lines+markers',
-                            line=dict(color=colors[m], width=3, shape='spline'),
-                            marker=dict(size=8)
-                        ))
+                        # Distance goes on the secondary axis
+                        is_distance = (m == 'Estimated Distance (y)')
+                        
+                        fig_flow.add_trace(
+                            go.Scatter(
+                                x=g_build['Phase'], 
+                                y=g_build[f'{m}_Rate'], 
+                                name=f"{m} (Right Axis)" if is_distance else m, 
+                                mode='lines+markers',
+                                line=dict(color=colors[m], width=3, shape='spline'),
+                                marker=dict(size=8)
+                            ),
+                            secondary_y=is_distance
+                        )
                     
                     fig_flow.update_layout(
-                        height=400, template="simple_white",
-                        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-                        margin=dict(l=10, r=10, t=30, b=10),
-                        yaxis_title="Intensity per Minute"
+                        height=450, 
+                        template="simple_white",
+                        legend=dict(orientation="h", yanchor="bottom", y=1.05, xanchor="center", x=0.5),
+                        margin=dict(l=10, r=10, t=50, b=10),
+                        xaxis_title="Practice Phase"
                     )
+
+                    # Label the axes appropriately
+                    fig_flow.update_yaxes(title_text="Load / Jumps / Efforts", secondary_y=False)
+                    fig_flow.update_yaxes(title_text="Yards per Minute", secondary_y=True, showgrid=False)
+                    
                     st.plotly_chart(fig_flow, use_container_width=True, config=LOCKED_CONFIG)
-                else:
-                    st.info(f"Select drills to visualize the intensity flow for {display_label}.")
-            else:
-                st.warning("No phase data detected.")
+                    
                 
         with tabs[7]: # Risk Monitor
             st.markdown('<div class="section-header">Practice Risk Monitor</div>', unsafe_allow_html=True)
