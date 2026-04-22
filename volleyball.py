@@ -990,9 +990,8 @@ if check_password():
 
                 
         with tabs[8]: # Performance History
-            st.markdown('<div class="section-header">Athlete Score History & Team Weekly Review</div>', unsafe_allow_html=True)
+            st.markdown('<div class="section-header">Season History & Team Weekly Review</div>', unsafe_allow_html=True)
             
-            # --- INTERNAL TAB TOGGLE ---
             sub_tabs = st.tabs(["Individual Season Path", "Team Weekly Review"])
             metrics_to_score = [m for m in all_metrics if m not in ['High Jumps', 'Moderate Jumps', 'High Intensity Movement']]
 
@@ -1003,103 +1002,51 @@ if check_password():
                 all_athletes = sorted(df['Name'].unique())
                 sel_ath_hist = st.selectbox("Select Athlete", all_athletes, key="master_ath_sel")
                 
-                # 1. DATA CONSOLIDATION: Summing all metrics by Date
                 p_full = df[df['Name'] == sel_ath_hist].copy()
                 p_full['Date'] = pd.to_datetime(p_full['Date'])
                 
-                # Group by Date and Week to sum raw metrics (combining matches)
+                # Consolidate raw metrics by Date and Week
                 daily_raw = p_full.groupby(['Date', 'Week'])[metrics_to_score].sum().reset_index()
-                daily_raw = daily_raw.sort_values('Date')
-
-                # 2. CALCULATION: Score the consolidated days
+                
+                # Dynamic Naming Logic (Applied to Master & Weekly)
+                display_names = []
+                for idx, row in daily_raw.iterrows():
+                    orig = p_full[p_full['Date'] == row['Date']]
+                    if len(orig) > 1:
+                        display_names.append(f"Match Day {row['Date'].strftime('%m/%d')}")
+                    else:
+                        display_names.append(orig['Session_Name'].iloc[0])
+                
+                daily_raw['Display'] = display_names
+                
+                # Scoring Logic
                 scores_list = []
                 for idx, row in daily_raw.iterrows():
                     row_grades = []
-                    # Lookback for 30-day Max (using already summed daily data)
-                    lb = daily_raw[(daily_raw['Date'] >= row['Date'] - timedelta(days=30)) & 
-                                   (daily_raw['Date'] <= row['Date'])]
-                    
+                    lb = daily_raw[(daily_raw['Date'] >= row['Date'] - timedelta(days=30)) & (daily_raw['Date'] <= row['Date'])]
                     for m in metrics_to_score:
                         mx = lb[m].max()
                         row_grades.append(math.ceil((row[m] / mx) * 100) if mx > 0 else 0)
-                    
-                    final_s = round(sum(row_grades)/len(row_grades), 1) if row_grades else 0
-                    
-                    # Label: If multiple sessions were found in original data for this date
-                    session_count = len(p_full[p_full['Date'] == row['Date']])
-                    display_label = f"Match Day {row['Date'].strftime('%m/%d')}" if session_count > 1 else row['Date'].strftime('%b %d')
-
                     scores_list.append({
-                        'Date': row['Date'],
-                        'Display': display_label,
-                        'Score': final_s,
-                        'Week': str(row['Week'])
+                        'Date': row['Date'], 'Display': row['Display'], 
+                        'Score': round(sum(row_grades)/len(row_grades), 1), 'Week': str(row['Week'])
                     })
                 
-                master_df = pd.DataFrame(scores_list)
+                master_df = pd.DataFrame(scores_list).sort_values('Date')
 
-                # --- MASTER SEASON TIMELINE ---
-                st.markdown("### Full Season Performance Path (Daily Totals)")
-                
-                # Ensure the data is sorted by date so the lines appear in the correct gaps
-                master_df = master_df.sort_values('Date')
-                
-                fig_master = px.line(
-                    master_df, 
-                    x='Display', 
-                    y='Score', 
-                    markers=True, 
-                    text='Score', 
-                    range_y=[0, 135]
-                )
-
-                # --- ADDING WEEK SEPARATORS ---
-                # We loop through the master_df and find where the Week changes
+                # A. Master Timeline with Week Separators
+                st.markdown("### Full Season Performance Path")
+                fig_master = px.line(master_df, x='Display', y='Score', markers=True, text='Score', range_y=[0, 135])
                 for i in range(1, len(master_df)):
-                    current_week = master_df.iloc[i]['Week']
-                    previous_week = master_df.iloc[i-1]['Week']
-                    
-                    if current_week != previous_week:
-                        # Add a vertical dashed line between the sessions
-                        fig_master.add_vline(
-                            x=i-0.5, 
-                            line_dash="dash", 
-                            line_color="#515154", 
-                            opacity=0.4,
-                            line_width=1
-                        )
-                        
-                        # Add a text label at the top of the separator
-                        fig_master.add_annotation(
-                            x=i-0.5, 
-                            y=130, 
-                            text=f"Week {current_week}", 
-                            showarrow=False, 
-                            font=dict(color="#515154", size=10),
-                            bgcolor="white",
-                            bordercolor="#515154",
-                            borderwidth=1,
-                            borderpad=2
-                        )
+                    if master_df.iloc[i]['Week'] != master_df.iloc[i-1]['Week']:
+                        fig_master.add_vline(x=i-0.5, line_dash="dash", line_color="#515154", opacity=0.4)
+                        fig_master.add_annotation(x=i-0.5, y=130, text=f"Week {master_df.iloc[i]['Week']}", showarrow=False, font=dict(size=10))
 
-                # Styling the flow and markers
-                fig_master.update_traces(
-                    line=dict(color='#FF8200', width=3), 
-                    marker=dict(size=10, color='#4895DB', line=dict(width=2, color='white')),
-                    textposition='top center'
-                )
-                
-                fig_master.update_layout(
-                    template="simple_white", 
-                    height=450, 
-                    xaxis=dict(type='category', title="Date / Match Day", tickangle=-45),
-                    yaxis=dict(title="Daily Practice Score", showgrid=True, gridcolor="#f0f0f0"),
-                    margin=dict(l=10, r=10, t=50, b=100)
-                )
-                
+                fig_master.update_traces(line=dict(color='#FF8200', width=3), marker=dict(size=10, color='#4895DB'), textposition='top center')
+                fig_master.update_layout(template="simple_white", height=450, xaxis=dict(type='category', tickangle=-45))
                 st.plotly_chart(fig_master, use_container_width=True, config=LOCKED_CONFIG)
-                
-                # B. Weekly Breakdown
+
+                # B. Weekly Breakdowns (Using Dynamic Labels)
                 st.markdown("---")
                 unique_weeks = sorted(master_df['Week'].unique(), key=int, reverse=True)
                 for w_val in unique_weeks:
@@ -1126,16 +1073,13 @@ if check_password():
                     for j in range(2):
                         if i + j < len(ath_names):
                             name = ath_names[i+j]
-                            
-                            # Consolidate athlete data for this specific week
                             p_all = df[df['Name'] == name].copy()
                             p_all['Date'] = pd.to_datetime(p_all['Date'])
                             
-                            # Group everything by date to get daily totals
+                            # Consolidate Daily Data
                             p_daily = p_all.groupby(['Date', 'Week'])[metrics_to_score].sum().reset_index()
                             w_daily = p_daily[p_daily['Week'].astype(str) == str(sel_week)].sort_values('Date')
                             
-                            # Score each consolidated day
                             card_scores = []
                             for _, r in w_daily.iterrows():
                                 r_grades = []
@@ -1144,13 +1088,12 @@ if check_password():
                                     mx = lb[m].max()
                                     r_grades.append(math.ceil((r[m] / mx) * 100) if mx > 0 else 0)
                                 
-                                s = round(sum(r_grades)/len(r_grades), 0)
-                                label = f"Match Day {r['Date'].strftime('%m/%d')}" if len(p_all[p_all['Date'] == r['Date']]) > 1 else r['Date'].strftime('%m/%d')
-                                card_scores.append({'Display': label, 'Score': s})
+                                # Dynamic Labeling for Cards
+                                orig_day = p_all[p_all['Date'] == r['Date']]
+                                label = f"Match Day {r['Date'].strftime('%m/%d')}" if len(orig_day) > 1 else orig_day['Session_Name'].iloc[0]
+                                card_scores.append({'Display': label, 'Score': round(sum(row_grades)/len(row_grades), 0)})
                             
-                            card_df = pd.DataFrame(card_scores)
                             p_meta = p_all.iloc[0]
-
                             with cols[j]:
                                 st.markdown(f"""
                                 <div style="border:1px solid #E5E5E7; border-top:4px solid #FF8200; border-radius:10px 10px 0 0; padding:10px; background:white;">
@@ -1161,9 +1104,9 @@ if check_password():
                                 </div>
                                 """, unsafe_allow_html=True)
                                 
-                                fig_p = px.line(card_df, x='Display', y='Score', markers=True, text='Score', range_y=[0, 115])
+                                fig_p = px.line(pd.DataFrame(card_scores), x='Display', y='Score', markers=True, text='Score', range_y=[0, 115])
                                 fig_p.update_traces(line=dict(color='#FF8200', width=3), marker=dict(size=8, color='#4895DB'), textposition='top center')
-                                fig_p.update_layout(height=220, margin=dict(l=20, r=20, t=30, b=20), template="simple_white", xaxis=dict(type='category', title=None), yaxis=dict(showgrid=True, title=None))
+                                fig_p.update_layout(height=220, margin=dict(l=20, r=20, t=30, b=20), template="simple_white", xaxis=dict(type='category', title=None))
                                 st.plotly_chart(fig_p, use_container_width=True, config={'displayModeBar': False})
                                 
     except Exception as e:
