@@ -153,50 +153,54 @@ if check_password():
         session_list = raw_sessions.sort_values('Date', ascending=False)['Session_Name'].unique().tolist()
 
         with tabs[0]: # Tab 0: Individual Profile
-            c_f1, c_f2 = st.columns(2)
-            with c_f1: 
-                selected_session = st.selectbox("Practice Selection", session_list, index=0, key="nav_sel_ind")
-            with c_f2: 
-                pos_f = st.selectbox("Position Filter", ["All Positions"] + sorted([p for p in df['Position'].unique() if p != "N/A"]), key="nav_pos_ind")
-            
-            day_df = df[df['Session_Name'] == selected_session].copy()
-            if not day_df.empty:
-                curr_date = day_df['Date'].iloc[0]
-                dropdown_df = day_df.copy()
-                if pos_f != "All Positions": 
-                    dropdown_df = dropdown_df[dropdown_df['Position'] == pos_f]
-                
-                sel_p = st.selectbox("Select Athlete", sorted(dropdown_df['Name'].unique()))
-                
-                # --- DATA GATHERING ---
-                p_full = df[df['Name'] == sel_p]
-                # Filter specific session row for the Photo/Position metadata
-                p_meta = day_df[day_df['Name'] == sel_p].iloc[0]
-                
-                # --- SUM LOGIC FOR TABLE ---
-                daily_sums = p_full.groupby('Date')[all_metrics].sum().reset_index()
-                lb = daily_sums[(daily_sums['Date'] >= curr_date - timedelta(days=30)) & (daily_sums['Date'] <= curr_date)]
-                p_today_total = daily_sums[daily_sums['Date'] == curr_date].iloc[0]
+            c_prof1, c_prof2 = st.columns(2)
+            with c_prof1:
+                # This session_list should be the same one used in Tab 1
+                selected_session_prof = st.selectbox("Session Selection", session_list, index=0, key="nav_sel_prof")
+            with c_prof2:
+                all_athletes = sorted(df['Name'].unique())
+                selected_athlete_prof = st.selectbox("Athlete Selection", all_athletes, key="nav_ath_prof")
 
-                # --- METRIC FILTERING ---
-                # Removing the metrics you requested to hide
+            # --- THE KEY FIX ---
+            # Filter by BOTH Name and Session_Name to get the single row for that specific match
+            p_session_data = df[(df['Name'] == selected_athlete_prof) & 
+                                (df['Session_Name'] == selected_session_prof)]
+
+            if not p_session_data.empty:
+                # Grab that specific row
+                p_row = p_session_data.iloc[0]
+                curr_date_prof = p_row['Date']
+                
+                # Get the athlete's 30-day history for the Max/Avg baselines
+                p_full_prof = df[df['Name'] == selected_athlete_prof]
+                # Note: We still use daily sums for the 'Max Day' baseline so we know how this 
+                # specific match compares to their best full day of output.
+                daily_sums_prof = p_full_prof.groupby('Date')[all_metrics].sum().reset_index()
+                lb_prof = daily_sums_prof[(daily_sums_prof['Date'] >= pd.to_datetime(curr_date_prof) - timedelta(days=30)) & 
+                                          (daily_sums_prof['Date'] <= pd.to_datetime(curr_date_prof))]
+
+                # Metric filtering (Excluding the 3 requested)
                 metrics_to_exclude = ['High Jumps', 'Moderate Jumps', 'High Intensity Movement']
-                filtered_metrics = [m for m in all_metrics if m not in metrics_to_exclude]
+                filtered_metrics_prof = [m for m in all_metrics if m not in metrics_to_exclude]
 
-                m_rows = ""; total_grade = 0; count = 0
-                for k in filtered_metrics:
-                    val, mx, avg = p_today_total[k], lb[k].max(), lb[k].mean()
-                    grade = math.ceil((val / mx) * 100) if mx > 0 else 0
-                    total_grade += grade
-                    count += 1
+                r_html_prof = ""; t_grade_prof = 0; c_metrics_prof = 0
+
+                for k in filtered_metrics_prof:
+                    val = p_row[k]  # Pulling from the specific session row only
+                    mx = lb_prof[k].max()
+                    avg = lb_prof[k].mean()
+                    
+                    g = math.ceil((val / mx) * 100) if mx > 0 else 0
+                    t_grade_prof += g
+                    c_metrics_prof += 1
                     
                     diff = (val - avg) / avg if avg != 0 else 0
                     h_class = "class='bg-highlight-red'" if abs(diff) > 0.10 else ""
                     arr_val = f"<span class='arrow-red'>{'↑' if diff > 0.10 else '↓'}</span>" if abs(diff) > 0.10 else ""
                     
-                    m_rows += f"<tr><td>{k}</td><td {h_class}>{val:.1f} {arr_val}</td><td>{mx:.1f}</td><td>{grade}</td></tr>"
-                
-                score = math.ceil(total_grade / count) if count > 0 else 0
+                    r_html_prof += f"<tr><td>{k}</td><td {h_class}>{val:.1f} {arr_val}</td><td>{mx:.1f}</td><td>{g}</td></tr>"
+
+                sc_prof = math.ceil(t_grade_prof / c_metrics_prof) if c_metrics_prof > 0 else 0
                 
                 # --- UI DISPLAY ---
                 c1, c2, c3 = st.columns([1.2, 2.5, 1.2])
