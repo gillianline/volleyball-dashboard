@@ -694,12 +694,7 @@ if check_password():
 
             else:
                 st.warning("No data found in the Phases sheet.")
-                
-        To add Estimated Distance back into the Practice Planner intensity flow, we need to update three sections: the plan_metrics list, the projection logic, and the graph trace colors.
 
-Here is the updated Tab 6 code with Estimated Distance (y) integrated:
-
-Python
         with tabs[6]: # Practice Planner
             st.markdown('<div class="section-header">Practice Phase Analysis & Planner</div>', unsafe_allow_html=True)
             
