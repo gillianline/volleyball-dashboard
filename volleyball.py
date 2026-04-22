@@ -213,19 +213,24 @@ if check_password():
                 p_cmj_hist = cmj_df[(cmj_df['Athlete'] == sel_p) & (cmj_df['Test Date'] <= curr_date)].sort_values('Test Date')
                 
                 with jc1:
+                    # We need at least 2 tests in history to show a "change"
                     if len(p_cmj_hist) >= 2:
-                        latest = p_cmj_hist.iloc[-1]   
-                        previous = p_cmj_hist.iloc[-2] 
+                        latest = p_cmj_hist.iloc[-1]   # The most recent test
+                        previous = p_cmj_hist.iloc[-2] # The test immediately before it
                         
-                        cur_h, cur_rsi = latest['Jump Height (in)'], latest['RSI-modified [m/s]']
-                        prev_h, prev_rsi = previous['Jump Height (in)'], previous['RSI-modified [m/s]']
+                        # UPDATED: Pulling raw CM values and updating labels to (cm)
+                        cur_h, cur_rsi = latest['Jump Height (cm)'], latest['RSI-modified [m/s]']
+                        prev_h, prev_rsi = previous['Jump Height (cm)'], previous['RSI-modified [m/s]']
                         
+                        # Calculate % change
                         p_diff = ((cur_h - prev_h) / prev_h) * 100 if prev_h > 0 else 0
                         
+                        # Status Logic
                         label, color = ("ELITE", "#28a745") if cur_h >= prev_h and cur_rsi >= prev_rsi else \
                                        ("FATIGUED", "#dc3545") if cur_h < prev_h and cur_rsi < prev_rsi else \
                                        ("GRINDER", "#ffc107")
                         
+                        # UI Display (Updated units to cm)
                         st.markdown(f"""
                             <div style="text-align:center;">
                                 <div class="score-box" style="background-color:{color}; line-height:1.2; padding-top:15px; height:80px; width:390px;">
@@ -234,22 +239,23 @@ if check_password():
                                 </div>
                             </div>
                             <div class="info-box" style="text-align:center; margin-top:10px;">
-                                <p style="margin:0; font-size:12px;"><b>Vs. Prev:</b> {prev_h:.1f}" | {prev_rsi:.2f}</p>
-                                <p style="margin:0; font-size:13px; color:#4895DB;"><b>Today:</b> {cur_h:.1f}" | {cur_rsi:.2f}</p>
+                                <p style="margin:0; font-size:12px;"><b>Vs. Prev:</b> {prev_h:.1f} cm | {prev_rsi:.2f}</p>
+                                <p style="margin:0; font-size:13px; color:#4895DB;"><b>Today:</b> {cur_h:.1f} cm | {cur_rsi:.2f}</p>
                             </div>
                         """, unsafe_allow_html=True)
                     elif not p_cmj_hist.empty:
                         latest = p_cmj_hist.iloc[-1]
-                        st.info(f"First test recorded: {latest['Jump Height (in)']:.1f}\"")
+                        st.info(f"First test recorded: {latest['Jump Height (cm)']:.1f} cm")
                         
                 with jc2:
                     if not p_cmj_hist.empty:
                         fig = make_subplots(specs=[[{"secondary_y": True}]])
-                        fig.add_trace(go.Scatter(x=p_cmj_hist['Test Date'], y=p_cmj_hist['Jump Height (in)'], name="Height", line=dict(color='#FF8200', width=3)), secondary_y=False)
+                        # UPDATED: Mapping to 'Jump Height (cm)' and labeling 'Height (cm)'
+                        fig.add_trace(go.Scatter(x=p_cmj_hist['Test Date'], y=p_cmj_hist['Jump Height (cm)'], name="Height (cm)", line=dict(color='#FF8200', width=3)), secondary_y=False)
                         fig.add_trace(go.Scatter(x=p_cmj_hist['Test Date'], y=p_cmj_hist['RSI-modified [m/s]'], name="RSI", line=dict(color='#4895DB', dash='dot')), secondary_y=True)
                         fig.update_layout(height=280, margin=dict(l=0, r=0, t=20, b=0), showlegend=False, template="simple_white")
                         st.plotly_chart(fig, use_container_width=True, config=LOCKED_CONFIG)
-                
+                        
                 # --- PRACTICE PHASE BREAKDOWN ---
                 p_ph = phase_df[(phase_df['Name'] == sel_p) & (phase_df['Date'] == curr_date)].copy()
                 if not p_ph.empty:
