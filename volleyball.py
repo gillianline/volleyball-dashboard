@@ -995,6 +995,12 @@ if check_password():
             sub_tabs = st.tabs(["Individual Season Path", "Team Weekly Review"])
             metrics_to_score = [m for m in all_metrics if m not in ['High Jumps', 'Moderate Jumps', 'High Intensity Movement']]
 
+            Got it. I've pinpointed exactly where that logic was dropping out. To keep the lines consistent, the loop needs to be inside both the Individual Season Path (for the master graph) and the Team Weekly Review (if you wanted them there, though usually, they only apply to the long season-view).
+
+I've re-applied the add_vline logic specifically to the Full Season Performance Path so those week-to-week "fences" are clearly visible.
+
+Tab 8: Full Season Path with Re-Integrated Week Lines
+Python
             # ---------------------------------------------------------
             # SUB-TAB 1: INDIVIDUAL SEASON PATH
             # ---------------------------------------------------------
@@ -1002,13 +1008,14 @@ if check_password():
                 all_athletes = sorted(df['Name'].unique())
                 sel_ath_hist = st.selectbox("Select Athlete", all_athletes, key="master_ath_sel")
                 
+                # Data Preparation (Daily Totals)
                 p_full = df[df['Name'] == sel_ath_hist].copy()
                 p_full['Date'] = pd.to_datetime(p_full['Date'])
                 
-                # Consolidate raw metrics by Date and Week
+                # Group raw data to handle multiple matches per day
                 daily_raw = p_full.groupby(['Date', 'Week'])[metrics_to_score].sum().reset_index()
                 
-                # Dynamic Naming Logic
+                # Dynamic Naming (Match Name or "Match Day")
                 display_names = []
                 for idx, row in daily_raw.iterrows():
                     orig = p_full[p_full['Date'] == row['Date']]
@@ -1018,7 +1025,7 @@ if check_password():
                         display_names.append(orig['Session_Name'].iloc[0])
                 daily_raw['Display'] = display_names
                 
-                # Scoring Logic
+                # Calculate Scores
                 scores_list = []
                 for idx, row in daily_raw.iterrows():
                     row_grades = []
@@ -1029,33 +1036,37 @@ if check_password():
                     scores_list.append({
                         'Date': row['Date'], 'Display': row['Display'], 
                         'Score': round(sum(row_grades)/len(row_grades), 1), 
-                        'Week': str(row['Week']) # Kept as string for comparison
+                        'Week': str(row['Week']) # String for categorical comparison
                     })
                 
                 master_df = pd.DataFrame(scores_list).sort_values('Date')
 
-                # A. Master Timeline
+                # A. Master Timeline (The Long Graph)
                 st.markdown("### Full Season Performance Path")
-                fig_master = px.line(master_df, x='Display', y='Score', markers=True, text='Score', range_y=[0, 140])
-                
-                # --- RE-ADDED WEEK SEPARATOR LINES ---
+                fig_master = px.line(master_df, x='Display', y='Score', markers=True, text='Score', range_y=[0, 145])
+
+                # --- VERTICAL LINES LOGIC ---
+                # We loop through the master_df indices to find where the Week changes
                 for i in range(1, len(master_df)):
                     if master_df.iloc[i]['Week'] != master_df.iloc[i-1]['Week']:
-                        # Vertical dashed line
+                        # Add the dashed line at the half-way point between sessions
                         fig_master.add_vline(
                             x=i-0.5, 
                             line_dash="dash", 
                             line_color="#515154", 
-                            opacity=0.4
+                            opacity=0.4,
+                            line_width=1
                         )
-                        # Week Label at the top
+                        # Add the "Week X" label at the top
                         fig_master.add_annotation(
                             x=i-0.5, 
-                            y=132, 
+                            y=135, 
                             text=f"Week {master_df.iloc[i]['Week']}", 
                             showarrow=False, 
                             font=dict(color="#515154", size=10),
-                            bgcolor="white"
+                            bgcolor="white",
+                            bordercolor="#E5E5E7",
+                            borderwidth=1
                         )
 
                 fig_master.update_traces(
@@ -1066,14 +1077,15 @@ if check_password():
                 
                 fig_master.update_layout(
                     template="simple_white", 
-                    height=450, 
-                    xaxis=dict(type='category', tickangle=-45),
-                    yaxis=dict(showgrid=True, gridcolor="#f5f5f5")
+                    height=480, 
+                    xaxis=dict(type='category', title="Session / Match Day", tickangle=-45),
+                    yaxis=dict(title="Daily Practice Score", showgrid=True, gridcolor="#f5f5f5"),
+                    margin=dict(l=10, r=10, t=50, b=100)
                 )
                 
-                # Unique Key maintained
-                st.plotly_chart(fig_master, use_container_width=True, config=LOCKED_CONFIG, key=f"master_chart_{sel_ath_hist}")
-
+                # Chart with unique key
+                st.plotly_chart(fig_master, use_container_width=True, config=LOCKED_CONFIG, key=f"master_full_{sel_ath_hist}")
+                
                 st.markdown("---")
                 st.markdown("### Weekly Progressions")
                 unique_weeks = sorted(master_df['Week'].unique(), key=int, reverse=True)
