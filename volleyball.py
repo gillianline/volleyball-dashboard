@@ -995,12 +995,6 @@ if check_password():
             sub_tabs = st.tabs(["Individual Season Path", "Team Weekly Review"])
             metrics_to_score = [m for m in all_metrics if m not in ['High Jumps', 'Moderate Jumps', 'High Intensity Movement']]
 
-            Got it. I've pinpointed exactly where that logic was dropping out. To keep the lines consistent, the loop needs to be inside both the Individual Season Path (for the master graph) and the Team Weekly Review (if you wanted them there, though usually, they only apply to the long season-view).
-
-I've re-applied the add_vline logic specifically to the Full Season Performance Path so those week-to-week "fences" are clearly visible.
-
-Tab 8: Full Season Path with Re-Integrated Week Lines
-Python
             # ---------------------------------------------------------
             # SUB-TAB 1: INDIVIDUAL SEASON PATH
             # ---------------------------------------------------------
