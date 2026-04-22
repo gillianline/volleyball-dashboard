@@ -152,9 +152,6 @@ if check_password():
         tabs = st.tabs(["Individual Profile", "Team Gallery", "Match v. Practice", "Position Analysis", "Match Summary", "Phase Analysis", "Practice Planner", "Practice Red Flags-TESTING"])
         session_list = df[['Date', 'Session_Name']].drop_duplicates().sort_values('Date', ascending=False)['Session_Name'].tolist()
 
-        Here is the complete code for Tab 0. I have incorporated the logic to exclude High Jumps, Moderate Jumps, and High Intensity Movement so they no longer appear in your table or factor into the athlete's daily score.
-
-Python
         with tabs[0]: # Tab 0: Individual Profile
             c_f1, c_f2 = st.columns(2)
             with c_f1: 
