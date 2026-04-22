@@ -973,113 +973,112 @@ if check_password():
 
                 
         with tabs[8]: # Performance History
-            st.markdown('<div class="section-header">Season History & Weekly Progression</div>', unsafe_allow_html=True)
+            st.markdown('<div class="section-header">Athlete Score History & Team Weekly Review</div>', unsafe_allow_html=True)
             
-            # 1. Athlete Selection
-            all_athletes = sorted(df['Name'].unique())
-            selected_ath_hist = st.selectbox("Select Athlete", all_athletes, key="hist_ath_sel")
+            # --- INTERNAL TAB TOGGLE ---
+            sub_tabs = st.tabs(["Individual Season Path", "Team Weekly Review"])
             
-            # 2. Data Preparation & Scoring Logic
-            hist_df = df[df['Name'] == selected_ath_hist].copy()
-            hist_df['Date'] = pd.to_datetime(hist_df['Date'])
-            
-            # Exclude specific metrics from the score
+            # Metric filtering logic (Excluding the 3 requested)
             metrics_to_score = [m for m in all_metrics if m not in ['High Jumps', 'Moderate Jumps', 'High Intensity Movement']]
-            
-            scores_list = []
-            for idx, row in hist_df.iterrows():
-                row_grades = []
-                p_full = df[df['Name'] == selected_ath_hist]
-                for m in metrics_to_score:
-                    recent_max = p_full[(p_full['Date'] <= row['Date']) & 
-                                        (p_full['Date'] >= pd.to_datetime(row['Date']) - timedelta(days=30))][m].max()
-                    row_grades.append(math.ceil((row[m] / recent_max) * 100) if recent_max > 0 else 0)
-                
-                s_score = round(sum(row_grades)/len(row_grades), 1) if row_grades else 0
-                
-                scores_list.append({
-                    'Date_Sort': row['Date'], 
-                    'Session': row['Session_Name'],
-                    'Score': s_score,
-                    'Week': str(row['Week'])
-                })
-            
-            score_final_df = pd.DataFrame(scores_list).sort_values('Date_Sort', ascending=True)
 
-            if not score_final_df.empty:
-                # --- 3. MASTER SEASON TIMELINE (The "Long" Graph) ---
+            # ---------------------------------------------------------
+            # SUB-TAB 1: INDIVIDUAL SEASON PATH
+            # ---------------------------------------------------------
+            with sub_tabs[0]:
+                all_athletes = sorted(df['Name'].unique())
+                sel_ath_hist = st.selectbox("Select Athlete", all_athletes, key="master_ath_sel")
+                
+                # Data Preparation
+                hist_df = df[df['Name'] == sel_ath_hist].copy()
+                hist_df['Date'] = pd.to_datetime(hist_df['Date'])
+                
+                scores_list = []
+                for _, row in hist_df.iterrows():
+                    row_grades = []
+                    p_full = df[df['Name'] == sel_ath_hist]
+                    for m in metrics_to_score:
+                        recent_max = p_full[(p_full['Date'] <= row['Date']) & 
+                                            (p_full['Date'] >= pd.to_datetime(row['Date']) - timedelta(days=30))][m].max()
+                        row_grades.append(math.ceil((row[m] / recent_max) * 100) if recent_max > 0 else 0)
+                    s_score = round(sum(row_grades)/len(row_grades), 1) if row_grades else 0
+                    scores_list.append({'Date': row['Date'], 'Session': row['Session_Name'], 'Score': s_score, 'Week': str(row['Week'])})
+                
+                master_df = pd.DataFrame(scores_list).sort_values('Date')
+
+                # A. Master Season Timeline (The Long Graph)
                 st.markdown("### Full Season Performance Path")
+                fig_master = px.line(master_df, x='Session', y='Score', markers=True, text='Score', range_y=[0, 135])
                 
-                fig_master = px.line(
-                    score_final_df, x='Session', y='Score', 
-                    markers=True, text='Score', range_y=[0, 135]
-                )
-
-                # Loop to add Vertical Lines and Week Labels
-                for i in range(1, len(score_final_df)):
-                    if score_final_df.iloc[i]['Week'] != score_final_df.iloc[i-1]['Week']:
-                        # Dashed line separator
+                # Dashed Lines and Week Labels
+                for i in range(1, len(master_df)):
+                    if master_df.iloc[i]['Week'] != master_df.iloc[i-1]['Week']:
                         fig_master.add_vline(x=i-0.5, line_dash="dash", line_color="#515154", opacity=0.4)
-                        # Week Label at the top
-                        fig_master.add_annotation(
-                            x=i-0.5, y=130, 
-                            text=f"Week {score_final_df.iloc[i]['Week']}", 
-                            showarrow=False, font=dict(color="#515154", size=10),
-                            bgcolor="white"
-                        )
+                        fig_master.add_annotation(x=i-0.5, y=130, text=f"Week {master_df.iloc[i]['Week']}", showarrow=False, font=dict(color="#515154", size=10), bgcolor="white")
 
-                fig_master.update_traces(
-                    line=dict(color='#FF8200', width=3), 
-                    marker=dict(size=10, color='#4895DB', line=dict(width=2, color='white')),
-                    textposition='top center'
-                )
-                
-                fig_master.update_layout(
-                    template="simple_white", height=450,
-                    xaxis=dict(type='category', title="Session Name", tickangle=-45),
-                    yaxis=dict(title="Practice Score", showgrid=True, gridcolor="#f0f0f0"),
-                    margin=dict(l=10, r=10, t=50, b=100)
-                )
-                
+                fig_master.update_traces(line=dict(color='#FF8200', width=3), marker=dict(size=10, color='#4895DB'), textposition='top center')
+                fig_master.update_layout(template="simple_white", height=450, xaxis=dict(type='category', tickangle=-45))
                 st.plotly_chart(fig_master, use_container_width=True, config=LOCKED_CONFIG)
-                
+
+                # B. Weekly Breakdown Underneath
                 st.markdown("---")
-                
-                # --- 4. WEEKLY BREAKDOWNS (Individual Weekly Graphs) ---
                 st.markdown("### Weekly Progressions")
+                unique_weeks = sorted(master_df['Week'].unique(), key=int, reverse=True)
+                for w_val in unique_weeks:
+                    w_data = master_df[master_df['Week'] == w_val]
+                    st.subheader(f"Week {w_val}")
+                    fig_w = px.line(w_data, x='Session', y='Score', markers=True, text='Score', range_y=[0, 115])
+                    fig_w.update_traces(line=dict(color='#FF8200', width=4), marker=dict(size=12, color='#4895DB'), textposition='top center')
+                    fig_w.update_layout(height=350, template="simple_white", xaxis=dict(type='category'))
+                    st.plotly_chart(fig_w, use_container_width=True, config=LOCKED_CONFIG)
+
+            # ---------------------------------------------------------
+            # SUB-TAB 2: TEAM WEEKLY REVIEW
+            # ---------------------------------------------------------
+            with sub_tabs[1]:
+                avail_weeks = sorted(df['Week'].unique(), reverse=True)
+                sel_week = st.selectbox("Select Week to Review", avail_weeks, key="team_week_sel")
                 
-                # Get unique weeks in descending order (Newest first)
-                unique_weeks = sorted(score_final_df['Week'].unique(), key=int, reverse=True)
+                week_df = df[df['Week'] == sel_week].copy()
+                week_df['Date'] = pd.to_datetime(week_df['Date'])
+                ath_names = sorted(week_df['Name'].unique())
                 
-                for week_val in unique_weeks:
-                    week_data = score_final_df[score_final_df['Week'] == week_val]
-                    
-                    with st.container():
-                        st.subheader(f"Week {week_val}")
-                        
-                        fig_week = px.line(
-                            week_data, x='Session', y='Score', 
-                            markers=True, text='Score', range_y=[0, 115]
-                        )
-                        
-                        fig_week.update_traces(
-                            line=dict(color='#FF8200', width=4),
-                            marker=dict(size=12, color='#4895DB', line=dict(width=2, color='white')),
-                            textposition='top center'
-                        )
-                        
-                        fig_week.update_layout(
-                            height=350,
-                            template="simple_white",
-                            xaxis=dict(type='category', title="Session Name"),
-                            yaxis=dict(title="Practice Score", showgrid=True, gridcolor='#f0f0f0'),
-                            margin=dict(l=10, r=10, t=20, b=50)
-                        )
-                        
-                        st.plotly_chart(fig_week, use_container_width=True, config=LOCKED_CONFIG)
-                        st.markdown('<br>', unsafe_allow_html=True)
-            else:
-                st.info("No performance history available for this athlete.")
-                
+                for i in range(0, len(ath_names), 2):
+                    cols = st.columns(2)
+                    for j in range(2):
+                        if i + j < len(ath_names):
+                            name = ath_names[i+j]
+                            a_week_data = week_df[week_df['Name'] == name].sort_values('Date')
+                            p_info = a_week_data.iloc[0]
+                            
+                            # Build the scoring data for the line chart
+                            week_scores = []
+                            for _, row in a_week_data.iterrows():
+                                row_grades = []
+                                p_full = df[df['Name'] == name]
+                                for m in metrics_to_score:
+                                    recent_max = p_full[(p_full['Date'] <= row['Date']) & (p_full['Date'] >= pd.to_datetime(row['Date']) - timedelta(days=30))][m].max()
+                                    row_grades.append(math.ceil((row[m] / recent_max) * 100) if recent_max > 0 else 0)
+                                week_scores.append({'Session': row['Session_Name'], 'Score': round(sum(row_grades)/len(row_grades), 0)})
+                            
+                            w_plot_df = pd.DataFrame(week_scores)
+
+                            with cols[j]:
+                                # Card Header with Photo
+                                st.markdown(f"""
+                                <div style="border:1px solid #E5E5E7; border-top:4px solid #FF8200; border-radius:10px 10px 0 0; padding:10px; background:white;">
+                                    <div style="display:flex; align-items:center; gap:12px;">
+                                        <img src="{p_info["PhotoURL"]}" style="width:45px; height:45px; border-radius:50%;">
+                                        <p style="margin:0; font-weight:900; font-size:16px;">{name}</p>
+                                    </div>
+                                </div>
+                                """, unsafe_allow_html=True)
+                                
+                                # Line Chart Progression
+                                fig_p = px.line(w_plot_df, x='Session', y='Score', markers=True, text='Score', range_y=[0, 115])
+                                fig_p.update_traces(line=dict(color='#FF8200', width=3), marker=dict(size=8, color='#4895DB'), textposition='top center')
+                                fig_p.update_layout(height=220, margin=dict(l=20, r=20, t=30, b=20), template="simple_white", xaxis=dict(showgrid=False, title=None), yaxis=dict(showgrid=True, title=None))
+                                st.plotly_chart(fig_p, use_container_width=True, config={'displayModeBar': False})
+                                st.markdown('<div style="margin-bottom:20px;"></div>', unsafe_allow_html=True)
+                                
     except Exception as e:
         st.error(f"Sync Error: {e}")
