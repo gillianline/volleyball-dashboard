@@ -989,7 +989,7 @@ if check_password():
                 st.warning("Please ensure 'Phases' and 'Thresholds' sheets are properly loaded.")
 
                 
-         with tabs[8]: # Performance History
+        with tabs[8]: # Performance History
             st.markdown('<div class="section-header">Season History & Team Weekly Review</div>', unsafe_allow_html=True)
             
             sub_tabs = st.tabs(["Individual Season Path", "Team Weekly Review"])
