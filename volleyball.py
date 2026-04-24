@@ -425,42 +425,44 @@ if check_password():
             players_in_pos = sorted(tr_df['Name'].unique())
             
             if players_in_pos:
-                # UPDATED METRICS LIST
-                tr_metrics = ["Player Load", "Estimated Distance (y)", "Total Jumps", "Explosive Efforts"]
+                tr_metrics = ["Player Load", "Estimated Distance (y)", "Explosive Efforts", "Total Jumps"]
                 pos_4wk_avg = tr_df[tr_metrics].mean()
 
                 for name in players_in_pos:
                     p_data = tr_df[tr_df['Name'] == name]
                     p_4wk_avg = p_data[tr_metrics].mean()
 
-                    st.markdown(f'<div class="player-row-container" style="padding: 20px; margin-bottom: 30px; border: 1px solid #E5E5E7; border-radius:15px; background:white;">', unsafe_allow_html=True)
+                    # --- FIXED: TABLE IS NOW INSIDE THE SAME MARKDOWN BLOCK AS THE PHOTO/DIV ---
+                    # This prevents Streamlit from injecting a "bar" (gutter) between the elements.
                     c_card1, c_card2 = st.columns([1.5, 3], gap="large")
                     
                     with c_card1:
-                        st.markdown(f"""
-                            <div style="text-align:center; padding:15px; background:#f8f9fa; border-bottom:2px solid #FF8200; border-radius: 12px;">
-                                <img src="{p_data["PhotoURL"].iloc[0]}" style="border-radius: 50%; width: 90px; height: 90px; object-fit: contain; background-color: white; border: 3px solid #FF8200; display: block; margin: 0 auto 10px auto;">
-                                <p style="margin:0; font-weight:900; color:#1D1D1F; font-size:18px;">{name}</p>
+                        # Combine everything (Div Start + Photo + Name + Table) into one single call
+                        profile_and_table_html = f"""
+                            <div class="player-row-container" style="padding: 20px; border: 1px solid #E5E5E7; border-radius:15px; background:white; margin-bottom: 0px;">
+                                <div style="text-align:center; padding:15px; background:#f8f9fa; border-bottom:2px solid #FF8200; border-radius: 12px;">
+                                    <img src="{p_data["PhotoURL"].iloc[0]}" style="border-radius: 50%; width: 90px; height: 90px; object-fit: contain; background-color: white; border: 3px solid #FF8200; display: block; margin: 0 auto 10px auto;">
+                                    <p style="margin:0; font-weight:900; color:#1D1D1F; font-size:18px;">{name}</p>
+                                </div>
+                                <table class="scout-table" style="width:100%; margin-top:15px;">
+                                    <thead>
+                                        <tr><th>Metric</th><th>{name[:3]}.</th><th>Pos. Avg</th></tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr><td style="font-weight:700;">Player Load</td><td>{p_4wk_avg['Player Load']:.0f}</td><td>{pos_4wk_avg['Player Load']:.0f}</td></tr>
+                                        <tr><td style="font-weight:700;">Est. Dist (y)</td><td>{p_4wk_avg['Estimated Distance (y)']:.0f}</td><td>{pos_4wk_avg['Estimated Distance (y)']:.0f}</td></tr>
+                                        <tr><td style="font-weight:700;">Explosive</td><td>{p_4wk_avg['Explosive Efforts']:.0f}</td><td>{pos_4wk_avg['Explosive Efforts']:.0f}</td></tr>
+                                        <tr><td style="font-weight:700;">Total Jumps</td><td>{p_4wk_avg['Total Jumps']:.0f}</td><td>{pos_4wk_avg['Total Jumps']:.0f}</td></tr>
+                                    </tbody>
+                                </table>
                             </div>
-                        """, unsafe_allow_html=True)
-                        
-                        table_html = f"""
-                            <table class="scout-table" style="width:100%; margin-top:15px;">
-                                <thead>
-                                    <tr><th>Metric</th><th>{name}</th><th>Pos. Avg</th></tr>
-                                </thead>
-                                <tbody>
-                                    <tr><td>Player Load</td><td>{p_4wk_avg['Player Load']:.0f}</td><td>{pos_4wk_avg['Player Load']:.0f}</td></tr>
-                                    <tr><td>Est. Distance (y)</td><td>{p_4wk_avg['Estimated Distance (y)']:.0f}</td><td>{pos_4wk_avg['Estimated Distance (y)']:.0f}</td></tr>
-                                    <tr><td>Explosive Efforts</td><td>{p_4wk_avg['Explosive Efforts']:.0f}</td><td>{pos_4wk_avg['Explosive Efforts']:.0f}</td></tr>
-                                    <tr><td>Total Jumps</td><td>{p_4wk_avg['Total Jumps']:.0f}</td><td>{pos_4wk_avg['Total Jumps']:.0f}</td></tr>
-                                </tbody>
-                            </table>
                         """
-                        st.markdown(table_html, unsafe_allow_html=True)
+                        st.markdown(profile_and_table_html, unsafe_allow_html=True)
 
                     with c_card2:
-                        t_cols = st.columns(2) # Grouping graphs into a 2x2 grid for better fit
+                        # Keep your graphs exactly as they were
+                        st.write("<div style='height: 10px;'></div>", unsafe_allow_html=True)
+                        t_cols = st.columns(2) 
                         for i, m in enumerate(tr_metrics):
                             col_idx = i % 2
                             with t_cols[col_idx]:
@@ -472,12 +474,17 @@ if check_password():
                                 
                                 fig_t.update_layout(
                                     title=dict(text=f"<b>{m}</b>", font=dict(size=12), x=0.5),
-                                    xaxis=dict(dtick=1, title="Week"), height=220, margin=dict(l=10, r=10, t=30, b=40),
+                                    xaxis=dict(dtick=1, showgrid=False, title="Week"), 
+                                    yaxis=dict(showgrid=True, gridcolor='#F5F5F7'),
+                                    height=220, margin=dict(l=10, r=10, t=30, b=40),
                                     showlegend=True, legend=dict(orientation="h", y=-0.6, x=0.5, xanchor="center"),
                                     template="simple_white"
                                 )
-                                st.plotly_chart(fig_t, use_container_width=True, key=f"trend_{name}_{m}")
-                                
+                                st.plotly_chart(fig_t, use_container_width=True, config=LOCKED_CONFIG, key=f"trend_{name}_{m}")
+                    
+                    # Add a small vertical space between athletes, but not inside the card
+                    st.write("<div style='height: 30px;'></div>", unsafe_allow_html=True)
+                    
         with tabs[5]: # Match Summary
             custom_colors = [
                 '#4895DB', # Blue
