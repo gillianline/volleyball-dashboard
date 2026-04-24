@@ -155,7 +155,6 @@ if check_password():
         with tabs[0]: # Tab 0: Individual Profile
             c_prof1, c_prof2 = st.columns(2)
             with c_prof1:
-                # Select specific session/match
                 selected_session_prof = st.selectbox("Session Selection", session_list, index=0, key="nav_sel_prof")
             with c_prof2:
                 all_athletes = sorted(df['Name'].unique())
@@ -166,18 +165,25 @@ if check_password():
                                 (df['Session_Name'] == selected_session_prof)]
 
             if not p_session_data.empty:
-                # Grab the specific row and metadata
                 p_row = p_session_data.iloc[0]
                 curr_date_prof = p_row['Date']
                 p_meta = p_row 
 
-                # 30-Day History for Max Day Baselines
+                # --- NEW BASELINE LOGIC: WEEK 4 JUMPS ---
                 p_full_prof = df[df['Name'] == selected_athlete_prof]
+                
+                # We find the specific max jumps from Week 4 to use as a "Baseline Test"
+                week_4_data = p_full_prof[p_full_prof['Week'] == 4]
+                if not week_4_data.empty:
+                    # Summing all jumps for their baseline test week
+                    baseline_jumps = week_4_data['Total Jumps'].max() 
+                else:
+                    baseline_jumps = 0
+
                 daily_sums_prof = p_full_prof.groupby('Date')[all_metrics].sum().reset_index()
                 lb_prof = daily_sums_prof[(daily_sums_prof['Date'] >= pd.to_datetime(curr_date_prof) - timedelta(days=30)) & 
                                           (daily_sums_prof['Date'] <= pd.to_datetime(curr_date_prof))]
 
-                # Metric filtering
                 metrics_to_exclude = ['High Jumps', 'Moderate Jumps', 'High Intensity Movement']
                 filtered_metrics_prof = [m for m in all_metrics if m not in metrics_to_exclude]
 
@@ -188,7 +194,17 @@ if check_password():
                     mx = lb_prof[k].max()
                     avg = lb_prof[k].mean()
                     
-                    g = math.ceil((val / mx) * 100) if mx > 0 else 0
+                    # Logic: If the metric is jumps, show the Baseline (Week 4) instead of 30d Max
+                    if k == 'Total Jumps':
+                        display_baseline = baseline_jumps
+                        baseline_label = "Baseline (Wk 4)"
+                        # Calculate grade based on baseline for jumps
+                        g = math.ceil((val / baseline_jumps) * 100) if baseline_jumps > 0 else 0
+                    else:
+                        display_baseline = mx
+                        baseline_label = "30d Max Day"
+                        g = math.ceil((val / mx) * 100) if mx > 0 else 0
+                    
                     t_grade_prof += g
                     c_metrics_prof += 1
                     
@@ -196,7 +212,8 @@ if check_password():
                     h_class = "class='bg-highlight-red'" if abs(diff) > 0.10 else ""
                     arr_val = f"<span class='arrow-red'>{'↑' if diff > 0.10 else '↓'}</span>" if abs(diff) > 0.10 else ""
                     
-                    r_html_prof += f"<tr><td>{k}</td><td {h_class}>{val:.1f} {arr_val}</td><td>{mx:.1f}</td><td>{g}</td></tr>"
+                    # Note: The third column dynamically changes its header/value based on the metric
+                    r_html_prof += f"<tr><td>{k}</td><td {h_class}>{val:.1f} {arr_val}</td><td>{display_baseline:.1f}</td><td>{g}</td></tr>"
 
                 sc_prof = math.ceil(t_grade_prof / c_metrics_prof) if c_metrics_prof > 0 else 0
                 
@@ -205,7 +222,8 @@ if check_password():
                 with c1: 
                     st.markdown(f'<div style="text-align:center;"><img src="{p_meta["PhotoURL"]}" class="player-photo-large"></div><h3 style="text-align:center;">{p_meta["Name"]}</h3>', unsafe_allow_html=True)
                 with c2: 
-                    st.markdown(f'<table class="scout-table"><thead><tr><th>Metric</th><th>Today Total</th><th>30d Max Day</th><th>Grade</th></tr></thead><tbody>{r_html_prof}</tbody></table>', unsafe_allow_html=True)
+                    # Changed Header to "Baseline / Max" to account for the jump logic
+                    st.markdown(f'<table class="scout-table"><thead><tr><th>Metric</th><th>Today Total</th><th>Baseline/Max</th><th>Grade</th></tr></thead><tbody>{r_html_prof}</tbody></table>', unsafe_allow_html=True)
                 with c3: 
                     st.markdown(f'<div style="display:flex; justify-content:center;"><div class="score-box" style="background-color:{get_flipped_gradient(sc_prof)};">{sc_prof}</div></div><p style="text-align:center; font-weight:bold; color:grey; margin-top:10px;">SESSION SCORE</p>', unsafe_allow_html=True)
 
@@ -220,12 +238,9 @@ if check_password():
                     if len(p_cmj_hist) >= 2:
                         latest = p_cmj_hist.iloc[-1]   
                         previous = p_cmj_hist.iloc[-2] 
-                        
                         cur_h, cur_rsi = latest[cmj_col], latest['RSI-modified [m/s]']
                         prev_h, prev_rsi = previous[cmj_col], previous['RSI-modified [m/s]']
-                        
                         p_diff = ((cur_h - prev_h) / prev_h) * 100 if prev_h > 0 else 0
-                        
                         label, color = ("ELITE", "#28a745") if cur_h >= prev_h and cur_rsi >= prev_rsi else \
                                        ("FATIGUED", "#dc3545") if cur_h < prev_h and cur_rsi < prev_rsi else \
                                        ("GRINDER", "#ffc107")
@@ -254,7 +269,6 @@ if check_password():
                         st.plotly_chart(fig, use_container_width=True, config=LOCKED_CONFIG, key=f"readiness_chart_{selected_athlete_prof}")
                         
                 # --- PRACTICE PHASE BREAKDOWN ---
-                # We filter phase_df by the specific date to see intensity distribution
                 p_ph = phase_df[(phase_df['Name'] == selected_athlete_prof) & (phase_df['Date'] == curr_date_prof)].copy()
                 if not p_ph.empty:
                     st.markdown('<div class="section-header">Practice Phase Breakdown</div>', unsafe_allow_html=True)
@@ -265,6 +279,7 @@ if check_password():
                     st.plotly_chart(fig_ph, use_container_width=True, config=LOCKED_CONFIG, key=f"phase_breakdown_{selected_athlete_prof}_{selected_session_prof}")
             else:
                 st.info("No data found for this specific session.")
+                
                 
         with tabs[1]: # Tab 1: Gallery
             c_gal1, c_gal2 = st.columns(2)
