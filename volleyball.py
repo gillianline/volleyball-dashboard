@@ -265,15 +265,6 @@ if check_password():
                             name="RSI (m/s)", 
                             line=dict(color='#4895DB', dash='dot')
                         ), secondary_y=True)
-                        
-                        # 3. Week 4 Baseline (Legend Only - Line removed from plot)
-                        if not week_4_cmj.empty:
-                            fig.add_trace(go.Scatter(
-                                x=[None], y=[None], # Invisible data so line doesn't show
-                                name="Wk 4 Baseline",
-                                mode='lines',
-                                line=dict(color='red', dash='dash', width=2)
-                            ), secondary_y=False)
 
                         fig.update_layout(
                             height=320, 
