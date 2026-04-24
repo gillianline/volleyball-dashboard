@@ -446,7 +446,7 @@ if check_password():
                                 </div>
                                 <table class="scout-table" style="width:100%; margin-top:15px;">
                                     <thead>
-                                        <tr><th>Metric</th><th>{name[:20]}.</th><th>Pos. Avg</th></tr>
+                                        <tr><th>Metric</th><th>{name[:20]}</th><th>Pos. Avg</th></tr>
                                     </thead>
                                     <tbody>
                                         <tr><td style="font-weight:700;">Player Load</td><td>{p_4wk_avg['Player Load']:.0f}</td><td>{pos_4wk_avg['Player Load']:.0f}</td></tr>
