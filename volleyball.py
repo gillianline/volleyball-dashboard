@@ -969,7 +969,7 @@ if check_password():
         with tabs[2]: # Performance History
             st.markdown('<div class="section-header">Season History & Team Weekly Review</div>', unsafe_allow_html=True)
             
-            sub_tabs = st.tabs(["Individual Season Path", "Team Weekly Review"])
+            sub_tabs = st.tabs(["Individual Weekly Review", "Team Weekly Review"])
             metrics_to_score = [m for m in all_metrics if m not in ['High Jumps', 'Moderate Jumps', 'High Intensity Movement']]
 
             # ---------------------------------------------------------
@@ -1013,7 +1013,7 @@ if check_password():
                 master_df = pd.DataFrame(scores_list).sort_values('Date')
 
                 # A. Master Timeline (The Long Graph)
-                st.markdown("### Full Season Performance Path")
+                st.markdown("### Full Season")
                 fig_master = px.line(master_df, x='Display', y='Score', markers=True, text='Score', range_y=[0, 145])
 
                 # --- VERTICAL LINES LOGIC ---
