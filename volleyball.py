@@ -243,7 +243,7 @@ if check_password():
                                 <p style="margin:0; font-size:11px; color:#555; line-height:1.4;"><b>{label}:</b> {desc}</p>
                             </div>
                             <div class="info-box" style="text-align:center; margin-top:10px; border: 1px solid #E5E5E7; border-radius:10px; padding:5px;">
-                                <p style="margin:0; font-size:12px; color:grey;"><b>Wk 4 Baseline:</b> {base_h:.1f} cm | {base_rsi:.2f}</p>
+                                <p style="margin:0; font-size:12px; color:grey;"><b>Baseline:</b> {base_h:.1f} cm | {base_rsi:.2f}</p>
                                 <p style="margin:0; font-size:13px; color:#FF8200;"><b>Today:</b> {cur_h:.1f} cm | {cur_rsi:.2f}</p>
                             </div>
                         """, unsafe_allow_html=True)
