@@ -202,32 +202,75 @@ if check_password():
                 with c3: 
                     st.markdown(f'<div style="display:flex; justify-content:center;"><div class="score-box" style="background-color:{get_flipped_gradient(sc_prof)};">{sc_prof}</div></div><p style="text-align:center; font-weight:bold; color:grey; margin-top:10px;">SESSION SCORE</p>', unsafe_allow_html=True)
 
-                # --- READINESS PROFILE (CMJ) ---
+                # --- READINESS PROFILE (BASELINE COMPARISON) ---
                 st.markdown('<div class="section-header">Weekly Readiness Profile</div>', unsafe_allow_html=True)
                 jc1, jc2 = st.columns([1.5, 3.5])
                 
+                # Filtering history for the selected athlete
                 p_cmj_hist = cmj_df[(cmj_df['Athlete'] == selected_athlete_prof) & (cmj_df['Test Date'] <= curr_date_prof)].sort_values('Test Date')
                 cmj_col = 'Jump Height (Imp-Mom) [cm]'
 
+                # 1. Pull the Week 4 Baseline Data
+                # We look specifically for the test performed during Week 4
+                week_4_cmj = cmj_df[(cmj_df['Athlete'] == selected_athlete_prof) & (cmj_df['Week'] == 4)]
+                
                 with jc1:
-                    # [Keep existing Elite/Fatigued logic...]
-                    pass
+                    if not week_4_cmj.empty and not p_cmj_hist.empty:
+                        # Baseline (Week 4) Values
+                        baseline_row = week_4_cmj.iloc[-1]
+                        base_h = baseline_row[cmj_col]
+                        base_rsi = baseline_row['RSI-modified [m/s]']
+                        
+                        # Current (Today) Values
+                        latest = p_cmj_hist.iloc[-1]
+                        cur_h = latest[cmj_col]
+                        cur_rsi = latest['RSI-modified [m/s]']
+                        
+                        # Calculate % Change vs. Week 4 Baseline
+                        p_diff_base = ((cur_h - base_h) / base_h) * 100 if base_h > 0 else 0
+                        
+                        # Status Logic relative to Baseline
+                        # ELITE: Above baseline in both | FATIGUED: Below baseline in both
+                        if cur_h >= base_h and cur_rsi >= base_rsi:
+                            label, color = "ELITE", "#28a745"
+                        elif cur_h < base_h and cur_rsi < base_rsi:
+                            label, color = "FATIGUED", "#dc3545"
+                        else:
+                            label, color = "GRINDER", "#ffc107"
+                        
+                        st.markdown(f"""
+                            <div style="text-align:center;">
+                                <div class="score-box" style="background-color:{color}; line-height:1.2; padding-top:15px; height:80px; width:100%;">
+                                    <span style="font-size:18px;">{p_diff_base:+.1f}%</span>
+                                    <span style="font-size:10px; display:block; font-weight:bold; margin-top:2px;">Vs. Baseline</span>
+                                    <span style="font-size:12px; display:block; font-weight:900;">{label}</span>
+                                </div>
+                            </div>
+                            <div class="info-box" style="text-align:center; margin-top:10px; border: 1px solid #E5E5E7; border-radius:10px; padding:5px;">
+                                <p style="margin:0; font-size:12px; color:grey;"><b>Wk 4 Baseline:</b> {base_h:.1f} cm | {base_rsi:.2f}</p>
+                                <p style="margin:0; font-size:13px; color:#FF8200;"><b>Today:</b> {cur_h:.1f} cm | {cur_rsi:.2f}</p>
+                            </div>
+                        """, unsafe_allow_html=True)
+                    else:
+                        st.warning("No Week 4 Baseline found for this athlete.")
                         
                 with jc2:
                     if not p_cmj_hist.empty:
                         fig = make_subplots(specs=[[{"secondary_y": True}]])
+                        
+                        # Current Jumps Path
                         fig.add_trace(go.Scatter(x=p_cmj_hist['Test Date'], y=p_cmj_hist[cmj_col], name="Height (cm)", line=dict(color='#FF8200', width=3)), secondary_y=False)
                         fig.add_trace(go.Scatter(x=p_cmj_hist['Test Date'], y=p_cmj_hist['RSI-modified [m/s]'], name="RSI", line=dict(color='#4895DB', dash='dot')), secondary_y=True)
                         
-                        # --- ADD BASELINE LINE TO GRAPH ---
-                        if baseline_jump_val > 0:
-                            fig.add_hline(y=baseline_jump_val, line_dash="dash", line_color="red", 
-                                          annotation_text=f"Baseline Jump: {baseline_jump_val:.1f}cm", 
-                                          annotation_position="bottom right")
+                        # Add Red Baseline Line to Graph
+                        if not week_4_cmj.empty:
+                            base_h_val = week_4_cmj.iloc[-1][cmj_col]
+                            fig.add_hline(y=base_h_val, line_dash="dash", line_color="red", 
+                                          annotation_text="Wk 4 Baseline", 
+                                          annotation_position="top left")
 
                         fig.update_layout(height=280, margin=dict(l=0, r=0, t=20, b=0), showlegend=False, template="simple_white")
-                        st.plotly_chart(fig, use_container_width=True, config=LOCKED_CONFIG, key=f"readiness_chart_{selected_athlete_prof}")
-                
+                        st.plotly_chart(fig, use_container_width=True, config=LOCKED_CONFIG, key=f"readiness_baseline_chart_{selected_athlete_prof}")
                 
         with tabs[1]: # Tab 1: Gallery
             c_gal1, c_gal2 = st.columns(2)
