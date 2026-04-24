@@ -220,13 +220,16 @@ if check_password():
                         
                         p_diff_base = ((cur_h - base_h) / base_h) * 100 if base_h > 0 else 0
                         
-                        # Elite/Fatigued Logic
+                        # --- Readiness Logic ---
                         if cur_h >= base_h and cur_rsi >= base_rsi:
                             label, color = "ELITE", "#28a745"
+                            desc = "Performing above baseline in both height and efficiency."
                         elif cur_h < base_h and cur_rsi < base_rsi:
                             label, color = "FATIGUED", "#dc3545"
+                            desc = "Performing below baseline both height and efficiency."
                         else:
                             label, color = "GRINDER", "#ffc107"
+                            desc = "ixed performance. Athlete is working hard but efficiency is inconsistent."
                         
                         st.markdown(f"""
                             <div style="text-align:center;">
@@ -235,6 +238,9 @@ if check_password():
                                     <span style="font-size:10px; display:block; font-weight:bold; margin-top:2px;">Vs. Baseline</span>
                                     <span style="font-size:12px; display:block; font-weight:900;">{label}</span>
                                 </div>
+                            </div>
+                            <div style="margin-top:15px; padding:10px; background:#f8f9fa; border-radius:8px; border-left:4px solid {color};">
+                                <p style="margin:0; font-size:11px; color:#555; line-height:1.4;"><b>{label}:</b> {desc}</p>
                             </div>
                             <div class="info-box" style="text-align:center; margin-top:10px; border: 1px solid #E5E5E7; border-radius:10px; padding:5px;">
                                 <p style="margin:0; font-size:12px; color:grey;"><b>Wk 4 Baseline:</b> {base_h:.1f} cm | {base_rsi:.2f}</p>
@@ -246,47 +252,37 @@ if check_password():
                     if not p_cmj_hist.empty:
                         fig = make_subplots(specs=[[{"secondary_y": True}]])
                         
-                        # 1. Current Jumps Path (Solid Orange)
+                        # 1. Current Jumps Path
                         fig.add_trace(go.Scatter(
                             x=p_cmj_hist['Test Date'], y=p_cmj_hist[cmj_col], 
                             name="Current Height", 
                             line=dict(color='#FF8200', width=3)
                         ), secondary_y=False)
                         
-                        # 2. RSI Path (Dotted Blue)
+                        # 2. RSI Path
                         fig.add_trace(go.Scatter(
                             x=p_cmj_hist['Test Date'], y=p_cmj_hist['RSI-modified [m/s]'], 
                             name="RSI (m/s)", 
                             line=dict(color='#4895DB', dash='dot')
                         ), secondary_y=True)
                         
-                        # 3. Week 4 Baseline Line (Red Dash) - Added as a trace for the legend
+                        # 3. Week 4 Baseline (Legend Only - Line removed from plot)
                         if not week_4_cmj.empty:
-                            base_h_val = week_4_cmj.iloc[-1][cmj_col]
-                            # Using a scatter trace with two points to act as a horizontal line in the legend
                             fig.add_trace(go.Scatter(
-                                x=[p_cmj_hist['Test Date'].min(), p_cmj_hist['Test Date'].max()],
-                                y=[base_h_val, base_h_val],
+                                x=[None], y=[None], # Invisible data so line doesn't show
                                 name="Wk 4 Baseline",
                                 mode='lines',
                                 line=dict(color='red', dash='dash', width=2)
                             ), secondary_y=False)
 
                         fig.update_layout(
-                            height=280, 
+                            height=320, 
                             margin=dict(l=0, r=0, t=20, b=0), 
-                            showlegend=True, # Legend Enabled
-                            legend=dict(
-                                orientation="h",
-                                yanchor="bottom",
-                                y=1.02,
-                                xanchor="right",
-                                x=1,
-                                font=dict(size=10)
-                            ),
+                            showlegend=True,
+                            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, font=dict(size=10)),
                             template="simple_white"
                         )
-                        st.plotly_chart(fig, use_container_width=True, config=LOCKED_CONFIG, key=f"readiness_final_chart_{selected_athlete_prof}")
+                        st.plotly_chart(fig, use_container_width=True, config=LOCKED_CONFIG, key=f"readiness_final_clean_{selected_athlete_prof}")
                         
         with tabs[1]: # Tab 1: Gallery
             c_gal1, c_gal2 = st.columns(2)
