@@ -416,7 +416,8 @@ if check_password():
         with tabs[4]: # Position Analysis
             st.markdown('<div class="section-header">Positional Performance Trends</div>', unsafe_allow_html=True)
             
-            pos_filter_an = st.selectbox("Select Position to Analyze", sorted([p for p in df['Position'].unique() if p != "N/A"]), key="pos_an_filt_main")
+            # --- PRIMARY FILTER ---
+            pos_filter_an = st.selectbox("Select Position", sorted([p for p in df['Position'].unique() if p != "N/A"]), key="pos_an_filt_main")
             
             max_wk = df['Week'].max()
             rec_4 = list(range(int(max_wk) - 3, int(max_wk) + 1))
@@ -425,59 +426,60 @@ if check_password():
             players_in_pos = sorted(tr_df['Name'].unique())
             
             if players_in_pos:
-                # UPDATED METRICS LIST
-                tr_metrics = ["Player Load", "Estimated Distance (y)", "Total Jumps", "Explosive Efforts"]
+                # 4 Core Metrics
+                tr_metrics = ["Player Load", "Estimated Distance (y)", "Explosive Efforts", "Total Jumps"]
                 pos_4wk_avg = tr_df[tr_metrics].mean()
 
                 for name in players_in_pos:
                     p_data = tr_df[tr_df['Name'] == name]
                     p_4wk_avg = p_data[tr_metrics].mean()
 
-                    st.markdown(f'<div class="player-row-container" style="padding: 20px; margin-bottom: 30px; border: 1px solid #E5E5E7; border-radius:15px; background:white;">', unsafe_allow_html=True)
-                    c_card1, c_card2 = st.columns([1.5, 3], gap="large")
+                    # Tight container - no extra padding or margin bars
+                    st.markdown(f'<div style="padding: 15px; margin-top: 10px; border: 1px solid #E5E5E7; border-radius:12px; background:white;">', unsafe_allow_html=True)
+                    
+                    c_card1, c_card2 = st.columns([1, 4]) # Weighted for more graph space
                     
                     with c_card1:
+                        # Compact Athlete Profile
                         st.markdown(f"""
-                            <div style="text-align:center; padding:15px; background:#f8f9fa; border-bottom:2px solid #FF8200; border-radius: 12px;">
-                                <img src="{p_data["PhotoURL"].iloc[0]}" style="border-radius: 50%; width: 90px; height: 90px; object-fit: contain; background-color: white; border: 3px solid #FF8200; display: block; margin: 0 auto 10px auto;">
-                                <p style="margin:0; font-weight:900; color:#1D1D1F; font-size:18px;">{name}</p>
+                            <div style="text-align:center;">
+                                <img src="{p_data["PhotoURL"].iloc[0]}" style="border-radius: 50%; width: 70px; height: 70px; object-fit: contain; border: 2px solid #FF8200; margin-bottom:5px;">
+                                <p style="margin:0; font-weight:900; font-size:14px;">{name}</p>
+                                <table style="width:100%; font-size:11px; margin-top:10px; border-collapse:collapse;">
+                                    <tr style="border-bottom:1px solid #eee;"><td>Load</td><td><b>{p_4wk_avg['Player Load']:.0f}</b></td></tr>
+                                    <tr style="border-bottom:1px solid #eee;"><td>Dist</td><td><b>{p_4wk_avg['Estimated Distance (y)']:.0f}</b></td></tr>
+                                    <tr style="border-bottom:1px solid #eee;"><td>Expl.</td><td><b>{p_4wk_avg['Explosive Efforts']:.0f}</b></td></tr>
+                                    <tr><td>Jumps</td><td><b>{p_4wk_avg['Total Jumps']:.0f}</b></td></tr>
+                                </table>
                             </div>
                         """, unsafe_allow_html=True)
-                        
-                        table_html = f"""
-                            <table class="scout-table" style="width:100%; margin-top:15px;">
-                                <thead>
-                                    <tr><th>Metric</th><th>{name}</th><th>Pos. Avg</th></tr>
-                                </thead>
-                                <tbody>
-                                    <tr><td>Player Load</td><td>{p_4wk_avg['Player Load']:.0f}</td><td>{pos_4wk_avg['Player Load']:.0f}</td></tr>
-                                    <tr><td>Est. Distance (y)</td><td>{p_4wk_avg['Estimated Distance (y)']:.0f}</td><td>{pos_4wk_avg['Estimated Distance (y)']:.0f}</td></tr>
-                                    <tr><td>Explosive Efforts</td><td>{p_4wk_avg['Explosive Efforts']:.0f}</td><td>{pos_4wk_avg['Explosive Efforts']:.0f}</td></tr>
-                                    <tr><td>Total Jumps</td><td>{p_4wk_avg['Total Jumps']:.0f}</td><td>{pos_4wk_avg['Total Jumps']:.0f}</td></tr>
-                                </tbody>
-                            </table>
-                        """
-                        st.markdown(table_html, unsafe_allow_html=True)
 
                     with c_card2:
-                        t_cols = st.columns(2) # Grouping graphs into a 2x2 grid for better fit
+                        # 4 Graphs in one row to minimize vertical height
+                        g_cols = st.columns(4)
                         for i, m in enumerate(tr_metrics):
-                            col_idx = i % 2
-                            with t_cols[col_idx]:
+                            with g_cols[i]:
                                 fig_t = go.Figure()
+                                
                                 p_t = p_data.groupby('Week')[m].mean().reset_index()
-                                fig_t.add_trace(go.Scatter(x=p_t['Week'], y=p_t[m], name="Athlete", line=dict(color='#4895DB', width=4), mode='lines+markers'))
+                                fig_t.add_trace(go.Scatter(x=p_t['Week'], y=p_t[m], name="Athlete", line=dict(color='#4895DB', width=2), mode='lines+markers'))
+                                
                                 g_t = tr_df.groupby('Week')[m].mean().reset_index()
-                                fig_t.add_trace(go.Scatter(x=g_t['Week'], y=g_t[m], name="Pos. Avg", line=dict(color='#FF8200', dash='dash', width=2), mode='lines'))
+                                fig_t.add_trace(go.Scatter(x=g_t['Week'], y=g_t[m], name="Pos", line=dict(color='#FF8200', dash='dash', width=1.5), mode='lines'))
                                 
                                 fig_t.update_layout(
-                                    title=dict(text=f"<b>{m}</b>", font=dict(size=12), x=0.5),
-                                    xaxis=dict(dtick=1, title="Week"), height=220, margin=dict(l=10, r=10, t=30, b=40),
-                                    showlegend=True, legend=dict(orientation="h", y=-0.6, x=0.5, xanchor="center"),
+                                    title=dict(text=f"<b>{m}</b>", font=dict(size=10), x=0.5),
+                                    xaxis=dict(dtick=1, showgrid=False, tickfont=dict(size=8)),
+                                    yaxis=dict(showgrid=True, gridcolor='#F5F5F7', tickfont=dict(size=8)),
+                                    height=160, margin=dict(l=5, r=5, t=30, b=20),
+                                    showlegend=True,
+                                    legend=dict(orientation="h", yanchor="bottom", y=-0.8, xanchor="center", x=0.5, font=dict(size=7)),
                                     template="simple_white"
                                 )
-                                st.plotly_chart(fig_t, use_container_width=True, key=f"trend_{name}_{m}")
-                                
+                                st.plotly_chart(fig_t, use_container_width=True, config={'displayModeBar': False}, key=f"pos_trend_{name}_{m}")
+                    
+                    st.markdown('</div>', unsafe_allow_html=True)
+                    
                     
         with tabs[5]: # Match Summary
             custom_colors = [
