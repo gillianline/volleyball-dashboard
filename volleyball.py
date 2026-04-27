@@ -600,21 +600,6 @@ if check_password():
         with tabs[6]: # Tab 5: Work Index Matrix
             st.markdown('<div class="section-header">Work Index Matrix & Drill Utilization</div>', unsafe_allow_html=True)
             
-            # --- THE CSS FIX: Forces centering on dataframes and hides the index gutter ---
-            st.markdown("""
-                <style>
-                    /* Center everything in the dataframe cells */
-                    [data-testid="stDataFrame"] div[class*="st-"] {
-                        text-align: center !important;
-                        justify-content: center !important;
-                    }
-                    /* Force alignment for the headers */
-                    [data-testid="stDataFrame"] th {
-                        text-align: center !important;
-                    }
-                </style>
-            """, unsafe_allow_html=True)
-
             if phase_df is not None and not phase_df.empty:
                 # --- 1. DATA PREPARATION ---
                 working_matrix = phase_df.copy()
@@ -624,31 +609,33 @@ if check_password():
                 if 'Phase' in working_matrix.columns:
                     working_matrix['Phase'] = working_matrix['Phase'].replace(phase_map)
 
-                # --- 2. DRILL FREQUENCY TABLE (Centered Integers) ---
+                # --- 2. DRILL FREQUENCY TABLE ---
                 st.markdown("### Drill Frequency")
                 drill_stats = working_matrix.groupby('Phase')['Number of Times'].sum().reset_index()
-                drill_stats = drill_stats.sort_values('Number of Times', ascending=False).rename(
-                    columns={'Phase': 'Drill/Phase', 'Number of Times': 'Frequency'}
-                )
+                drill_stats = drill_stats.sort_values('Number of Times', ascending=False)
                 
-                # Back to st.dataframe with hide_index=True
-                st.dataframe(
-                    drill_stats.style.format({'Frequency': '{:.0f}'}).set_properties(**{'text-align': 'center'}),
-                    use_container_width=True,
-                    hide_index=True,
-                    height=200
-                )
+                # Manual HTML to force centering and remove index
+                freq_html = """<table style="width:100%; border-collapse: collapse; text-align: center;">
+                                <tr style="background-color: #f0f2f6; font-weight: bold;">
+                                    <th style="padding: 8px; border: 1px solid #ddd;">Drill/Phase</th>
+                                    <th style="padding: 8px; border: 1px solid #ddd;">Frequency</th>
+                                </tr>"""
+                for _, row in drill_stats.iterrows():
+                    freq_html += f"""<tr>
+                                    <td style="padding: 8px; border: 1px solid #ddd;">{row['Phase']}</td>
+                                    <td style="padding: 8px; border: 1px solid #ddd;">{row['Number of Times']:.0f}</td>
+                                  </tr>"""
+                freq_html += "</table>"
+                st.markdown(freq_html, unsafe_allow_html=True)
 
                 # --- 3. CALCULATION LOGIC ---
-                time_col = 'Duration'
+                time_col, index_metrics = 'Duration', ['Player Load', 'Total Jumps', 'Explosive Efforts']
                 working_matrix[time_col] = pd.to_numeric(working_matrix[time_col], errors='coerce').fillna(0)
-                index_metrics = ['Player Load', 'Total Jumps', 'Explosive Efforts']
                 
                 for m in index_metrics:
-                    if m in working_matrix.columns:
-                        working_matrix[f'{m}_Rate'] = working_matrix.apply(
-                            lambda x: x[m] / x[time_col] if x[time_col] > 0 else 0, axis=1
-                        )
+                    working_matrix[f'{m}_Rate'] = working_matrix.apply(
+                        lambda x: x[m] / x[time_col] if x[time_col] > 0 else 0, axis=1
+                    )
 
                 # --- 4. UI FILTERS ---
                 f_col1, f_col2, f_col3 = st.columns(3)
@@ -679,37 +666,43 @@ if check_password():
                 group_keys = ['Position', 'Phase'] if view_mode == "Position" else ['Name', 'Position', 'Phase']
                 matrix_df = working_matrix.groupby(group_keys)[rate_cols + [time_col]].mean().reset_index()
 
-                if metric_mode == "Total Volume":
-                    for m in index_metrics:
-                        matrix_df[m] = matrix_df[f'{m}_Rate'] * matrix_df[time_col]
-                    label_prefix = "Total"
-                    fmt = "{:.0f}" # Integers for Volume
-                else:
-                    for m in index_metrics:
-                        matrix_df[m] = matrix_df[f'{m}_Rate']
-                    label_prefix = "Rate"
-                    fmt = "{:.2f}" # Decimals for Work Index (Rate)
+                label_prefix = "Total" if metric_mode == "Total Volume" else "Rate"
+                fmt = "{:.0f}" if metric_mode == "Total Volume" else "{:.2f}"
 
-                # --- 6. DISPLAY ---
+                # --- 6. MANUAL HTML WORK INDEX TABLE (FORCED CENTER) ---
+                st.markdown(f"### {metric_mode} Matrix")
+                
                 sort_col = 'Position' if view_mode == "Position" else 'Name'
-                display_df = matrix_df[[sort_col, 'Phase', time_col] + index_metrics].rename(columns={
-                    'Duration': 'Mins',
-                    'Player Load': f'{label_prefix} Load',
-                    'Total Jumps': f'{label_prefix} Jumps',
-                    'Explosive Efforts': f'{label_prefix} Explosive'
-                })
+                matrix_df = matrix_df.sort_values([sort_col, 'Phase'])
 
-                st.dataframe(
-                    display_df.sort_values([sort_col, 'Phase']).style.format({
-                        'Mins': '{:.1f}',
-                        f'{label_prefix} Load': fmt,
-                        f'{label_prefix} Jumps': fmt,
-                        f'{label_prefix} Explosive': fmt
-                    }).set_properties(**{'text-align': 'center'}),
-                    use_container_width=True,
-                    hide_index=True,
-                    height=500
-                )
+                matrix_html = f"""<table style="width:100%; border-collapse: collapse; text-align: center;">
+                                <tr style="background-color: #f0f2f6; font-weight: bold;">
+                                    <th style="padding: 8px; border: 1px solid #ddd;">{sort_col}</th>
+                                    <th style="padding: 8px; border: 1px solid #ddd;">Phase</th>
+                                    <th style="padding: 8px; border: 1px solid #ddd;">Mins</th>
+                                    <th style="padding: 8px; border: 1px solid #ddd;">{label_prefix} Load</th>
+                                    <th style="padding: 8px; border: 1px solid #ddd;">{label_prefix} Jumps</th>
+                                    <th style="padding: 8px; border: 1px solid #ddd;">{label_prefix} Expl.</th>
+                                </tr>"""
+
+                for _, row in matrix_df.iterrows():
+                    # Math for Volume vs Rate
+                    load_val = (row['Player Load_Rate'] * row[time_col]) if metric_mode == "Total Volume" else row['Player Load_Rate']
+                    jump_val = (row['Total Jumps_Rate'] * row[time_col]) if metric_mode == "Total Volume" else row['Total Jumps_Rate']
+                    expl_val = (row['Explosive Efforts_Rate'] * row[time_col]) if metric_mode == "Total Volume" else row['Explosive Efforts_Rate']
+
+                    matrix_html += f"""<tr>
+                                    <td style="padding: 8px; border: 1px solid #ddd;">{row[sort_col]}</td>
+                                    <td style="padding: 8px; border: 1px solid #ddd;">{row['Phase']}</td>
+                                    <td style="padding: 8px; border: 1px solid #ddd;">{row[time_col]:.1f}</td>
+                                    <td style="padding: 8px; border: 1px solid #ddd;">{fmt.format(load_val)}</td>
+                                    <td style="padding: 8px; border: 1px solid #ddd;">{fmt.format(jump_val)}</td>
+                                    <td style="padding: 8px; border: 1px solid #ddd;">{fmt.format(expl_val)}</td>
+                                  </tr>"""
+                matrix_html += "</table>"
+                st.markdown(matrix_html, unsafe_allow_html=True)
+            else:
+                st.warning("No data found in the Phases sheet.")
                 
                 
         with tabs[7]: # Practice Planner
