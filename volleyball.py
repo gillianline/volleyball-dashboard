@@ -600,18 +600,18 @@ if check_password():
         with tabs[6]: # Tab 5: Work Index Matrix
             st.markdown('<div class="section-header">Work Index Matrix & Drill Utilization</div>', unsafe_allow_html=True)
             
-            # --- THE "NUKE" CSS: Forces center alignment and hides extra index columns ---
+            # --- THE CSS FIX: Forces centering on dataframes and hides the index gutter ---
             st.markdown("""
                 <style>
-                    /* Force text centering */
-                    .stTable td, .stTable th, [data-testid="stTable"] td, [data-testid="stTable"] th {
+                    /* Center everything in the dataframe cells */
+                    [data-testid="stDataFrame"] div[class*="st-"] {
+                        text-align: center !important;
+                        justify-content: center !important;
+                    }
+                    /* Force alignment for the headers */
+                    [data-testid="stDataFrame"] th {
                         text-align: center !important;
                     }
-                    /* Hide the index column (the row numbers on the left) */
-                    thead tr th:first-child { display:none; }
-                    tbody tr td:first-child { display:none; }
-                    
-                    table { margin-left: auto; margin-right: auto; }
                 </style>
             """, unsafe_allow_html=True)
 
@@ -624,15 +624,20 @@ if check_password():
                 if 'Phase' in working_matrix.columns:
                     working_matrix['Phase'] = working_matrix['Phase'].replace(phase_map)
 
-                # --- 2. DRILL FREQUENCY TABLE (Whole Numbers) ---
+                # --- 2. DRILL FREQUENCY TABLE (Centered Integers) ---
                 st.markdown("### Drill Frequency")
                 drill_stats = working_matrix.groupby('Phase')['Number of Times'].sum().reset_index()
                 drill_stats = drill_stats.sort_values('Number of Times', ascending=False).rename(
                     columns={'Phase': 'Drill/Phase', 'Number of Times': 'Frequency'}
                 )
                 
-                # Format Frequency as an integer (no decimals)
-                st.table(drill_stats.style.format({'Frequency': '{:.0f}'}))
+                # Back to st.dataframe with hide_index=True
+                st.dataframe(
+                    drill_stats.style.format({'Frequency': '{:.0f}'}).set_properties(**{'text-align': 'center'}),
+                    use_container_width=True,
+                    hide_index=True,
+                    height=200
+                )
 
                 # --- 3. CALCULATION LOGIC ---
                 time_col = 'Duration'
@@ -669,7 +674,7 @@ if check_password():
                 if sel_date != "Season Avg":
                     working_matrix = working_matrix[working_matrix['Date'] == pd.to_datetime(sel_date)]
 
-                # --- 5. AGGREGATION ---
+                # --- 5. AGGREGATION & MODE SWITCH ---
                 rate_cols = [f'{m}_Rate' for m in index_metrics]
                 group_keys = ['Position', 'Phase'] if view_mode == "Position" else ['Name', 'Position', 'Phase']
                 matrix_df = working_matrix.groupby(group_keys)[rate_cols + [time_col]].mean().reset_index()
@@ -678,14 +683,14 @@ if check_password():
                     for m in index_metrics:
                         matrix_df[m] = matrix_df[f'{m}_Rate'] * matrix_df[time_col]
                     label_prefix = "Total"
-                    fmt = "{:.0f}" # Whole numbers for Total Volume
+                    fmt = "{:.0f}" # Integers for Volume
                 else:
                     for m in index_metrics:
                         matrix_df[m] = matrix_df[f'{m}_Rate']
                     label_prefix = "Rate"
-                    fmt = "{:.2f}" # Decimals for Work Index Rate
+                    fmt = "{:.2f}" # Decimals for Work Index (Rate)
 
-                # --- 6. FORMATTING & DISPLAY ---
+                # --- 6. DISPLAY ---
                 sort_col = 'Position' if view_mode == "Position" else 'Name'
                 display_df = matrix_df[[sort_col, 'Phase', time_col] + index_metrics].rename(columns={
                     'Duration': 'Mins',
@@ -694,18 +699,17 @@ if check_password():
                     'Explosive Efforts': f'{label_prefix} Explosive'
                 })
 
-                # Apply the format (Decimals for Rate, Whole Numbers for Volume)
-                st.table(
+                st.dataframe(
                     display_df.sort_values([sort_col, 'Phase']).style.format({
                         'Mins': '{:.1f}',
                         f'{label_prefix} Load': fmt,
                         f'{label_prefix} Jumps': fmt,
                         f'{label_prefix} Explosive': fmt
-                    })
+                    }).set_properties(**{'text-align': 'center'}),
+                    use_container_width=True,
+                    hide_index=True,
+                    height=500
                 )
-            else:
-                st.warning("No data found in the Phases sheet.")
-                
                 
                 
         with tabs[7]: # Practice Planner
