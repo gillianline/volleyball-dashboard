@@ -600,8 +600,21 @@ if check_password():
         with tabs[6]: # Tab 5: Work Index Matrix
             st.markdown('<div class="section-header">Work Index Matrix & Drill Utilization</div>', unsafe_allow_html=True)
             
+            # --- FORCED CSS INJECTION (Centers everything in THIS tab only) ---
+            st.markdown("""
+                <style>
+                    [data-testid="stTable"] td, [data-testid="stTable"] th, 
+                    [data-testid="stDataFrame"] td, [data-testid="stDataFrame"] th {
+                        text-align: center !important;
+                    }
+                    div[data-testid="stExpander"] div[role="listbox"] {
+                        text-align: center !important;
+                    }
+                </style>
+            """, unsafe_allow_html=True)
+
             if phase_df is not None and not phase_df.empty:
-                # --- 1. DATA PREPARATION & MAPPING ---
+                # --- 1. DATA PREPARATION ---
                 working_matrix = phase_df.copy()
                 for col in ['Position', 'Name', 'Phase']:
                     if col in working_matrix.columns:
@@ -610,18 +623,16 @@ if check_password():
                 if 'Phase' in working_matrix.columns:
                     working_matrix['Phase'] = working_matrix['Phase'].replace(phase_map)
 
-                # --- 2. DRILL UTILIZATION TABLE (Centered) ---
-                st.markdown("### Drill Frequency (Mapped Groups)")
+                # --- 2. DRILL FREQUENCY TABLE ---
+                st.markdown("### Drill Frequency")
                 drill_stats = working_matrix.groupby('Phase')['Number of Times'].sum().reset_index()
                 drill_stats = drill_stats.sort_values('Number of Times', ascending=False).rename(
                     columns={'Phase': 'Drill/Phase', 'Number of Times': 'Frequency'}
                 )
                 
-                # Centering the Frequency Table
+                # Show as whole numbers and center
                 st.dataframe(
-                    drill_stats.style.set_properties(**{'text-align': 'center'}).set_table_styles(
-                        [{'selector': 'th', 'props': [('text-align', 'center')]}]
-                    ),
+                    drill_stats.style.format({'Frequency': '{:.0f}'}).set_properties(**{'text-align': 'center'}),
                     use_container_width=True, hide_index=True, height=200
                 )
 
@@ -640,27 +651,27 @@ if check_password():
                 f_col1, f_col2, f_col3 = st.columns(3)
                 with f_col1:
                     view_mode = st.radio("Group By", ["Position", "Individual"], horizontal=True, key="wi_view")
-                    metric_mode = st.radio("Data Mode", ["Work Index (Per Min)", "Total Volume"], horizontal=True, key="wi_mode")
+                    metric_mode = st.radio("Data Mode", ["Work Index", "Total Volume"], horizontal=True, key="wi_mode")
                 with f_col2:
                     if view_mode == "Position":
                         pos_list = ["All Positions"] + sorted([p for p in working_matrix['Position'].unique() if p not in ["nan", "N/A"]])
-                        sel_sub_filter = st.selectbox("Select Specific Position", pos_list)
+                        sel_sub_filter = st.selectbox("Select Position", pos_list)
                         if sel_sub_filter != "All Positions":
                             working_matrix = working_matrix[working_matrix['Position'] == sel_sub_filter]
                     else:
                         player_list = ["All Players"] + sorted(working_matrix['Name'].unique())
-                        sel_sub_filter = st.selectbox("Select Specific Player", player_list)
+                        sel_sub_filter = st.selectbox("Select Player", player_list)
                         if sel_sub_filter != "All Players":
                             working_matrix = working_matrix[working_matrix['Name'] == sel_sub_filter]
                 with f_col3:
                     valid_dates = working_matrix['Date'].dropna().unique()
-                    date_opts = ["Season Average"] + sorted([d.strftime('%Y-%m-%d') for d in valid_dates], reverse=True)
-                    sel_date = st.selectbox("Select Date Scope", date_opts, key="wi_volume_date")
+                    date_opts = ["Season Avg"] + sorted([d.strftime('%Y-%m-%d') for d in valid_dates], reverse=True)
+                    sel_date = st.selectbox("Select Date", date_opts, key="wi_volume_date")
 
-                if sel_date != "Season Average":
+                if sel_date != "Season Avg":
                     working_matrix = working_matrix[working_matrix['Date'] == pd.to_datetime(sel_date)]
 
-                # --- 5. AGGREGATION & MODE SWITCH ---
+                # --- 5. AGGREGATION ---
                 rate_cols = [f'{m}_Rate' for m in index_metrics]
                 group_keys = ['Position', 'Phase'] if view_mode == "Position" else ['Name', 'Position', 'Phase']
                 matrix_df = working_matrix.groupby(group_keys)[rate_cols + [time_col]].mean().reset_index()
@@ -672,42 +683,30 @@ if check_password():
                 else:
                     for m in index_metrics:
                         matrix_df[m] = matrix_df[f'{m}_Rate']
-                    label_prefix = "Rate/Min"
+                    label_prefix = "Rate"
 
-                # --- 6. THE STYLE TABLE FUNCTION (Centering & Formatting) ---
-                def style_matrix(styler):
-                    # Center all cells
-                    styler.set_properties(**{'text-align': 'center'})
-                    # Center all headers
-                    styler.set_table_styles([{'selector': 'th', 'props': [('text-align', 'center')]}])
-                    # Format numbers
-                    styler.format({
-                        'Avg Mins': '{:.1f}',
-                        f'{label_prefix} Load': '{:.1f}',
-                        f'{label_prefix} Jumps': '{:.1f}',
-                        f'{label_prefix} Explosive': '{:.1f}'
-                    })
-                    return styler
-
-                # Final Display
+                # --- 6. FORMATTING & DISPLAY ---
                 sort_col = 'Position' if view_mode == "Position" else 'Name'
                 display_df = matrix_df[[sort_col, 'Phase', time_col] + index_metrics].rename(columns={
-                    'Duration': 'Avg Mins',
+                    'Duration': 'Mins',
                     'Player Load': f'{label_prefix} Load',
                     'Total Jumps': f'{label_prefix} Jumps',
                     'Explosive Efforts': f'{label_prefix} Explosive'
                 })
 
+                # SETTING WHOLE NUMBERS (:.0f)
                 st.dataframe(
-                    display_df.sort_values([sort_col, 'Phase']).style.pipe(style_matrix),
+                    display_df.sort_values([sort_col, 'Phase']).style.format({
+                        'Mins': '{:.0f}',
+                        f'{label_prefix} Load': '{:.0f}',
+                        f'{label_prefix} Jumps': '{:.0f}',
+                        f'{label_prefix} Explosive': '{:.0f}'
+                    }).set_properties(**{'text-align': 'center'}),
                     use_container_width=True,
                     hide_index=True,
                     height=500
                 )
-            else:
-                st.warning("No data found in the Phases sheet.")
                 
-
         with tabs[7]: # Practice Planner
             st.markdown('<div class="section-header">Practice Phase Analysis & Planner</div>', unsafe_allow_html=True)
             
