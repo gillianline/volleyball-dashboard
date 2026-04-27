@@ -600,15 +600,17 @@ if check_password():
         with tabs[6]: # Tab 5: Work Index Matrix
             st.markdown('<div class="section-header">Work Index Matrix & Drill Utilization</div>', unsafe_allow_html=True)
             
-            # --- FORCED CSS INJECTION (Centers everything in THIS tab only) ---
+            # --- THE "NUKE" CSS: Forces center alignment on all tables in this tab ---
             st.markdown("""
                 <style>
-                    [data-testid="stTable"] td, [data-testid="stTable"] th, 
-                    [data-testid="stDataFrame"] td, [data-testid="stDataFrame"] th {
+                    /* Target the table cells and headers */
+                    .stTable td, .stTable th, [data-testid="stTable"] td, [data-testid="stTable"] th {
                         text-align: center !important;
                     }
-                    div[data-testid="stExpander"] div[role="listbox"] {
-                        text-align: center !important;
+                    /* Ensure the table itself is centered in the container */
+                    table {
+                        margin-left: auto;
+                        margin-right: auto;
                     }
                 </style>
             """, unsafe_allow_html=True)
@@ -630,11 +632,8 @@ if check_password():
                     columns={'Phase': 'Drill/Phase', 'Number of Times': 'Frequency'}
                 )
                 
-                # Show as whole numbers and center
-                st.dataframe(
-                    drill_stats.style.format({'Frequency': '{:.0f}'}).set_properties(**{'text-align': 'center'}),
-                    use_container_width=True, hide_index=True, height=200
-                )
+                # Using st.table + integer formatting for perfect centering
+                st.table(drill_stats.style.format({'Frequency': '{:.0f}'}))
 
                 # --- 3. CALCULATION LOGIC ---
                 time_col = 'Duration'
@@ -694,18 +693,18 @@ if check_password():
                     'Explosive Efforts': f'{label_prefix} Explosive'
                 })
 
-                # SETTING WHOLE NUMBERS (:.0f)
-                st.dataframe(
+                # Displaying with st.table to force the CSS alignment and whole numbers
+                st.table(
                     display_df.sort_values([sort_col, 'Phase']).style.format({
                         'Mins': '{:.0f}',
                         f'{label_prefix} Load': '{:.0f}',
                         f'{label_prefix} Jumps': '{:.0f}',
                         f'{label_prefix} Explosive': '{:.0f}'
-                    }).set_properties(**{'text-align': 'center'}),
-                    use_container_width=True,
-                    hide_index=True,
-                    height=500
+                    })
                 )
+            else:
+                st.warning("No data found in the Phases sheet.")
+                
                 
         with tabs[7]: # Practice Planner
             st.markdown('<div class="section-header">Practice Phase Analysis & Planner</div>', unsafe_allow_html=True)
