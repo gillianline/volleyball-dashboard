@@ -598,27 +598,37 @@ if check_password():
                     
                     
         with tabs[6]: # Tab 5: Work Index Matrix
-            st.markdown('<div class="section-header">Practice Phase Volume & Avg Duration</div>', unsafe_allow_html=True)
+            st.markdown('<div class="section-header">Work Index Matrix & Drill Utilization</div>', unsafe_allow_html=True)
             
             if phase_df is not None and not phase_df.empty:
-                # --- 1. DATA PREPARATION ---
+                # --- 1. DRILL UTILIZATION TABLE (Top) ---
+                st.markdown("### Drill Frequency (Season to Date)")
+                # Group by Phase to see how many times each drill was used
+                drill_stats = phase_df.groupby('Phase')['Number of Times'].sum().reset_index()
+                drill_stats = drill_stats.sort_values('Number of Times', ascending=False)
+                
+                st.dataframe(
+                    drill_stats.rename(columns={'Phase': 'Drill/Phase', 'Number of Times': 'Frequency'}),
+                    use_container_width=True,
+                    hide_index=True,
+                    height=200
+                )
+
+                # --- 2. DATA PREPARATION ---
                 working_matrix = phase_df.copy()
                 time_col = 'Duration'
                 
-                # Cleaning: Remove hidden spaces
+                # Cleaning
                 for col in ['Position', 'Name', 'Phase']:
                     if col in working_matrix.columns:
                         working_matrix[col] = working_matrix[col].astype(str).str.strip()
 
-                # Group Mini Games and other phases
                 if 'Phase' in working_matrix.columns:
                     working_matrix['Phase'] = working_matrix['Phase'].replace(phase_map)
                 
-                # Force Duration to be numeric
                 working_matrix[time_col] = pd.to_numeric(working_matrix[time_col], errors='coerce').fillna(0)
                 
-                # --- 2. CALCULATION LOGIC ---
-                # We calculate the "Rate" first, then we will use the Avg Duration to show Total Volume
+                # Calculation Logic
                 index_metrics = ['Player Load', 'Total Jumps', 'Explosive Efforts']
                 for m in index_metrics:
                     if m in working_matrix.columns:
@@ -627,10 +637,26 @@ if check_password():
                         )
 
                 # --- 3. UI FILTERS ---
-                f_col1, f_col2 = st.columns(2)
+                f_col1, f_col2, f_col3 = st.columns(3)
+                
                 with f_col1:
-                    view_mode = st.radio("Table View", ["By Position", "By Individual Player"], horizontal=True, key="wi_volume_view")
+                    view_mode = st.radio("Group By", ["Position", "Individual"], horizontal=True, key="wi_view")
+                    metric_mode = st.radio("Data Mode", ["Work Index (Per Min)", "Total Volume"], horizontal=True, key="wi_mode")
+                
                 with f_col2:
+                    # Specific Position/Player Filter
+                    if view_mode == "Position":
+                        pos_list = ["All Positions"] + sorted([p for p in working_matrix['Position'].unique() if p not in ["nan", "N/A"]])
+                        sel_sub_filter = st.selectbox("Select Specific Position", pos_list)
+                        if sel_sub_filter != "All Positions":
+                            working_matrix = working_matrix[working_matrix['Position'] == sel_sub_filter]
+                    else:
+                        player_list = ["All Players"] + sorted(working_matrix['Name'].unique())
+                        sel_sub_filter = st.selectbox("Select Specific Player", player_list)
+                        if sel_sub_filter != "All Players":
+                            working_matrix = working_matrix[working_matrix['Name'] == sel_sub_filter]
+
+                with f_col3:
                     valid_dates = working_matrix['Date'].dropna().unique()
                     date_opts = ["Season Average"] + sorted([d.strftime('%Y-%m-%d') for d in valid_dates], reverse=True)
                     sel_date = st.selectbox("Select Date Scope", date_opts, key="wi_volume_date")
@@ -639,52 +665,48 @@ if check_password():
                     working_matrix = working_matrix[working_matrix['Date'] == pd.to_datetime(sel_date)]
 
                 # --- 4. AGGREGATION ---
-                # We average the Rates and the Duration separately
                 rate_cols = [f'{m}_Rate' for m in index_metrics]
                 agg_cols = rate_cols + [time_col]
                 
-                if view_mode == "By Position":
-                    mask = (working_matrix['Position'] != 'nan') & (working_matrix['Position'] != '') & (working_matrix['Position'] != 'N/A')
-                    matrix_df = working_matrix[mask].groupby(['Position', 'Phase'])[agg_cols].mean().reset_index()
-                    sort_col = 'Position'
+                group_keys = ['Position', 'Phase'] if view_mode == "Position" else ['Name', 'Position', 'Phase']
+                matrix_df = working_matrix.groupby(group_keys)[agg_cols].mean().reset_index()
+
+                # --- 5. DATA RENDERING MODE ---
+                if metric_mode == "Total Volume":
+                    # Multiply rate by avg duration
+                    for m in index_metrics:
+                        matrix_df[m] = matrix_df[f'{m}_Rate'] * matrix_df[time_col]
+                    label_prefix = "Total"
                 else:
-                    matrix_df = working_matrix.groupby(['Name', 'Position', 'Phase'])[agg_cols].mean().reset_index()
-                    sort_col = 'Name'
+                    # Show the raw rate
+                    for m in index_metrics:
+                        matrix_df[m] = matrix_df[f'{m}_Rate']
+                    label_prefix = "Rate/Min"
 
-                # --- 5. CONVERT RATES BACK TO VOLUME ---
-                # This makes the numbers "Total Load" for that duration
-                for m in index_metrics:
-                    matrix_df[m] = matrix_df[f'{m}_Rate'] * matrix_df[time_col]
-
-                # --- 6. FORMATTING & DISPLAY ---
-                display_df = matrix_df[[sort_col, 'Phase', time_col] + index_metrics].rename(columns={
+                # --- 6. DISPLAY ---
+                sort_col = 'Position' if view_mode == "Position" else 'Name'
+                display_cols = [sort_col, 'Phase', time_col] + index_metrics
+                display_df = matrix_df[display_cols].rename(columns={
                     'Duration': 'Avg Mins',
-                    'Player Load': 'Total Load',
-                    'Total Jumps': 'Total Jumps',
-                    'Explosive Efforts': 'Total Efforts'
+                    'Player Load': f'{label_prefix} Load',
+                    'Total Jumps': f'{label_prefix} Jumps',
+                    'Explosive Efforts': f'{label_prefix} Explosive'
                 })
 
-                display_df = display_df.sort_values([sort_col, 'Phase'])
-
-                def style_table(styler):
-                    # Show as whole numbers (integers)
-                    styler.format({
-                        'Avg Mins': '{:.0f}',
-                        'Total Load': '{:.0f}', 
-                        'Total Jumps': '{:.0f}', 
-                        'Total Efforts': '{:.0f}'
-                    })
-                    return styler
-
                 st.dataframe(
-                    display_df.style.pipe(style_table),
+                    display_df.sort_values([sort_col, 'Phase']).style.format({
+                        'Avg Mins': '{:.1f}',
+                        f'{label_prefix} Load': '{:.1f}',
+                        f'{label_prefix} Jumps': '{:.1f}',
+                        f'{label_prefix} Explosive': '{:.1f}'
+                    }),
                     use_container_width=True,
                     hide_index=True,
-                    height=600
+                    height=500
                 )
-
             else:
                 st.warning("No data found in the Phases sheet.")
+                
 
         with tabs[7]: # Practice Planner
             st.markdown('<div class="section-header">Practice Phase Analysis & Planner</div>', unsafe_allow_html=True)
