@@ -640,7 +640,7 @@ if check_password():
                 f_col1, f_col2, f_col3 = st.columns(3)
                 with f_col1:
                     view_mode = st.radio("Group By", ["Position", "Individual"], horizontal=True, key="wi_view")
-                    metric_mode = st.radio("Data Mode", ["Work Index", "Total Volume"], horizontal=True, key="wi_mode")
+                    metric_mode = st.radio("Data Mode", ["Work Index (per minute)", "Total Volume"], horizontal=True, key="wi_mode")
                 with f_col2:
                     if view_mode == "Position":
                         pos_list = ["All Positions"] + sorted([p for p in working_matrix['Position'].unique() if p not in ["nan", "N/A"]])
