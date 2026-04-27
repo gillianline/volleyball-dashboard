@@ -614,7 +614,6 @@ if check_password():
                 drill_stats = working_matrix.groupby('Phase')['Number of Times'].sum().reset_index()
                 drill_stats = drill_stats.sort_values('Number of Times', ascending=False)
                 
-                # Manual HTML to force centering and remove index
                 freq_html = """<table style="width:100%; border-collapse: collapse; text-align: center;">
                                 <tr style="background-color: #f0f2f6; font-weight: bold;">
                                     <th style="padding: 8px; border: 1px solid #ddd;">Drill/Phase</th>
@@ -661,17 +660,21 @@ if check_password():
                 if sel_date != "Season Avg":
                     working_matrix = working_matrix[working_matrix['Date'] == pd.to_datetime(sel_date)]
 
-                # --- 5. AGGREGATION & MODE SWITCH ---
+                # --- 5. AGGREGATION & HEADER LOGIC ---
                 rate_cols = [f'{m}_Rate' for m in index_metrics]
                 group_keys = ['Position', 'Phase'] if view_mode == "Position" else ['Name', 'Position', 'Phase']
                 matrix_df = working_matrix.groupby(group_keys)[rate_cols + [time_col]].mean().reset_index()
 
-                label_prefix = "Total" if metric_mode == "Total Volume" else "Rate"
-                fmt = "{:.0f}" if metric_mode == "Total Volume" else "{:.2f}"
+                # --- NEW HEADER LOGIC ---
+                if metric_mode == "Total Volume":
+                    h_load, h_jumps, h_expl = "Total Load", "Total Jumps", "Total Efforts"
+                    fmt = "{:.0f}"
+                else:
+                    h_load, h_jumps, h_expl = "Player Load/Min", "Jumps/Min", "Explosive Efforts/Min"
+                    fmt = "{:.2f}"
 
-                # --- 6. MANUAL HTML WORK INDEX TABLE (FORCED CENTER) ---
+                # --- 6. MANUAL HTML TABLE ---
                 st.markdown(f"### {metric_mode} Matrix")
-                
                 sort_col = 'Position' if view_mode == "Position" else 'Name'
                 matrix_df = matrix_df.sort_values([sort_col, 'Phase'])
 
@@ -680,13 +683,13 @@ if check_password():
                                     <th style="padding: 8px; border: 1px solid #ddd;">{sort_col}</th>
                                     <th style="padding: 8px; border: 1px solid #ddd;">Phase</th>
                                     <th style="padding: 8px; border: 1px solid #ddd;">Mins</th>
-                                    <th style="padding: 8px; border: 1px solid #ddd;">{label_prefix} Load</th>
-                                    <th style="padding: 8px; border: 1px solid #ddd;">{label_prefix} Jumps</th>
-                                    <th style="padding: 8px; border: 1px solid #ddd;">{label_prefix} Expl.</th>
+                                    <th style="padding: 8px; border: 1px solid #ddd;">{h_load}</th>
+                                    <th style="padding: 8px; border: 1px solid #ddd;">{h_jumps}</th>
+                                    <th style="padding: 8px; border: 1px solid #ddd;">{h_expl}</th>
                                 </tr>"""
 
                 for _, row in matrix_df.iterrows():
-                    # Math for Volume vs Rate
+                    # Math check
                     load_val = (row['Player Load_Rate'] * row[time_col]) if metric_mode == "Total Volume" else row['Player Load_Rate']
                     jump_val = (row['Total Jumps_Rate'] * row[time_col]) if metric_mode == "Total Volume" else row['Total Jumps_Rate']
                     expl_val = (row['Explosive Efforts_Rate'] * row[time_col]) if metric_mode == "Total Volume" else row['Explosive Efforts_Rate']
@@ -701,8 +704,6 @@ if check_password():
                                   </tr>"""
                 matrix_html += "</table>"
                 st.markdown(matrix_html, unsafe_allow_html=True)
-            else:
-                st.warning("No data found in the Phases sheet.")
                 
                 
         with tabs[7]: # Practice Planner
