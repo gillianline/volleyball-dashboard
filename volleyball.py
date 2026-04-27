@@ -600,18 +600,18 @@ if check_password():
         with tabs[6]: # Tab 5: Work Index Matrix
             st.markdown('<div class="section-header">Work Index Matrix & Drill Utilization</div>', unsafe_allow_html=True)
             
-            # --- THE "NUKE" CSS: Forces center alignment on all tables in this tab ---
+            # --- THE "NUKE" CSS: Forces center alignment and hides extra index columns ---
             st.markdown("""
                 <style>
-                    /* Target the table cells and headers */
+                    /* Force text centering */
                     .stTable td, .stTable th, [data-testid="stTable"] td, [data-testid="stTable"] th {
                         text-align: center !important;
                     }
-                    /* Ensure the table itself is centered in the container */
-                    table {
-                        margin-left: auto;
-                        margin-right: auto;
-                    }
+                    /* Hide the index column (the row numbers on the left) */
+                    thead tr th:first-child { display:none; }
+                    tbody tr td:first-child { display:none; }
+                    
+                    table { margin-left: auto; margin-right: auto; }
                 </style>
             """, unsafe_allow_html=True)
 
@@ -621,18 +621,17 @@ if check_password():
                 for col in ['Position', 'Name', 'Phase']:
                     if col in working_matrix.columns:
                         working_matrix[col] = working_matrix[col].astype(str).str.strip()
-
                 if 'Phase' in working_matrix.columns:
                     working_matrix['Phase'] = working_matrix['Phase'].replace(phase_map)
 
-                # --- 2. DRILL FREQUENCY TABLE ---
+                # --- 2. DRILL FREQUENCY TABLE (Whole Numbers) ---
                 st.markdown("### Drill Frequency")
                 drill_stats = working_matrix.groupby('Phase')['Number of Times'].sum().reset_index()
                 drill_stats = drill_stats.sort_values('Number of Times', ascending=False).rename(
                     columns={'Phase': 'Drill/Phase', 'Number of Times': 'Frequency'}
                 )
                 
-                # Using st.table + integer formatting for perfect centering
+                # Format Frequency as an integer (no decimals)
                 st.table(drill_stats.style.format({'Frequency': '{:.0f}'}))
 
                 # --- 3. CALCULATION LOGIC ---
@@ -679,10 +678,12 @@ if check_password():
                     for m in index_metrics:
                         matrix_df[m] = matrix_df[f'{m}_Rate'] * matrix_df[time_col]
                     label_prefix = "Total"
+                    fmt = "{:.0f}" # Whole numbers for Total Volume
                 else:
                     for m in index_metrics:
                         matrix_df[m] = matrix_df[f'{m}_Rate']
                     label_prefix = "Rate"
+                    fmt = "{:.2f}" # Decimals for Work Index Rate
 
                 # --- 6. FORMATTING & DISPLAY ---
                 sort_col = 'Position' if view_mode == "Position" else 'Name'
@@ -693,17 +694,18 @@ if check_password():
                     'Explosive Efforts': f'{label_prefix} Explosive'
                 })
 
-                # Displaying with st.table to force the CSS alignment and whole numbers
+                # Apply the format (Decimals for Rate, Whole Numbers for Volume)
                 st.table(
                     display_df.sort_values([sort_col, 'Phase']).style.format({
-                        'Mins': '{:.0f}',
-                        f'{label_prefix} Load': '{:.0f}',
-                        f'{label_prefix} Jumps': '{:.0f}',
-                        f'{label_prefix} Explosive': '{:.0f}'
+                        'Mins': '{:.1f}',
+                        f'{label_prefix} Load': fmt,
+                        f'{label_prefix} Jumps': fmt,
+                        f'{label_prefix} Explosive': fmt
                     })
                 )
             else:
                 st.warning("No data found in the Phases sheet.")
+                
                 
                 
         with tabs[7]: # Practice Planner
