@@ -601,34 +601,36 @@ if check_password():
             st.markdown('<div class="section-header">Work Index Matrix & Drill Utilization</div>', unsafe_allow_html=True)
             
             if phase_df is not None and not phase_df.empty:
-                # --- 1. DRILL UTILIZATION TABLE (Top) ---
-                st.markdown("### Drill Frequency (Season to Date)")
-                # Group by Phase to see how many times each drill was used
-                drill_stats = phase_df.groupby('Phase')['Number of Times'].sum().reset_index()
+                # --- 1. DATA PREPARATION & MAPPING ---
+                working_matrix = phase_df.copy()
+                
+                # Standardize strings to remove hidden spaces
+                for col in ['Position', 'Name', 'Phase']:
+                    if col in working_matrix.columns:
+                        working_matrix[col] = working_matrix[col].astype(str).str.strip()
+
+                # APPLY PHASE MAPPING IMMEDIATELY 
+                # This groups "Indy", "Indy Prep", etc., based on your global phase_map dictionary
+                if 'Phase' in working_matrix.columns:
+                    working_matrix['Phase'] = working_matrix['Phase'].replace(phase_map)
+
+                # --- 2. DRILL UTILIZATION TABLE (Top) ---
+                st.markdown("### Drill Frequency (Mapped Groups)")
+                # Now that phases are grouped, we sum the 'Number of Times'
+                drill_stats = working_matrix.groupby('Phase')['Number of Times'].sum().reset_index()
                 drill_stats = drill_stats.sort_values('Number of Times', ascending=False)
                 
                 st.dataframe(
-                    drill_stats.rename(columns={'Phase': 'Drill/Phase', 'Number of Times': 'Frequency'}),
+                    drill_stats.rename(columns={'Phase': 'Grouped Drill/Phase', 'Number of Times': 'Total Frequency'}),
                     use_container_width=True,
                     hide_index=True,
                     height=200
                 )
 
-                # --- 2. DATA PREPARATION ---
-                working_matrix = phase_df.copy()
+                # --- 3. CALCULATION LOGIC ---
                 time_col = 'Duration'
-                
-                # Cleaning
-                for col in ['Position', 'Name', 'Phase']:
-                    if col in working_matrix.columns:
-                        working_matrix[col] = working_matrix[col].astype(str).str.strip()
-
-                if 'Phase' in working_matrix.columns:
-                    working_matrix['Phase'] = working_matrix['Phase'].replace(phase_map)
-                
                 working_matrix[time_col] = pd.to_numeric(working_matrix[time_col], errors='coerce').fillna(0)
                 
-                # Calculation Logic
                 index_metrics = ['Player Load', 'Total Jumps', 'Explosive Efforts']
                 for m in index_metrics:
                     if m in working_matrix.columns:
@@ -636,7 +638,7 @@ if check_password():
                             lambda x: x[m] / x[time_col] if x[time_col] > 0 else 0, axis=1
                         )
 
-                # --- 3. UI FILTERS ---
+                # --- 4. UI FILTERS ---
                 f_col1, f_col2, f_col3 = st.columns(3)
                 
                 with f_col1:
@@ -644,7 +646,7 @@ if check_password():
                     metric_mode = st.radio("Data Mode", ["Work Index (Per Min)", "Total Volume"], horizontal=True, key="wi_mode")
                 
                 with f_col2:
-                    # Specific Position/Player Filter
+                    # Filter logic for specific selections
                     if view_mode == "Position":
                         pos_list = ["All Positions"] + sorted([p for p in working_matrix['Position'].unique() if p not in ["nan", "N/A"]])
                         sel_sub_filter = st.selectbox("Select Specific Position", pos_list)
@@ -664,29 +666,26 @@ if check_password():
                 if sel_date != "Season Average":
                     working_matrix = working_matrix[working_matrix['Date'] == pd.to_datetime(sel_date)]
 
-                # --- 4. AGGREGATION ---
+                # --- 5. AGGREGATION ---
                 rate_cols = [f'{m}_Rate' for m in index_metrics]
                 agg_cols = rate_cols + [time_col]
                 
                 group_keys = ['Position', 'Phase'] if view_mode == "Position" else ['Name', 'Position', 'Phase']
                 matrix_df = working_matrix.groupby(group_keys)[agg_cols].mean().reset_index()
 
-                # --- 5. DATA RENDERING MODE ---
+                # Convert to chosen format
                 if metric_mode == "Total Volume":
-                    # Multiply rate by avg duration
                     for m in index_metrics:
                         matrix_df[m] = matrix_df[f'{m}_Rate'] * matrix_df[time_col]
                     label_prefix = "Total"
                 else:
-                    # Show the raw rate
                     for m in index_metrics:
                         matrix_df[m] = matrix_df[f'{m}_Rate']
                     label_prefix = "Rate/Min"
 
                 # --- 6. DISPLAY ---
                 sort_col = 'Position' if view_mode == "Position" else 'Name'
-                display_cols = [sort_col, 'Phase', time_col] + index_metrics
-                display_df = matrix_df[display_cols].rename(columns={
+                display_df = matrix_df[[sort_col, 'Phase', time_col] + index_metrics].rename(columns={
                     'Duration': 'Avg Mins',
                     'Player Load': f'{label_prefix} Load',
                     'Total Jumps': f'{label_prefix} Jumps',
@@ -704,8 +703,6 @@ if check_password():
                     hide_index=True,
                     height=500
                 )
-            else:
-                st.warning("No data found in the Phases sheet.")
                 
 
         with tabs[7]: # Practice Planner
