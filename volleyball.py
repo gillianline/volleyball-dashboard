@@ -674,7 +674,7 @@ if check_password():
                     fmt = "{:.2f}"
 
                 # --- 6. MANUAL HTML TABLE ---
-                st.markdown(f"### {metric_mode} Matrix")
+                st.markdown(f"### {metric_mode}")
                 sort_col = 'Position' if view_mode == "Position" else 'Name'
                 matrix_df = matrix_df.sort_values([sort_col, 'Phase'])
 
