@@ -578,7 +578,6 @@ if check_password():
                 st.plotly_chart(fig_tr, use_container_width=True)
             else:
                 st.info("Missing practice or match data for the current selection.")
-
                   
                 
         with tabs[6]: # Position Analysis
