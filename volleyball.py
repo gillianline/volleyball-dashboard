@@ -418,7 +418,7 @@ if check_password():
             main_filtered = clean_gp_data(main_filtered)
             match_filtered = clean_gp_data(match_filtered)
 
-            # --- 3. SEASON OVERALL STANDARDS TABLE ---
+           # --- 3. SEASON OVERALL STANDARDS TABLE ---
             st.markdown("### Season Standards: Overall Intensity")
             if not main_filtered.empty and not match_filtered.empty:
                 s_metrics = {'Total Player Load': 'Load', 'Explosive Efforts': 'Expl.', 'Total Jumps': 'Jumps', 'Estimated Distance (y)': 'Dist'}
@@ -429,7 +429,7 @@ if check_password():
                 s_p_avg = s_prac[s_calc + ['Duration']].mean()
                 s_m_avg = match_filtered[s_calc + ['Duration']].mean()
                 
-                overall_html = """<table style="width:100%; border-collapse: collapse; text-align: center; margin-bottom: 30px;">
+                overall_html = """<table style="width:100%; border-collapse: collapse; text-align: center; margin-bottom: 20px;">
                                 <tr style="background-color: #31333F; color: white; font-weight: bold;">
                                     <th style="padding: 12px; border: 1px solid #ddd;">Metric (Rate/Min)</th>
                                     <th style="padding: 12px; border: 1px solid #ddd;">Season Practice Avg</th>
@@ -450,6 +450,30 @@ if check_password():
                         <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold; color: {color};">{perc:.1f}%</td>
                     </tr>"""
                 st.markdown(overall_html + "</table>", unsafe_allow_html=True)
+
+                # --- MOVED: METHODOLOGY GUIDE (Now right under the first table) ---
+                with st.expander("How is Match Intensity Calculated? (Coaches' Guide)"):
+                    st.markdown("""
+                    #### 1. The Core Formula: 'The Work Index'
+                    Intensity is calculated as a **Rate per Minute**. This allows us to compare a 90-minute Match to a 40-minute Practice on a level playing field.
+                    
+                    **Formula:** `[Total Metric Volume] / [Duration in Minutes] = Rate per Minute`
+                    
+                    #### 2. The Intensity Percentage (%)
+                    This shows how close the practice environment came to simulating the "density" of a game.
+                    
+                    **Formula:** `(Practice Rate / Match Rate) * 100 = % Intensity`
+                    
+                    #### 3. Why is Intensity sometimes over 100%?
+                    If a metric shows **114%** or **180%**, it means the practice was **more dense** than a game. This is common because:
+                    * **No 'Dead Time':** Practices involve rapid-fire drills, whereas games have timeouts and stoppages.
+                    * **Condensed Drills:** High-rep drills pack a game's worth of output into a shorter window.
+                    
+                    #### 4. Color Logic:
+                    * <span style="color:#28a745">**Green (90%+):**</span> Game Speed simulation.
+                    * <span style="color:#FF8200">**Orange (75-89%):**</span> Technical/Tactical work.
+                    * <span style="color:#dc3545">**Red (<75%):**</span> Targeted recovery.
+                    """, unsafe_allow_html=True)
 
             st.divider()
 
@@ -477,7 +501,7 @@ if check_password():
 
                 # --- 5. REDESIGNED VOLUME GAPS ---
                 st.markdown("### Total Volume Comparison")
-                st.info("💡 **What is the Delta (+/-)?** This shows how much more (or less) volume was performed in the Match compared to that week's average Practice.")
+                st.info(" **What is the +/- ?** This shows how much more (or less) volume was performed in the Match compared to that week's average Practice.")
                 
                 # Create a row of cards for the metrics
                 m_cols = st.columns(4)
@@ -554,21 +578,7 @@ if check_password():
                     margin=dict(l=10, r=10, t=10, b=10)
                 )
                 st.plotly_chart(fig_dual, use_container_width=True)
-                # 6. VOLUME METRICS & TRENDS
-                cg1, cg2 = st.columns([1, 2.2])
-                with cg1:
-                    st.markdown("#### Weekly Volume Gap")
-                    for m in calc_cols:
-                        st.metric(label=metrics_dict[m], value=f"{g_avg[m]:.0f}", delta=f"{(w_avg[m] - g_avg[m]):+.0f} vs Wk Avg")
-                with cg2:
-                    fig_dual = make_subplots(specs=[[{"secondary_y": True}]])
-                    bar_metrics = ['Total Player Load', 'Explosive Efforts', 'Total Jumps']
-                    fig_dual.add_trace(go.Bar(x=[metrics_dict[m] for m in bar_metrics], y=[w_avg[m] for m in bar_metrics], name="Wkly Practice Avg", marker_color='#4895DB', offsetgroup=1), secondary_y=False)
-                    fig_dual.add_trace(go.Bar(x=[metrics_dict[m] for m in bar_metrics], y=[g_avg[m] for m in bar_metrics], name="Match Output", marker_color='#FF8200', offsetgroup=2), secondary_y=False)
-                    fig_dual.add_trace(go.Bar(x=['Distance (y)'], y=[w_avg['Estimated Distance (y)']], name="Wkly Dist", marker=dict(color='#4895DB', opacity=0.3), offsetgroup=1), secondary_y=True)
-                    fig_dual.add_trace(go.Bar(x=['Distance (y)'], y=[g_avg['Estimated Distance (y)']], name="Match Dist", marker=dict(color='#FF8200', opacity=0.3), offsetgroup=2), secondary_y=True)
-                    fig_dual.update_layout(barmode='group', height=380, template="simple_white", legend=dict(orientation="h", y=-0.2, x=0.5, xanchor="center"))
-                    st.plotly_chart(fig_dual, use_container_width=True)
+                
 
                 # 7. MULTI-LINE TREND WITH LEGEND
                 st.markdown("#### Load Progression (Practice to Match)")
@@ -582,32 +592,6 @@ if check_password():
                 fig_tr.add_trace(go.Scatter(x=wk_trends['Day'], y=wk_trends['Explosive Efforts'], mode='lines+markers', name="Explosive Efforts", line=dict(color='#28a745', width=2, dash='dash')))
                 fig_tr.update_layout(height=400, template="simple_white", legend=dict(orientation="h", y=-0.3, x=0.5, xanchor="center"))
                 st.plotly_chart(fig_tr, use_container_width=True)
-
-                #8. COACHES' METHODOLOGY GUIDE (Expandable)
-                with st.expander("ℹ️ How is Match Intensity Calculated? (Coaches' Guide)"):
-                    st.markdown("""
-                    #### 1. The Core Formula: 'The Work Index'
-                    Intensity is calculated as a **Rate per Minute**. This allows us to compare a 90-minute Match to a 40-minute Practice on a level playing field.
-                
-                    **Formula:** `[Total Metric Volume] / [Duration in Minutes] = Rate per Minute`
-                
-                    #### 2. The Intensity Percentage (%)
-                    This shows how close the practice environment came to simulating the "density" of a game.
-                
-                    **Formula:** `(Practice Rate / Match Rate) * 100 = % Intensity`
-                
-                    #### 3. Why is Intensity sometimes over 100%?
-                    If a metric shows **114%** or **180%**, it means the practice was **more dense** than a game. This is common because:
-                    * **No 'Dead Time':** Practices often involve rapid-fire drills with very little rest, whereas games have timeouts, substitutions, and play-stoppages.
-                    * **Condensed Drills:** High-rep drills (like red-zone passing or 1v1s) pack a game's worth of jumping or sprinting into a much shorter window.
-                    * **Over-Preparation:** We often intentionally "over-load" certain metrics in practice to ensure the athlete is physically prepared for the worst-case scenario in a match.
-                
-                    #### 4. Color Logic:
-                    * <span style="color:#28a745">**Green (90%+):**</span> Game Speed simulation.
-                    * <span style="color:#FF8200">**Orange (75-89%):**</span> Technical/Tactical work at sub-maximal pace.
-                    * <span style="color:#dc3545">**Red (<75%):**</span> Targeted recovery or low-intensity session.
-                    """, unsafe_allow_html=True)
-                
             else:
                 st.info("Missing practice or match data for the current selection.")
 
