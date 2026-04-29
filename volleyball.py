@@ -389,10 +389,11 @@ if check_password():
                     main_filtered = df[df['Name'] == gp_p].copy()
                     match_filtered = match_df[match_df['Name'] == gp_p].copy()
                 elif view_mode == "Position":
-                    gp_pos = st.selectbox("Select Position Group", sorted(df['Position'].unique()), key="gp_pos_vf")
+                    gp_pos = st.selectbox("Select Position Group", sorted(df['Position'].unique().tolist()), key="gp_pos_vf")
                     main_filtered = df[df['Position'] == gp_pos].copy()
                     match_filtered = match_df[match_df['Position'] == gp_pos].copy()
                 else:
+                    st.write("**Full Roster Active**")
                     main_filtered = df.copy()
                     match_filtered = match_df.copy()
 
@@ -405,6 +406,8 @@ if check_password():
                 for c in cols:
                     if c in target_df.columns:
                         target_df[c] = pd.to_numeric(target_df[c], errors='coerce').fillna(0)
+                if 'Duration' in target_df.columns:
+                    target_df['Duration'] = target_df['Duration'].apply(lambda x: x if x > 0 else 1)
                 return target_df
 
             main_filtered = clean_gp_data(main_filtered)
@@ -416,6 +419,7 @@ if check_password():
                 s_metrics = {'Total Player Load': 'Load', 'Explosive Efforts': 'Expl.', 'Total Jumps': 'Jumps', 'Estimated Distance (y)': 'Dist'}
                 s_calc = list(s_metrics.keys())
                 s_prac = main_filtered[main_filtered['Session_Type'] == 'Practice']
+                
                 s_p_avg = s_prac[s_calc + ['Duration']].mean()
                 s_m_avg = match_filtered[s_calc + ['Duration']].mean()
                 
@@ -427,19 +431,35 @@ if check_password():
                                     <th style="padding: 12px; border: 1px solid #ddd;">% Match Intensity</th>
                                 </tr>"""
                 for m, label in s_metrics.items():
-                    p_rate = s_p_avg[m] / (s_p_avg['Duration'] if s_p_avg['Duration'] > 0 else 1)
-                    m_rate = s_m_avg[m] / (s_m_avg['Duration'] if s_m_avg['Duration'] > 0 else 1)
+                    p_rate = s_p_avg[m] / s_p_avg['Duration']
+                    m_rate = s_m_avg[m] / s_m_avg['Duration']
                     perc = (p_rate / m_rate * 100) if m_rate > 0 else 0
                     color = "#28a745" if perc >= 85 else "#dc3545"
                     overall_html += f"<tr><td><b>{label}</b></td><td>{p_rate:.2f}</td><td>{m_rate:.2f}</td><td style='color:{color}; font-weight:bold;'>{perc:.1f}%</td></tr>"
                 st.markdown(overall_html + "</table>", unsafe_allow_html=True)
 
-                with st.expander("ℹ️ How is Match Intensity Calculated? (Coaches' Guide)"):
-                    st.markdown("#### 1. The Core Formula: 'The Work Index'\nIntensity is calculated as a **Rate per Minute**. `[Total Volume] / [Duration] = Rate/Min`.")
+                # --- 4. METHODOLOGY GUIDE (MOVED & RESTORED) ---
+                with st.expander("ℹ️ Coaches' Guide: How to read these numbers"):
+                    st.markdown("""
+                    **1. The +/- (Delta) Meaning:**
+                    * **Positive (+):** The Match volume was HIGHER than practice. This represents the 'extra' work performed.
+                    * **Negative (-):** The Match volume was LOWER than the average training day.
+                    
+                    **2. Intensity (Rate per Minute):**
+                    `[Total Volume] / [Duration] = Rate/Min`. This allows us to compare a long game to a short practice.
+                    
+                    **3. Why is % Intensity sometimes over 100%?**
+                    Practices pack more work into a shorter window (drills with no 'dead time'), whereas matches have halftime, timeouts, and stoppages.
+                    
+                    **4. Color Logic:**
+                    * <span style="color:#28a745">**Green (90%+):**</span> Match Speed.
+                    * <span style="color:#FF8200">**Orange (75-89%):**</span> Technical Prep.
+                    * <span style="color:#dc3545">**Red (<75%):**</span> Recovery/Walk-through.
+                    """, unsafe_allow_html=True)
 
             st.divider()
 
-            # --- 4. NEW MULTI-MATCH AGGREGATION LOGIC ---
+            # --- 5. WEEKLY FILTERS & AGGREGATION ---
             with c_week:
                 w_r = df.groupby('Week')['Date'].agg(['min', 'max']).reset_index()
                 w_r['L'] = w_r.apply(lambda x: f"{x['Week']} ({x['min'].strftime('%m/%d')} - {x['max'].strftime('%m/%d')})", axis=1)
@@ -447,7 +467,6 @@ if check_password():
                 sel_w = w_r[w_r['L'] == gp_w]['Week'].values[0]
 
             with c_match:
-                # Group match_filtered by DATE to catch multiple sessions in one day
                 if not match_filtered.empty:
                     daily_matches = match_filtered[match_filtered['Week'] == sel_w].groupby('Date').agg({
                         'Session_Name': lambda x: " + ".join(x.unique())
@@ -462,31 +481,32 @@ if check_password():
             g_data_raw = match_filtered[match_filtered['Date'] == sel_match_date].copy()
 
             if not w_data.empty and not g_data_raw.empty:
-                metrics_dict = {'Total Player Load': 'Player Load', 'Explosive Efforts': 'Expl. Efforts', 'Total Jumps': 'Total Jumps', 'Estimated Distance (y)': 'Distance (y)'}
+                metrics_dict = {'Total Player Load': 'Player Load', 'Explosive Efforts': 'Explosive Efforts', 'Total Jumps': 'Total Jumps', 'Estimated Distance (y)': 'Distance (y)'}
                 calc_cols = list(metrics_dict.keys())
                 
-                # Combine multiple matches into one "Daily Game Load"
                 g_combined = g_data_raw.groupby('Date').agg({col: 'sum' for col in calc_cols + ['Duration']}).iloc[0]
                 g_name_label = " + ".join(g_data_raw['Session_Name'].unique())
-                
                 w_avg = w_data[calc_cols + ['Duration']].mean()
 
-                # --- 5. REDESIGNED VOLUME CARDS ---
-                st.markdown(f"### Combined Match Volume: {g_name_label}")
+                # --- 6. VOLUME CARDS (RED/GREEN LOGIC RESTORED) ---
+                st.markdown(f"### Total Volume Gap: {g_name_label}")
+                st.info("The +/- shows how much the Match exceeded (or fell short of) that week's average Practice volume.")
                 m_cols = st.columns(4)
                 for i, (raw_col, label) in enumerate(metrics_dict.items()):
                     with m_cols[i]:
-                        match_val, prac_avg = g_combined[raw_col], w_avg[raw_col]
-                        delta = match_val - prac_avg
-                        st.markdown(f"""<div style="background-color: #f8f9fb; padding: 15px; border-radius: 10px; border-left: 5px solid #FF8200; text-align: center;">
-                            <p style="margin: 0; font-size: 14px; color: #555;">{label}</p>
-                            <h2 style="margin: 5px 0;">{match_val:.0f}</h2>
-                            <p style="margin: 0; font-weight: bold; color: {'#dc3545' if delta > 0 else '#28a745'};">{'+' if delta > 0 else ''}{delta:.0f} vs Practice</p>
+                        m_val, p_val = g_combined[raw_col], w_avg[raw_col]
+                        delta = m_val - p_val
+                        # Color: Red if Match > Practice (Spike), Green if Match < Practice
+                        d_color = '#dc3545' if delta > 0 else '#28a745'
+                        st.markdown(f"""<div style="background-color: #f8f9fb; padding: 15px; border-radius: 10px; border-left: 5px solid {d_color}; text-align: center;">
+                            <p style="margin:0; font-size:14px; color:#555;">{label}</p>
+                            <h2 style="margin:5px 0;">{m_val:.0f}</h2>
+                            <p style="margin:0; font-weight:bold; color:{d_color};">{'+' if delta > 0 else ''}{delta:.0f} vs Practice</p>
                         </div>""", unsafe_allow_html=True)
 
-                # --- 6. INTENSITY TABLE ---
-                st.markdown("#### Intensity Density (Work Rate)")
-                week_html = """<table style="width:100%; border-collapse: collapse; text-align: center;">
+                # --- 7. WEEKLY INTENSITY TABLE ---
+                st.markdown("#### Intensity Analysis (Density of Work)")
+                week_html = """<table style="width:100%; border-collapse: collapse; text-align: center; margin-bottom: 25px;">
                                 <tr style="background-color: #f0f2f6; font-weight: bold;">
                                     <th style="padding: 10px; border: 1px solid #ddd;">Metric (Rate/Min)</th>
                                     <th style="padding: 10px; border: 1px solid #ddd;">Match Rate</th>
@@ -494,22 +514,21 @@ if check_password():
                                     <th style="padding: 10px; border: 1px solid #ddd;">% Intensity</th>
                                 </tr>"""
                 for m in calc_cols:
-                    m_r = g_combined[m] / (g_combined['Duration'] if g_combined['Duration'] > 0 else 1)
-                    p_r = w_avg[m] / (w_avg['Duration'] if w_avg['Duration'] > 0 else 1)
+                    m_r, p_r = g_combined[m]/g_combined['Duration'], w_avg[m]/w_avg['Duration']
                     perc = (p_r / m_r * 100) if m_r > 0 else 0
                     color = "#28a745" if perc >= 90 else ("#FF8200" if perc >= 75 else "#dc3545")
                     week_html += f"<tr><td><b>{metrics_dict[m]}</b></td><td>{m_r:.2f}</td><td>{p_r:.2f}</td><td style='color:{color}; font-weight:bold;'>{perc:.1f}%</td></tr>"
-                st.markdown(week_html + "</table><br>", unsafe_allow_html=True)
+                st.markdown(week_html + "</table>", unsafe_allow_html=True)
 
-                # --- 7. TRENDS ---
-                combined_wk = pd.concat([w_data, g_data_raw])
-                wk_trends = combined_wk.groupby(['Date']).agg({m: 'sum' for m in calc_cols}).reset_index().sort_values('Date')
+                # --- 8. TREND GRAPH ---
+                wk_trends = pd.concat([w_data, g_data_raw]).groupby(['Date']).agg({m: 'sum' for m in ['Total Player Load', 'Total Jumps', 'Explosive Efforts']}).reset_index().sort_values('Date')
                 wk_trends['Day'] = wk_trends['Date'].dt.strftime('%a %m/%d')
                 
                 fig_tr = go.Figure()
                 fig_tr.add_trace(go.Scatter(x=wk_trends['Day'], y=wk_trends['Total Player Load'], mode='lines+markers', name="Player Load", line=dict(color='#4895DB', width=3)))
                 fig_tr.add_trace(go.Scatter(x=wk_trends['Day'], y=wk_trends['Total Jumps'], mode='lines+markers', name="Total Jumps", line=dict(color='#FF8200', width=2, dash='dot')))
-                fig_tr.update_layout(height=350, template="simple_white", legend=dict(orientation="h", y=-0.3, x=0.5, xanchor="center"))
+                fig_tr.add_trace(go.Scatter(x=wk_trends['Day'], y=wk_trends['Explosive Efforts'], mode='lines+markers', name="Explosive Efforts", line=dict(color='#28a745', width=2, dash='dash')))
+                fig_tr.update_layout(height=400, template="simple_white", legend=dict(orientation="h", y=-0.3, x=0.5, xanchor="center"))
                 st.plotly_chart(fig_tr, use_container_width=True)
             else:
                 st.info("Missing data for the current selection.")
