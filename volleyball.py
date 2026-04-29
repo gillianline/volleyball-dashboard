@@ -380,38 +380,99 @@ if check_password():
             c_ga, c_gw, c_gg = st.columns(3)
             with c_ga: gp_p = st.selectbox("Athlete", sorted(df['Name'].unique()), key="gp_p_vf")
             with c_gw:
-                w_r = df.groupby('Week')['Date'].agg(['min', 'max']).reset_index(); w_r['L'] = w_r.apply(lambda x: f"{x['Week']} ({x['min'].strftime('%m/%d')} - {x['max'].strftime('%m/%d')})", axis=1); gp_w = st.selectbox("Week", w_r['L'].tolist(), key="gp_w_vf"); sel_w = w_r[w_r['L'] == gp_w]['Week'].values[0]
+                w_r = df.groupby('Week')['Date'].agg(['min', 'max']).reset_index()
+                w_r['L'] = w_r.apply(lambda x: f"{x['Week']} ({x['min'].strftime('%m/%d')} - {x['max'].strftime('%m/%d')})", axis=1)
+                gp_w = st.selectbox("Week", w_r['L'].tolist(), key="gp_w_vf")
+                sel_w = w_r[w_r['L'] == gp_w]['Week'].values[0]
             with c_gg: 
-                # Games now pull from match_df
-                game_opts = match_df[(match_df['Name'] == gp_p) & (match_df['Week'] == sel_w)]['Session_Name'].unique(); gp_g = st.selectbox("Select Specific Match", game_opts, key="gp_g_vf")
+                game_opts = match_df[(match_df['Name'] == gp_p) & (match_df['Week'] == sel_w)]['Session_Name'].unique()
+                gp_g = st.selectbox("Select Specific Match", game_opts, key="gp_g_vf")
             
-            w_data = df[(df['Name'] == gp_p) & (df['Session_Type'] == 'Practice') & (df['Week'] == sel_w)]; g_data_l = match_df[(match_df['Name'] == gp_p) & (match_df['Session_Name'] == gp_g)]
+            w_data = df[(df['Name'] == gp_p) & (df['Session_Type'] == 'Practice') & (df['Week'] == sel_w)]
+            g_data_l = match_df[(match_df['Name'] == gp_p) & (match_df['Session_Name'] == gp_g)]
             
             if not w_data.empty and not g_data_l.empty:
-                low_m = ['Total Jumps', 'Player Load', 'Explosive Efforts']; w_avg = w_data[low_m + ['Estimated Distance (y)']].mean(); g_d = g_data_l.iloc[0]; cg1, cg2 = st.columns([1, 2])
+                metrics = ['Player Load', 'Explosive Efforts', 'Total Jumps']
+                g_d = g_data_l.iloc[0]
+                
+                # --- WORK INDEX CALCULATIONS ---
+                # Match Rates
+                g_mins = g_d['Duration'] if g_d['Duration'] > 0 else 1
+                g_rates = {m: g_d[m] / g_mins for m in metrics}
+                
+                # Practice Rates (Average of all practices that week)
+                w_avg_mins = w_data['Duration'].mean() if w_data['Duration'].mean() > 0 else 1
+                w_avg_vals = w_data[metrics].mean()
+                w_rates = {m: w_avg_vals[m] / w_avg_mins for m in metrics}
+
+                # --- 1. INTENSITY COMPARISON TABLE ---
+                st.markdown("### Work Index Comparison (Intensity per Minute)")
+                
+                matrix_html = f"""
+                <table style="width:100%; border-collapse: collapse; text-align: center; margin-bottom: 20px;">
+                    <tr style="background-color: #f0f2f6; font-weight: bold;">
+                        <th style="padding: 10px; border: 1px solid #ddd;">Metric (Per Min)</th>
+                        <th style="padding: 10px; border: 1px solid #ddd;">Match Rate</th>
+                        <th style="padding: 10px; border: 1px solid #ddd;">Practice Rate</th>
+                        <th style="padding: 10px; border: 1px solid #ddd;">% Match Intensity</th>
+                    </tr>"""
+                
+                for m in metrics:
+                    m_rate = g_rates[m]
+                    p_rate = w_rates[m]
+                    perc = (p_rate / m_rate * 100) if m_rate > 0 else 0
+                    
+                    # Color logic: Practice intensity > 90% match is green, < 70% is red
+                    color = "#28a745" if perc >= 90 else ("#FF8200" if perc >= 75 else "#dc3545")
+                    
+                    matrix_html += f"""
+                    <tr>
+                        <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold;">{m}</td>
+                        <td style="padding: 10px; border: 1px solid #ddd;">{m_rate:.2f}</td>
+                        <td style="padding: 10px; border: 1px solid #ddd;">{p_rate:.2f}</td>
+                        <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold; color: {color};">{perc:.1f}%</td>
+                    </tr>"""
+                
+                matrix_html += "</table>"
+                st.markdown(matrix_html, unsafe_allow_html=True)
+
+                # --- 2. ORIGINAL TOTAL VOLUME METRICS & GRAPHS ---
+                cg1, cg2 = st.columns([1, 2])
                 with cg1:
-                    for m in low_m + ['Estimated Distance (y)']: st.metric(label=m, value=f"{g_d[m]:.0f}", delta=f"{(w_avg[m]-g_d[m])/g_d[m]*100:+.1f}%")
+                    st.markdown("#### Total Volume Gaps")
+                    for m in metrics + ['Estimated Distance (y)']:
+                        st.metric(label=m, value=f"{g_d[m]:.0f}", delta=f"{(w_avg_vals[m]-g_d[m]) if m in metrics else (w_data['Estimated Distance (y)'].mean()-g_d[m]):.0f} vs Wk Avg")
+                
                 with cg2:
                     fig_dual = make_subplots(specs=[[{"secondary_y": True}]])
+                    fig_dual.add_trace(go.Bar(x=metrics, y=[w_avg_vals[m] for m in metrics], name="Wkly Practice Avg", marker_color='#4895DB', offsetgroup=1), secondary_y=False)
+                    fig_dual.add_trace(go.Bar(x=metrics, y=[g_d[m] for m in metrics], name="Match Output", marker_color='#FF8200', offsetgroup=2), secondary_y=False)
                     
-                    # Primary Metrics (Left Axis)
-                    fig_dual.add_trace(go.Bar(x=low_m, y=[w_avg[m] for m in low_m], name="Weekly Avg", marker_color='#4895DB', offsetgroup=1), secondary_y=False)
-                    fig_dual.add_trace(go.Bar(x=low_m, y=[g_d[m] for m in low_m], name=f"Match Output", marker_color='#FF8200', offsetgroup=2), secondary_y=False)
-                    
-                    # Distance Ghost Bars (Right Axis)
-                    fig_dual.add_trace(go.Bar(x=['Estimated Distance (y)'], y=[w_avg['Estimated Distance (y)']], name="Wkly Dist", marker=dict(color='#4895DB', opacity=0.3), offsetgroup=1), secondary_y=True)
+                    # Distance Ghost Bars
+                    fig_dual.add_trace(go.Bar(x=['Estimated Distance (y)'], y=[w_data['Estimated Distance (y)'].mean()], name="Wkly Dist", marker=dict(color='#4895DB', opacity=0.3), offsetgroup=1), secondary_y=True)
                     fig_dual.add_trace(go.Bar(x=['Estimated Distance (y)'], y=[g_d['Estimated Distance (y)']], name="Match Dist", marker=dict(color='#FF8200', opacity=0.3), offsetgroup=2), secondary_y=True)
                     
-                    fig_dual.update_layout(barmode='group', height=350, margin=dict(l=0, r=0, t=20, b=0), template="simple_white")
+                    fig_dual.update_layout(barmode='group', height=350, margin=dict(l=0, r=0, t=20, b=0), template="simple_white", legend=dict(orientation="h", y=-0.2))
                     st.plotly_chart(fig_dual, use_container_width=True, config=LOCKED_CONFIG)
-                
-                # Trends pull from combined sources to show the full week
+
+                # --- 3. DAILY TRENDS ---
                 combined_wk = pd.concat([w_data, g_data_l])
-                wk_trends = combined_wk.groupby(['Date', 'Session_Name', 'Session_Type']).agg({'Player Load': 'mean'}).reset_index().sort_values('Date'); wk_trends['Day_Label'] = wk_trends['Date'].dt.strftime('%a %m/%d'); fig_tr = go.Figure(); fig_tr.add_trace(go.Scatter(x=wk_trends['Day_Label'], y=wk_trends['Player Load'], mode='lines', line=dict(color='#4895DB', width=3), showlegend=False))
+                wk_trends = combined_wk.groupby(['Date', 'Session_Name', 'Session_Type']).agg({'Player Load': 'mean'}).reset_index().sort_values('Date')
+                wk_trends['Day_Label'] = wk_trends['Date'].dt.strftime('%a %m/%d')
+                
+                fig_tr = go.Figure()
+                fig_tr.add_trace(go.Scatter(x=wk_trends['Day_Label'], y=wk_trends['Player Load'], mode='lines', line=dict(color='#4895DB', width=3), showlegend=False))
+                
                 for s_t, clr in [('Practice', '#4895DB'), ('Match', '#FF8200')]:
                     sub = wk_trends[wk_trends['Session_Type'] == s_t]
-                    for _, r in sub.iterrows(): is_sel = (r['Session_Name'] == gp_g); fig_tr.add_trace(go.Scatter(x=[r['Day_Label']], y=[r['Player Load']], name=r['Session_Name'] if s_t == 'Game' else s_t, mode='markers', marker=dict(color=clr, size=16 if is_sel else 10, line=dict(width=3 if is_sel else 1, color='black' if is_sel else 'white')), showlegend=True if s_t == 'Game' else (True if _ == sub.index[0] else False)))
-                fig_tr.update_layout(height=350, margin=dict(l=0, r=0, t=20, b=0), yaxis_title="Avg Player Load"); st.plotly_chart(fig_tr, use_container_width=True, config=LOCKED_CONFIG)
+                    for _, r in sub.iterrows():
+                        is_sel = (r['Session_Name'] == gp_g)
+                        fig_tr.add_trace(go.Scatter(x=[r['Day_Label']], y=[r['Player Load']], name=r['Session_Name'] if s_t == 'Match' else s_t, mode='markers', 
+                                                   marker=dict(color=clr, size=16 if is_sel else 10, line=dict(width=3 if is_sel else 1, color='black' if is_sel else 'white')), 
+                                                   showlegend=True if s_t == 'Match' else (True if _ == sub.index[0] else False)))
+                
+                fig_tr.update_layout(height=350, margin=dict(l=0, r=0, t=20, b=0), yaxis_title="Player Load")
+                st.plotly_chart(fig_tr, use_container_width=True, config=LOCKED_CONFIG)
                 
         with tabs[6]: # Position Analysis
             st.markdown('<div class="section-header">Positional Performance Trends</div>', unsafe_allow_html=True)
