@@ -413,7 +413,7 @@ if check_password():
             main_filtered = clean_gp_data(main_filtered)
             match_filtered = clean_gp_data(match_filtered)
 
-            # --- 3. SEASON OVERALL STANDARDS ---
+            # --- 3. SEASON OVERALL STANDARDS & INTENSITY ---
             st.markdown(f"### {view_mode} Season Standards: Overall Intensity")
             if not main_filtered.empty and not match_filtered.empty:
                 s_metrics = {'Total Player Load': 'Load', 'Explosive Efforts': 'Expl.', 'Total Jumps': 'Jumps', 'Estimated Distance (y)': 'Dist'}
@@ -435,37 +435,21 @@ if check_password():
                     color = "#28a745" if perc >= 85 else "#dc3545"
                     overall_html += f"<tr><td><b>{label}</b></td><td>{p_rate:.2f}</td><td>{m_rate:.2f}</td><td style='color:{color}; font-weight:bold;'>{perc:.1f}%</td></tr>"
                 st.markdown(overall_html + "</table>", unsafe_allow_html=True)
-                
-            # --- 8. INTENSITY TABLE ---
-                st.markdown("#### Intensity Analysis (Density)")
-                week_html = """<table style="width:100%; border-collapse: collapse; text-align: center; margin-bottom: 25px;">
-                                <tr style="background-color: #f0f2f6; font-weight: bold;">
-                                    <th style="padding: 10px; border: 1px solid #ddd;">Metric (Rate/Min)</th>
-                                    <th style="padding: 10px; border: 1px solid #ddd;">Match Rate</th>
-                                    <th style="padding: 10px; border: 1px solid #ddd;">Practice Rate</th>
-                                    <th style="padding: 10px; border: 1px solid #ddd;">% Intensity</th>
-                                </tr>"""
-                                
-                for m in calc_cols:
-                    m_r, p_r = g_data_raw[m]/g_data_raw['Duration'], w_avg[m]/w_avg['Duration']
-                    perc = (p_r / m_r * 100) if m_r > 0 else 0
-                    color = "#28a745" if perc >= 90 else ("#FF8200" if perc >= 75 else "#dc3545")
-                    week_html += f"<tr><td><b>{metrics_dict[m]}</b></td><td>{m_r:.2f}</td><td>{p_r:.2f}</td><td style='color:{color}; font-weight:bold;'>{perc:.1f}%</td></tr>"
-                st.markdown(week_html + "</table>", unsafe_allow_html=True)
 
                 # --- 4. METHODOLOGY GUIDE ---
                 with st.expander("ℹ️ Coaches' Guide: How to read these metrics"):
                     st.markdown("""
                     **1. The +/- (Delta) Meaning:**
-                    * **Positive (+):** The Match volume was HIGHER than practice average.
-                    * **Negative (-):** The Match volume was LOWER than practice average.
-                    **2. Intensity (Rate per Minute):** `[Total Volume] / [Duration] = Rate/Min`.
-                    **3. Color Logic:** Green (90%+), Orange (75-89%), Red (<75%).
+                    * **Positive (+):** Match volume was HIGHER than practice average (The extra 'Game Day' load).
+                    * **Negative (-):** Match volume was LOWER than practice average.
+                    **2. Intensity (Rate per Minute):** `[Total Volume] / [Duration] = Rate/Min`. 
+                    **3. Why is % Intensity sometimes over 100%?** Practices pack work into a shorter window with fewer rest periods than a game.
+                    **4. Color Logic:** Green (90%+ Speed), Orange (75-89% Tactical), Red (<75% Recovery).
                     """, unsafe_allow_html=True)
 
             st.divider()
 
-            # --- 5. WEEKLY FILTERS (REVERTED TO INDIVIDUAL SESSION SELECTION) ---
+            # --- 5. WEEKLY FILTERS ---
             with c_week:
                 w_r = df.groupby('Week')['Date'].agg(['min', 'max']).reset_index()
                 w_r['L'] = w_r.apply(lambda x: f"{x['Week']} ({x['min'].strftime('%m/%d')} - {x['max'].strftime('%m/%d')})", axis=1)
@@ -473,12 +457,10 @@ if check_password():
                 sel_w = w_r[w_r['L'] == gp_w]['Week'].values[0]
 
             with c_match:
-                # Individual Session Selection (Handles multiple games on one day as separate choices)
                 match_options = match_filtered[match_filtered['Week'] == sel_w].copy()
                 if not match_options.empty:
                     match_options['Display'] = match_options.apply(lambda x: f"{x['Date'].strftime('%m/%d')} - {x['Session_Name']}", axis=1)
                     sel_match_display = st.selectbox("Select Specific Match", match_options['Display'].tolist(), key="gp_g_vf")
-                    # Retrieve the specific row based on the selection
                     g_data_raw = match_options[match_options['Display'] == sel_match_display].iloc[0]
                 else:
                     g_data_raw = None
@@ -490,8 +472,24 @@ if check_password():
                 calc_cols = list(metrics_dict.keys())
                 w_avg = w_data[calc_cols + ['Duration']].mean()
 
-                # --- 6. VOLUME CARDS ---
-                st.markdown(f"### Match Volume Analysis: {g_data_raw['Session_Name']}")
+                # --- 6. INTENSITY ANALYSIS (Moved under seasonal standards per request) ---
+                st.markdown(f"#### Week {sel_w} Match Intensity (Density of Work)")
+                week_html = """<table style="width:100%; border-collapse: collapse; text-align: center; margin-bottom: 25px;">
+                                <tr style="background-color: #f0f2f6; font-weight: bold;">
+                                    <th style="padding: 10px; border: 1px solid #ddd;">Metric (Rate/Min)</th>
+                                    <th style="padding: 10px; border: 1px solid #ddd;">Match Rate</th>
+                                    <th style="padding: 10px; border: 1px solid #ddd;">Practice Rate</th>
+                                    <th style="padding: 10px; border: 1px solid #ddd;">% Intensity</th>
+                                </tr>"""
+                for m in calc_cols:
+                    m_r, p_r = g_data_raw[m]/g_data_raw['Duration'], w_avg[m]/w_avg['Duration']
+                    perc = (p_r / m_r * 100) if m_r > 0 else 0
+                    color = "#28a745" if perc >= 90 else ("#FF8200" if perc >= 75 else "#dc3545")
+                    week_html += f"<tr><td><b>{metrics_dict[m]}</b></td><td>{m_r:.2f}</td><td>{p_r:.2f}</td><td style='color:{color}; font-weight:bold;'>{perc:.1f}%</td></tr>"
+                st.markdown(week_html + "</table>", unsafe_allow_html=True)
+
+                # --- 7. VOLUME CARDS ---
+                st.markdown(f"### Total Volume Gap: {g_data_raw['Session_Name']}")
                 m_cols = st.columns(4)
                 for i, (raw_col, label) in enumerate(metrics_dict.items()):
                     with m_cols[i]:
@@ -504,7 +502,7 @@ if check_password():
                             <p style="margin:0; font-weight:bold; color:{d_color};">{'+' if delta > 0 else ''}{delta:.0f} vs Practice</p>
                         </div>""", unsafe_allow_html=True)
 
-                # --- 7. GROUPED BAR CHART ---
+                # --- 8. VOLUME COMPARISON BAR CHART ---
                 st.markdown("#### Volume Comparison Chart")
                 fig_bar = make_subplots(specs=[[{"secondary_y": True}]])
                 bar_m = ['Total Player Load', 'Explosive Efforts', 'Total Jumps']
@@ -515,7 +513,7 @@ if check_password():
                 fig_bar.update_layout(barmode='group', height=400, template="simple_white", legend=dict(orientation="h", y=-0.2, x=0.5, xanchor="center"))
                 st.plotly_chart(fig_bar, use_container_width=True)
 
-                # --- 9. TREND GRAPH ---
+                # --- 9. TREND LINE GRAPH ---
                 st.markdown("#### Weekly Load Progression")
                 combined_wk = pd.concat([w_data, match_filtered[match_filtered['Week'] == sel_w]])
                 wk_trends = combined_wk.groupby(['Date']).agg({m: 'sum' for m in ['Total Player Load', 'Total Jumps', 'Explosive Efforts']}).reset_index().sort_values('Date')
@@ -528,7 +526,7 @@ if check_password():
                 fig_tr.update_layout(height=400, template="simple_white", legend=dict(orientation="h", y=-0.3, x=0.5, xanchor="center"))
                 st.plotly_chart(fig_tr, use_container_width=True)
             else:
-                st.info("Missing data for the current selection.")
+                st.info("Ensure both Practice and Match data exist for the selected athlete and week.")
                 
                 
                 
