@@ -1139,7 +1139,7 @@ if check_password():
                                 st.plotly_chart(fig_p, use_container_width=True, config={'displayModeBar': False}, key=f"team_card_{name}_{sel_week}")
 
 
-           with tabs[9]: # Tab 7: CMJ Comparison
+        with tabs[9]: # Tab 7: CMJ Comparison
             st.markdown('<div class="section-header">CMJ Baseline vs. Post-Match Recovery</div>', unsafe_allow_html=True)
             
             if cmj_df is not None and not cmj_df.empty:
@@ -1185,7 +1185,7 @@ if check_password():
                     comparison_list = []
                     for _, row in post_match_cmj.iterrows():
                         diff_val = row[cmj_col] - base_row[cmj_col]
-                        status = "✅ Recovered" if diff_val >= 0 else "⚠️ Fatigued"
+                        status = "Recovered" if diff_val >= 0 else "Fatigued"
                         
                         comparison_list.append({
                             "Date": row['Test Date'].strftime('%Y-%m-%d'),
