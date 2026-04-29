@@ -462,7 +462,7 @@ if check_password():
                     st.plotly_chart(fig_dual, use_container_width=True)
 
                 # --- 6. WEEKLY TRENDS (MULTI-LINE WITH LEGEND) ---
-                st.markdown("#### Weekly Multi-Metric Progression")
+                st.markdown("#### Weekly Progression")
                 combined_wk = pd.concat([w_data, g_data_l])
                 wk_trends = combined_wk.groupby(['Date', 'Session_Name']).agg({
                     'Total Player Load': 'mean',
