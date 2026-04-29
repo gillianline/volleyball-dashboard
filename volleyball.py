@@ -1144,19 +1144,13 @@ if check_password():
             
             if cmj_df is not None and not cmj_df.empty:
                 # --- 1. SELECTION FILTERS ---
-                c_cmj1, c_cmj2 = st.columns(2)
-                with c_cmj1:
-                    all_ath_cmj = sorted(cmj_df['Athlete'].unique())
-                    sel_ath_cmj = st.selectbox("Select Athlete", all_ath_cmj, key="cmj_tab_ath")
+                all_ath_cmj = sorted(cmj_df['Athlete'].unique())
+                sel_ath_cmj = st.selectbox("Select Athlete", all_ath_cmj, key="cmj_tab_ath")
                 
-                # Filter data for selected athlete
                 ath_cmj_data = cmj_df[cmj_df['Athlete'] == sel_ath_cmj].sort_values('Test Date')
-                
-                # Identify the Baseline (Week 4)
                 baseline_cmj = ath_cmj_data[ath_cmj_data['Week'] == 4]
                 
-                # Identify Post-Match Jumps (Filtering for sessions labeled Match/Game or by date)
-                # Note: Adjust 'Session Type' or 'Match Day' based on your specific column name
+                # Filter for jumps occurring after the Week 4 baseline
                 post_match_cmj = ath_cmj_data[ath_cmj_data['Week'] > 4] 
 
                 if not baseline_cmj.empty:
@@ -1164,68 +1158,95 @@ if check_password():
                     cmj_col = 'Jump Height (Imp-Mom) [cm]'
                     rsi_col = 'RSI-modified [m/s]'
                     
-                    # --- 2. SUMMARY TOP CARDS ---
-                    st.markdown("### Performance Gap: Baseline vs. Latest Post-Match")
+                    # --- 2. SUMMARY METRICS ---
+                    st.markdown("### Performance vs. Week 4 Baseline")
                     latest_post = post_match_cmj.iloc[-1] if not post_match_cmj.empty else None
                     
                     if latest_post is not None:
-                        # Calculation
                         h_diff = ((latest_post[cmj_col] - base_row[cmj_col]) / base_row[cmj_col]) * 100
                         rsi_diff = ((latest_post[rsi_col] - base_row[rsi_col]) / base_row[rsi_col]) * 100
                         
                         m1, m2, m3 = st.columns(3)
-                        m1.metric("Baseline Height (Wk 4)", f"{base_row[cmj_col]:.1f} cm")
-                        m2.metric("Post-Match Height", f"{latest_post[cmj_col]:.1f} cm", f"{h_diff:+.1f}%")
+                        m1.metric("Wk 4 Baseline", f"{base_row[cmj_col]:.1f} cm")
+                        m2.metric("Latest Jump", f"{latest_post[cmj_col]:.1f} cm", f"{h_diff:+.1f}%")
                         m3.metric("RSI Recovery", f"{latest_post[rsi_col]:.2f}", f"{rsi_diff:+.1f}%")
 
-                    # --- 3. COMPARISON TABLE ---
-                    st.markdown("#### Jump History vs. Baseline")
+                    # --- 3. COMPARISON TABLE WITH PREVIOUS MATCH ---
+                    st.markdown("#### Jump History & Match Context")
                     
-                    # Create a display table where every row is compared back to Week 4
                     comparison_list = []
                     for _, row in post_match_cmj.iterrows():
+                        jump_date = pd.to_datetime(row['Test Date'])
+                        
+                        # Logic to find the name of the match directly preceding this jump
+                        # We look in the main 'df' for sessions where date < jump_date
+                        try:
+                            prev_matches = df[(df['Name'] == sel_ath_cmj) & 
+                                              (df['Date'] < jump_date) & 
+                                              (df['Session_Name'].str.contains('Match|Game', case=False, na=False))]
+                            
+                            prev_match_name = prev_matches.sort_values('Date', ascending=False).iloc[0]['Session_Name']
+                        except:
+                            prev_match_name = "N/A"
+
                         diff_val = row[cmj_col] - base_row[cmj_col]
-                        status = "Recovered" if diff_val >= 0 else "Fatigued"
                         
                         comparison_list.append({
-                            "Date": row['Test Date'].strftime('%Y-%m-%d'),
+                            "Date": jump_date.strftime('%Y-%m-%d'),
+                            "Prev Match": prev_match_name,
                             "Jump Height": f"{row[cmj_col]:.1f} cm",
                             "Vs. Baseline": f"{diff_val:+.1f} cm",
-                            "RSI": f"{row[rsi_col]:.2f}",
-                            "Status": status
+                            "RSI": f"{row[rsi_col]:.2f}"
                         })
                     
                     # Manual HTML Table for Centering
                     cmj_table_html = """<table style="width:100%; border-collapse: collapse; text-align: center;">
                                         <tr style="background-color: #f0f2f6; font-weight: bold;">
-                                            <th style="padding: 10px; border: 1px solid #ddd;">Date</th>
+                                            <th style="padding: 10px; border: 1px solid #ddd;">Jump Date</th>
+                                            <th style="padding: 10px; border: 1px solid #ddd;">Previous Match</th>
                                             <th style="padding: 10px; border: 1px solid #ddd;">Jump Height</th>
                                             <th style="padding: 10px; border: 1px solid #ddd;">Vs. Baseline</th>
                                             <th style="padding: 10px; border: 1px solid #ddd;">RSI</th>
-                                            <th style="padding: 10px; border: 1px solid #ddd;">Status</th>
                                         </tr>"""
                     for item in comparison_list:
-                        color = "#28a745" if "Recovered" in item['Status'] else "#dc3545"
+                        # Color code the difference value
+                        val_float = float(item['Vs. Baseline'].replace(' cm', ''))
+                        color = "#28a745" if val_float >= 0 else "#dc3545"
+                        
                         cmj_table_html += f"""<tr>
                             <td style="padding: 10px; border: 1px solid #ddd;">{item['Date']}</td>
+                            <td style="padding: 10px; border: 1px solid #ddd;">{item['Prev Match']}</td>
                             <td style="padding: 10px; border: 1px solid #ddd;">{item['Jump Height']}</td>
                             <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold; color: {color};">{item['Vs. Baseline']}</td>
                             <td style="padding: 10px; border: 1px solid #ddd;">{item['RSI']}</td>
-                            <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold; color: {color};">{item['Status']}</td>
                         </tr>"""
                     cmj_table_html += "</table>"
                     st.markdown(cmj_table_html, unsafe_allow_html=True)
 
-                    # --- 4. VISUAL TREND ---
-                    st.markdown("#### Jump Height Trend")
+                    # --- 4. VISUAL TREND (Clean Graph) ---
+                    st.markdown("#### Recovery Trendline")
                     fig_cmj = go.Figure()
-                    # All Jumps
-                    fig_cmj.add_trace(go.Scatter(x=ath_cmj_data['Test Date'], y=ath_cmj_data[cmj_col], name="Jump Height", line=dict(color='#4895DB', width=3)))
-                    # Baseline Line
-                    fig_cmj.add_hline(y=base_row[cmj_col], line_dash="dash", line_color="red", annotation_text="Week 4 Baseline")
                     
-                    fig_cmj.update_layout(height=350, template="simple_white", margin=dict(l=10, r=10, t=30, b=10))
-                    st.plotly_chart(fig_cmj, use_container_width=True)
+                    # Jump Height Trace
+                    fig_cmj.add_trace(go.Scatter(
+                        x=ath_cmj_data['Test Date'], 
+                        y=ath_cmj_data[cmj_col], 
+                        name="Jump Height", 
+                        line=dict(color='#4895DB', width=3),
+                        mode='lines+markers'
+                    ))
+                    
+                    # Baseline Line (Removed the text label annotation as requested)
+                    fig_cmj.add_hline(y=base_row[cmj_col], line_dash="dash", line_color="red")
+                    
+                    fig_cmj.update_layout(
+                        height=350, 
+                        template="simple_white", 
+                        margin=dict(l=10, r=10, t=30, b=10),
+                        xaxis_title="Date",
+                        yaxis_title="Height (cm)"
+                    )
+                    st.plotly_chart(fig_cmj, use_container_width=True, key="cmj_recovery_trend")
 
                 else:
                     st.warning(f"No Week 4 Baseline data found for {sel_ath_cmj}.")
