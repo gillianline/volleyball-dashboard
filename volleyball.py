@@ -437,28 +437,16 @@ if check_password():
                     overall_html += f"<tr><td><b>{label}</b></td><td>{p_rate:.2f}</td><td>{m_rate:.2f}</td><td style='color:{color}; font-weight:bold;'>{perc:.1f}%</td></tr>"
                 st.markdown(overall_html + "</table>", unsafe_allow_html=True)
 
-                # --- 4. METHODOLOGY GUIDE (WITH RESTORED DELTA MEANING) ---
-                with st.expander("Coaches' Guide: How to read these metrics"):
+                with st.expander("ℹ️ Coaches' Guide: How is Intensity Calculated?"):
                     st.markdown("""
-                    **1. The +/- (Delta) Meaning:**
-                    * **Positive (+):** The Match volume was **HIGHER** than the practice average. This represents the 'extra' work performed on game day.
-                    * **Negative (-):** The Match volume was **LOWER** than the average training day.
+                    **The Work Index Formula:** `[Total Volume] / [Duration] = Rate/Min`.
                     
-                    **2. Intensity (Rate per Minute):**
-                    `[Total Volume] / [Duration] = Rate/Min`. This allows us to compare a long game to a short practice fairly.
-                    
-                    **3. Why is % Intensity sometimes over 100%?**
-                    Practices pack work into a shorter window (rapid drills with no timeouts), whereas matches have halftime, timeouts, and play stoppages.
-                    
-                    **4. Color Logic:**
-                    * <span style="color:#28a745">**Green (90%+):**</span> Game Speed simulation.
-                    * <span style="color:#FF8200">**Orange (75-89%):**</span> Technical/Tactical prep.
-                    * <span style="color:#dc3545">**Red (<75%):**</span> Recovery day pace.
-                    """, unsafe_allow_html=True)
+                    **Why over 100%?** Practices pack work into a shorter window with fewer rest periods, packing more movement density into each minute than a full game typically does.
+                    """)
 
             st.divider()
 
-            # --- 5. WEEKLY FILTERS ---
+            # --- 4. WEEKLY FILTERS ---
             with c_week:
                 w_r = df.groupby('Week')['Date'].agg(['min', 'max']).reset_index()
                 w_r['L'] = w_r.apply(lambda x: f"{x['Week']} ({x['min'].strftime('%m/%d')} - {x['max'].strftime('%m/%d')})", axis=1)
@@ -481,7 +469,7 @@ if check_password():
                 calc_cols = list(metrics_dict.keys())
                 w_avg = w_data[calc_cols + ['Duration']].mean()
 
-                # --- 6. INTENSITY TABLE ---
+                # --- 5. INTENSITY TABLE ---
                 st.markdown(f"#### Week {sel_w} Match Intensity (Density)")
                 week_html = """<table style="width:100%; border-collapse: collapse; text-align: center; margin-bottom: 25px;">
                                 <tr style="background-color: #f0f2f6; font-weight: bold;">
@@ -497,8 +485,20 @@ if check_password():
                     week_html += f"<tr><td><b>{metrics_dict[m]}</b></td><td>{m_r:.2f}</td><td>{p_r:.2f}</td><td style='color:{color}; font-weight:bold;'>{perc:.1f}%</td></tr>"
                 st.markdown(week_html + "</table>", unsafe_allow_html=True)
 
-                # --- 7. VOLUME CARDS (RED/GREEN DELTA INDICATORS) ---
-                st.markdown(f"### Total Volume Gap: {g_data_raw['Session_Name']}")
+                # --- 6. STANDALONE TERMINOLOGY KEY (RE-SEPARATED) ---
+                st.markdown("### Total Volume Gap Analysis")
+                st.markdown("""
+                    <div style="background-color: #eef2f6; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+                        <p style="margin: 0; font-weight: bold; color: #31333F;">Understanding the +/- (Delta) Meaning:</p>
+                        <ul style="margin: 5px 0 0 20px; font-size: 14px; color: #555;">
+                            <li><b>Positive (+):</b> The Match volume was <b>HIGHER</b> than the weekly practice average (represents 'game spike').</li>
+                            <li><b>Negative (-):</b> The Match volume was <b>LOWER</b> than the average practice session.</li>
+                        </ul>
+                    </div>
+                """, unsafe_allow_html=True)
+
+                # --- 7. VOLUME CARDS ---
+                st.markdown(f"**Match Data: {g_data_raw['Session_Name']}**")
                 m_cols = st.columns(4)
                 for i, (raw_col, label) in enumerate(metrics_dict.items()):
                     with m_cols[i]:
@@ -511,8 +511,8 @@ if check_password():
                             <p style="margin:0; font-weight:bold; color:{d_color};">{'+' if delta > 0 else ''}{delta:.0f} vs Practice</p>
                         </div>""", unsafe_allow_html=True)
 
-                # --- 8. GROUPED BAR CHART ---
-                st.markdown("#### Volume Comparison Chart")
+                # --- 8. VOLUME COMPARISON BAR CHART ---
+                st.markdown("#### Practice vs. Match Volume Breakdown")
                 fig_bar = make_subplots(specs=[[{"secondary_y": True}]])
                 bar_m = ['Total Player Load', 'Explosive Efforts', 'Total Jumps']
                 fig_bar.add_trace(go.Bar(x=[metrics_dict[m] for m in bar_m], y=[w_avg[m] for m in bar_m], name="Weekly Practice Avg", marker_color='#4895DB', offsetgroup=1), secondary_y=False)
@@ -522,7 +522,7 @@ if check_password():
                 fig_bar.update_layout(barmode='group', height=400, template="simple_white", legend=dict(orientation="h", y=-0.2, x=0.5, xanchor="center"))
                 st.plotly_chart(fig_bar, use_container_width=True)
 
-                # --- 9. MULTI-LINE TREND GRAPH ---
+                # --- 9. TREND LINE GRAPH ---
                 st.markdown("#### Weekly Progression")
                 combined_wk = pd.concat([w_data, match_filtered[match_filtered['Week'] == sel_w]])
                 wk_trends = combined_wk.groupby(['Date']).agg({m: 'sum' for m in ['Total Player Load', 'Total Jumps', 'Explosive Efforts']}).reset_index().sort_values('Date')
@@ -534,9 +534,6 @@ if check_password():
                 fig_tr.add_trace(go.Scatter(x=wk_trends['Day'], y=wk_trends['Explosive Efforts'], mode='lines+markers', name="Explosive Efforts", line=dict(color='#28a745', width=2, dash='dash')))
                 fig_tr.update_layout(height=400, template="simple_white", legend=dict(orientation="h", y=-0.3, x=0.5, xanchor="center"))
                 st.plotly_chart(fig_tr, use_container_width=True)
-            else:
-                st.info("No matching data found for the current selection.")
-                
                 
                 
         with tabs[6]: # Position Analysis
