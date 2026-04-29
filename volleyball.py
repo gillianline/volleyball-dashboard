@@ -414,7 +414,7 @@ if check_password():
             match_filtered = clean_gp_data(match_filtered)
 
             # --- 4. DEEP-DIVE METHODOLOGY GUIDE ---
-            with st.expander("ℹ️ In-Depth: Understanding Prep Intensity vs. Game Speed"):
+            with st.expander("The Calculations"):
                 st.markdown("""
                 #### **How the Intensity % Works**
                 We don't compare total volume (because games are longer). We compare **Density**.
