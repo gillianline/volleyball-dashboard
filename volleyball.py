@@ -388,33 +388,44 @@ if check_password():
                 gp_w = st.selectbox("Week", w_r['L'].tolist(), key="gp_w_vf")
                 sel_w = w_r[w_r['L'] == gp_w]['Week'].values[0]
             with c_gg: 
-                # Games now pull from match_df
-                game_opts = match_df[(match_df['Name'] == gp_p) & (match_df['Week'] == sel_w)]['Session_Name'].unique()
+                # Filters matches specifically for the chosen athlete and week
+                game_opts = match_df[(match_df['Name'] == gp_p) & (match_df['Week'] == sel_w)]['Session_Name'].unique() if not match_df.empty else []
                 gp_g = st.selectbox("Select Specific Match", game_opts, key="gp_g_vf")
             
-            # --- 2. DATA SYNC & CLEANING ---
+            # --- 2. DATA SYNC & COLUMN MAPPING ---
+            # Define your exact sheet headers vs the short names we use for the table
+            header_map = {
+                'Total Player Load': 'Player Load',
+                'Explosive Efforts': 'Explosive Efforts',
+                'Total Jumps': 'Total Jumps',
+                'Estimated Distance (y)': 'Estimated Distance (y)'
+            }
+            # The keys used for calculations
+            calc_metrics = ['Total Player Load', 'Explosive Efforts', 'Total Jumps']
+            
             w_data = df[(df['Name'] == gp_p) & (df['Session_Type'] == 'Practice') & (df['Week'] == sel_w)].copy()
             g_data_l = match_df[(match_df['Name'] == gp_p) & (match_df['Session_Name'] == gp_g)].copy()
-            
-            # Force 'Duration' to numeric and handle missing values to avoid sync errors
+
+            # Fix Duration sync and clean numeric data
             for dff in [w_data, g_data_l]:
                 if not dff.empty:
-                    if 'Duration' in dff.columns:
-                        dff['Duration'] = pd.to_numeric(dff['Duration'], errors='coerce').fillna(0)
-            
+                    dff['Duration'] = pd.to_numeric(dff['Duration'], errors='coerce').fillna(0)
+                    for m in calc_metrics + ['Estimated Distance (y)']:
+                        if m in dff.columns:
+                            dff[m] = pd.to_numeric(dff[m], errors='coerce').fillna(0)
+
             if not w_data.empty and not g_data_l.empty:
-                metrics = ['Player Load', 'Explosive Efforts', 'Total Jumps']
                 g_d = g_data_l.iloc[0]
                 
-                # --- 3. WORK INDEX (PER MINUTE) CALCULATIONS ---
+                # --- 3. WORK INDEX CALCULATIONS ---
                 g_mins = g_d['Duration'] if g_d['Duration'] > 0 else 1
-                g_rates = {m: g_d[m] / g_mins for m in metrics}
+                g_rates = {m: g_d[m] / g_mins for m in calc_metrics}
                 
                 w_avg_mins = w_data['Duration'].mean() if w_data['Duration'].mean() > 0 else 1
-                w_avg_vals = w_data[metrics].mean()
-                w_rates = {m: w_avg_vals[m] / w_avg_mins for m in metrics}
+                w_avg_vals = w_data[calc_metrics].mean()
+                w_rates = {m: w_avg_vals[m] / w_avg_mins for m in calc_metrics}
 
-                # --- 4. INTENSITY COMPARISON TABLE (Manual HTML for Centering) ---
+                # --- 4. INTENSITY COMPARISON TABLE ---
                 st.markdown("### Work Index Comparison (Intensity per Minute)")
                 
                 matrix_html = f"""
@@ -426,73 +437,58 @@ if check_password():
                         <th style="padding: 12px; border: 1px solid #ddd;">% Match Intensity</th>
                     </tr>"""
                 
-                for m in metrics:
+                for m in calc_metrics:
                     m_rate, p_rate = g_rates[m], w_rates[m]
                     perc = (p_rate / m_rate * 100) if m_rate > 0 else 0
                     color = "#28a745" if perc >= 90 else ("#FF8200" if perc >= 75 else "#dc3545")
                     
                     matrix_html += f"""
                     <tr>
-                        <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold;">{m}</td>
+                        <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold;">{header_map[m]}</td>
                         <td style="padding: 10px; border: 1px solid #ddd;">{m_rate:.2f}</td>
                         <td style="padding: 10px; border: 1px solid #ddd;">{p_rate:.2f}</td>
                         <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold; color: {color};">{perc:.1f}%</td>
                     </tr>"""
                 
-                matrix_html += "</table>"
-                st.markdown(matrix_html, unsafe_allow_html=True)
+                st.markdown(matrix_html + "</table>", unsafe_allow_html=True)
 
-                # --- 5. TOTAL VOLUME METRICS ---
+                # --- 5. TOTAL VOLUME METRICS & GRAPHS ---
                 cg1, cg2 = st.columns([1, 2.2])
                 with cg1:
                     st.markdown("#### Match Volume Output")
-                    for m in metrics + ['Estimated Distance (y)']:
+                    for m in calc_metrics + ['Estimated Distance (y)']:
                         m_val = g_d[m]
                         w_val = w_data[m].mean() if m in w_data.columns else 0
-                        delta_val = w_val - m_val
-                        st.metric(label=m, value=f"{m_val:.0f}", delta=f"{delta_val:+.0f} vs Wk Avg")
+                        st.metric(label=header_map.get(m, m), value=f"{m_val:.0f}", delta=f"{(w_val - m_val):+.0f} vs Wk Avg")
                 
                 with cg2:
                     fig_dual = make_subplots(specs=[[{"secondary_y": True}]])
+                    # Bars for Load, Efforts, Jumps
+                    fig_dual.add_trace(go.Bar(x=[header_map[m] for m in calc_metrics], y=[w_avg_vals[m] for m in calc_metrics], name="Weekly Practice Avg", marker_color='#4895DB', offsetgroup=1), secondary_y=False)
+                    fig_dual.add_trace(go.Bar(x=[header_map[m] for m in calc_metrics], y=[g_d[m] for m in calc_metrics], name="Match Output", marker_color='#FF8200', offsetgroup=2), secondary_y=False)
                     
-                    # Primary Metrics (Left Axis)
-                    fig_dual.add_trace(go.Bar(x=metrics, y=[w_avg_vals[m] for m in metrics], name="Weekly Practice Avg", marker_color='#4895DB', offsetgroup=1), secondary_y=False)
-                    fig_dual.add_trace(go.Bar(x=metrics, y=[g_d[m] for m in metrics], name="Match Output", marker_color='#FF8200', offsetgroup=2), secondary_y=False)
+                    # Distance on Secondary Axis
+                    d_col = 'Estimated Distance (y)'
+                    fig_dual.add_trace(go.Bar(x=['Distance (y)'], y=[w_data[d_col].mean()], name="Wkly Dist", marker=dict(color='#4895DB', opacity=0.3), offsetgroup=1), secondary_y=True)
+                    fig_dual.add_trace(go.Bar(x=['Distance (y)'], y=[g_d[d_col]], name="Match Dist", marker=dict(color='#FF8200', opacity=0.3), offsetgroup=2), secondary_y=True)
                     
-                    # Distance Ghost Bars (Right Axis)
-                    dist_col = 'Estimated Distance (y)'
-                    fig_dual.add_trace(go.Bar(x=[dist_col], y=[w_data[dist_col].mean()], name="Wkly Dist", marker=dict(color='#4895DB', opacity=0.3), offsetgroup=1), secondary_y=True)
-                    fig_dual.add_trace(go.Bar(x=[dist_col], y=[g_d[dist_col]], name="Match Dist", marker=dict(color='#FF8200', opacity=0.3), offsetgroup=2), secondary_y=True)
-                    
-                    fig_dual.update_layout(barmode='group', height=380, margin=dict(l=0, r=0, t=20, b=0), template="simple_white", legend=dict(orientation="h", y=-0.2, x=0.5, xanchor="center"))
+                    fig_dual.update_layout(barmode='group', height=380, template="simple_white", legend=dict(orientation="h", y=-0.2, x=0.5, xanchor="center"))
                     st.plotly_chart(fig_dual, use_container_width=True, config=LOCKED_CONFIG)
 
-                # --- 6. DAILY PRACTICE TO MATCH TRENDS ---
+                # --- 6. WEEKLY LOAD TREND ---
                 st.markdown("#### Weekly Load Progression")
                 combined_wk = pd.concat([w_data, g_data_l])
-                wk_trends = combined_wk.groupby(['Date', 'Session_Name', 'Session_Type']).agg({'Player Load': 'mean'}).reset_index().sort_values('Date')
+                wk_trends = combined_wk.groupby(['Date', 'Session_Name', 'Session_Type']).agg({'Total Player Load': 'mean'}).reset_index().sort_values('Date')
                 wk_trends['Day_Label'] = wk_trends['Date'].dt.strftime('%a %m/%d')
                 
                 fig_tr = go.Figure()
-                fig_tr.add_trace(go.Scatter(x=wk_trends['Day_Label'], y=wk_trends['Player Load'], mode='lines', line=dict(color='#4895DB', width=3), showlegend=False))
+                fig_tr.add_trace(go.Scatter(x=wk_trends['Day_Label'], y=wk_trends['Total Player Load'], mode='lines+markers', line=dict(color='#4895DB', width=3), name="Load Trend"))
                 
-                for s_t, clr in [('Practice', '#4895DB'), ('Match', '#FF8200')]:
-                    sub = wk_trends[wk_trends['Session_Type'] == s_t]
-                    for _, r in sub.iterrows():
-                        is_sel = (r['Session_Name'] == gp_g)
-                        fig_tr.add_trace(go.Scatter(
-                            x=[r['Day_Label']], y=[r['Player Load']], 
-                            name=r['Session_Name'] if s_t == 'Match' else s_t, 
-                            mode='markers', 
-                            marker=dict(color=clr, size=16 if is_sel else 10, line=dict(width=3 if is_sel else 1, color='black' if is_sel else 'white')), 
-                            showlegend=True if s_t == 'Match' else (True if _ == sub.index[0] else False)
-                        ))
-                
-                fig_tr.update_layout(height=350, margin=dict(l=0, r=0, t=20, b=0), yaxis_title="Player Load")
+                fig_tr.update_layout(height=350, margin=dict(l=0, r=0, t=20, b=0), yaxis_title="Total Player Load")
                 st.plotly_chart(fig_tr, use_container_width=True, config=LOCKED_CONFIG)
             
             else:
-                st.warning("Ensure both Practice data and Match data exist for this athlete in the selected week.")
+                st.info("Please select an athlete and week that contains both Match and Practice data.")
                 
         with tabs[6]: # Position Analysis
             st.markdown('<div class="section-header">Positional Performance Trends</div>', unsafe_allow_html=True)
