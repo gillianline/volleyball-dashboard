@@ -539,6 +539,37 @@ if check_password():
                 fig_tr.add_trace(go.Scatter(x=wk_trends['Day'], y=wk_trends['Explosive Efforts'], mode='lines+markers', name="Explosive Efforts", line=dict(color='#28a745', width=2, dash='dash')))
                 fig_tr.update_layout(height=400, template="simple_white", legend=dict(orientation="h", y=-0.3, x=0.5, xanchor="center"))
                 st.plotly_chart(fig_tr, use_container_width=True)
+
+                # --- 11. DYNAMIC COACHING NOTES ---
+                st.markdown("### Performance & Recovery Insights")
+                
+                # Logic-based notes
+                notes = []
+                
+                # 1. Volume Spike Check
+                if (g_data_raw['Total Player Load'] / w_avg['Total Player Load']) > 1.5:
+                    notes.append("⚠️ **High Volume Alert:** Match Load exceeded Practice Average by over 50%. Prioritize CNS recovery and monitor muscle soreness over the next 48 hours.")
+                
+                # 2. Intensity Paradox Check (The 'Vandy' Effect)
+                if (w_avg['Total Player Load'] / g_data_raw['Duration']) > (g_data_raw['Total Player Load'] / g_data_raw['Duration']):
+                    notes.append("🏃 **Density Note:** Practice density is currently higher than Match density. This suggests athletes are well-prepared for the 'speed' of the game, but the total duration of the match is the primary stressor.")
+                
+                # 3. Explosive Outlier Check
+                exp_perc = (w_avg['Explosive Efforts'] / w_avg['Duration']) / (g_data_raw['Explosive Efforts'] / g_data_raw['Duration']) * 100
+                if exp_perc > 150:
+                    notes.append(f"💥 **Explosive Over-Prep:** Practice Explosive Intensity is at {exp_perc:.1f}% of Match speed. Consider tapering high-rep acceleration drills if approaching a high-stakes fixture.")
+
+                # 4. Jump Loading
+                if g_data_raw['Total Jumps'] > (w_avg['Total Jumps'] + 20):
+                    notes.append("🚀 **Jump Load:** Significant increase in vertical demands during this match. Check for patellar tendon sensitivity.")
+
+                # Display the notes in a clean container
+                if notes:
+                    with st.container():
+                        for note in notes:
+                            st.write(note)
+                else:
+                    st.success("✅ Training loads are well-aligned with match demands. No significant outliers detected.")
                 
                 
         with tabs[6]: # Position Analysis
