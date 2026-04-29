@@ -428,7 +428,7 @@ if check_password():
             # --- 3. SEASON OVERALL STANDARDS ---
             st.markdown(f"### {view_mode} Season Standards: Overall Intensity")
             if not main_filtered.empty and not match_filtered.empty:
-                s_metrics = {'Total Player Load': 'Load', 'Explosive Efforts': 'Expl.', 'Total Jumps': 'Jumps', 'Estimated Distance (y)': 'Dist'}
+                s_metrics = {'Total Player Load': 'Player Load', 'Explosive Efforts': 'Explosive Efforts', 'Total Jumps': 'Total Jumps', 'Estimated Distance (y)': 'Estimated Dist.'}
                 s_calc = list(s_metrics.keys())
                 s_prac_all = main_filtered[main_filtered['Session_Type'] == 'Practice']
                 s_p_avg = s_prac_all[s_calc + ['Duration']].mean()
