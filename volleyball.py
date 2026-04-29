@@ -470,7 +470,7 @@ if check_password():
             w_data = main_filtered[(main_filtered['Session_Type'] == 'Practice') & (main_filtered['Week'] == sel_w)].copy()
 
             if not w_data.empty and g_data_raw is not None:
-                metrics_dict = {'Total Player Load': 'Player Load', 'Explosive Efforts': 'Explosive Efforts', 'Total Jumps': 'Total Jumps', 'Estimated Distance (y)': 'Distance (y)'}
+                metrics_dict = {'Total Player Load': 'Player Load', 'Explosive Efforts': 'Explosive Efforts', 'Total Jumps': 'Total Jumps', 'Estimated Distance (y)': 'Estimated Dist.'}
                 calc_cols = list(metrics_dict.keys())
                 w_avg = w_data[calc_cols + ['Duration']].mean()
 
