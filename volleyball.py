@@ -148,7 +148,7 @@ if check_password():
         st.markdown('<div class="main-logo-container" style="text-align: center; margin-top: 10px; margin-bottom: 15px;"><img src="https://upload.wikimedia.org/wikipedia/commons/thumb/f/fc/Tennessee_Lady_Volunteers_logo.svg/1280px-Tennessee_Lady_Volunteers_logo.svg.png" width="120"><div style="color: #FF8200; font-size: 2rem; font-weight: 900; margin-top: 10px;">LADY VOLS VOLLEYBALL PERFORMANCE</div></div>', unsafe_allow_html=True)
 
         
-        tabs = st.tabs(["Individual Profile", "Practice Scores", "Practice Score History", "Match v. Practice", "Position Analysis", "Match Summary", "Phase Analysis", "Practice Planner", "Practice Red Flags-TESTING", "Counter Movement Jumps"])
+        tabs = st.tabs(["Individual Profile", "Practice Scores", "Practice Score History", "Counter Movement Jumps", "Match v. Practice", "Match Summary", "Position Analysis", "Phase Analysis", "Practice Planner", "Practice Red Flags-TESTING"])
         raw_sessions = df[df['Session_Name'].notna()]
         session_list = raw_sessions.sort_values('Date', ascending=False)['Session_Name'].unique().tolist()
 
@@ -375,7 +375,7 @@ if check_password():
             else:
                 st.info("No data found for the selected session.")
                 
-        with tabs[3]: # Game v Practice
+        with tabs[4]: # Game v Practice
             st.markdown('<div class="section-header">Weekly Prep Intensity vs. Match Demands</div>', unsafe_allow_html=True)
             c_ga, c_gw, c_gg = st.columns(3)
             with c_ga: gp_p = st.selectbox("Athlete", sorted(df['Name'].unique()), key="gp_p_vf")
@@ -413,7 +413,7 @@ if check_password():
                     for _, r in sub.iterrows(): is_sel = (r['Session_Name'] == gp_g); fig_tr.add_trace(go.Scatter(x=[r['Day_Label']], y=[r['Player Load']], name=r['Session_Name'] if s_t == 'Game' else s_t, mode='markers', marker=dict(color=clr, size=16 if is_sel else 10, line=dict(width=3 if is_sel else 1, color='black' if is_sel else 'white')), showlegend=True if s_t == 'Game' else (True if _ == sub.index[0] else False)))
                 fig_tr.update_layout(height=350, margin=dict(l=0, r=0, t=20, b=0), yaxis_title="Avg Player Load"); st.plotly_chart(fig_tr, use_container_width=True, config=LOCKED_CONFIG)
                 
-        with tabs[4]: # Position Analysis
+        with tabs[6]: # Position Analysis
             st.markdown('<div class="section-header">Positional Performance Trends</div>', unsafe_allow_html=True)
             
             pos_filter_an = st.selectbox("Select Position to Analyze", sorted([p for p in df['Position'].unique() if p != "N/A"]), key="pos_an_filt_main")
@@ -597,7 +597,7 @@ if check_password():
                     st.markdown('</div>', unsafe_allow_html=True)
                     
                     
-        with tabs[6]: # Tab 5: Work Index Matrix
+        with tabs[7]: # Tab 5: Work Index Matrix
             st.markdown('<div class="section-header">Work Index Matrix & Drill Utilization</div>', unsafe_allow_html=True)
             
             if phase_df is not None and not phase_df.empty:
@@ -706,7 +706,7 @@ if check_password():
                 st.markdown(matrix_html, unsafe_allow_html=True)
                 
                 
-        with tabs[7]: # Practice Planner
+        with tabs[8]: # Practice Planner
             st.markdown('<div class="section-header">Practice Phase Analysis & Planner</div>', unsafe_allow_html=True)
             
             if phase_df is not None and not phase_df.empty:
@@ -857,7 +857,7 @@ if check_password():
                     st.plotly_chart(fig_flow, use_container_width=True, config=LOCKED_CONFIG)
                     
                 
-        with tabs[8]: # Risk Monitor
+        with tabs[9]: # Risk Monitor
             st.markdown('<div class="section-header">Practice Risk Monitor</div>', unsafe_allow_html=True)
             
             if phase_df is not None and thresh_df is not None:
@@ -1139,7 +1139,7 @@ if check_password():
                                 st.plotly_chart(fig_p, use_container_width=True, config={'displayModeBar': False}, key=f"team_card_{name}_{sel_week}")
 
 
-        with tabs[9]: # Tab 7: CMJ Comparison
+        with tabs[3]: # Tab 7: CMJ Comparison
             st.markdown('<div class="section-header">CMJ Baseline vs. Post-Match Recovery</div>', unsafe_allow_html=True)
             
             if cmj_df is not None and not cmj_df.empty:
