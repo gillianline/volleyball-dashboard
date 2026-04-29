@@ -413,6 +413,26 @@ if check_password():
             main_filtered = clean_gp_data(main_filtered)
             match_filtered = clean_gp_data(match_filtered)
 
+            # --- 4. DEEP-DIVE METHODOLOGY GUIDE ---
+                with st.expander("ℹ️ In-Depth: Understanding Prep Intensity vs. Game Speed"):
+                    st.markdown("""
+                    #### **How the Intensity % Works**
+                    We don't compare total volume (because games are longer). We compare **Density**.
+                    
+                    * **Game Intensity (100%):** The baseline speed and effort level required in a real match.
+                    * **Practice Intensity (The Score):** How "packed" our drills are compared to the game.
+                    
+                    #### **What does 100%+ mean?**
+                    If a score is **above 100%**, it means that minute-for-minute, the practice was **more physically demanding** than the game.
+                    * **Example (180% Explosive Efforts):** This happens when we run high-tempo 1v1s or Red Zone drills with short rest. The players are accelerating/decelerating nearly twice as often per minute as they would during a game's natural flow (which has timeouts and huddles).
+                    * **Coach Takeaway:** 100%+ is great for "over-preparing" the body for worst-case scenarios, but if it stays this high all week, the players may go into the game with high CNS fatigue.
+                    
+                    #### **The Color 'Check Engine' Light**
+                    * <span style="color:#28a745">**90% - 110% (Game Ready):**</span> Drills successfully simulated game-day demands.
+                    * <span style="color:#FF8200">**75% - 89% (Tactical):**</span> Good for learning plays, but the physical "speed" is sub-maximal.
+                    * <span style="color:#dc3545">**Below 70% (Recovery):**</span> Low density. Use this for walk-throughs or flush days.
+                    """, unsafe_allow_html=True)
+
             # --- 3. SEASON OVERALL STANDARDS ---
             st.markdown(f"### {view_mode} Season Standards: Overall Intensity")
             if not main_filtered.empty and not match_filtered.empty:
@@ -436,13 +456,6 @@ if check_password():
                     color = "#28a745" if perc >= 85 else "#dc3545"
                     overall_html += f"<tr><td><b>{label}</b></td><td>{p_rate:.2f}</td><td>{m_rate:.2f}</td><td style='color:{color}; font-weight:bold;'>{perc:.1f}%</td></tr>"
                 st.markdown(overall_html + "</table>", unsafe_allow_html=True)
-
-                with st.expander("ℹ️ Coaches' Guide: How is Intensity Calculated?"):
-                    st.markdown("""
-                    **The Work Index Formula:** `[Total Volume] / [Duration] = Rate/Min`.
-                    
-                    **Why over 100%?** Practices pack work into a shorter window with fewer rest periods, packing more movement density into each minute than a full game typically does.
-                    """)
 
             st.divider()
 
