@@ -1167,9 +1167,9 @@ if check_password():
                         rsi_diff = ((latest_post[rsi_col] - base_row[rsi_col]) / base_row[rsi_col]) * 100
                         
                         m1, m2, m3 = st.columns(3)
-                        m1.metric("Wk 4 Baseline", f"{base_row[cmj_col]:.1f} cm")
+                        m1.metric("Baseline", f"{base_row[cmj_col]:.1f} cm")
                         m2.metric("Latest Jump", f"{latest_post[cmj_col]:.1f} cm", f"{h_diff:+.1f}%")
-                        m3.metric("RSI Recovery", f"{latest_post[rsi_col]:.2f}", f"{rsi_diff:+.1f}%")
+                        m3.metric("RSI", f"{latest_post[rsi_col]:.2f}", f"{rsi_diff:+.1f}%")
 
                     # --- 3. COMPARISON TABLE WITH PREVIOUS MATCH ---
                     st.markdown("#### Jump History & Match Context")
@@ -1178,8 +1178,7 @@ if check_password():
                     for _, row in post_match_cmj.iterrows():
                         jump_date = pd.to_datetime(row['Test Date'])
                         
-                        # Logic to find the name of the match directly preceding this jump
-                        # We look in the main 'df' for sessions where date < jump_date
+                        # Find the name of the match directly preceding this jump
                         try:
                             prev_matches = df[(df['Name'] == sel_ath_cmj) & 
                                               (df['Date'] < jump_date) & 
@@ -1192,7 +1191,8 @@ if check_password():
                         diff_val = row[cmj_col] - base_row[cmj_col]
                         
                         comparison_list.append({
-                            "Date": jump_date.strftime('%Y-%m-%d'),
+                            # --- UPDATED DATE FORMAT ---
+                            "Date": jump_date.strftime('%m/%d/%Y'),
                             "Prev Match": prev_match_name,
                             "Jump Height": f"{row[cmj_col]:.1f} cm",
                             "Vs. Baseline": f"{diff_val:+.1f} cm",
@@ -1209,7 +1209,6 @@ if check_password():
                                             <th style="padding: 10px; border: 1px solid #ddd;">RSI</th>
                                         </tr>"""
                     for item in comparison_list:
-                        # Color code the difference value
                         val_float = float(item['Vs. Baseline'].replace(' cm', ''))
                         color = "#28a745" if val_float >= 0 else "#dc3545"
                         
@@ -1227,29 +1226,25 @@ if check_password():
                     st.markdown("#### Recovery Trendline")
                     fig_cmj = go.Figure()
                     
-                    # Jump Height Trace
+                    # Use the same MM/DD/YYYY format for the X-axis hover text
                     fig_cmj.add_trace(go.Scatter(
                         x=ath_cmj_data['Test Date'], 
                         y=ath_cmj_data[cmj_col], 
                         name="Jump Height", 
                         line=dict(color='#4895DB', width=3),
-                        mode='lines+markers'
+                        mode='lines+markers',
+                        hovertemplate="Date: %{x|%m/%d/%Y}<br>Height: %{y} cm<extra></extra>"
                     ))
                     
-                    # Baseline Line (Removed the text label annotation as requested)
                     fig_cmj.add_hline(y=base_row[cmj_col], line_dash="dash", line_color="red")
                     
                     fig_cmj.update_layout(
                         height=350, 
                         template="simple_white", 
                         margin=dict(l=10, r=10, t=30, b=10),
-                        xaxis_title="Date",
-                        yaxis_title="Height (cm)"
+                        xaxis=dict(title="Date", tickformat="%m/%d/%Y")
                     )
                     st.plotly_chart(fig_cmj, use_container_width=True, key="cmj_recovery_trend")
-
-                else:
-                    st.warning(f"No Week 4 Baseline data found for {sel_ath_cmj}.")
             else:
                 st.error("CMJ Data sheet is empty or not loaded.")
                 
