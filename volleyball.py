@@ -475,22 +475,85 @@ if check_password():
                 g_avg = g_data_l[calc_cols + ['Duration']].mean()
                 w_avg = w_data[calc_cols + ['Duration']].mean()
 
-                # 5. WEEKLY INTENSITY TABLE
-                st.markdown(f"### Week {sel_w} Match Intensity Analysis")
-                week_html = """<table style="width:100%; border-collapse: collapse; text-align: center; margin-bottom: 25px;">
-                                <tr style="background-color: #f0f2f6; font-weight: bold;">
-                                    <th style="padding: 12px; border: 1px solid #ddd;">Metric (Rate/Min)</th>
-                                    <th style="padding: 12px; border: 1px solid #ddd;">Match Rate</th>
-                                    <th style="padding: 12px; border: 1px solid #ddd;">Practice Rate</th>
-                                    <th style="padding: 12px; border: 1px solid #ddd;">% Intensity</th>
-                                </tr>"""
-                for m in calc_cols:
-                    m_r, p_r = g_avg[m]/g_avg['Duration'], w_avg[m]/w_avg['Duration']
-                    perc = (p_r / m_r * 100) if m_r > 0 else 0
-                    color = "#28a745" if perc >= 90 else ("#FF8200" if perc >= 75 else "#dc3545")
-                    week_html += f"<tr><td><b>{metrics_dict[m]}</b></td><td>{m_r:.2f}</td><td>{p_r:.2f}</td><td style='color:{color}; font-weight:bold;'>{perc:.1f}%</td></tr>"
-                st.markdown(week_html + "</table>", unsafe_allow_html=True)
+                # --- 5. REDESIGNED VOLUME GAPS ---
+                st.markdown("### Total Volume Comparison")
+                st.info("💡 **What is the Delta (+/-)?** This shows how much more (or less) volume was performed in the Match compared to that week's average Practice.")
+                
+                # Create a row of cards for the metrics
+                m_cols = st.columns(4)
+                display_metrics = [
+                    ('Total Player Load', 'Player Load'),
+                    ('Explosive Efforts', 'Explosive Efforts'),
+                    ('Total Jumps', 'Total Jumps'),
+                    ('Estimated Distance (y)', 'Distance (y)')
+                ]
 
+                for i, (raw_col, label) in enumerate(display_metrics):
+                    with m_cols[i]:
+                        match_val = g_avg[raw_col]
+                        prac_avg = w_avg[raw_col]
+                        delta = match_val - prac_avg
+                        
+                        # Custom HTML Card for better visibility
+                        st.markdown(f"""
+                            <div style="background-color: #f8f9fb; padding: 15px; border-radius: 10px; border-left: 5px solid #FF8200; text-align: center;">
+                                <p style="margin: 0; font-size: 14px; color: #555;">{label}</p>
+                                <h2 style="margin: 5px 0; color: #31333F;">{match_val:.0f}</h2>
+                                <p style="margin: 0; font-size: 16px; font-weight: bold; color: {'#dc3545' if delta > 0 else '#28a745'};">
+                                    {'+' if delta > 0 else ''}{delta:.0f} vs. Practice
+                                </p>
+                            </div>
+                        """, unsafe_allow_html=True)
+
+                st.markdown("<br>", unsafe_allow_html=True) # Spacer
+
+                # --- 6. VISUAL BARS (Now full width for better scaling) ---
+                fig_dual = make_subplots(specs=[[{"secondary_y": True}]])
+                bar_m = ['Total Player Load', 'Explosive Efforts', 'Total Jumps']
+                
+                # Weekly Practice Bars
+                fig_dual.add_trace(go.Bar(
+                    x=[metrics_dict[m] for m in bar_m], 
+                    y=[w_avg[m] for m in bar_m], 
+                    name="Practice Average", 
+                    marker_color='#4895DB', 
+                    offsetgroup=1
+                ), secondary_y=False)
+                
+                # Match Output Bars
+                fig_dual.add_trace(go.Bar(
+                    x=[metrics_dict[m] for m in bar_m], 
+                    y=[g_avg[m] for m in bar_m], 
+                    name="Match Output", 
+                    marker_color='#FF8200', 
+                    offsetgroup=2
+                ), secondary_y=False)
+                
+                # Distance Overlay
+                fig_dual.add_trace(go.Bar(
+                    x=['Distance (y)'], 
+                    y=[w_avg['Estimated Distance (y)']], 
+                    name="Prac. Distance", 
+                    marker=dict(color='#4895DB', opacity=0.3), 
+                    offsetgroup=1
+                ), secondary_y=True)
+                
+                fig_dual.add_trace(go.Bar(
+                    x=['Distance (y)'], 
+                    y=[g_avg['Estimated Distance (y)']], 
+                    name="Match Distance", 
+                    marker=dict(color='#FF8200', opacity=0.3), 
+                    offsetgroup=2
+                ), secondary_y=True)
+
+                fig_dual.update_layout(
+                    barmode='group', 
+                    height=400, 
+                    template="simple_white", 
+                    legend=dict(orientation="h", y=-0.2, x=0.5, xanchor="center"),
+                    margin=dict(l=10, r=10, t=10, b=10)
+                )
+                st.plotly_chart(fig_dual, use_container_width=True)
                 # 6. VOLUME METRICS & TRENDS
                 cg1, cg2 = st.columns([1, 2.2])
                 with cg1:
