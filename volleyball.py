@@ -520,7 +520,7 @@ if check_password():
                 fig_tr.update_layout(height=400, template="simple_white", legend=dict(orientation="h", y=-0.3, x=0.5, xanchor="center"))
                 st.plotly_chart(fig_tr, use_container_width=True)
 
-                --- 8. COACHES' METHODOLOGY GUIDE (Expandable) ---
+                #8. COACHES' METHODOLOGY GUIDE (Expandable)
                 with st.expander("ℹ️ How is Match Intensity Calculated? (Coaches' Guide)"):
                     st.markdown("""
                     #### 1. The Core Formula: 'The Work Index'
