@@ -576,7 +576,6 @@ if check_password():
                 fig_tr.add_trace(go.Scatter(x=wk_trends['Day'], y=wk_trends['Explosive Efforts'], mode='lines+markers', name="Explosive Efforts", line=dict(color='#28a745', width=2, dash='dash')))
                 fig_tr.update_layout(height=400, template="simple_white", legend=dict(orientation="h", y=-0.3, x=0.5, xanchor="center"))
                 st.plotly_chart(fig_tr, use_container_width=True)
-                
             else:
                 st.info("Missing practice or match data for the current selection.")
 
