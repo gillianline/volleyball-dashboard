@@ -519,8 +519,36 @@ if check_password():
                 fig_tr.add_trace(go.Scatter(x=wk_trends['Day'], y=wk_trends['Explosive Efforts'], mode='lines+markers', name="Explosive Efforts", line=dict(color='#28a745', width=2, dash='dash')))
                 fig_tr.update_layout(height=400, template="simple_white", legend=dict(orientation="h", y=-0.3, x=0.5, xanchor="center"))
                 st.plotly_chart(fig_tr, use_container_width=True)
+
+                --- 8. COACHES' METHODOLOGY GUIDE (Expandable) ---
+                with st.expander("ℹ️ How is Match Intensity Calculated? (Coaches' Guide)"):
+                    st.markdown("""
+                    #### 1. The Core Formula: 'The Work Index'
+                    Intensity is calculated as a **Rate per Minute**. This allows us to compare a 90-minute Match to a 40-minute Practice on a level playing field.
+                
+                    **Formula:** `[Total Metric Volume] / [Duration in Minutes] = Rate per Minute`
+                
+                    #### 2. The Intensity Percentage (%)
+                    This shows how close the practice environment came to simulating the "density" of a game.
+                
+                    **Formula:** `(Practice Rate / Match Rate) * 100 = % Intensity`
+                
+                    #### 3. Why is Intensity sometimes over 100%?
+                    If a metric shows **114%** or **180%**, it means the practice was **more dense** than a game. This is common because:
+                    * **No 'Dead Time':** Practices often involve rapid-fire drills with very little rest, whereas games have timeouts, substitutions, and play-stoppages.
+                    * **Condensed Drills:** High-rep drills (like red-zone passing or 1v1s) pack a game's worth of jumping or sprinting into a much shorter window.
+                    * **Over-Preparation:** We often intentionally "over-load" certain metrics in practice to ensure the athlete is physically prepared for the worst-case scenario in a match.
+                
+                    #### 4. Color Logic:
+                    * <span style="color:#28a745">**Green (90%+):**</span> Game Speed simulation.
+                    * <span style="color:#FF8200">**Orange (75-89%):**</span> Technical/Tactical work at sub-maximal pace.
+                    * <span style="color:#dc3545">**Red (<75%):**</span> Targeted recovery or low-intensity session.
+                    """, unsafe_allow_html=True)
+                
             else:
                 st.info("Missing practice or match data for the current selection.")
+
+                
                 
         with tabs[6]: # Position Analysis
             st.markdown('<div class="section-header">Positional Performance Trends</div>', unsafe_allow_html=True)
