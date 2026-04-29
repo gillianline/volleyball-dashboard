@@ -496,7 +496,7 @@ if check_password():
                     <div style="background-color: #eef2f6; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
                         <p style="margin: 0; font-weight: bold; color: #31333F;">Understanding the Meaning:</p>
                         <ul style="margin: 5px 0 0 20px; font-size: 14px; color: #555;">
-                            <li><b>Positive (+):</b> The Match volume was <b>HIGHER</b> than the weekly practice average.</li>
+                            <li style="color:#dc3545"><b>Positive (+):</b> The Match volume was <b>HIGHER</b> than the weekly practice average.</li>
                             <li><b>Negative (-):</b> The Match volume was <b>LOWER</b> than the average practice session.</li>
                         </ul>
                     </div>
