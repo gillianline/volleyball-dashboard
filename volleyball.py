@@ -414,24 +414,24 @@ if check_password():
             match_filtered = clean_gp_data(match_filtered)
 
             # --- 4. DEEP-DIVE METHODOLOGY GUIDE ---
-                with st.expander("ℹ️ In-Depth: Understanding Prep Intensity vs. Game Speed"):
-                    st.markdown("""
-                    #### **How the Intensity % Works**
-                    We don't compare total volume (because games are longer). We compare **Density**.
+            with st.expander("ℹ️ In-Depth: Understanding Prep Intensity vs. Game Speed"):
+                st.markdown("""
+                #### **How the Intensity % Works**
+                We don't compare total volume (because games are longer). We compare **Density**.
                     
-                    * **Game Intensity (100%):** The baseline speed and effort level required in a real match.
-                    * **Practice Intensity (The Score):** How "packed" our drills are compared to the game.
+                * **Game Intensity (100%):** The baseline speed and effort level required in a real match.
+                * **Practice Intensity (The Score):** How "packed" our drills are compared to the game.
                     
-                    #### **What does 100%+ mean?**
-                    If a score is **above 100%**, it means that minute-for-minute, the practice was **more physically demanding** than the game.
-                    * **Example (180% Explosive Efforts):** This happens when we run high-tempo 1v1s or Red Zone drills with short rest. The players are accelerating/decelerating nearly twice as often per minute as they would during a game's natural flow (which has timeouts and huddles).
-                    * **Coach Takeaway:** 100%+ is great for "over-preparing" the body for worst-case scenarios, but if it stays this high all week, the players may go into the game with high CNS fatigue.
+                #### **What does 100%+ mean?**
+                If a score is **above 100%**, it means that minute-for-minute, the practice was **more physically demanding** than the game.
+                * **Example (180% Explosive Efforts):** This happens when we run high-tempo 1v1s or Red Zone drills with short rest. The players are accelerating/decelerating nearly twice as often per minute as they would during a game's natural flow (which has timeouts and huddles).
+                * **Coach Takeaway:** 100%+ is great for "over-preparing" the body for worst-case scenarios, but if it stays this high all week, the players may go into the game with high CNS fatigue.
                     
-                    #### **The Color 'Check Engine' Light**
-                    * <span style="color:#28a745">**90% - 110% (Game Ready):**</span> Drills successfully simulated game-day demands.
-                    * <span style="color:#FF8200">**75% - 89% (Tactical):**</span> Good for learning plays, but the physical "speed" is sub-maximal.
-                    * <span style="color:#dc3545">**Below 70% (Recovery):**</span> Low density. Use this for walk-throughs or flush days.
-                    """, unsafe_allow_html=True)
+                #### **The Color 'Check Engine' Light**
+                * <span style="color:#28a745">**90% - 110% (Game Ready):**</span> Drills successfully simulated game-day demands.
+                * <span style="color:#FF8200">**75% - 89% (Tactical):**</span> Good for learning plays, but the physical "speed" is sub-maximal.
+                * <span style="color:#dc3545">**Below 70% (Recovery):**</span> Low density. Use this for walk-throughs or flush days.
+                """, unsafe_allow_html=True)
 
             # --- 3. SEASON OVERALL STANDARDS ---
             st.markdown(f"### {view_mode} Season Standards: Overall Intensity")
