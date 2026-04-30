@@ -1178,22 +1178,23 @@ if check_password():
                         display_names.append(orig['Session_Name'].iloc[0])
                 daily_raw['Display'] = display_names
                 
-                # Calculate Scores
-                scores_list = []
-                for idx, row in daily_raw.iterrows():
-                    row_grades = []
-                    lb = daily_raw[(daily_raw['Date'] >= row['Date'] - timedelta(days=30)) & (daily_raw['Date'] <= row['Date'])]
-                    for m in metrics_to_score:
-                        mx = lb[m].max()
-                        row_grades.append(math.ceil((row[m] / mx) * 100) if mx > 0 else 0)
-                    scores_list.append({
-                        'Date': row['Date'], 'Display': row['Display'], 
-                        'Score': round(sum(row_grades)/len(row_grades), 1), 
-                        'Week': str(row['Week']) # String for categorical comparison
-                    })
-                
-                master_df = pd.DataFrame(scores_list).sort_values('Date')
-
+                card_scores = []
+                            for _, r in w_daily.iterrows():
+                                r_grades = []
+                                lb = p_daily[(p_daily['Date'] >= r['Date'] - timedelta(days=30)) & (p_daily['Date'] <= r['Date'])]
+                                for m in metrics_to_score:
+                                    mx = lb[m].max()
+                                    # Ensure val and mx are treated as floats
+                                    val_f, mx_f = float(r[m]), float(mx)
+                                    r_grades.append(math.ceil((val_f / mx_f) * 100) if mx_f > 0 else 0)
+                                
+                                # Safety check: only append if we actually have grades to average
+                                if r_grades:
+                                    session_avg = sum(r_grades) / len(r_grades)
+                                    orig_day = p_all[p_all['Date'] == r['Date']]
+                                    label = f"Match Day {r['Date'].strftime('%m/%d')}" if len(orig_day) > 1 else orig_day['Session_Name'].iloc[0]
+                                    card_scores.append({'Display': label, 'Score': round(session_avg, 0)})
+                                    
                 # A. Master Timeline (The Long Graph)
                 st.markdown("### Full Season")
                 fig_master = px.line(master_df, x='Display', y='Score', markers=True, text='Score', range_y=[0, 145])
