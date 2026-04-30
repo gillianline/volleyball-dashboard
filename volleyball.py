@@ -274,6 +274,72 @@ if check_password():
                             template="simple_white"
                         )
                         st.plotly_chart(fig, use_container_width=True, config=LOCKED_CONFIG, key=f"readiness_final_clean_{selected_athlete_prof}")
+
+                # --- PRACTICE PHASE BREAKDOWN ---
+                st.markdown('<div class="section-header">Session Phase Distribution</div>', unsafe_allow_html=True)
+                
+                # Filter for all periods within this specific session for this athlete
+                # Note: Adjust 'Period' to match your column name (e.g., 'Phase' or 'Drill')
+                phase_col = 'Period' if 'Period' in p_session_data.columns else 'Session_Name'
+                
+                # Get all rows for this athlete on this date to see the breakdown
+                p_day_phases = df[(df['Name'] == selected_athlete_prof) & 
+                                  (df['Date'] == curr_date_prof)].copy()
+
+                if not p_day_phases.empty:
+                    # 1. Prepare Data
+                    # We usually want to see how Player Load and Explosive efforts are spread out
+                    phase_dist = p_day_phases.groupby(phase_col).agg({
+                        'Total Player Load': 'sum',
+                        'Explosive Efforts': 'sum',
+                        'Duration': 'sum'
+                    }).reset_index()
+
+                    # 2. Create the Distribution Graph
+                    fig_phases = make_subplots(specs=[[{"secondary_y": True}]])
+
+                    # Bars for Player Load per Phase
+                    fig_phases.add_trace(go.Bar(
+                        x=phase_dist[phase_col],
+                        y=phase_dist['Total Player Load'],
+                        name="Phase Load",
+                        marker_color='#4895DB',
+                        text=phase_dist['Total Player Load'].round(1),
+                        textposition='auto',
+                    ), secondary_y=False)
+
+                    # Line for Intensity (Load/Min) per Phase
+                    # This shows which part of practice was actually the 'hardest'
+                    phase_dist['Intensity'] = phase_dist['Total Player Load'] / phase_dist['Duration']
+                    
+                    fig_phases.add_trace(go.Scatter(
+                        x=phase_dist[phase_col],
+                        y=phase_dist['Intensity'],
+                        name="Intensity (Load/Min)",
+                        line=dict(color='#FF8200', width=3),
+                        mode='lines+markers'
+                    ), secondary_y=True)
+
+                    fig_phases.update_layout(
+                        height=350,
+                        template="simple_white",
+                        showlegend=True,
+                        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+                        margin=dict(l=10, r=10, t=40, b=10),
+                        xaxis_title="Practice Period"
+                    )
+                    
+                    fig_phases.update_yaxes(title_text="Total Volume", secondary_y=False)
+                    fig_phases.update_yaxes(title_text="Intensity Rate", secondary_y=True)
+
+                    st.plotly_chart(fig_phases, use_container_width=True, key=f"phase_dist_{selected_athlete_prof}")
+                    
+                    # 3. Quick Phase Insight
+                    hardest_phase = phase_dist.loc[phase_dist['Intensity'].idxmax()]
+                    st.caption(f"**Highest Intensity Period:** {hardest_phase[phase_col]} at {hardest_phase['Intensity']:.2f} Load/Min.")
+                else:
+                    st.info("No period-level data found for this session.")
+                    
                         
         with tabs[1]: # Tab 1: Gallery
             c_gal1, c_gal2 = st.columns(2)
