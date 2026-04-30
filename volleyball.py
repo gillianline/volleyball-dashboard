@@ -69,7 +69,7 @@ if check_password():
         </style>
         """, unsafe_allow_html=True)
     
-    ef get_flipped_gradient(score):
+    def get_flipped_gradient(score):
         try:
             # Force the score to be a number
             score = float(score)
