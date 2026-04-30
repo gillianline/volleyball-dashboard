@@ -82,7 +82,13 @@ if check_password():
     def load_all_data():
         def sanitize_frame(frame, numeric_cols):
             frame.columns = frame.columns.str.strip()
-            # Force every metric column to be numeric, turning errors (strings) into 0
+            
+            # --- THE PLAYER LOAD SYNC FIX ---
+            # If the sheet has "Total Player Load", rename it to "Player Load" immediately
+            load_synonyms = {'Total Player Load': 'Player Load', 'PlayerLoad': 'Player Load', 'Player_Load': 'Player Load'}
+            frame.rename(columns=load_synonyms, inplace=True)
+            
+            # Force numeric, turning text/errors into 0
             for col in numeric_cols:
                 if col in frame.columns:
                     frame[col] = pd.to_numeric(frame[col], errors='coerce').fillna(0).astype(float)
@@ -93,14 +99,17 @@ if check_password():
         match_df = pd.read_csv(st.secrets["MATCHES_SHEET_URL"])
         
         rename_map = {
-            'Total Jumps': 'Total Jumps', 'IMA Jump Count Med Band': 'Moderate Jumps', 
-            'IMA Jump Count High Band': 'High Jumps', 'BMP Jumping Load': 'Jump Load', 
-            'Total Player Load': 'Player Load', 'Estimated Distance (y)': 'Estimated Distance (y)', 
-            'Explosive Efforts': 'Explosive Efforts', 'High Intensity Movement': 'High Intensity Movement'
+            'Total Jumps': 'Total Jumps', 
+            'IMA Jump Count Med Band': 'Moderate Jumps', 
+            'IMA Jump Count High Band': 'High Jumps', 
+            'BMP Jumping Load': 'Jump Load', 
+            'Estimated Distance (y)': 'Estimated Distance (y)', 
+            'Explosive Efforts': 'Explosive Efforts', 
+            'High Intensity Movement': 'High Intensity Movement'
         }
 
-        # Identify all columns that MUST be numbers
-        math_targets = list(rename_map.values()) + ['Duration', 'Player Load', 'Total Jumps']
+        # math_targets should use the names AFTER rename_map and synonyms
+        math_targets = ['Player Load', 'Total Jumps', 'Moderate Jumps', 'High Jumps', 'Jump Load', 'Estimated Distance (y)', 'Explosive Efforts', 'High Intensity Movement', 'Duration']
 
         # Process Main Sheets
         for frame in [df, match_df]:
@@ -124,13 +133,13 @@ if check_password():
         
         phase_df = pd.read_csv(st.secrets["PHASES_SHEET_URL"])
         if 'Phases' in phase_df.columns: phase_df = phase_df.rename(columns={'Phases': 'Phase'})
-        phase_df = sanitize_frame(phase_df, ['Player Load', 'Total Jumps', 'Duration'])
+        # Ensure Phase sheet naming is synced before sanitizing
+        phase_df = sanitize_frame(phase_df, math_targets)
         phase_df['Date'] = pd.to_datetime(phase_df['Date'], errors='coerce')
         
         try:
             thresh_df = pd.read_csv(st.secrets["THRESH_SHEET_URL"])
             thresh_df.columns = thresh_df.columns.str.strip()
-            # Force limits to be numbers too!
             thresh_df = sanitize_frame(thresh_df, ['Load_Limit', 'Jump_Limit'])
         except:
             thresh_df = None
