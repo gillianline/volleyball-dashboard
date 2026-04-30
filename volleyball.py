@@ -157,8 +157,8 @@ if check_password():
             col_map = {
                 'Player Load': 'Total Player Load',
                 'PlayerLoad': 'Total Player Load',
-                'Estimated Distance (y)': 'Distance (y)',
-                'Distance (y)': 'Distance (y)'
+                'Total Jumps': 'Total Jumps',
+                'Estimated Distance (y)': 'Distance (y)'
             }
             
             c_prof1, c_prof2 = st.columns(2)
