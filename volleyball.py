@@ -466,8 +466,8 @@ if check_password():
                     
                 #### **The Colors**
                 * <span style="color:#28a745">**90% - 110% (Game Ready):**</span> Drills successfully simulated game-day demands.
-                * <span style="color:#FF8200">**75% - 89% (Tactical):**</span> Good for learning plays, but the physical "speed" is sub-maximal.
-                * <span style="color:#dc3545">**Below 70% (Recovery):**</span> Low density. Use this for walk-throughs or flush days.
+                * <span style="color:#FF8200">**75% - 89% (Tactical):**</span> Good for learning, but the physical "speed" is sub-maximal.
+                * <span style="color:#dc3545">**Below 70% (Recovery):**</span> Low density.
                 """, unsafe_allow_html=True)
 
             # --- 3. SEASON OVERALL STANDARDS ---
@@ -498,26 +498,42 @@ if check_password():
 
             # --- 4. WEEKLY FILTERS ---
             with c_week:
+                # Group by Week to get date ranges for the selector
                 w_r = df.groupby('Week')['Date'].agg(['min', 'max']).reset_index()
                 w_r['L'] = w_r.apply(lambda x: f"{x['Week']} ({x['min'].strftime('%m/%d')} - {x['max'].strftime('%m/%d')})", axis=1)
                 gp_w = st.selectbox("Select Week", w_r['L'].tolist(), key="gp_w_vf")
                 sel_w = w_r[w_r['L'] == gp_w]['Week'].values[0]
 
             with c_match:
-                match_options = match_filtered[match_filtered['Week'] == sel_w].copy()
+                # THE FIX: Filter match_df by the selected week first
+                match_options = match_df[match_df['Week'] == sel_w].copy()
+                
                 if not match_options.empty:
-                    match_options['Display'] = match_options.apply(lambda x: f"{x['Date'].strftime('%m/%d')} - {x['Session_Name']}", axis=1)
-                    sel_match_display = st.selectbox("Select Specific Match", match_options['Display'].tolist(), key="gp_g_vf")
-                    g_data_raw = match_options[match_options['Display'] == sel_match_display].iloc[0]
+                    # THE FIX: Create unique display strings so you only see ONE option per match
+                    match_options['Match_Display'] = match_options['Date'].dt.strftime('%m/%d') + " - " + match_options['Session_Name']
+                    
+                    # Pull only UNIQUE match names for the dropdown
+                    unique_match_list = sorted(match_options['Match_Display'].unique())
+                    sel_match_display = st.selectbox("Select Specific Match", unique_match_list, key="gp_g_vf")
+                    
+                    # Extract the clean Session_Name and Date from that selection to filter the actual data
+                    selected_match_name = sel_match_display.split(" - ")[1]
+                    selected_match_date = match_options[match_options['Match_Display'] == sel_match_display]['Date'].iloc[0]
+                    
+                    # Get the raw match data for the selected mode (Individual vs Team Avg)
+                    g_data_raw_all = match_filtered[(match_filtered['Session_Name'] == selected_match_name) & 
+                                                    (match_filtered['Date'] == selected_match_date)]
+                    
+                    # Average the match demands (if Team/Position mode) or get the single row (if Individual)
+                    if not g_data_raw_all.empty:
+                        g_data_raw = g_data_raw_all.mean(numeric_only=True)
+                        # Re-add the session name for chart labels
+                        g_data_raw['Session_Name'] = selected_match_name
+                    else:
+                        g_data_raw = None
                 else:
+                    st.warning("No matches found for this week.")
                     g_data_raw = None
-
-            w_data = main_filtered[(main_filtered['Session_Type'] == 'Practice') & (main_filtered['Week'] == sel_w)].copy()
-
-            if not w_data.empty and g_data_raw is not None:
-                metrics_dict = {'Total Player Load': 'Player Load', 'Explosive Efforts': 'Explosive Efforts', 'Total Jumps': 'Total Jumps', 'Estimated Distance (y)': 'Estimated Dist.'}
-                calc_cols = list(metrics_dict.keys())
-                w_avg = w_data[calc_cols + ['Duration']].mean()
 
                 # --- 5. INTENSITY TABLE ---
                 st.markdown(f"#### Week {sel_w} Match Intensity (Density)")
@@ -1340,9 +1356,9 @@ if check_password():
                         rsi_diff = ((latest_post[rsi_col] - base_row[rsi_col]) / base_row[rsi_col]) * 100
                         
                         m1, m2, m3 = st.columns(3)
-                        m1.metric("Wk 4 Baseline", f"{base_row[cmj_col]:.1f} cm")
+                        m1.metric("Baseline", f"{base_row[cmj_col]:.1f} cm")
                         m2.metric("Latest Jump", f"{latest_post[cmj_col]:.1f} cm", f"{h_diff:+.1f}%")
-                        m3.metric("RSI Recovery", f"{latest_post[rsi_col]:.2f}", f"{rsi_diff:+.1f}%")
+                        m3.metric("RSI", f"{latest_post[rsi_col]:.2f}", f"{rsi_diff:+.1f}%")
 
                     # --- 3. COMPARISON TABLE ---
                     st.markdown("#### Jump History & Match Context")
@@ -1394,7 +1410,7 @@ if check_password():
                     st.markdown(cmj_table_html + "</table>", unsafe_allow_html=True)
                 
                     # --- 4. DUAL-AXIS RECOVERY TRENDLINE ---
-                    st.markdown("#### Recovery Trends (Height vs. RSI)")
+                    st.markdown("#### Height vs. RSI")
                     from plotly.subplots import make_subplots
                     
                     # Create subplots with a secondary y-axis
