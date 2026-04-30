@@ -95,7 +95,7 @@ if check_password():
             # 2. FORCE NUMERIC (The 'Nuclear' Sanitizer)
             # List of columns we expect to be numbers
             math_cols = ['Player Load', 'Total Jumps', 'Estimated Distance (y)', 'Explosive Efforts', 'Duration', 
-                         'Moderate Jumps', 'High Jumps', 'Jump Load', 'High Intensity Movement']
+                         'Moderate Jumps', 'High Jumps', 'BMP Jumping Load', 'High Intensity Movement']
             
             for col in math_cols:
                 if col in frame.columns:
@@ -169,7 +169,7 @@ if check_password():
                 "Serve & Pass": "Serve and Pass"
             }
         
-        all_metrics = ['Total Jumps', 'Moderate Jumps', 'High Jumps', 'Jump Load', 'Player Load', 'Estimated Distance (y)', 'Explosive Efforts', 'High Intensity Movement']
+        all_metrics = ['Total Jumps', 'Moderate Jumps', 'High Jumps', 'BMP Jumping Load', 'Player Load', 'Estimated Distance (y)', 'Explosive Efforts', 'High Intensity Movement']
         
         st.markdown('<div class="main-logo-container" style="text-align: center; margin-top: 10px; margin-bottom: 15px;"><img src="https://upload.wikimedia.org/wikipedia/commons/thumb/f/fc/Tennessee_Lady_Volunteers_logo.svg/1280px-Tennessee_Lady_Volunteers_logo.svg.png" width="120"><div style="color: #FF8200; font-size: 2rem; font-weight: 900; margin-top: 10px;">LADY VOLS VOLLEYBALL PERFORMANCE</div></div>', unsafe_allow_html=True)
 
