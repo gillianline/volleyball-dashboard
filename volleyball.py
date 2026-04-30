@@ -496,7 +496,7 @@ if check_password():
 
             st.divider()
 
-            # --- 4. WEEKLY FILTERS ---
+            # --- 5. WEEKLY FILTERS & UNIQUE MATCH DROPDOWN ---
             with c_week:
                 w_r = df.groupby('Week')['Date'].agg(['min', 'max']).reset_index()
                 w_r['L'] = w_r.apply(lambda x: f"{x['Week']} ({x['min'].strftime('%m/%d')} - {x['max'].strftime('%m/%d')})", axis=1)
@@ -504,20 +504,24 @@ if check_password():
                 sel_w = w_r[w_r['L'] == gp_w]['Week'].values[0]
 
             with c_match:
-                match_options = match_filtered[match_filtered['Week'] == sel_w].copy()
-                if not match_options.empty:
-                    match_options['Display'] = match_options.apply(lambda x: f"{x['Date'].strftime('%m/%d')} - {x['Session_Name']}", axis=1)
-                    sel_match_display = st.selectbox("Select Specific Match", match_options['Display'].tolist(), key="gp_g_vf")
-                    g_data_raw = match_options[match_options['Display'] == sel_match_display].iloc[0]
+                # Filter match_df for this week
+                m_opts = match_df[match_df['Week'] == sel_w].copy()
+                if not m_opts.empty:
+                    # Create display label
+                    m_opts['Match_Display'] = m_opts['Date'].dt.strftime('%m/%d') + " - " + m_opts['Session_Name']
+                    # THE FIX: unique() removes the per-athlete duplicates
+                    u_matches = sorted(m_opts['Match_Display'].unique())
+                    sel_match_display = st.selectbox("Select Specific Match", u_matches, key="gp_g_vf")
+                    
+                    sel_m_date = m_opts[m_opts['Match_Display'] == sel_match_display]['Date'].iloc[0]
+                    sel_m_name = sel_match_display.split(" - ")[1]
+                    
+                    # Filter data for selected group (Indiv/Pos/Team) and specifically this unique match
+                    g_raw_block = match_filtered[(match_filtered['Date'] == sel_m_date) & (match_filtered['Session_Name'] == sel_m_name)]
+                    # Average the block so Team/Position view gives one standard match demand
+                    g_data_raw = g_raw_block.mean(numeric_only=True) if not g_raw_block.empty else None
                 else:
                     g_data_raw = None
-
-            w_data = main_filtered[(main_filtered['Session_Type'] == 'Practice') & (main_filtered['Week'] == sel_w)].copy()
-
-            if not w_data.empty and g_data_raw is not None:
-                metrics_dict = {'Total Player Load': 'Player Load', 'Explosive Efforts': 'Explosive Efforts', 'Total Jumps': 'Total Jumps', 'Estimated Distance (y)': 'Estimated Dist.'}
-                calc_cols = list(metrics_dict.keys())
-                w_avg = w_data[calc_cols + ['Duration']].mean()
 
                 # --- 5. INTENSITY TABLE ---
                 st.markdown(f"#### Week {sel_w} Match Intensity (Density)")
