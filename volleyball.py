@@ -438,16 +438,13 @@ if check_password():
                     main_filtered = df[df['Position'] == gp_pos].copy()
                     match_filtered = match_df[match_df['Position'] == gp_pos].copy()
                 else:
-                    st.write("**Full Roster Active**")
                     main_filtered = df.copy()
                     match_filtered = match_df.copy()
 
-            # --- 2. DATA STANDARDIZATION ---
+            # --- 2. DATA CLEANING & STANDARDIZATION ---
             def clean_gp_data(target_df):
                 if target_df.empty: return target_df
-                # Syncing names to match your global loader
-                rename_map_local = {'Total Player Load': 'Player Load', 'PlayerLoad': 'Player Load'}
-                target_df = target_df.rename(columns=rename_map_local)
+                target_df = target_df.rename(columns={'Total Player Load': 'Player Load', 'PlayerLoad': 'Player Load'})
                 cols = ['Player Load', 'Explosive Efforts', 'Total Jumps', 'Jump Load', 'Duration', 'Distance (y)']
                 for c in cols:
                     if c in target_df.columns:
@@ -461,43 +458,7 @@ if check_password():
             metrics_dict = {'Player Load': 'Player Load', 'Jump Load': 'Jump Load', 'Total Jumps': 'Total Jumps', 'Explosive Efforts': 'Explosive Efforts'}
             calc_cols = list(metrics_dict.keys())
 
-            # --- 3. CALCULATIONS FOR COACHES ---
-            with st.expander("ℹ️ The Calculations: Methodology Guide"):
-                st.markdown(""" 
-                #### **What does 100%+ mean?**
-                If a score is **above 100%**, it means that minute-for-minute, the practice was **more physically demanding** than the game (higher density).
-                    
-                #### **Intensity Zones**
-                * <span style="color:#28a745">**90% - 110% (Game Ready):**</span> Drills successfully simulated game-day demands.
-                * <span style="color:#FF8200">**75% - 89% (Tactical):**</span> physical "speed" is sub-maximal.
-                * <span style="color:#dc3545">**Below 70% (Recovery):**</span> Low density/Recovery day.
-                """, unsafe_allow_html=True)
-
-            # --- 4. SEASON OVERALL STANDARDS ---
-            st.markdown(f"### {view_mode} Season Standards: Overall Intensity")
-            if not main_filtered.empty and not match_filtered.empty:
-                s_prac_all = main_filtered[main_filtered['Session_Type'] == 'Practice']
-                s_p_avg = s_prac_all[calc_cols + ['Duration']].mean()
-                s_m_avg = match_filtered[calc_cols + ['Duration']].mean()
-                
-                overall_html = """<table style="width:100%; border-collapse: collapse; text-align: center; margin-bottom: 20px;">
-                                <tr style="background-color: #31333F; color: white; font-weight: bold;">
-                                    <th style="padding: 12px; border: 1px solid #ddd;">Metric (Rate/Min)</th>
-                                    <th style="padding: 12px; border: 1px solid #ddd;">Season Practice Avg</th>
-                                    <th style="padding: 12px; border: 1px solid #ddd;">Season Match Avg</th>
-                                    <th style="padding: 12px; border: 1px solid #ddd;">% Match Intensity</th>
-                                </tr>"""
-                for m in calc_cols:
-                    p_rate = s_p_avg[m] / s_p_avg['Duration'] if s_p_avg['Duration'] > 0 else 0
-                    m_rate = s_m_avg[m] / s_m_avg['Duration'] if s_m_avg['Duration'] > 0 else 0
-                    perc = (p_rate / m_rate * 100) if m_rate > 0 else 0
-                    color = "#28a745" if perc >= 85 else "#dc3545"
-                    overall_html += f"<tr><td><b>{metrics_dict[m]}</b></td><td>{p_rate:.2f}</td><td>{m_rate:.2f}</td><td style='color:{color}; font-weight:bold;'>{perc:.1f}%</td></tr>"
-                st.markdown(overall_html + "</table>", unsafe_allow_html=True)
-
-            st.divider()
-
-            # --- 5. WEEKLY FILTERS & UNIQUE MATCH DROPDOWN ---
+            # --- 3. CALCULATIONS & FILTERING ---
             with c_week:
                 w_r = df.groupby('Week')['Date'].agg(['min', 'max']).reset_index()
                 w_r['L'] = w_r.apply(lambda x: f"{x['Week']} ({x['min'].strftime('%m/%d')} - {x['max'].strftime('%m/%d')})", axis=1)
@@ -505,103 +466,94 @@ if check_password():
                 sel_w = w_r[w_r['L'] == gp_w]['Week'].values[0]
 
             with c_match:
-                # Filter match_df for this week
                 m_opts = match_df[match_df['Week'] == sel_w].copy()
                 if not m_opts.empty:
-                    # Create display label
                     m_opts['Match_Display'] = m_opts['Date'].dt.strftime('%m/%d') + " - " + m_opts['Session_Name']
-                    # THE FIX: unique() removes the per-athlete duplicates
                     u_matches = sorted(m_opts['Match_Display'].unique())
                     sel_match_display = st.selectbox("Select Specific Match", u_matches, key="gp_g_vf")
-                    
                     sel_m_date = m_opts[m_opts['Match_Display'] == sel_match_display]['Date'].iloc[0]
                     sel_m_name = sel_match_display.split(" - ")[1]
-                    
-                    # Filter data for selected group (Indiv/Pos/Team) and specifically this unique match
                     g_raw_block = match_filtered[(match_filtered['Date'] == sel_m_date) & (match_filtered['Session_Name'] == sel_m_name)]
-                    # Average the block so Team/Position view gives one standard match demand
                     g_data_raw = g_raw_block.mean(numeric_only=True) if not g_raw_block.empty else None
                 else:
                     g_data_raw = None
 
-            # --- 6. INTENSITY DENSITY TABLE ---
             w_data = main_filtered[(main_filtered['Session_Type'] == 'Practice') & (main_filtered['Week'] == sel_w)].copy()
 
             if not w_data.empty and g_data_raw is not None:
-                # Fix for 'Distance (y)' indexing crash
                 avail_math = [c for c in calc_cols + ['Duration', 'Distance (y)'] if c in w_data.columns]
                 w_avg = w_data[avail_math].mean()
 
-                st.markdown(f"#### Week {sel_w} Match Intensity (Density)")
-                week_html = """<table style="width:100%; border-collapse: collapse; text-align: center; margin-bottom: 25px;">
-                                <tr style="background-color: #f0f2f6; font-weight: bold;">
-                                    <th style="padding: 10px; border: 1px solid #ddd;">Metric (Rate/Min)</th>
-                                    <th style="padding: 10px; border: 1px solid #ddd;">Match Rate</th>
-                                    <th style="padding: 10px; border: 1px solid #ddd;">Practice Rate</th>
-                                    <th style="padding: 10px; border: 1px solid #ddd;">% Intensity</th>
-                                </tr>"""
-                for m in calc_cols:
-                    if m in g_data_raw.index and m in w_avg.index:
+                # --- 4. TOP SUMMARY: INTENSITY GAUGE ---
+                st.markdown("### ⚡ Quick Look: Weekly Prep Intensity")
+                q1, q2, q3, q4 = st.columns(4)
+                q_cols = [q1, q2, q3, q4]
+                for i, m in enumerate(calc_cols):
+                    m_r = g_data_raw[m]/g_data_raw['Duration']
+                    p_r = w_avg[m]/w_avg['Duration']
+                    perc = (p_r / m_r * 100) if m_r > 0 else 0
+                    q_cols[i].metric(label=f"{metrics_dict[m]} Rate", value=f"{perc:.1f}%", delta=f"{perc-100:.1f}% vs Match")
+                
+                st.divider()
+
+                # --- 5. SIDE-BY-SIDE: TABLES & CARDS ---
+                col_left, col_right = st.columns([2, 2], gap="large")
+
+                with col_left:
+                    st.markdown("#### 🏃‍♂️ Work Density (Rate per Minute)")
+                    week_html = """<table class="scout-table">
+                                    <thead><tr><th>Metric</th><th>Match Rate</th><th>Prac Rate</th><th>% Intensity</th></tr></thead>
+                                    <tbody>"""
+                    for m in calc_cols:
                         m_r, p_r = g_data_raw[m]/g_data_raw['Duration'], w_avg[m]/w_avg['Duration']
                         perc = (p_r / m_r * 100) if m_r > 0 else 0
                         color = "#28a745" if perc >= 90 else ("#FF8200" if perc >= 75 else "#dc3545")
                         week_html += f"<tr><td><b>{metrics_dict[m]}</b></td><td>{m_r:.2f}</td><td>{p_r:.2f}</td><td style='color:{color}; font-weight:bold;'>{perc:.1f}%</td></tr>"
-                st.markdown(week_html + "</table>", unsafe_allow_html=True)
+                    st.markdown(week_html + "</tbody></table>", unsafe_allow_html=True)
+                    
+                    with st.expander("ℹ️ The Calculations"):
+                        st.markdown("Above 100% means the practice was **more physically demanding per minute** than the game.")
 
-                # --- 7. VOLUME GAP CARDS ---
-                st.markdown("### Total Volume Gap Analysis")
-                st.markdown("""
-                    <div style="background-color: #eef2f6; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
-                        <p style="margin: 0; font-weight: bold; color: #31333F;">Understanding the Volume Delta:</p>
-                        <ul style="margin: 5px 0 0 20px; font-size: 14px; color: #555;">
-                            <li style="color:#dc3545"><b>Positive (+):</b> Match volume was HIGHER than weekly practice avg (Higher Physical Stress).</li>
-                            <li style="color:#28a745"><b>Negative (-):</b> Match volume was LOWER than weekly practice avg (Lower Physical Stress).</li>
-                        </ul>
-                    </div>
-                """, unsafe_allow_html=True)
-                
-                m_cards = st.columns(4)
-                for i, m in enumerate(calc_cols):
-                    if m in g_data_raw.index and m in w_avg.index:
+                with col_right:
+                    st.markdown("#### 📊 Total Volume Gap Analysis")
+                    v_c1, v_c2 = st.columns(2); v_c3, v_c4 = st.columns(2)
+                    v_cols = [v_c1, v_c2, v_c3, v_c4]
+                    for i, m in enumerate(calc_cols):
                         m_val, p_val = g_data_raw[m], w_avg[m]
                         delta = m_val - p_val
-                        d_color = '#dc3545' if delta > 0 else '#28a745'
-                        with m_cards[i]:
-                            st.markdown(f"""<div style="background-color: #f8f9fb; padding: 15px; border-radius: 10px; border-left: 5px solid {d_color}; text-align: center;">
-                                <p style="margin:0; font-size:12px; color:#555;">{metrics_dict[m]}</p>
-                                <h3 style="margin:5px 0;">{m_val:.0f}</h3>
-                                <p style="margin:0; font-weight:bold; color:{d_color}; font-size:11px;">{'+' if delta > 0 else ''}{delta:.0f} vs Prac</p>
-                            </div>""", unsafe_allow_html=True)
+                        # Red if match was way higher volume than practice
+                        v_cols[i].metric(label=f"Total {metrics_dict[m]}", value=f"{m_val:.0f}", delta=f"{delta:.0f} vs Prac", delta_color='inverse' if delta > 0 else 'normal')
+                    
+                    st.info("Positive (+) delta means the Match volume was HIGHER than your weekly practice average.")
 
-                # --- 8. VOLUME COMPARISON BAR CHART ---
-                st.markdown("#### Practice vs. Match Volume Breakdown")
-                fig_bar = make_subplots(specs=[[{"secondary_y": True}]])
-                bar_m = ['Player Load', 'Jump Load', 'Total Jumps']
-                fig_bar.add_trace(go.Bar(x=bar_m, y=[w_avg[m] for m in bar_m], name="Prac Avg", marker_color='#4895DB', offsetgroup=1), secondary_y=False)
-                fig_bar.add_trace(go.Bar(x=bar_m, y=[g_data_raw[m] for m in bar_m], name="Match Output", marker_color='#FF8200', offsetgroup=2), secondary_y=False)
-                
-                if 'Distance (y)' in w_avg.index:
-                    fig_bar.add_trace(go.Bar(x=['Distance (y)'], y=[w_avg['Distance (y)']], name="Prac Distance", marker=dict(color='#4895DB', opacity=0.4), offsetgroup=1), secondary_y=True)
-                    fig_bar.add_trace(go.Bar(x=['Distance (y)'], y=[g_data_raw['Distance (y)']], name="Match Distance", marker=dict(color='#FF8200', opacity=0.4), offsetgroup=2), secondary_y=True)
-                
-                fig_bar.update_layout(barmode='group', height=400, template="simple_white", legend=dict(orientation="h", y=-0.2, x=0.5, xanchor="center"))
-                st.plotly_chart(fig_bar, use_container_width=True, key=f"gp_bar_{sel_w}")
+                st.divider()
 
-                # --- 9. WEEKLY PROGRESSION ---
-                st.markdown("#### Weekly Progression")
-                # Ensure we only combine the single selected match date into the trends
-                single_match_data = match_filtered[(match_filtered['Date'] == sel_m_date) & (match_filtered['Session_Name'] == sel_m_name)]
-                combined_wk = pd.concat([w_data, single_match_data])
+                # --- 6. CHART TABS ---
+                chart_tab1, chart_tab2 = st.tabs(["📊 Volume Comparison", "📈 Weekly Rhythm (Averages)"])
                 
-                wk_trends = combined_wk.groupby(['Date']).agg({m: 'sum' for m in ['Player Load', 'Total Jumps'] if m in combined_wk.columns}).reset_index().sort_values('Date')
-                wk_trends['Day'] = wk_trends['Date'].dt.strftime('%a %m/%d')
-                
-                fig_tr = go.Figure()
-                fig_tr.add_trace(go.Scatter(x=wk_trends['Day'], y=wk_trends['Player Load'], mode='lines+markers', name="Player Load", line=dict(color='#4895DB', width=3)))
-                fig_tr.add_trace(go.Scatter(x=wk_trends['Day'], y=wk_trends['Total Jumps'], mode='lines+markers', name="Total Jumps", line=dict(color='#FF8200', width=2, dash='dot')))
-                fig_tr.update_layout(height=400, template="simple_white", legend=dict(orientation="h", y=-0.3, x=0.5, xanchor="center"))
-                st.plotly_chart(fig_tr, use_container_width=True, key=f"gp_trend_{sel_w}")
-                
+                with chart_tab1:
+                    fig_bar = make_subplots(specs=[[{"secondary_y": True}]])
+                    bar_m = ['Player Load', 'Jump Load', 'Total Jumps']
+                    fig_bar.add_trace(go.Bar(x=bar_m, y=[w_avg[m] for m in bar_m], name="Prac Avg", marker_color='#4895DB', offsetgroup=1), secondary_y=False)
+                    fig_bar.add_trace(go.Bar(x=bar_m, y=[g_data_raw[m] for m in bar_m], name="Match", marker_color='#FF8200', offsetgroup=2), secondary_y=False)
+                    if 'Distance (y)' in w_avg.index:
+                        fig_bar.add_trace(go.Bar(x=['Distance (y)'], y=[w_avg['Distance (y)']], name="Prac Dist", marker=dict(color='#4895DB', opacity=0.4), offsetgroup=1), secondary_y=True)
+                        fig_bar.add_trace(go.Bar(x=['Distance (y)'], y=[g_data_raw['Distance (y)']], name="Match Dist", marker=dict(color='#FF8200', opacity=0.4), offsetgroup=2), secondary_y=True)
+                    fig_bar.update_layout(barmode='group', height=450, template="simple_white", legend=dict(orientation="h", y=-0.2, x=0.5, xanchor="center"))
+                    st.plotly_chart(fig_bar, use_container_width=True, key=f"gp_bar_{sel_w}")
+
+                with chart_tab2:
+                    single_match_data = match_filtered[(match_filtered['Date'] == sel_m_date) & (match_filtered['Session_Name'] == sel_m_name)]
+                    combined_wk = pd.concat([w_data, single_match_data])
+                    # USE MEAN TO AVOID THE 'THOUSANDS' ERROR
+                    wk_trends = combined_wk.groupby(['Date']).agg({m: 'mean' for m in ['Player Load', 'Total Jumps'] if m in combined_wk.columns}).reset_index().sort_values('Date')
+                    wk_trends['Day'] = wk_trends['Date'].dt.strftime('%a %m/%d')
+                    fig_tr = go.Figure()
+                    fig_tr.add_trace(go.Scatter(x=wk_trends['Day'], y=wk_trends['Player Load'], mode='lines+markers', name="Avg Player Load", line=dict(color='#4895DB', width=4)))
+                    fig_tr.add_trace(go.Scatter(x=wk_trends['Day'], y=wk_trends['Total Jumps'], mode='lines+markers', name="Avg Total Jumps", line=dict(color='#FF8200', width=2, dash='dot')))
+                    fig_tr.update_layout(height=450, template="simple_white", legend=dict(orientation="h", y=-0.3, x=0.5, xanchor="center"), yaxis_title="Average per Athlete")
+                    st.plotly_chart(fig_tr, use_container_width=True, key=f"gp_trend_{sel_w}")
+                    
         with tabs[6]: # Position Analysis
             st.markdown('<div class="section-header">Positional Performance Trends</div>', unsafe_allow_html=True)
             
