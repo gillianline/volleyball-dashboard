@@ -82,56 +82,72 @@ if check_password():
 
     @st.cache_data(ttl=10)
     def load_all_data():
-        # Load Primary Sheet
+        # 1. Load Data
         df = pd.read_csv(st.secrets["GOOGLE_SHEET_URL"])
-        df.columns = df.columns.str.strip()
-        df['Sheet_Order'] = range(len(df))
-        df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
-        df = df.dropna(subset=['Date']) 
-
-        # Load New Matches Sheet
         match_df = pd.read_csv(st.secrets["MATCHES_SHEET_URL"])
-        match_df.columns = match_df.columns.str.strip()
-        match_df['Sheet_Order'] = range(len(match_df))
-        match_df['Date'] = pd.to_datetime(match_df['Date'], errors='coerce')
-        match_df = match_df.dropna(subset=['Date'])
-
+        
+        # Define the exact names we want to use inside the app
         rename_map = {
-            'Total Jumps': 'Total Jumps', 'IMA Jump Count Med Band': 'Moderate Jumps', 'IMA Jump Count High Band': 'High Jumps', 
-            'BMP Jumping Load': 'Jump Load', 'Total Player Load': 'Player Load', 'Estimated Distance (y)': 'Estimated Distance (y)', 
-            'Explosive Efforts': 'Explosive Efforts', 'High Intensity Movement': 'High Intensity Movement'
+            'Total Jumps': 'Total Jumps', 
+            'IMA Jump Count Med Band': 'Moderate Jumps', 
+            'IMA Jump Count High Band': 'High Jumps', 
+            'BMP Jumping Load': 'Jump Load', 
+            'Total Player Load': 'Player Load', 
+            'Estimated Distance (y)': 'Estimated Distance (y)', 
+            'Explosive Efforts': 'Explosive Efforts', 
+            'High Intensity Movement': 'High Intensity Movement'
         }
 
-        # Process both sheets
+        # 2. Process Primary and Match Sheets
         for frame in [df, match_df]:
+            frame.columns = frame.columns.str.strip()
+            frame['Date'] = pd.to_datetime(frame['Date'], errors='coerce')
             frame.rename(columns=rename_map, inplace=True)
+            
+            # --- THE KEY FIX FOR THE FLOAT VS STR ERROR ---
+            # Identify all columns that should be numbers
+            numeric_cols = list(rename_map.values()) + ['Duration']
+            for col in numeric_cols:
+                if col in frame.columns:
+                    # errors='coerce' turns text like "-" or "N/A" into NaN
+                    # .fillna(0) turns those NaNs into 0.0 (a float)
+                    frame[col] = pd.to_numeric(frame[col], errors='coerce').fillna(0).astype(float)
+            
+            # Extract Week Number
             if 'Week' in frame.columns:
                 frame['Week'] = pd.to_numeric(frame['Week'].astype(str).str.extract('(\d+)', expand=False), errors='coerce').fillna(0).astype(int)
-            avail = [v for v in rename_map.values() if v in frame.columns]
-            for col in avail: frame[col] = pd.to_numeric(frame[col], errors='coerce').fillna(0).round(1)
+            
             frame['Session_Name'] = frame['Activity'].fillna(frame['Date'].dt.strftime('%m/%d/%Y'))
             frame['Position'] = frame.groupby('Name')['Position'].ffill().bfill().fillna("N/A")
             frame['PhotoURL'] = frame.groupby('Name')['PhotoURL'].ffill().bfill().fillna("https://www.w3schools.com/howto/img_avatar.png")
             frame['Session_Type'] = frame['Activity'].apply(lambda x: 'Game' if any(w in str(x).lower() for w in ['game', 'match', 'v.']) else 'Practice')
 
+        # 3. Process CMJ and Phase Sheets
         cmj_df = pd.read_csv(st.secrets["CMJ_SHEET_URL"])
         cmj_df.columns = cmj_df.columns.str.strip()
         cmj_df['Test Date'] = pd.to_datetime(cmj_df['Test Date'], errors='coerce')
+        # Force RSI and Height to floats
+        for col in ['Jump Height (Imp-Mom) [cm]', 'RSI-modified [m/s]']:
+            if col in cmj_df.columns:
+                cmj_df[col] = pd.to_numeric(cmj_df[col], errors='coerce').fillna(0).astype(float)
         
         phase_df = pd.read_csv(st.secrets["PHASES_SHEET_URL"])
         phase_df.columns = phase_df.columns.str.strip()
         if 'Phases' in phase_df.columns: phase_df = phase_df.rename(columns={'Phases': 'Phase'})
         phase_df['Date'] = pd.to_datetime(phase_df['Date'], errors='coerce')
-        phase_df = phase_df.rename(columns=rename_map)
+        phase_df.rename(columns=rename_map, inplace=True)
+        # Force numeric in phases
+        for col in ['Player Load', 'Total Jumps']:
+            if col in phase_df.columns:
+                phase_df[col] = pd.to_numeric(phase_df[col], errors='coerce').fillna(0).astype(float)
         
         try:
             thresh_df = pd.read_csv(st.secrets["THRESH_SHEET_URL"])
             thresh_df.columns = thresh_df.columns.str.strip()
         except:
             thresh_df = None
-        
-        # UPDATE THE RETURN TO INCLUDE thresh_df
-        return df, match_df, cmj_df, phase_df, thresh_df
+            
+        return df.dropna(subset=['Date']), match_df.dropna(subset=['Date']), cmj_df, phase_df, thresh_df
 
     LOCKED_CONFIG = {'staticPlot': True, 'displayModeBar': False}
 
