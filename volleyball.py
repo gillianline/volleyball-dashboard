@@ -499,7 +499,7 @@ if check_password():
                 else:
                     g_data_raw = None
 
-            # --- 5. WEEKLY INTENSITY TABLE (Simplified) ---
+            # --- 5. WEEKLY INTENSITY TABLE (Aligned Spacing & Column Order) ---
             w_data = main_filtered[(main_filtered['Session_Type'] == 'Practice') & (main_filtered['Week'] == sel_w)].copy()
 
             if not w_data.empty and g_data_raw is not None:
@@ -507,17 +507,32 @@ if check_password():
                 w_avg = w_data[avail_math].mean()
 
                 st.markdown(f"#### Week {sel_w} Match Intensity Rates (Density)")
-                week_html = f"""<p style="font-size:14px; color:#666;">Comparing <b>{sel_m_name}</b> to Weekly Training Average</p>
-                                <table style="width:100%; border-collapse: collapse; text-align: center; margin-bottom: 25px;">
-                                <tr style="background-color: #f0f2f6; font-weight: bold;">
-                                    <th style="padding: 10px; border: 1px solid #ddd;">Metric (Rate/Min)</th>
-                                    <th style="padding: 10px; border: 1px solid #ddd;">Practice Rate</th>
-                                    <th style="padding: 10px; border: 1px solid #ddd;">Match Rate</th>
-                                </tr>"""
+            
+                # Swapping columns to: Metric -> Practice -> Match to match Season Standards
+                week_html = f"""
+                    <p style="font-size:14px; color:#666;">Comparing Weekly Training Average to <b>{sel_m_name}</b></p>
+                    <table style="width:100%; border-collapse: collapse; text-align: center; margin-bottom: 25px;">
+                        <tr style="background-color: #31333F; color: white; font-weight: bold;">
+                            <th style="padding: 12px; border: 1px solid #ddd;">Metric (Rate/Min)</th>
+                            <th style="padding: 12px; border: 1px solid #ddd;">Weekly Practice Avg</th>
+                            <th style="padding: 12px; border: 1px solid #ddd;">Match Rate</th>
+                        </tr>"""
+            
                 for m in calc_cols:
                     if m in g_data_raw.index and m in w_avg.index:
-                        m_r, p_r = g_data_raw[m]/g_data_raw['Duration'], w_avg[m]/w_avg['Duration']
-                        week_html += f"<tr><td><b>{metrics_dict[m]}</b></td><td>{m_r:.2f}</td><td>{p_r:.2f}</td></tr>"
+                        m_duration = g_data_raw['Duration'] if g_data_raw['Duration'] > 0 else 1
+                        p_duration = w_avg['Duration'] if w_avg['Duration'] > 0 else 1
+                    
+                        m_r = g_data_raw[m] / m_duration
+                        p_r = w_avg[m] / p_duration
+                    
+                        week_html += f"""
+                            <tr>
+                                <td style="padding: 12px; border: 1px solid #ddd;"><b>{metrics_dict[m]}</b></td>
+                                <td style="padding: 12px; border: 1px solid #ddd;">{p_r:.2f}</td>
+                                <td style="padding: 12px; border: 1px solid #ddd;">{m_r:.2f}</td>
+                            </tr>"""
+            
                 st.markdown(week_html + "</table>", unsafe_allow_html=True)
 
                 # --- 6. VOLUME GAP ANALYSIS CARDS ---
