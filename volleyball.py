@@ -1322,23 +1322,28 @@ if check_password():
                     comparison_list = []
                     for _, row in post_match_cmj.iterrows():
                         jump_date = pd.to_datetime(row['Test Date'])
+                    
+                        # Logic to find previous match
                         try:
                             prev_matches = df[(df['Name'] == sel_ath_cmj) & 
-                                              (df['Date'] < jump_date) & 
-                                              (df['Session_Name'].str.contains('Match|Game', case=False, na=False))]
+                                            (df['Date'] < jump_date) & 
+                                            (df['Session_Name'].str.contains('Match|Game', case=False, na=False))]
                             prev_match_name = prev_matches.sort_values('Date', ascending=False).iloc[0]['Session_Name']
                         except:
                             prev_match_name = "N/A"
 
-                        diff_val = row[cmj_col] - base_row[cmj_col]
+                        # THE FIX: Keep the raw numeric difference for the color logic
+                        raw_diff = float(row[cmj_col]) - float(base_row[cmj_col])
+                    
                         comparison_list.append({
                             "Date": jump_date.strftime('%m/%d/%Y'),
                             "Prev Match": prev_match_name,
                             "Jump Height": f"{row[cmj_col]:.1f} cm",
-                            "Vs. Baseline": f"{diff_val:+.1f} cm",
+                            "Raw Diff": raw_diff, # Numeric for math
+                            "Display Diff": f"{raw_diff:+.1f} cm", # String for table
                             "RSI": f"{row[rsi_col]:.2f}"
                         })
-                    
+                
                     # Manual Centered Table
                     cmj_table_html = """<table style="width:100%; border-collapse: collapse; text-align: center;">
                                         <tr style="background-color: #f0f2f6; font-weight: bold;">
@@ -1349,17 +1354,18 @@ if check_password():
                                             <th style="padding: 10px; border: 1px solid #ddd;">RSI</th>
                                         </tr>"""
                     for item in comparison_list:
-                        val_float = float(item['Vs. Baseline'].replace(' cm', ''))
-                        color = "#28a745" if val_float >= 0 else "#dc3545"
+                        # Use the numeric Raw Diff instead of parsing strings
+                        color = "#28a745" if item['Raw Diff'] >= 0 else "#dc3545"
+                    
                         cmj_table_html += f"""<tr>
                             <td style="padding: 10px; border: 1px solid #ddd;">{item['Date']}</td>
                             <td style="padding: 10px; border: 1px solid #ddd;">{item['Prev Match']}</td>
                             <td style="padding: 10px; border: 1px solid #ddd;">{item['Jump Height']}</td>
-                            <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold; color: {color};">{item['Vs. Baseline']}</td>
+                            <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold; color: {color};">{item['Display Diff']}</td>
                             <td style="padding: 10px; border: 1px solid #ddd;">{item['RSI']}</td>
                         </tr>"""
                     st.markdown(cmj_table_html + "</table>", unsafe_allow_html=True)
-
+                
                     # --- 4. DUAL-AXIS RECOVERY TRENDLINE ---
                     st.markdown("#### Recovery Trends (Height vs. RSI)")
                     from plotly.subplots import make_subplots
