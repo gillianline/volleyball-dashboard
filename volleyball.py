@@ -496,45 +496,81 @@ if check_password():
 
             st.divider()
 
-            # --- 4. WEEKLY FILTERS ---
+            with tabs[4]: # Tab 4: Game v Practice
+            st.markdown('<div class="section-header">Preparation Intensity vs. Match Demands</div>', unsafe_allow_html=True)
+            
+            # --- 1. DYNAMIC FILTERS ---
+            c_mode, c_sel, c_week, c_match = st.columns(4)
+            with c_mode:
+                view_mode = st.radio("View Level", ["Team", "Position", "Individual"], horizontal=True, key="gp_view_mode")
+            
+            with c_sel:
+                if view_mode == "Individual":
+                    gp_p = st.selectbox("Select Athlete", sorted(df['Name'].unique()), key="gp_p_vf")
+                    main_filtered = df[df['Name'] == gp_p].copy()
+                    match_filtered = match_df[match_df['Name'] == gp_p].copy()
+                elif view_mode == "Position":
+                    gp_pos = st.selectbox("Select Position Group", sorted(df['Position'].unique().tolist()), key="gp_pos_vf")
+                    main_filtered = df[df['Position'] == gp_pos].copy()
+                    match_filtered = match_df[match_df['Position'] == gp_pos].copy()
+                else:
+                    st.write("**Full Roster Active**")
+                    main_filtered = df.copy()
+                    match_filtered = match_df.copy()
+
+            # --- 2. DATA STANDARDIZATION ---
+            def clean_gp_data(target_df):
+                if target_df.empty: return target_df
+                # Syncing names to match your global loader
+                target_df = target_df.rename(columns={'Total Player Load': 'Player Load', 'PlayerLoad': 'Player Load'})
+                cols = ['Player Load', 'Explosive Efforts', 'Total Jumps', 'Jump Load', 'Duration', 'Estimated Distance (y)']
+                for c in cols:
+                    if c in target_df.columns:
+                        target_df[c] = pd.to_numeric(target_df[c], errors='coerce').fillna(0)
+                if 'Duration' in target_df.columns:
+                    target_df['Duration'] = target_df['Duration'].apply(lambda x: x if x > 0 else 1)
+                return target_df
+
+            main_filtered = clean_gp_data(main_filtered)
+            match_filtered = clean_gp_data(match_filtered)
+
+            # --- 3. METRIC DEFINITIONS (Fixes 'calc_cols' Error) ---
+            metrics_dict = {'Player Load': 'Player Load', 'Jump Load': 'Jump Load', 'Total Jumps': 'Total Jumps', 'Explosive Efforts': 'Explosive Efforts'}
+            calc_cols = list(metrics_dict.keys())
+
+            # --- 4. WEEKLY FILTERS & UNIQUE MATCH DROPDOWN ---
             with c_week:
-                # Group by Week to get date ranges for the selector
                 w_r = df.groupby('Week')['Date'].agg(['min', 'max']).reset_index()
                 w_r['L'] = w_r.apply(lambda x: f"{x['Week']} ({x['min'].strftime('%m/%d')} - {x['max'].strftime('%m/%d')})", axis=1)
                 gp_w = st.selectbox("Select Week", w_r['L'].tolist(), key="gp_w_vf")
                 sel_w = w_r[w_r['L'] == gp_w]['Week'].values[0]
 
             with c_match:
-                # THE FIX: Filter match_df by the selected week first
+                # Filter match_df for this week to build the clean dropdown
                 match_options = match_df[match_df['Week'] == sel_w].copy()
-                
                 if not match_options.empty:
-                    # THE FIX: Create unique display strings so you only see ONE option per match
+                    # Create a display string: "04/30 - Match Name"
                     match_options['Match_Display'] = match_options['Date'].dt.strftime('%m/%d') + " - " + match_options['Session_Name']
-                    
-                    # Pull only UNIQUE match names for the dropdown
+                    # Get UNIQUE match names (removes the duplicate per-athlete rows)
                     unique_match_list = sorted(match_options['Match_Display'].unique())
                     sel_match_display = st.selectbox("Select Specific Match", unique_match_list, key="gp_g_vf")
                     
-                    # Extract the clean Session_Name and Date from that selection to filter the actual data
-                    selected_match_name = sel_match_display.split(" - ")[1]
-                    selected_match_date = match_options[match_options['Match_Display'] == sel_match_display]['Date'].iloc[0]
+                    # Pull the selected date and name back out
+                    sel_m_date = match_options[match_options['Match_Display'] == sel_match_display]['Date'].iloc[0]
+                    sel_m_name = sel_match_display.split(" - ")[1]
                     
-                    # Get the raw match data for the selected mode (Individual vs Team Avg)
-                    g_data_raw_all = match_filtered[(match_filtered['Session_Name'] == selected_match_name) & 
-                                                    (match_filtered['Date'] == selected_match_date)]
+                    # Filter the match_filtered data (which respects Team/Pos/Indiv) for this specific match
+                    g_raw_block = match_filtered[(match_filtered['Date'] == sel_m_date) & (match_filtered['Session_Name'] == sel_m_name)]
                     
-                    # Average the match demands (if Team/Position mode) or get the single row (if Individual)
-                    if not g_data_raw_all.empty:
-                        g_data_raw = g_data_raw_all.mean(numeric_only=True)
-                        # Re-add the session name for chart labels
-                        g_data_raw['Session_Name'] = selected_match_name
+                    if not g_raw_block.empty:
+                        # Average the data for that match (Team/Pos) or get single row (Indiv)
+                        g_data_raw = g_raw_block.mean(numeric_only=True)
+                        g_data_raw['Session_Name'] = sel_m_name
                     else:
                         g_data_raw = None
                 else:
                     st.warning("No matches found for this week.")
                     g_data_raw = None
-
                 # --- 5. INTENSITY TABLE ---
                 st.markdown(f"#### Week {sel_w} Match Intensity (Density)")
                 week_html = """<table style="width:100%; border-collapse: collapse; text-align: center; margin-bottom: 25px;">
