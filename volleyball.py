@@ -80,43 +80,41 @@ if check_password():
         return "#2D5A27" if score <= 40 else "#D4A017" if score <= 70 else "#A52A2A"
     @st.cache_data(ttl=10)
     def load_all_data():
-        def sanitize_frame(frame, numeric_cols):
+        def heavy_sanitize(frame):
             frame.columns = frame.columns.str.strip()
+            # 1. AUTO-FIND COLUMNS (The 'Search and Rescue' Logic)
+            # This looks for names even if they are slightly different
+            for col in frame.columns:
+                c_low = col.lower()
+                if 'player' in c_low and 'load' in c_low: frame.rename(columns={col: 'Player Load'}, inplace=True)
+                if 'total' in c_low and 'jumps' in c_low: frame.rename(columns={col: 'Total Jumps'}, inplace=True)
+                if 'estimated' in c_low and 'dist' in c_low: frame.rename(columns={col: 'Estimated Distance (y)'}, inplace=True)
+                if 'explosive' in c_low: frame.rename(columns={col: 'Explosive Efforts'}, inplace=True)
+                if 'duration' in c_low: frame.rename(columns={col: 'Duration'}, inplace=True)
+
+            # 2. FORCE NUMERIC (The 'Nuclear' Sanitizer)
+            # List of columns we expect to be numbers
+            math_cols = ['Player Load', 'Total Jumps', 'Estimated Distance (y)', 'Explosive Efforts', 'Duration', 
+                         'Moderate Jumps', 'High Jumps', 'Jump Load', 'High Intensity Movement']
             
-            # --- THE PLAYER LOAD SYNC FIX ---
-            # If the sheet has "Total Player Load", rename it to "Player Load" immediately
-            load_synonyms = {'Total Player Load': 'Player Load', 'PlayerLoad': 'Player Load', 'Player_Load': 'Player Load'}
-            frame.rename(columns=load_synonyms, inplace=True)
-            
-            # Force numeric, turning text/errors into 0
-            for col in numeric_cols:
+            for col in math_cols:
                 if col in frame.columns:
-                    frame[col] = pd.to_numeric(frame[col], errors='coerce').fillna(0).astype(float)
+                    # This turns ANY string (like "-", "N/A", " yards") into 0.0
+                    frame[col] = pd.to_numeric(frame[col].astype(str).str.replace(r'[^0-9.]', '', regex=True), errors='coerce').fillna(0).astype(float)
+                else:
+                    # If a column is missing entirely, create it as 0 so the charts don't crash
+                    frame[col] = 0.0
             return frame
 
         # Load RAW Data
         df = pd.read_csv(st.secrets["GOOGLE_SHEET_URL"])
         match_df = pd.read_csv(st.secrets["MATCHES_SHEET_URL"])
         
-        rename_map = {
-            'Total Jumps': 'Total Jumps', 
-            'IMA Jump Count Med Band': 'Moderate Jumps', 
-            'IMA Jump Count High Band': 'High Jumps', 
-            'BMP Jumping Load': 'Jump Load', 
-            'Estimated Distance (y)': 'Estimated Distance (y)', 
-            'Explosive Efforts': 'Explosive Efforts', 
-            'High Intensity Movement': 'High Intensity Movement'
-        }
-
-        # math_targets should use the names AFTER rename_map and synonyms
-        math_targets = ['Player Load', 'Total Jumps', 'Moderate Jumps', 'High Jumps', 'Jump Load', 'Estimated Distance (y)', 'Explosive Efforts', 'High Intensity Movement', 'Duration']
-
         # Process Main Sheets
         for frame in [df, match_df]:
-            frame = sanitize_frame(frame, math_targets)
+            frame = heavy_sanitize(frame)
             frame['Sheet_Order'] = range(len(frame))
             frame['Date'] = pd.to_datetime(frame['Date'], errors='coerce')
-            frame.rename(columns=rename_map, inplace=True)
             
             if 'Week' in frame.columns:
                 frame['Week'] = pd.to_numeric(frame['Week'].astype(str).str.extract('(\d+)', expand=False), errors='coerce').fillna(0).astype(int)
@@ -126,21 +124,28 @@ if check_password():
             frame['PhotoURL'] = frame.groupby('Name')['PhotoURL'].ffill().bfill().fillna("https://www.w3schools.com/howto/img_avatar.png")
             frame['Session_Type'] = frame['Activity'].apply(lambda x: 'Game' if any(w in str(x).lower() for w in ['game', 'match', 'v.']) else 'Practice')
 
-        # Process CMJ and Phase Sheets
+        # Process CMJ
         cmj_df = pd.read_csv(st.secrets["CMJ_SHEET_URL"])
-        cmj_df = sanitize_frame(cmj_df, ['Jump Height (Imp-Mom) [cm]', 'RSI-modified [m/s]'])
+        cmj_df.columns = cmj_df.columns.str.strip()
         cmj_df['Test Date'] = pd.to_datetime(cmj_df['Test Date'], errors='coerce')
-        
+        # Specific Hawkin metrics
+        for col in ['Jump Height (Imp-Mom) [cm]', 'RSI-modified [m/s]']:
+            if col in cmj_df.columns:
+                cmj_df[col] = pd.to_numeric(cmj_df[col].astype(str).str.replace(r'[^0-9.]', '', regex=True), errors='coerce').fillna(0).astype(float)
+
+        # Process Phases
         phase_df = pd.read_csv(st.secrets["PHASES_SHEET_URL"])
+        phase_df = heavy_sanitize(phase_df)
         if 'Phases' in phase_df.columns: phase_df = phase_df.rename(columns={'Phases': 'Phase'})
-        # Ensure Phase sheet naming is synced before sanitizing
-        phase_df = sanitize_frame(phase_df, math_targets)
         phase_df['Date'] = pd.to_datetime(phase_df['Date'], errors='coerce')
         
         try:
             thresh_df = pd.read_csv(st.secrets["THRESH_SHEET_URL"])
             thresh_df.columns = thresh_df.columns.str.strip()
-            thresh_df = sanitize_frame(thresh_df, ['Load_Limit', 'Jump_Limit'])
+            # Clean Thresholds
+            for col in ['Load_Limit', 'Jump_Limit']:
+                if col in thresh_df.columns:
+                    thresh_df[col] = pd.to_numeric(thresh_df[col].astype(str).str.replace(r'[^0-9.]', '', regex=True), errors='coerce').fillna(0).astype(float)
         except:
             thresh_df = None
             
