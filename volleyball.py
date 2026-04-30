@@ -511,8 +511,8 @@ if check_password():
                                 <table style="width:100%; border-collapse: collapse; text-align: center; margin-bottom: 25px;">
                                 <tr style="background-color: #f0f2f6; font-weight: bold;">
                                     <th style="padding: 10px; border: 1px solid #ddd;">Metric (Rate/Min)</th>
-                                    <th style="padding: 10px; border: 1px solid #ddd;">Match Rate</th>
                                     <th style="padding: 10px; border: 1px solid #ddd;">Practice Rate</th>
+                                    <th style="padding: 10px; border: 1px solid #ddd;">Match Rate</th>
                                 </tr>"""
                 for m in calc_cols:
                     if m in g_data_raw.index and m in w_avg.index:
@@ -521,7 +521,7 @@ if check_password():
                 st.markdown(week_html + "</table>", unsafe_allow_html=True)
 
                 # --- 6. VOLUME GAP ANALYSIS CARDS ---
-                st.markdown("### Total Volume Gap Analysis")
+                st.markdown("### Total Volume Analysis")
                 m_cols = st.columns(4)
                 for i, m in enumerate(calc_cols):
                     if m in g_data_raw.index and m in w_avg.index:
