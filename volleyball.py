@@ -71,15 +71,13 @@ if check_password():
     
     def get_flipped_gradient(score):
         try:
-            # Force the score to be a number
+            # Force numeric conversion and handle NaN/None
             score = float(score)
+            if pd.isna(score): return "#808080" 
         except (ValueError, TypeError):
-            # If the score is text like "N/A" or empty, return grey
-            return "#808080" 
+            return "#808080"  # Neutral grey for errors/strings
             
-        # Now the comparison will always work because both sides are numbers
-        return "#2D5A27" if score <= 40 else "#D4A017" if score <= 70 else "#A52A2A"  
-
+        return "#2D5A27" if score <= 40 else "#D4A017" if score <= 70 else "#A52A2A"
     @st.cache_data(ttl=10)
     def load_all_data():
         # 1. Load RAW Data
