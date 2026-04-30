@@ -69,9 +69,16 @@ if check_password():
         </style>
         """, unsafe_allow_html=True)
     
-    def get_flipped_gradient(score):
-        score = float(score)
-        return "#2D5A27" if score <= 40 else "#D4A017" if score <= 70 else "#A52A2A"    
+    ef get_flipped_gradient(score):
+        try:
+            # Force the score to be a number
+            score = float(score)
+        except (ValueError, TypeError):
+            # If the score is text like "N/A" or empty, return grey
+            return "#808080" 
+            
+        # Now the comparison will always work because both sides are numbers
+        return "#2D5A27" if score <= 40 else "#D4A017" if score <= 70 else "#A52A2A"  
 
     @st.cache_data(ttl=10)
     def load_all_data():
