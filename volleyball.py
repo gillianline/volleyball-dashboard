@@ -153,6 +153,14 @@ if check_password():
         session_list = raw_sessions.sort_values('Date', ascending=False)['Session_Name'].unique().tolist()
 
         with tabs[0]: # Tab 0: Individual Profile
+
+            col_map = {
+                'Player Load': 'Total Player Load',
+                'PlayerLoad': 'Total Player Load',
+                'Estimated Distance (y)': 'Distance (y)',
+                'Distance (y)': 'Distance (y)'
+            }
+            
             c_prof1, c_prof2 = st.columns(2)
             with c_prof1:
                 selected_session_prof = st.selectbox("Session Selection", session_list, index=0, key="nav_sel_prof")
