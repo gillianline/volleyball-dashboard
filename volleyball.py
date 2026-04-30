@@ -82,11 +82,10 @@ if check_password():
 
     @st.cache_data(ttl=10)
     def load_all_data():
-        # 1. Load Data
+        # 1. Load RAW Data
         df = pd.read_csv(st.secrets["GOOGLE_SHEET_URL"])
         match_df = pd.read_csv(st.secrets["MATCHES_SHEET_URL"])
         
-        # Define the exact names we want to use inside the app
         rename_map = {
             'Total Jumps': 'Total Jumps', 
             'IMA Jump Count Med Band': 'Moderate Jumps', 
@@ -101,19 +100,19 @@ if check_password():
         # 2. Process Primary and Match Sheets
         for frame in [df, match_df]:
             frame.columns = frame.columns.str.strip()
+            
+            # --- RESTORE SHEET ORDER ---
+            frame['Sheet_Order'] = range(len(frame))
+            
             frame['Date'] = pd.to_datetime(frame['Date'], errors='coerce')
             frame.rename(columns=rename_map, inplace=True)
             
-            # --- THE KEY FIX FOR THE FLOAT VS STR ERROR ---
-            # Identify all columns that should be numbers
+            # --- KEEP FLOAT SAFETY ---
             numeric_cols = list(rename_map.values()) + ['Duration']
             for col in numeric_cols:
                 if col in frame.columns:
-                    # errors='coerce' turns text like "-" or "N/A" into NaN
-                    # .fillna(0) turns those NaNs into 0.0 (a float)
                     frame[col] = pd.to_numeric(frame[col], errors='coerce').fillna(0).astype(float)
             
-            # Extract Week Number
             if 'Week' in frame.columns:
                 frame['Week'] = pd.to_numeric(frame['Week'].astype(str).str.extract('(\d+)', expand=False), errors='coerce').fillna(0).astype(int)
             
@@ -126,7 +125,6 @@ if check_password():
         cmj_df = pd.read_csv(st.secrets["CMJ_SHEET_URL"])
         cmj_df.columns = cmj_df.columns.str.strip()
         cmj_df['Test Date'] = pd.to_datetime(cmj_df['Test Date'], errors='coerce')
-        # Force RSI and Height to floats
         for col in ['Jump Height (Imp-Mom) [cm]', 'RSI-modified [m/s]']:
             if col in cmj_df.columns:
                 cmj_df[col] = pd.to_numeric(cmj_df[col], errors='coerce').fillna(0).astype(float)
@@ -136,7 +134,6 @@ if check_password():
         if 'Phases' in phase_df.columns: phase_df = phase_df.rename(columns={'Phases': 'Phase'})
         phase_df['Date'] = pd.to_datetime(phase_df['Date'], errors='coerce')
         phase_df.rename(columns=rename_map, inplace=True)
-        # Force numeric in phases
         for col in ['Player Load', 'Total Jumps']:
             if col in phase_df.columns:
                 phase_df[col] = pd.to_numeric(phase_df[col], errors='coerce').fillna(0).astype(float)
