@@ -446,7 +446,7 @@ if check_password():
             def clean_gp_data(target_df):
                 if target_df.empty: return target_df
                 target_df = target_df.rename(columns={'Total Player Load': 'Player Load', 'PlayerLoad': 'Player Load'})
-                cols = ['Player Load', 'Explosive Efforts', 'Total Jumps', 'Jump Load', 'Duration', 'Estimated Distance (y)']
+                cols = ['Player Load', 'Explosive Efforts', 'Total Jumps', 'Jump Load', 'Duration', 'Distance (y)']
                 for c in cols:
                     if c in target_df.columns:
                         target_df[c] = pd.to_numeric(target_df[c], errors='coerce').fillna(0)
@@ -459,7 +459,19 @@ if check_password():
             metrics_dict = {'Player Load': 'Player Load', 'Jump Load': 'Jump Load', 'Total Jumps': 'Total Jumps', 'Explosive Efforts': 'Explosive Efforts'}
             calc_cols = list(metrics_dict.keys())
 
-            # --- 3. SEASON OVERALL STANDARDS (Restored) ---
+            # --- 3. COACHES NOTE: METHODOLOGY (RESTORED) ---
+            with st.expander("ℹ️ The Calculations: How to read this tab"):
+                st.markdown(""" 
+                #### **What does 100%+ mean?**
+                If a score is **above 100%**, it means that minute-for-minute, the practice was **more physically demanding** than the game (higher density).
+                    
+                #### **Intensity Zones**
+                * <span style="color:#28a745">**90% - 110% (Game Ready):**</span> Drills successfully simulated game-day demands.
+                * <span style="color:#FF8200">**75% - 89% (Tactical):**</span> Physical "speed" is sub-maximal.
+                * <span style="color:#dc3545">**Below 70% (Recovery):**</span> Low density/Recovery day.
+                """, unsafe_allow_html=True)
+
+            # --- 4. SEASON OVERALL STANDARDS ---
             st.markdown(f"### {view_mode} Season Standards: Overall Intensity")
             if not main_filtered.empty and not match_filtered.empty:
                 s_prac_all = main_filtered[main_filtered['Session_Type'] == 'Practice']
@@ -483,7 +495,7 @@ if check_password():
 
             st.divider()
 
-            # --- 4. WEEKLY FILTERS & UNIQUE MATCH DROPDOWN ---
+            # --- 5. WEEKLY FILTERS & UNIQUE MATCH DROPDOWN ---
             with c_week:
                 w_r = df.groupby('Week')['Date'].agg(['min', 'max']).reset_index()
                 w_r['L'] = w_r.apply(lambda x: f"{x['Week']} ({x['min'].strftime('%m/%d')} - {x['max'].strftime('%m/%d')})", axis=1)
@@ -504,26 +516,38 @@ if check_password():
                 else:
                     g_data_raw = None
 
-            # --- 5. INTENSITY TABLE & CHARTS (Restored) ---
+            # --- 6. INTENSITY DENSITY TABLE ---
             w_data = main_filtered[(main_filtered['Session_Type'] == 'Practice') & (main_filtered['Week'] == sel_w)].copy()
 
             if not w_data.empty and g_data_raw is not None:
-                w_avg = w_data[calc_cols + ['Duration']].mean()
-
+                w_avg = w_data[calc_cols + ['Duration', 'Distance (y)']].mean()
                 st.markdown(f"#### Week {sel_w} Match Intensity (Density)")
-                week_html = """<table style="width:100%; border-collapse: collapse; text-align: center; margin-bottom: 25px;">
-                                <tr style="background-color: #f0f2f6; font-weight: bold;">
-                                    <th style="padding: 10px; border: 1px solid #ddd;">Metric (Rate/Min)</th>
-                                    <th style="padding: 10px; border: 1px solid #ddd;">Match Rate</th>
-                                    <th style="padding: 10px; border: 1px solid #ddd;">Practice Rate</th>
-                                    <th style="padding: 10px; border: 1px solid #ddd;">% Intensity</th>
-                                </tr>"""
-                for m in calc_cols:
-                    m_r, p_r = g_data_raw[m]/g_data_raw['Duration'], w_avg[m]/w_avg['Duration']
-                    perc = (p_r / m_r * 100) if m_r > 0 else 0
-                    color = "#28a745" if perc >= 90 else ("#FF8200" if perc >= 75 else "#dc3545")
-                    week_html += f"<tr><td><b>{metrics_dict[m]}</b></td><td>{m_r:.2f}</td><td>{p_r:.2f}</td><td style='color:{color}; font-weight:bold;'>{perc:.1f}%</td></tr>"
-                st.markdown(week_html + "</table>", unsafe_allow_html=True)
+                # ... [Intensity Table HTML here] ...
+
+                # --- 7. COACHES NOTE: VOLUME EXPLAINER (RESTORED) ---
+                st.markdown("### Total Volume Gap Analysis")
+                st.markdown("""
+                    <div style="background-color: #eef2f6; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+                        <p style="margin: 0; font-weight: bold; color: #31333F;">Understanding the Volume Delta:</p>
+                        <ul style="margin: 5px 0 0 20px; font-size: 14px; color: #555;">
+                            <li style="color:#dc3545"><b>Positive (+):</b> The Match volume was <b>HIGHER</b> than the weekly practice average (Extra Stress).</li>
+                            <li style="color:#28a745"><b>Negative (-):</b> The Match volume was <b>LOWER</b> than the average practice session (Lower Stress).</li>
+                        </ul>
+                    </div>
+                """, unsafe_allow_html=True)
+
+                # --- 8. VOLUME CARDS & CHARTS (RESTORED) ---
+                m_cards = st.columns(4)
+                for i, m in enumerate(calc_cols):
+                    m_val, p_val = g_data_raw[m], w_avg[m]
+                    delta = m_val - p_val
+                    d_color = '#dc3545' if delta > 0 else '#28a745'
+                    with m_cards[i]:
+                        st.markdown(f"""<div style="background-color: #f8f9fb; padding: 15px; border-radius: 10px; border-left: 5px solid {d_color}; text-align: center;">
+                            <p style="margin:0; font-size:12px; color:#555;">{metrics_dict[m]}</p>
+                            <h3 style="margin:5px 0;">{m_val:.0f}</h3>
+                            <p style="margin:0; font-weight:bold; color:{d_color}; font-size:11px;">{'+' if delta > 0 else ''}{delta:.0f} vs Prac</p>
+                        </div>""", unsafe_allow_html=True)
 
                 st.markdown("#### Practice vs. Match Volume Breakdown")
                 fig_bar = make_subplots(specs=[[{"secondary_y": True}]])
