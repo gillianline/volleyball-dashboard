@@ -428,7 +428,7 @@ if check_password():
             # --- 3. SEASON OVERALL STANDARDS ---
             st.markdown(f"### {view_mode} Season Standards: Overall Intensity")
             if not main_filtered.empty and not match_filtered.empty:
-                s_metrics = {'Total Player Load': 'Player Load', 'Explosive Efforts': 'Explosive Efforts', 'Total Jumps': 'Total Jumps', 'Estimated Distance (y)': 'Estimated Dist.'}
+                s_metrics = {'Total Player Load': 'Load', 'Explosive Efforts': 'Expl.', 'Total Jumps': 'Jumps', 'Estimated Distance (y)': 'Dist'}
                 s_calc = list(s_metrics.keys())
                 s_prac_all = main_filtered[main_filtered['Session_Type'] == 'Practice']
                 s_p_avg = s_prac_all[s_calc + ['Duration']].mean()
@@ -497,7 +497,7 @@ if check_password():
                         <p style="margin: 0; font-weight: bold; color: #31333F;">Understanding the Meaning:</p>
                         <ul style="margin: 5px 0 0 20px; font-size: 14px; color: #555;">
                             <li style="color:#dc3545"><b>Positive (+):</b> The Match volume was <b>HIGHER</b> than the weekly practice average.</li>
-                            <li style="color:#28a745"><b>Negative (-):</b> The Match volume was <b>LOWER</b> than the average practice session.</li>
+                            <li><b>Negative (-):</b> The Match volume was <b>LOWER</b> than the average practice session.</li>
                         </ul>
                     </div>
                 """, unsafe_allow_html=True)
