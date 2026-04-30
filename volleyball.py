@@ -283,39 +283,50 @@ if check_password():
                         )
                         st.plotly_chart(fig, use_container_width=True, config=LOCKED_CONFIG, key=f"readiness_final_clean_{selected_athlete_prof}")
 
-                # --- 6. SESSION PHASE BREAKDOWN (RESTORING THE MISSING PIECE) ---
+                # --- 6. PRACTICE PHASE BREAKDOWN (FIXED: LOAD BARS + JUMP LINE) ---
                 st.markdown('<div class="section-header">Session Phase Distribution</div>', unsafe_allow_html=True)
                 
-                # Identify if periods exist in the data
-                phase_col = 'Period' if 'Period' in p_full_prof.columns else 'Session_Name'
-                
-                # Pull ALL split data for this specific athlete and date
-                p_day_phases = df[(df['Name'] == selected_athlete_prof) & (df['Date'] == curr_date_prof)].rename(columns=col_map).copy()
+                p_day_phases = p_full_prof[p_full_prof['Date'] == curr_date_prof].copy()
+                phase_col = 'Period' if 'Period' in p_day_phases.columns else 'Session_Name'
 
                 if not p_day_phases.empty:
-                    # Aggregate by Phase
                     phase_dist = p_day_phases.groupby(phase_col).agg({
                         'Total Player Load': 'sum',
-                        'Explosive Efforts': 'sum',
-                        'Duration': 'sum'
+                        'Total Jumps': 'sum'
                     }).reset_index()
 
-                    # Filter out zero-duration noise
-                    phase_dist = phase_dist[phase_dist['Duration'] > 0]
-                    phase_dist['Intensity'] = phase_dist['Total Player Load'] / phase_dist['Duration']
-
-                    fig_phases = make_subplots(specs=[[{"secondary_y": True}]])
-                    # Volume Bars
-                    fig_phases.add_trace(go.Bar(x=phase_dist[phase_col], y=phase_dist['Total Player Load'], name="Phase Load", marker_color='#4895DB'), secondary_y=False)
-                    # Intensity Line
-                    fig_phases.add_trace(go.Scatter(x=phase_dist[phase_col], y=phase_dist['Intensity'], name="Intensity (Load/Min)", line=dict(color='#FF8200', width=3), mode='lines+markers'), secondary_y=True)
-
-                    fig_phases.update_layout(height=350, template="simple_white", showlegend=True, legend=dict(orientation="h", y=1.1, x=1), xaxis_title="Practice Period")
-                    st.plotly_chart(fig_phases, use_container_width=True, key=f"phase_dist_{selected_athlete_prof}")
+                    fig_ph = make_subplots(specs=[[{"secondary_y": True}]])
                     
-                    hardest = phase_dist.loc[phase_dist['Intensity'].idxmax()]
-                    st.caption(f" **Highest Intensity Period:** {hardest[phase_col]} at {hardest['Intensity']:.2f} Load/Min.")
-                        
+                    # 1. Player Load as BARS
+                    fig_ph.add_trace(go.Bar(
+                        x=phase_dist[phase_col], 
+                        y=phase_dist['Total Player Load'], 
+                        name="Player Load", 
+                        marker_color='#4895DB'
+                    ), secondary_y=False)
+                    
+                    # 2. Total Jumps as LINE
+                    fig_ph.add_trace(go.Scatter(
+                        x=phase_dist[phase_col], 
+                        y=phase_dist['Total Jumps'], 
+                        name="Total Jumps", 
+                        line=dict(color='#FF8200', width=4),
+                        mode='lines+markers'
+                    ), secondary_y=True)
+
+                    fig_ph.update_layout(
+                        height=350, 
+                        template="simple_white", 
+                        showlegend=True, 
+                        legend=dict(orientation="h", y=1.1, x=1),
+                        xaxis_title="Practice Period"
+                    )
+                    
+                    fig_ph.update_yaxes(title_text="Total Player Load", secondary_y=False)
+                    fig_ph.update_yaxes(title_text="Total Jumps", secondary_y=True)
+                    
+                    st.plotly_chart(fig_ph, use_container_width=True, key=f"session_phase_jumps_{selected_athlete_prof}")
+                    
         with tabs[1]: # Tab 1: Gallery
             c_gal1, c_gal2 = st.columns(2)
             with c_gal1: 
