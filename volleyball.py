@@ -283,9 +283,10 @@ if check_password():
                         )
                         st.plotly_chart(fig, use_container_width=True, config=LOCKED_CONFIG, key=f"readiness_final_clean_{selected_athlete_prof}")
 
-                # --- 6. PRACTICE PHASE BREAKDOWN (FIXED: LOAD BARS + JUMP LINE) ---
-                st.markdown('<div class="section-header">Session Phase Distribution</div>', unsafe_allow_html=True)
+                # --- 6. SESSION PHASE BREAKDOWN (FIXED: LOAD BARS + JUMP LINE) ---
+                st.markdown('<div class="section-header">Practice Phase Analysis</div>', unsafe_allow_html=True)
                 
+                # Get all split/period data for this athlete on this date
                 p_day_phases = p_full_prof[p_full_prof['Date'] == curr_date_prof].copy()
                 phase_col = 'Period' if 'Period' in p_day_phases.columns else 'Session_Name'
 
@@ -297,15 +298,15 @@ if check_password():
 
                     fig_ph = make_subplots(specs=[[{"secondary_y": True}]])
                     
-                    # 1. Player Load as BARS
+                    # Volume: BARS (Total Player Load)
                     fig_ph.add_trace(go.Bar(
                         x=phase_dist[phase_col], 
                         y=phase_dist['Total Player Load'], 
-                        name="Player Load", 
+                        name="Player Load (Vol)", 
                         marker_color='#4895DB'
                     ), secondary_y=False)
                     
-                    # 2. Total Jumps as LINE
+                    # Density: LINE (Total Jumps)
                     fig_ph.add_trace(go.Scatter(
                         x=phase_dist[phase_col], 
                         y=phase_dist['Total Jumps'], 
@@ -315,17 +316,16 @@ if check_password():
                     ), secondary_y=True)
 
                     fig_ph.update_layout(
-                        height=350, 
+                        height=400, 
                         template="simple_white", 
-                        showlegend=True, 
-                        legend=dict(orientation="h", y=1.1, x=1),
-                        xaxis_title="Practice Period"
+                        legend=dict(orientation="h", y=1.1, x=0.5, xanchor="center"),
+                        margin=dict(l=0, r=0, t=30, b=0)
                     )
                     
-                    fig_ph.update_yaxes(title_text="Total Player Load", secondary_y=False)
+                    fig_ph.update_yaxes(title_text="Player Load", secondary_y=False)
                     fig_ph.update_yaxes(title_text="Total Jumps", secondary_y=True)
                     
-                    st.plotly_chart(fig_ph, use_container_width=True, key=f"session_phase_jumps_{selected_athlete_prof}")
+                    st.plotly_chart(fig_ph, use_container_width=True, key=f"session_phase_fixed_{selected_athlete_prof}")
                     
         with tabs[1]: # Tab 1: Gallery
             c_gal1, c_gal2 = st.columns(2)
