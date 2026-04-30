@@ -277,30 +277,24 @@ if check_password():
                         st.plotly_chart(fig, use_container_width=True, config=LOCKED_CONFIG, key=f"readiness_final_clean_{selected_athlete_prof}")
 
                 # --- PRACTICE PHASE BREAKDOWN ---
-                st.markdown('<div class="section-header">Session Phase Distribution</div>', unsafe_allow_html=True)
-                
-                # Filter for all data on this date to get the split/period breakdown
-                p_day_phases = df[(df['Name'] == selected_athlete_prof) & (df['Date'] == curr_date_prof)].copy()
-                
-                # Handles the 'Label do not exist' error by syncing the naming convention
-                p_day_phases = p_day_phases.rename(columns={'Player Load': 'Total Player Load', 'PlayerLoad': 'Total Player Load'})
-                phase_col = 'Period' if 'Period' in p_day_phases.columns else 'Session_Name'
 
-                if not p_day_phases.empty:
-                    phase_dist = p_day_phases.groupby(phase_col).agg({'Total Player Load': 'sum', 'Total Jumps': 'sum'}).reset_index()
+                p_ph = phase_df[(phase_df['Name'] == sel_p) & (phase_df['Date'] == curr_date)].copy()
+
+                if not p_ph.empty:
+
+                    st.markdown('<div class="section-header">Practice Phase Breakdown</div>', unsafe_allow_html=True)
 
                     fig_ph = make_subplots(specs=[[{"secondary_y": True}]])
-                    # Player Load as BARS
-                    fig_ph.add_trace(go.Bar(x=phase_dist[phase_col], y=phase_dist['Total Player Load'], name="Player Load", marker_color='#4895DB'), secondary_y=False)
-                    # Total Jumps as LINE
-                    fig_ph.add_trace(go.Scatter(x=phase_dist[phase_col], y=phase_dist['Total Jumps'], name="Total Jumps", line=dict(color='#FF8200', width=4), mode='lines+markers'), secondary_y=True)
 
-                    fig_ph.update_layout(height=350, template="simple_white", showlegend=True, legend=dict(orientation="h", y=1.1, x=1), xaxis_title="Practice Period")
-                    fig_ph.update_yaxes(title_text="Player Load", secondary_y=False)
-                    fig_ph.update_yaxes(title_text="Total Jumps", secondary_y=True)
-                    
-                    st.plotly_chart(fig_ph, use_container_width=True, key=f"session_phase_dist_{selected_athlete_prof}")
-                    
+                    fig_ph.add_trace(go.Bar(x=p_ph['Phase'], y=p_ph['Total Jumps'], name="Jumps", marker_color='#FF8200'), secondary_y=False)
+
+                    fig_ph.add_trace(go.Scatter(x=p_ph['Phase'], y=p_ph['Player Load'], name="Load", line=dict(color='#4895DB', width=4)), secondary_y=False)
+
+                    fig_ph.update_layout(height=350, showlegend=True, template="simple_white", legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
+
+                    st.plotly_chart(fig_ph, use_container_width=True, config=LOCKED_CONFIG)
+
+        
         with tabs[1]: # Tab 1: Gallery
             c_gal1, c_gal2 = st.columns(2)
             with c_gal1: 
