@@ -544,10 +544,10 @@ if check_password():
                         <p style="margin: 0; font-weight: bold; color: #31333F; font-size: 15px;">How to read the +/- vs Practice:</p>
                         <ul style="margin: 8px 0 0 20px; font-size: 14px; color: #444;">
                             <li style="margin-bottom: 5px;">
-                                <span style="color:#dc3545; font-weight:bold;">Positive (+):</span> The Match volume was <b>HIGHER</b> than your average training session. This indicates a physical "spike" compared to practice.
+                                <span style="color:#dc3545; font-weight:bold;">Positive (+):</span> The Match volume was <b>HIGHER</b> than your average training session.
                             </li>
                             <li>
-                                <span style="color:#28a745; font-weight:bold;">Negative (-):</span> The Match volume was <b>LOWER</b> than a typical practice. This suggests training is successfully over-preparing the athlete for these specific match demands.
+                                <span style="color:#28a745; font-weight:bold;">Negative (-):</span> The Match volume was <b>LOWER</b> than a typical practice.
                             </li>
                         </ul>
                     </div>
