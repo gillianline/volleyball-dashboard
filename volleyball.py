@@ -535,21 +535,47 @@ if check_password():
             
                 st.markdown(week_html + "</table>", unsafe_allow_html=True)
 
-                # --- 6. VOLUME GAP ANALYSIS CARDS ---
+                # --- 7. VOLUME GAP ANALYSIS (Restored Legend) ---
                 st.markdown("### Total Volume Analysis")
+                
+                # Coaches' Legend Box
+                st.markdown("""
+                    <div style="background-color: #f0f2f6; padding: 15px; border-radius: 10px; margin-bottom: 20px; border: 1px solid #e6e9ef;">
+                        <p style="margin: 0; font-weight: bold; color: #31333F; font-size: 15px;">How to read the +/- vs Practice:</p>
+                        <ul style="margin: 8px 0 0 20px; font-size: 14px; color: #444;">
+                            <li style="margin-bottom: 5px;">
+                                <span style="color:#dc3545; font-weight:bold;">Positive (+):</span> The Match volume was <b>HIGHER</b> than your average training session. This indicates a physical "spike" compared to practice.
+                            </li>
+                            <li>
+                                <span style="color:#28a745; font-weight:bold;">Negative (-):</span> The Match volume was <b>LOWER</b> than a typical practice. This suggests training is successfully over-preparing the athlete for these specific match demands.
+                            </li>
+                        </ul>
+                    </div>
+                """, unsafe_allow_html=True)
+
+                # Match Header for Context
+                st.markdown(f"**Data Comparison: {sel_m_name}**")
+                
+                # Volume Metric Cards
                 m_cols = st.columns(4)
                 for i, m in enumerate(calc_cols):
                     if m in g_data_raw.index and m in w_avg.index:
                         m_val, p_val = g_data_raw[m], w_avg[m]
                         delta = m_val - p_val
+                        
+                        # Use Red for Positive (Spike) and Green for Negative (Under Match Load)
                         d_color = '#dc3545' if delta > 0 else '#28a745'
+                        
                         with m_cols[i]:
-                            st.markdown(f"""<div style="background-color: #f8f9fb; padding: 15px; border-radius: 10px; border-left: 5px solid {d_color}; text-align: center;">
-                                <p style="margin:0; font-size:14px; color:#555;">{metrics_dict[m]}</p>
-                                <h2 style="margin:5px 0;">{m_val:.0f}</h2>
-                                <p style="margin:0; font-weight:bold; color:{d_color};">{'+' if delta > 0 else ''}{delta:.0f} vs Practice</p>
-                            </div>""", unsafe_allow_html=True)
-
+                            st.markdown(f"""
+                                <div style="background-color: white; padding: 15px; border-radius: 10px; border: 1px solid #E5E5E7; border-left: 5px solid {d_color}; text-align: center;">
+                                    <p style="margin:0; font-size:13px; color:#666; font-weight:600;">{metrics_dict[m]}</p>
+                                    <h2 style="margin:8px 0; color:#31333F;">{m_val:.0f}</h2>
+                                    <p style="margin:0; font-weight:bold; color:{d_color}; font-size:13px;">
+                                        {'+' if delta > 0 else ''}{delta:.0f} vs Practice
+                                    </p>
+                                </div>
+                            """, unsafe_allow_html=True)
                 # --- 7. VOLUME COMPARISON BAR CHART ---
                 st.markdown("#### Practice vs. Match Volume Breakdown")
                 fig_bar = make_subplots(specs=[[{"secondary_y": True}]])
