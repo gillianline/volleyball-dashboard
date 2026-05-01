@@ -1185,7 +1185,7 @@ if check_password():
                         mx = lb[m].max()
                         row_grades.append(math.ceil((row[m] / mx) * 100) if mx > 0 else 0)
                     scores_list.append({
-                        'Date': row['Date'], 'Date': row['Date'], 
+                        'Date': row['Date'], 'Display': row['Date'], 
                         'Score': round(sum(row_grades)/len(row_grades), 1), 
                         'Week': str(row['Week']) # String for categorical comparison
                     })
