@@ -1185,7 +1185,7 @@ if check_password():
                         mx = lb[m].max()
                         row_grades.append(math.ceil((row[m] / mx) * 100) if mx > 0 else 0)
                     scores_list.append({
-                        'Date': row['Date'], 'Display': row['Display'], 
+                        'Date': row['Date'], 'Date': row['Date'], 
                         'Score': round(sum(row_grades)/len(row_grades), 1), 
                         'Week': str(row['Week']) # String for categorical comparison
                     })
@@ -1194,7 +1194,7 @@ if check_password():
 
                 # A. Master Timeline (The Long Graph)
                 st.markdown("### Full Season")
-                fig_master = px.line(master_df, x='Display', y='Score', markers=True, text='Score', range_y=[0, 145])
+                fig_master = px.line(master_df, x='Date', y='Score', markers=True, text='Score', range_y=[0, 145])
 
                 # --- VERTICAL LINES LOGIC ---
                 # We loop through the master_df indices to find where the Week changes
@@ -1243,7 +1243,7 @@ if check_password():
                 for w_val in unique_weeks:
                     w_data = master_df[master_df['Week'] == w_val]
                     st.subheader(f"Week {w_val}")
-                    fig_w = px.line(w_data, x='Display', y='Score', markers=True, text='Score', range_y=[0, 115])
+                    fig_w = px.line(w_data, x='Date', y='Score', markers=True, text='Score', range_y=[0, 115])
                     fig_w.update_traces(line=dict(color='#FF8200', width=4), marker=dict(size=12, color='#4895DB'), textposition='top center')
                     fig_w.update_layout(height=350, template="simple_white", xaxis=dict(type='category'))
                     
