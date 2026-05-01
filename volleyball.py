@@ -1146,7 +1146,7 @@ if check_password():
                 st.warning("Please ensure 'Phases' and 'Thresholds' sheets are properly loaded.")
 
                 
-        with tabs[2]: # Performance History
+        with tabs[2]: # Tab 2: Performance History
             st.markdown('<div class="section-header">Season History & Team Weekly Review</div>', unsafe_allow_html=True)
             
             sub_tabs = st.tabs(["Individual Weekly Review", "Team Weekly Review"])
@@ -1159,65 +1159,60 @@ if check_password():
                 all_athletes = sorted(df['Name'].unique())
                 sel_ath_hist = st.selectbox("Select Athlete", all_athletes, key="master_ath_sel")
                 
-                # Data Preparation (Daily Totals)
+                # Data Preparation
                 p_full = df[df['Name'] == sel_ath_hist].copy()
                 p_full['Date'] = pd.to_datetime(p_full['Date'])
                 
-                # Group raw data to handle multiple matches per day
+                # Group raw data
                 daily_raw = p_full.groupby(['Date', 'Week'])[metrics_to_score].sum().reset_index()
+                daily_raw = daily_raw.sort_values('Date') # Ensure chronological order before labeling
                 
-                # Dynamic Naming (Match Name or "Match Day")
-                display_names = []
-                for idx, row in daily_raw.iterrows():
-                    orig = p_full[p_full['Date'] == row['Date']]
-                    if len(orig) > 1:
-                        display_names.append(f"Match Day {row['Date'].strftime('%m/%d')}")
-                    else:
-                        display_names.append(orig['Session_Name'].iloc[0])
-                daily_raw['Display'] = display_names
-                
-                # Calculate Scores
                 scores_list = []
                 for idx, row in daily_raw.iterrows():
                     row_grades = []
+                    # 30-day rolling lookback
                     lb = daily_raw[(daily_raw['Date'] >= row['Date'] - timedelta(days=30)) & (daily_raw['Date'] <= row['Date'])]
+                    
                     for m in metrics_to_score:
                         mx = lb[m].max()
                         row_grades.append(math.ceil((row[m] / mx) * 100) if mx > 0 else 0)
+                    
+                    # THE FIX: Create a clean date string for the X-axis label
+                    clean_label = row['Date'].strftime('%m/%d')
+                    
                     scores_list.append({
-                        'Date': row['Date'], 'Display': row['Date'], 
+                        'Date': row['Date'], 
+                        'Display': clean_label, # This is what shows on the axis
                         'Score': round(sum(row_grades)/len(row_grades), 1), 
-                        'Week': str(row['Week']) # String for categorical comparison
+                        'Week': str(row['Week'])
                     })
                 
-                master_df = pd.DataFrame(scores_list).sort_values('Date')
+                master_df = pd.DataFrame(scores_list).sort_values('Date').reset_index(drop=True)
 
-                # A. Master Timeline (The Long Graph)
-                st.markdown("### Full Season")
-                fig_master = px.line(master_df, x='Date', y='Score', markers=True, text='Score', range_y=[0, 145])
+                # A. Master Timeline
+                st.markdown("### Full Season Progression")
+                # Use 'Display' for X to keep the labels clean
+                fig_master = px.line(master_df, x='Display', y='Score', markers=True, text='Score', range_y=[0, 150])
 
                 # --- VERTICAL LINES LOGIC ---
-                # We loop through the master_df indices to find where the Week changes
                 for i in range(1, len(master_df)):
                     if master_df.iloc[i]['Week'] != master_df.iloc[i-1]['Week']:
-                        # Add the dashed line at the half-way point between sessions
+                        # Add dashed line between categories
                         fig_master.add_vline(
                             x=i-0.5, 
                             line_dash="dash", 
                             line_color="#515154", 
-                            opacity=0.4,
+                            opacity=0.3,
                             line_width=1
                         )
-                        # Add the "Week X" label at the top
+                        # Add Week label
                         fig_master.add_annotation(
                             x=i-0.5, 
-                            y=135, 
-                            text=f"Week {master_df.iloc[i]['Week']}", 
+                            y=140, 
+                            text=f"Wk {master_df.iloc[i]['Week']}", 
                             showarrow=False, 
-                            font=dict(color="#515154", size=10),
-                            bgcolor="white",
-                            bordercolor="#E5E5E7",
-                            borderwidth=1
+                            font=dict(color="#515154", size=9),
+                            bgcolor="white"
                         )
 
                 fig_master.update_traces(
@@ -1228,37 +1223,33 @@ if check_password():
                 
                 fig_master.update_layout(
                     template="simple_white", 
-                    height=480, 
-                    xaxis=dict(type='category', title="Session / Match Day", tickangle=-45),
-                    yaxis=dict(title="Daily Practice Score", showgrid=True, gridcolor="#f5f5f5"),
-                    margin=dict(l=10, r=10, t=50, b=100)
+                    height=450, 
+                    xaxis=dict(type='category', title="Session Date"), # Forces category to use our 'Display' strings
+                    yaxis=dict(title="Performance Score", showgrid=True, gridcolor="#f5f5f5"),
+                    margin=dict(l=10, r=10, t=50, b=50)
                 )
                 
-                # Chart with unique key
-                st.plotly_chart(fig_master, use_container_width=True, config=LOCKED_CONFIG, key=f"master_full_{sel_ath_hist}")
+                st.plotly_chart(fig_master, use_container_width=True, key=f"master_full_{sel_ath_hist}")
                 
                 st.markdown("---")
-                st.markdown("### Weekly Progressions")
+                # Weekly breakdown logic remains identical but uses the standardized Display
                 unique_weeks = sorted(master_df['Week'].unique(), key=int, reverse=True)
                 for w_val in unique_weeks:
                     w_data = master_df[master_df['Week'] == w_val]
-                    st.subheader(f"Week {w_val}")
-                    fig_w = px.line(w_data, x='Date', y='Score', markers=True, text='Score', range_y=[0, 115])
+                    st.subheader(f"Week {w_val} Detail")
+                    fig_w = px.line(w_data, x='Display', y='Score', markers=True, text='Score', range_y=[0, 120])
                     fig_w.update_traces(line=dict(color='#FF8200', width=4), marker=dict(size=12, color='#4895DB'), textposition='top center')
-                    fig_w.update_layout(height=350, template="simple_white", xaxis=dict(type='category'))
-                    
-                    # ADDED DYNAMIC KEY HERE
+                    fig_w.update_layout(height=300, template="simple_white", xaxis=dict(type='category', title=None))
                     st.plotly_chart(fig_w, use_container_width=True, key=f"week_chart_{sel_ath_hist}_{w_val}")
 
             # ---------------------------------------------------------
-            # SUB-TAB 2: TEAM WEEKLY REVIEW
+            # SUB-TAB 2: TEAM WEEKLY REVIEW (Corrected for Labels)
             # ---------------------------------------------------------
             with sub_tabs[1]:
                 avail_weeks = sorted(df['Week'].unique(), reverse=True)
-                sel_week = st.selectbox("Select Week", avail_weeks, key="team_week_sel")
+                sel_week = st.selectbox("Select Review Week", avail_weeks, key="team_week_sel")
                 
                 week_df = df[df['Week'] == sel_week].copy()
-                week_df['Date'] = pd.to_datetime(week_df['Date'])
                 ath_names = sorted(week_df['Name'].unique())
                 
                 for i in range(0, len(ath_names), 2):
@@ -1269,8 +1260,8 @@ if check_password():
                             p_all = df[df['Name'] == name].copy()
                             p_all['Date'] = pd.to_datetime(p_all['Date'])
                             
-                            p_daily = p_all.groupby(['Date', 'Week'])[metrics_to_score].sum().reset_index()
-                            w_daily = p_daily[p_daily['Week'].astype(str) == str(sel_week)].sort_values('Date')
+                            p_daily = p_all.groupby(['Date', 'Week'])[metrics_to_score].sum().reset_index().sort_values('Date')
+                            w_daily = p_daily[p_daily['Week'].astype(str) == str(sel_week)]
                             
                             card_scores = []
                             for _, r in w_daily.iterrows():
@@ -1280,28 +1271,25 @@ if check_password():
                                     mx = lb[m].max()
                                     r_grades.append(math.ceil((r[m] / mx) * 100) if mx > 0 else 0)
                                 
-                                orig_day = p_all[p_all['Date'] == r['Date']]
-                                label = f"Match Day {r['Date'].strftime('%m/%d')}" if len(orig_day) > 1 else orig_day['Session_Name'].iloc[0]
-                                card_scores.append({'Display': label, 'Score': round(sum(r_grades)/len(r_grades), 0)})
+                                # Standard label: MM/DD
+                                date_label = r['Date'].strftime('%m/%d')
+                                card_scores.append({'Display': date_label, 'Score': round(sum(r_grades)/len(r_grades), 0)})
                             
                             p_meta = p_all.iloc[0]
                             with cols[j]:
                                 st.markdown(f"""
                                 <div style="border:1px solid #E5E5E7; border-top:4px solid #FF8200; border-radius:10px 10px 0 0; padding:10px; background:white;">
                                     <div style="display:flex; align-items:center; gap:12px;">
-                                        <img src="{p_meta["PhotoURL"]}" style="width:45px; height:45px; border-radius:50%;">
-                                        <p style="margin:0; font-weight:900; font-size:16px;">{name}</p>
+                                        <img src="{p_meta["PhotoURL"]}" style="width:40px; height:40px; border-radius:50%; object-fit:cover;">
+                                        <p style="margin:0; font-weight:900; font-size:15px;">{name}</p>
                                     </div>
                                 </div>
                                 """, unsafe_allow_html=True)
                                 
-                                fig_p = px.line(pd.DataFrame(card_scores), x='Display', y='Score', markers=True, text='Score', range_y=[0, 115])
+                                fig_p = px.line(pd.DataFrame(card_scores), x='Display', y='Score', markers=True, text='Score', range_y=[0, 125])
                                 fig_p.update_traces(line=dict(color='#FF8200', width=3), marker=dict(size=8, color='#4895DB'), textposition='top center')
-                                fig_p.update_layout(height=220, margin=dict(l=20, r=20, t=30, b=20), template="simple_white", xaxis=dict(type='category', title=None))
-                                
-                                # ADDED DYNAMIC KEY HERE
+                                fig_p.update_layout(height=200, margin=dict(l=20, r=20, t=30, b=20), template="simple_white", xaxis=dict(type='category', title=None))
                                 st.plotly_chart(fig_p, use_container_width=True, config={'displayModeBar': False}, key=f"team_card_{name}_{sel_week}")
-
 
         with tabs[3]: # Tab 7: CMJ Comparison
             st.markdown('<div class="section-header">CMJ Baseline vs. Post-Match Recovery</div>', unsafe_allow_html=True)
