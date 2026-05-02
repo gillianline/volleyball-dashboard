@@ -175,7 +175,7 @@ if check_password():
         st.markdown('<div class="main-logo-container" style="text-align: center; margin-top: 10px; margin-bottom: 15px;"><img src="https://upload.wikimedia.org/wikipedia/commons/thumb/f/fc/Tennessee_Lady_Volunteers_logo.svg/1280px-Tennessee_Lady_Volunteers_logo.svg.png" width="120"><div style="color: #FF8200; font-size: 2rem; font-weight: 900; margin-top: 10px;">LADY VOLS VOLLEYBALL PERFORMANCE</div></div>', unsafe_allow_html=True)
 
         
-        tabs = st.tabs(["Individual Profile", "Practice Scores", "Practice Score History", "Counter Movement Jumps", "Match v. Practice", "Match Summary", "Position Analysis", "Phase Analysis", "Practice Planner", "Practice Red Flags-TESTING"])
+        tabs = st.tabs(["Individual Profile", "Practice Scores", "Practice Score History", "Counter Movement Jumps", "Match v. Practice", "Match Summary", "Position Analysis", "Phase Analysis", "Practice Planner"])
         raw_sessions = df[df['Session_Name'].notna()]
         session_list = raw_sessions.sort_values('Date', ascending=False)['Session_Name'].unique().tolist()
 
@@ -1175,7 +1175,7 @@ if check_password():
         with tabs[2]: # Tab 2: Performance History
             st.markdown('<div class="section-header">Season History & Team Weekly Review</div>', unsafe_allow_html=True)
             
-            sub_tabs = st.tabs(["Individual Weekly Review", "Team Weekly Review"])
+            sub_tabs = st.tabs(["Individual Review", "Team Weekly Review"])
             metrics_to_score = [m for m in all_metrics if m not in ['High Jumps', 'Moderate Jumps', 'High Intensity Movement']]
 
             # ---------------------------------------------------------
@@ -1185,91 +1185,88 @@ if check_password():
                 all_athletes = sorted(df['Name'].unique())
                 sel_ath_hist = st.selectbox("Select Athlete", all_athletes, key="master_ath_sel")
                 
-                # Data Preparation
+                # 1. Performance Data Preparation
                 p_full = df[df['Name'] == sel_ath_hist].copy()
                 p_full['Date'] = pd.to_datetime(p_full['Date'])
-                
-                # Group raw data
-                daily_raw = p_full.groupby(['Date', 'Week'])[metrics_to_score].sum().reset_index()
-                daily_raw = daily_raw.sort_values('Date') # Ensure chronological order before labeling
+                daily_raw = p_full.groupby(['Date', 'Week'])[metrics_to_score].sum().reset_index().sort_values('Date')
                 
                 scores_list = []
                 for idx, row in daily_raw.iterrows():
                     row_grades = []
-                    # 30-day rolling lookback
                     lb = daily_raw[(daily_raw['Date'] >= row['Date'] - timedelta(days=30)) & (daily_raw['Date'] <= row['Date'])]
-                    
                     for m in metrics_to_score:
                         mx = lb[m].max()
                         row_grades.append(math.ceil((row[m] / mx) * 100) if mx > 0 else 0)
                     
-                    # THE FIX: Create a clean date string for the X-axis label
-                    clean_label = row['Date'].strftime('%m/%d')
-                    
                     scores_list.append({
                         'Date': row['Date'], 
-                        'Display': clean_label, # This is what shows on the axis
+                        'Display': row['Date'].strftime('%m/%d'), 
                         'Score': round(sum(row_grades)/len(row_grades), 1), 
                         'Week': str(row['Week'])
                     })
                 
-                master_df = pd.DataFrame(scores_list).sort_values('Date').reset_index(drop=True)
+                master_df = pd.DataFrame(scores_list).reset_index(drop=True)
 
-                # A. Master Timeline
-                st.markdown("### Full Season Progression")
-                # Use 'Display' for X to keep the labels clean
+                # A. Full Season Performance Graph
+                st.markdown("### Full Season Performance Progression")
                 fig_master = px.line(master_df, x='Display', y='Score', markers=True, text='Score', range_y=[0, 150])
 
-                # --- VERTICAL LINES LOGIC ---
+                # Week Divider Logic
                 for i in range(1, len(master_df)):
                     if master_df.iloc[i]['Week'] != master_df.iloc[i-1]['Week']:
-                        # Add dashed line between categories
-                        fig_master.add_vline(
-                            x=i-0.5, 
-                            line_dash="dash", 
-                            line_color="#515154", 
-                            opacity=0.3,
-                            line_width=1
-                        )
-                        # Add Week label
-                        fig_master.add_annotation(
-                            x=i-0.5, 
-                            y=140, 
-                            text=f"Wk {master_df.iloc[i]['Week']}", 
-                            showarrow=False, 
-                            font=dict(color="#515154", size=9),
-                            bgcolor="white"
-                        )
+                        fig_master.add_vline(x=i-0.5, line_dash="dash", line_color="#515154", opacity=0.3)
+                        fig_master.add_annotation(x=i-0.5, y=140, text=f"Wk {master_df.iloc[i]['Week']}", showarrow=False, bgcolor="white")
 
-                fig_master.update_traces(
-                    line=dict(color='#FF8200', width=3), 
-                    marker=dict(size=10, color='#4895DB', line=dict(width=2, color='white')),
-                    textposition='top center'
-                )
-                
-                fig_master.update_layout(
-                    template="simple_white", 
-                    height=450, 
-                    xaxis=dict(type='category', title="Session Date"), # Forces category to use our 'Display' strings
-                    yaxis=dict(title="Performance Score", showgrid=True, gridcolor="#f5f5f5"),
-                    margin=dict(l=10, r=10, t=50, b=50)
-                )
-                
+                fig_master.update_traces(line=dict(color='#FF8200', width=3), marker=dict(size=10, color='#4895DB', line=dict(width=2, color='white')), textposition='top center')
+                fig_master.update_layout(template="simple_white", height=400, xaxis=dict(type='category', title="Session Date"), yaxis_title="Daily Practice Score")
                 st.plotly_chart(fig_master, use_container_width=True, key=f"master_full_{sel_ath_hist}")
-                
+
                 st.markdown("---")
-                # Weekly breakdown logic remains identical but uses the standardized Display
-                unique_weeks = sorted(master_df['Week'].unique(), key=int, reverse=True)
-                for w_val in unique_weeks:
-                    w_data = master_df[master_df['Week'] == w_val]
-                    st.subheader(f"Week {w_val} Detail")
-                    fig_w = px.line(w_data, x='Display', y='Score', markers=True, text='Score', range_y=[0, 120])
-                    fig_w.update_traces(line=dict(color='#FF8200', width=4), marker=dict(size=12, color='#4895DB'), textposition='top center')
-                    fig_w.update_layout(height=300, template="simple_white", xaxis=dict(type='category', title=None))
-                    st.plotly_chart(fig_w, use_container_width=True, key=f"week_chart_{sel_ath_hist}_{w_val}")
+                
+                # 2. CMJ Readiness Integration (Replacing Weekly Graphs)
+                st.markdown("### Readiness History (Countermovement Jump)")
+                
+                if cmj_df is not None and not cmj_df.empty:
+                    # Filter CMJ for this specific athlete
+                    ath_cmj = cmj_df[cmj_df['Name'] == sel_ath_hist].copy().sort_values('Test Date')
+                    ath_cmj['DisplayDate'] = ath_cmj['Test Date'].dt.strftime('%m/%d')
+                    
+                    if not ath_cmj.empty:
+                        # Create a dual-axis chart for Jump Height and RSI-m
+                        from plotly.subplots import make_subplots
+                        fig_cmj = make_subplots(specs=[[{"secondary_y": True}]])
+
+                        # Jump Height Trace
+                        fig_cmj.add_trace(go.Scatter(
+                            x=ath_cmj['DisplayDate'], y=ath_cmj['Jump Height (Imp-Mom) [cm]'],
+                            name="Jump Height (cm)", mode='lines+markers',
+                            line=dict(color='#FF8200', width=3), marker=dict(size=8)
+                        ), secondary_y=False)
+
+                        # RSI-modified Trace
+                        fig_cmj.add_trace(go.Scatter(
+                            x=ath_cmj['DisplayDate'], y=ath_cmj['RSI-modified [m/s]'],
+                            name="RSI-modified", mode='lines+markers',
+                            line=dict(color='#4895DB', width=2, dash='dot'), marker=dict(size=8)
+                        ), secondary_y=True)
+
+                        fig_cmj.update_layout(
+                            height=400, template="simple_white", 
+                            title_text=f"Neuromuscular Readiness: {sel_ath_hist}",
+                            legend=dict(orientation="h", y=-0.2, x=0.5, xanchor="center"),
+                            xaxis=dict(type='category')
+                        )
+                        fig_cmj.update_yaxes(title_text="Jump Height (cm)", secondary_y=False)
+                        fig_cmj.update_yaxes(title_text="RSI-modified", secondary_y=True)
+                        
+                        st.plotly_chart(fig_cmj, use_container_width=True, key=f"cmj_hist_{sel_ath_hist}")
+                    else:
+                        st.info(f"No CMJ data found for {sel_ath_hist}.")
+                else:
+                    st.warning("CMJ Data Source not connected.")
 
             # ---------------------------------------------------------
-            # SUB-TAB 2: TEAM WEEKLY REVIEW (Corrected for Labels)
+            # SUB-TAB 2: TEAM WEEKLY REVIEW
             # ---------------------------------------------------------
             with sub_tabs[1]:
                 avail_weeks = sorted(df['Week'].unique(), reverse=True)
