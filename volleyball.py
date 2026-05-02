@@ -1298,7 +1298,7 @@ if check_password():
                     else:
                         st.warning(f"No Week 4 Baseline found for {sel_ath_hist}.")
             # ---------------------------------------------------------
-            # SUB-TAB 2: TEAM WEEKLY REVIEW (THE TUPLE ERROR FIX)
+            # SUB-TAB 2: TEAM WEEKLY REVIEW (LABEL POSITION FIX)
             # ---------------------------------------------------------
             with sub_tabs[1]:
                 avail_weeks = sorted(df['Week'].unique(), reverse=True)
@@ -1315,7 +1315,6 @@ if check_password():
                             p_daily = p_all.groupby(['Date', 'Week'])[metrics_to_score].sum().reset_index().sort_values('Date')
                             w_daily = p_daily[p_daily['Week'].astype(str) == str(sel_week)]
                             
-                            # SAFETY GATE: Only build chart if data exists
                             if not w_daily.empty:
                                 card_scores = []
                                 for _, r in w_daily.iterrows():
@@ -1328,12 +1327,31 @@ if check_password():
                                 
                                 with cols[j]:
                                     st.markdown(f'<div class="athlete-card-header">{name}</div>', unsafe_allow_html=True)
-                                    fig_p = px.line(pd.DataFrame(card_scores), x='Display', y='Score', markers=True, text='Score', range_y=[0, 125])
-                                    fig_p.update_layout(height=180, margin=dict(l=10, r=10, t=10, b=10), template="simple_white", xaxis=dict(type='category', title=None))
+                                    
+                                    # Increased range_y to 140 to give labels room at the top
+                                    fig_p = px.line(pd.DataFrame(card_scores), x='Display', y='Score', 
+                                                    markers=True, text='Score', range_y=[0, 140])
+                                    
+                                    # THE FIX: Explicit text positioning
+                                    fig_p.update_traces(
+                                        textposition="top center",
+                                        line=dict(color='#FF8200', width=3),
+                                        marker=dict(size=8, color='#4895DB')
+                                    )
+                                    
+                                    fig_p.update_layout(
+                                        height=200, # Slightly taller helps with label spacing
+                                        margin=dict(l=10, r=10, t=30, b=10), 
+                                        template="simple_white", 
+                                        xaxis=dict(type='category', title=None),
+                                        yaxis=dict(visible=False) # Hides the Y axis numbers to keep it clean
+                                    )
+                                    
                                     st.plotly_chart(fig_p, use_container_width=True, key=f"team_card_{name}_{sel_week}")
                             else:
-                                with cols[j]: st.write(f"**{name}**: No data for Week {sel_week}")
-                                
+                                with cols[j]: 
+                                    st.info(f"**{name}**: No sessions recorded")
+                                    
         #with tabs[3]: # Tab 7: CMJ Comparison
             #st.markdown('<div class="section-header">CMJ Baseline vs. Post-Match Recovery</div>', unsafe_allow_html=True)
             
