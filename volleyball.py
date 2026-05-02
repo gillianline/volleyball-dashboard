@@ -1298,7 +1298,7 @@ if check_password():
                     else:
                         st.warning(f"No Week 4 Baseline found for {sel_ath_hist}.")
             # ---------------------------------------------------------
-            # SUB-TAB 2: TEAM WEEKLY REVIEW (LABEL POSITION FIX)
+            # SUB-TAB 2: TEAM WEEKLY REVIEW
             # ---------------------------------------------------------
             with sub_tabs[1]:
                 avail_weeks = sorted(df['Week'].unique(), reverse=True)
@@ -1325,32 +1325,42 @@ if check_password():
                                         r_grades.append(math.ceil((r[m] / mx) * 100) if mx > 0 else 0)
                                     card_scores.append({'Display': r['Date'].strftime('%m/%d'), 'Score': round(sum(r_grades)/len(r_grades), 0)})
                                 
+                                # Grab photo URL from the main dataframe
+                                p_meta = p_all.iloc[0]
+                                
                                 with cols[j]:
-                                    st.markdown(f'<div class="athlete-card-header">{name}</div>', unsafe_allow_html=True)
+                                    # RESTORED PHOTO FORMATTING
+                                    st.markdown(f"""
+                                    <div style="border:1px solid #E5E5E7; border-top:4px solid #FF8200; border-radius:10px 10px 0 0; padding:10px; background:white;">
+                                        <div style="display:flex; align-items:center; gap:12px;">
+                                            <img src="{p_meta["PhotoURL"]}" style="width:40px; height:40px; border-radius:50%; object-fit:cover; border:1px solid #eee;">
+                                            <p style="margin:0; font-weight:900; font-size:15px; color:#31333F;">{name}</p>
+                                        </div>
+                                    </div>
+                                    """, unsafe_allow_html=True)
                                     
-                                    # Increased range_y to 140 to give labels room at the top
+                                    # GRAPH WITH LABEL FIXES
                                     fig_p = px.line(pd.DataFrame(card_scores), x='Display', y='Score', 
                                                     markers=True, text='Score', range_y=[0, 140])
                                     
-                                    # THE FIX: Explicit text positioning
                                     fig_p.update_traces(
                                         textposition="top center",
                                         line=dict(color='#FF8200', width=3),
-                                        marker=dict(size=8, color='#4895DB')
+                                        marker=dict(size=8, color='#4895DB', line=dict(width=1, color='white'))
                                     )
                                     
                                     fig_p.update_layout(
-                                        height=200, # Slightly taller helps with label spacing
-                                        margin=dict(l=10, r=10, t=30, b=10), 
+                                        height=200, 
+                                        margin=dict(l=15, r=15, t=30, b=10), 
                                         template="simple_white", 
                                         xaxis=dict(type='category', title=None),
-                                        yaxis=dict(visible=False) # Hides the Y axis numbers to keep it clean
+                                        yaxis=dict(visible=False)
                                     )
                                     
                                     st.plotly_chart(fig_p, use_container_width=True, key=f"team_card_{name}_{sel_week}")
                             else:
                                 with cols[j]: 
-                                    st.info(f"**{name}**: No sessions recorded")
+                                    st.info(f"**{name}**: No data for Week {sel_week}")
                                     
         #with tabs[3]: # Tab 7: CMJ Comparison
             #st.markdown('<div class="section-header">CMJ Baseline vs. Post-Match Recovery</div>', unsafe_allow_html=True)
