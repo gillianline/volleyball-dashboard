@@ -1125,7 +1125,7 @@ if check_password():
                                     #status = "CLEAR"
                                     # Use int() here for clean comparison logic
                                     #if int(a_totals['Player Load']) >= L_LIM or int(a_totals['Total Jumps']) >= J_LIM:
-                                        status = "WATCH"
+                                        #status = "WATCH"
 
                                     #ath_projections.append({
                                         #'Athlete': athlete,
@@ -1419,7 +1419,7 @@ if check_password():
 
                     # Labels for both axes
                     #fig_cmj.update_yaxes(title_text="<b>Height (cm)</b>", color="#4895DB", secondary_y=False)
-                    fig_cmj.update_yaxes(title_text="<b>RSI-mod</b>", color="#FF8200", secondary_y=True)
+                    #fig_cmj.update_yaxes(title_text="<b>RSI-mod</b>", color="#FF8200", secondary_y=True)
                     
                     #st.plotly_chart(fig_cmj, use_container_width=True, key="cmj_dual_trend")
                 #else:
