@@ -1179,13 +1179,13 @@ if check_password():
             metrics_to_score = [m for m in all_metrics if m not in ['High Jumps', 'Moderate Jumps', 'High Intensity Movement']]
 
             # ---------------------------------------------------------
-            # SUB-TAB 1: INDIVIDUAL SEASON PATH
+            # SUB-TAB 1: INDIVIDUAL SEASON PATH & READINESS
             # ---------------------------------------------------------
             with sub_tabs[0]:
                 all_athletes = sorted(df['Name'].unique())
                 sel_ath_hist = st.selectbox("Select Athlete", all_athletes, key="master_ath_sel")
                 
-                # 1. Performance Data Preparation
+                # 1. Performance Progression Logic
                 p_full = df[df['Name'] == sel_ath_hist].copy()
                 p_full['Date'] = pd.to_datetime(p_full['Date'])
                 daily_raw = p_full.groupby(['Date', 'Week'])[metrics_to_score].sum().reset_index().sort_values('Date')
@@ -1207,75 +1207,70 @@ if check_password():
                 
                 master_df = pd.DataFrame(scores_list).reset_index(drop=True)
 
-                # A. Full Season Performance Graph
-                st.markdown("### Full Season Performance Progression")
+                st.markdown("### Full Season Performance")
                 fig_master = px.line(master_df, x='Display', y='Score', markers=True, text='Score', range_y=[0, 150])
 
-                # Week Divider Logic
+                # Week Divider Lines
                 for i in range(1, len(master_df)):
                     if master_df.iloc[i]['Week'] != master_df.iloc[i-1]['Week']:
                         fig_master.add_vline(x=i-0.5, line_dash="dash", line_color="#515154", opacity=0.3)
                         fig_master.add_annotation(x=i-0.5, y=140, text=f"Wk {master_df.iloc[i]['Week']}", showarrow=False, bgcolor="white")
 
                 fig_master.update_traces(line=dict(color='#FF8200', width=3), marker=dict(size=10, color='#4895DB', line=dict(width=2, color='white')), textposition='top center')
-                fig_master.update_layout(template="simple_white", height=400, xaxis=dict(type='category', title="Session Date"), yaxis_title="Daily Practice Score")
-                st.plotly_chart(fig_master, use_container_width=True, key=f"master_full_{sel_ath_hist}")
+                fig_master.update_layout(template="simple_white", height=400, xaxis=dict(type='category', title="Date"), yaxis_title="Practice Score")
+                st.plotly_chart(fig_master, use_container_width=True, key=f"master_full_flow_{sel_ath_hist}")
 
                 st.markdown("---")
-                
-                # 2. CMJ Readiness Integration (Replacing Weekly Graphs)
-                st.markdown("### Readiness History (Countermovement Jump)")
+
+                # 2. EXACT CMJ REPLICA (From your jump page)
+                st.markdown("### Countermovement Jump (CMJ) History")
                 
                 if cmj_df is not None and not cmj_df.empty:
-                    # Filter CMJ for this specific athlete
                     ath_cmj = cmj_df[cmj_df['Name'] == sel_ath_hist].copy().sort_values('Test Date')
                     
                     if not ath_cmj.empty:
                         ath_cmj['DisplayDate'] = ath_cmj['Test Date'].dt.strftime('%m/%d')
                         
-                        # THE FIX: Ensure subplots are initialized for 1 row and 1 column with secondary_y
-                        fig_cmj = make_subplots(rows=1, cols=1, specs=[[{"secondary_y": True}]])
+                        # Subplot setup to match the original page's dual-axis look
+                        fig_cmj = make_subplots(specs=[[{"secondary_y": True}]])
 
-                        # Define the metrics we want to plot
-                        col_h = 'Jump Height (Imp-Mom) [cm]'
-                        col_rsi = 'RSI-modified [m/s]'
+                        # Jump Height (Matches original page)
+                        fig_cmj.add_trace(go.Scatter(
+                            x=ath_cmj['DisplayDate'], 
+                            y=ath_cmj['Jump Height (Imp-Mom) [cm]'],
+                            name="Jump Height (cm)",
+                            mode='lines+markers',
+                            line=dict(color='#FF8200', width=3),
+                            marker=dict(size=8)
+                        ), secondary_y=False)
 
-                        # Add Jump Height (Primary Y)
-                        if col_h in ath_cmj.columns:
-                            fig_cmj.add_trace(go.Scatter(
-                                x=ath_cmj['DisplayDate'], 
-                                y=ath_cmj[col_h],
-                                name="Jump Height (cm)", 
-                                mode='lines+markers',
-                                line=dict(color='#FF8200', width=3), 
-                                marker=dict(size=8)
-                            ), row=1, col=1, secondary_y=False)
-
-                        # Add RSI-modified (Secondary Y)
-                        if col_rsi in ath_cmj.columns:
-                            fig_cmj.add_trace(go.Scatter(
-                                x=ath_cmj['DisplayDate'], 
-                                y=ath_cmj[col_rsi],
-                                name="RSI-modified", 
-                                mode='lines+markers',
-                                line=dict(color='#4895DB', width=2, dash='dot'), 
-                                marker=dict(size=8)
-                            ), row=1, col=1, secondary_y=True)
+                        # RSI-modified (Matches original page)
+                        fig_cmj.add_trace(go.Scatter(
+                            x=ath_cmj['DisplayDate'], 
+                            y=ath_cmj['RSI-modified [m/s]'],
+                            name="RSI-modified",
+                            mode='lines+markers',
+                            line=dict(color='#4895DB', width=2, dash='dot'),
+                            marker=dict(size=8)
+                        ), secondary_y=True)
 
                         fig_cmj.update_layout(
                             height=400, 
-                            template="simple_white", 
+                            template="simple_white",
                             legend=dict(orientation="h", y=-0.2, x=0.5, xanchor="center"),
                             xaxis=dict(type='category', title="Test Date"),
-                            margin=dict(l=10, r=10, t=30, b=50)
+                            margin=dict(l=10, r=10, t=20, b=50)
                         )
                         
                         fig_cmj.update_yaxes(title_text="Jump Height (cm)", secondary_y=False)
                         fig_cmj.update_yaxes(title_text="RSI-modified", secondary_y=True)
                         
-                        st.plotly_chart(fig_cmj, use_container_width=True, key=f"cmj_hist_plot_{sel_ath_hist}")
+                        st.plotly_chart(fig_cmj, use_container_width=True, key=f"cmj_migration_{sel_ath_hist}")
                     else:
                         st.info(f"No CMJ test records found for {sel_ath_hist}.")
+                else:
+                    st.warning("CMJ Data source not found in load_all_data.")
+
             # ---------------------------------------------------------
             # SUB-TAB 2: TEAM WEEKLY REVIEW
             # ---------------------------------------------------------
