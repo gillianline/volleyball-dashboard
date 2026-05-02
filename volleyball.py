@@ -1185,7 +1185,7 @@ if check_password():
                 all_athletes = sorted(df['Name'].unique())
                 sel_ath_hist = st.selectbox("Select Athlete", all_athletes, key="master_ath_sel")
                 
-                # 1. Performance Progression Logic
+                # 1. Performance Data Preparation
                 p_full = df[df['Name'] == sel_ath_hist].copy()
                 p_full['Date'] = pd.to_datetime(p_full['Date'])
                 daily_raw = p_full.groupby(['Date', 'Week'])[metrics_to_score].sum().reset_index().sort_values('Date')
@@ -1210,7 +1210,6 @@ if check_password():
                 st.markdown("### Full Season Performance")
                 fig_master = px.line(master_df, x='Display', y='Score', markers=True, text='Score', range_y=[0, 150])
 
-                # Week Divider Lines
                 for i in range(1, len(master_df)):
                     if master_df.iloc[i]['Week'] != master_df.iloc[i-1]['Week']:
                         fig_master.add_vline(x=i-0.5, line_dash="dash", line_color="#515154", opacity=0.3)
@@ -1222,54 +1221,112 @@ if check_password():
 
                 st.markdown("---")
 
-                # 2. EXACT CMJ REPLICA (From your jump page)
-                st.markdown("### Countermovement Jump (CMJ) History")
+                # 2. INTEGRATED CMJ TAB LOGIC
+                st.markdown("### CMJ Baseline vs. Post-Match Recovery")
                 
                 if cmj_df is not None and not cmj_df.empty:
-                    ath_cmj = cmj_df[cmj_df['Name'] == sel_ath_hist].copy().sort_values('Test Date')
+                    # Sync with the athlete selected at the top of the page
+                    ath_cmj_data = cmj_df[cmj_df['Name'] == sel_ath_hist].sort_values('Test Date')
                     
-                    if not ath_cmj.empty:
-                        ath_cmj['DisplayDate'] = ath_cmj['Test Date'].dt.strftime('%m/%d')
+                    # Your specific Week 4 Baseline logic
+                    baseline_cmj = ath_cmj_data[ath_cmj_data['Week'] == 4]
+                    post_match_cmj = ath_cmj_data[ath_cmj_data['Week'] > 4] 
+
+                    if not baseline_cmj.empty:
+                        base_row = baseline_cmj.iloc[-1]
+                        cmj_col = 'Jump Height (Imp-Mom) [cm]'
+                        rsi_col = 'RSI-modified [m/s]'
                         
-                        # Subplot setup to match the original page's dual-axis look
+                        # A. Summary Metrics
+                        st.markdown("#### Performance vs. Week 4 Baseline")
+                        latest_post = post_match_cmj.iloc[-1] if not post_match_cmj.empty else None
+                        
+                        if latest_post is not None:
+                            h_diff = ((latest_post[cmj_col] - base_row[cmj_col]) / base_row[cmj_col]) * 100
+                            rsi_diff = ((latest_post[rsi_col] - base_row[rsi_col]) / base_row[rsi_col]) * 100
+                            
+                            m1, m2, m3 = st.columns(3)
+                            m1.metric("Baseline", f"{base_row[cmj_col]:.1f} cm")
+                            m2.metric("Latest Jump", f"{latest_post[cmj_col]:.1f} cm", f"{h_diff:+.1f}%")
+                            m3.metric("RSI", f"{latest_post[rsi_col]:.2f}", f"{rsi_diff:+.1f}%")
+
+                        # B. Comparison Table
+                        st.markdown("#### Jump History & Match Context")
+                        comparison_list = []
+                        for _, row in post_match_cmj.iterrows():
+                            jump_date = pd.to_datetime(row['Test Date'])
+                            
+                            # Match context logic
+                            try:
+                                prev_matches = df[(df['Name'] == sel_ath_hist) & 
+                                                (df['Date'] < jump_date) & 
+                                                (df['Session_Name'].str.contains('Match|Game', case=False, na=False))]
+                                prev_match_name = prev_matches.sort_values('Date', ascending=False).iloc[0]['Session_Name']
+                            except:
+                                prev_match_name = "N/A"
+
+                            raw_diff = float(row[cmj_col]) - float(base_row[cmj_col])
+                            
+                            comparison_list.append({
+                                "Date": jump_date.strftime('%m/%d/%Y'),
+                                "Prev Match": prev_match_name,
+                                "Jump Height": f"{row[cmj_col]:.1f} cm",
+                                "Raw Diff": raw_diff,
+                                "Display Diff": f"{raw_diff:+.1f} cm",
+                                "RSI": f"{row[rsi_col]:.2f}"
+                            })
+                        
+                        cmj_table_html = """<table style="width:100%; border-collapse: collapse; text-align: center;">
+                                            <tr style="background-color: #f0f2f6; font-weight: bold;">
+                                                <th style="padding: 10px; border: 1px solid #ddd;">Jump Date</th>
+                                                <th style="padding: 10px; border: 1px solid #ddd;">Previous Match</th>
+                                                <th style="padding: 10px; border: 1px solid #ddd;">Jump Height</th>
+                                                <th style="padding: 10px; border: 1px solid #ddd;">Vs. Baseline</th>
+                                                <th style="padding: 10px; border: 1px solid #ddd;">RSI</th>
+                                            </tr>"""
+                        for item in comparison_list:
+                            color = "#28a745" if item['Raw Diff'] >= 0 else "#dc3545"
+                            cmj_table_html += f"""<tr>
+                                <td style="padding: 10px; border: 1px solid #ddd;">{item['Date']}</td>
+                                <td style="padding: 10px; border: 1px solid #ddd;">{item['Prev Match']}</td>
+                                <td style="padding: 10px; border: 1px solid #ddd;">{item['Jump Height']}</td>
+                                <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold; color: {color};">{item['Display Diff']}</td>
+                                <td style="padding: 10px; border: 1px solid #ddd;">{item['RSI']}</td>
+                            </tr>"""
+                        st.markdown(cmj_table_html + "</table>", unsafe_allow_html=True)
+                        
+                        # C. Dual-Axis Chart
+                        st.markdown("#### Height vs. RSI Trend")
+                        from plotly.subplots import make_subplots
                         fig_cmj = make_subplots(specs=[[{"secondary_y": True}]])
-
-                        # Jump Height (Matches original page)
+                        
                         fig_cmj.add_trace(go.Scatter(
-                            x=ath_cmj['DisplayDate'], 
-                            y=ath_cmj['Jump Height (Imp-Mom) [cm]'],
-                            name="Jump Height (cm)",
-                            mode='lines+markers',
-                            line=dict(color='#FF8200', width=3),
-                            marker=dict(size=8)
+                            x=ath_cmj_data['Test Date'], y=ath_cmj_data[cmj_col], 
+                            name="Jump Height (cm)", mode='lines+markers',
+                            line=dict(color='#4895DB', width=3)
                         ), secondary_y=False)
-
-                        # RSI-modified (Matches original page)
+                        
                         fig_cmj.add_trace(go.Scatter(
-                            x=ath_cmj['DisplayDate'], 
-                            y=ath_cmj['RSI-modified [m/s]'],
-                            name="RSI-modified",
-                            mode='lines+markers',
-                            line=dict(color='#4895DB', width=2, dash='dot'),
-                            marker=dict(size=8)
+                            x=ath_cmj_data['Test Date'], y=ath_cmj_data[rsi_col], 
+                            name="RSI-mod", mode='lines+markers',
+                            line=dict(color='#FF8200', width=2, dash='dot')
                         ), secondary_y=True)
-
+                        
+                        fig_cmj.add_hline(y=base_row[cmj_col], line_dash="dash", line_color="red")
+                        
                         fig_cmj.update_layout(
-                            height=400, 
-                            template="simple_white",
-                            legend=dict(orientation="h", y=-0.2, x=0.5, xanchor="center"),
-                            xaxis=dict(type='category', title="Test Date"),
-                            margin=dict(l=10, r=10, t=20, b=50)
+                            height=400, template="simple_white", margin=dict(l=10, r=10, t=30, b=10),
+                            legend=dict(orientation="h", y=-0.3, x=0.5, xanchor="center"),
+                            xaxis=dict(title="Date", tickformat="%m/%d")
                         )
+                        fig_cmj.update_yaxes(title_text="Height (cm)", secondary_y=False)
+                        fig_cmj.update_yaxes(title_text="RSI-mod", secondary_y=True)
                         
-                        fig_cmj.update_yaxes(title_text="Jump Height (cm)", secondary_y=False)
-                        fig_cmj.update_yaxes(title_text="RSI-modified", secondary_y=True)
-                        
-                        st.plotly_chart(fig_cmj, use_container_width=True, key=f"cmj_migration_{sel_ath_hist}")
+                        st.plotly_chart(fig_cmj, use_container_width=True, key=f"integrated_cmj_{sel_ath_hist}")
                     else:
-                        st.info(f"No CMJ test records found for {sel_ath_hist}.")
+                        st.warning(f"No Week 4 Baseline data found for {sel_ath_hist}.")
                 else:
-                    st.warning("CMJ Data source not found in load_all_data.")
+                    st.error("CMJ Data source is empty or not loaded.")
 
             # ---------------------------------------------------------
             # SUB-TAB 2: TEAM WEEKLY REVIEW
