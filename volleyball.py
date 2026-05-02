@@ -1221,14 +1221,15 @@ if check_password():
 
                 st.markdown("---")
 
-                # 2. INTEGRATED CMJ TAB LOGIC
+                # 2. INTEGRATED CMJ LOGIC (Syncing 'Athlete' to 'Name')
                 st.markdown("### CMJ Baseline vs. Post-Match Recovery")
                 
                 if cmj_df is not None and not cmj_df.empty:
-                    # Sync with the athlete selected at the top of the page
-                    ath_cmj_data = cmj_df[cmj_df['Name'] == sel_ath_hist].sort_values('Test Date')
+                    # Sync column naming if necessary
+                    if 'Athlete' in cmj_df.columns:
+                        cmj_df = cmj_df.rename(columns={'Athlete': 'Name'})
                     
-                    # Your specific Week 4 Baseline logic
+                    ath_cmj_data = cmj_df[cmj_df['Name'] == sel_ath_hist].sort_values('Test Date')
                     baseline_cmj = ath_cmj_data[ath_cmj_data['Week'] == 4]
                     post_match_cmj = ath_cmj_data[ath_cmj_data['Week'] > 4] 
 
@@ -1237,7 +1238,6 @@ if check_password():
                         cmj_col = 'Jump Height (Imp-Mom) [cm]'
                         rsi_col = 'RSI-modified [m/s]'
                         
-                        # A. Summary Metrics
                         st.markdown("#### Performance vs. Week 4 Baseline")
                         latest_post = post_match_cmj.iloc[-1] if not post_match_cmj.empty else None
                         
@@ -1255,8 +1255,6 @@ if check_password():
                         comparison_list = []
                         for _, row in post_match_cmj.iterrows():
                             jump_date = pd.to_datetime(row['Test Date'])
-                            
-                            # Match context logic
                             try:
                                 prev_matches = df[(df['Name'] == sel_ath_hist) & 
                                                 (df['Date'] < jump_date) & 
@@ -1266,7 +1264,6 @@ if check_password():
                                 prev_match_name = "N/A"
 
                             raw_diff = float(row[cmj_col]) - float(base_row[cmj_col])
-                            
                             comparison_list.append({
                                 "Date": jump_date.strftime('%m/%d/%Y'),
                                 "Prev Match": prev_match_name,
@@ -1295,22 +1292,22 @@ if check_password():
                             </tr>"""
                         st.markdown(cmj_table_html + "</table>", unsafe_allow_html=True)
                         
-                        # C. Dual-Axis Chart
+                        # C. THE PLOTLY FIX: Dual-Axis Chart with explicit row/col
                         st.markdown("#### Height vs. RSI Trend")
                         from plotly.subplots import make_subplots
-                        fig_cmj = make_subplots(specs=[[{"secondary_y": True}]])
+                        fig_cmj = make_subplots(rows=1, cols=1, specs=[[{"secondary_y": True}]])
                         
                         fig_cmj.add_trace(go.Scatter(
                             x=ath_cmj_data['Test Date'], y=ath_cmj_data[cmj_col], 
                             name="Jump Height (cm)", mode='lines+markers',
                             line=dict(color='#4895DB', width=3)
-                        ), secondary_y=False)
+                        ), row=1, col=1, secondary_y=False)
                         
                         fig_cmj.add_trace(go.Scatter(
                             x=ath_cmj_data['Test Date'], y=ath_cmj_data[rsi_col], 
                             name="RSI-mod", mode='lines+markers',
                             line=dict(color='#FF8200', width=2, dash='dot')
-                        ), secondary_y=True)
+                        ), row=1, col=1, secondary_y=True)
                         
                         fig_cmj.add_hline(y=base_row[cmj_col], line_dash="dash", line_color="red")
                         
@@ -1325,8 +1322,6 @@ if check_password():
                         st.plotly_chart(fig_cmj, use_container_width=True, key=f"integrated_cmj_{sel_ath_hist}")
                     else:
                         st.warning(f"No Week 4 Baseline data found for {sel_ath_hist}.")
-                else:
-                    st.error("CMJ Data source is empty or not loaded.")
 
             # ---------------------------------------------------------
             # SUB-TAB 2: TEAM WEEKLY REVIEW
