@@ -1238,7 +1238,7 @@ if check_password():
                 ))
 
                 # Layer 2: Match (Bold Orange & Larger)
-                match_points = master_df[match_df['Type'] == 'Match']
+                match_points = master_df[match_df['Type'] == 'Match Day']
                 fig_master.add_trace(go.Scatter(
                     x=match_points['Display'], y=match_points['Score'],
                     mode='markers+text', 
