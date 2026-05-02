@@ -1229,42 +1229,53 @@ if check_password():
                 if cmj_df is not None and not cmj_df.empty:
                     # Filter CMJ for this specific athlete
                     ath_cmj = cmj_df[cmj_df['Name'] == sel_ath_hist].copy().sort_values('Test Date')
-                    ath_cmj['DisplayDate'] = ath_cmj['Test Date'].dt.strftime('%m/%d')
                     
                     if not ath_cmj.empty:
-                        # Create a dual-axis chart for Jump Height and RSI-m
-                        from plotly.subplots import make_subplots
-                        fig_cmj = make_subplots(specs=[[{"secondary_y": True}]])
+                        ath_cmj['DisplayDate'] = ath_cmj['Test Date'].dt.strftime('%m/%d')
+                        
+                        # THE FIX: Ensure subplots are initialized for 1 row and 1 column with secondary_y
+                        fig_cmj = make_subplots(rows=1, cols=1, specs=[[{"secondary_y": True}]])
 
-                        # Jump Height Trace
-                        fig_cmj.add_trace(go.Scatter(
-                            x=ath_cmj['DisplayDate'], y=ath_cmj['Jump Height (Imp-Mom) [cm]'],
-                            name="Jump Height (cm)", mode='lines+markers',
-                            line=dict(color='#FF8200', width=3), marker=dict(size=8)
-                        ), secondary_y=False)
+                        # Define the metrics we want to plot
+                        col_h = 'Jump Height (Imp-Mom) [cm]'
+                        col_rsi = 'RSI-modified [m/s]'
 
-                        # RSI-modified Trace
-                        fig_cmj.add_trace(go.Scatter(
-                            x=ath_cmj['DisplayDate'], y=ath_cmj['RSI-modified [m/s]'],
-                            name="RSI-modified", mode='lines+markers',
-                            line=dict(color='#4895DB', width=2, dash='dot'), marker=dict(size=8)
-                        ), secondary_y=True)
+                        # Add Jump Height (Primary Y)
+                        if col_h in ath_cmj.columns:
+                            fig_cmj.add_trace(go.Scatter(
+                                x=ath_cmj['DisplayDate'], 
+                                y=ath_cmj[col_h],
+                                name="Jump Height (cm)", 
+                                mode='lines+markers',
+                                line=dict(color='#FF8200', width=3), 
+                                marker=dict(size=8)
+                            ), row=1, col=1, secondary_y=False)
+
+                        # Add RSI-modified (Secondary Y)
+                        if col_rsi in ath_cmj.columns:
+                            fig_cmj.add_trace(go.Scatter(
+                                x=ath_cmj['DisplayDate'], 
+                                y=ath_cmj[col_rsi],
+                                name="RSI-modified", 
+                                mode='lines+markers',
+                                line=dict(color='#4895DB', width=2, dash='dot'), 
+                                marker=dict(size=8)
+                            ), row=1, col=1, secondary_y=True)
 
                         fig_cmj.update_layout(
-                            height=400, template="simple_white", 
-                            title_text=f"Neuromuscular Readiness: {sel_ath_hist}",
+                            height=400, 
+                            template="simple_white", 
                             legend=dict(orientation="h", y=-0.2, x=0.5, xanchor="center"),
-                            xaxis=dict(type='category')
+                            xaxis=dict(type='category', title="Test Date"),
+                            margin=dict(l=10, r=10, t=30, b=50)
                         )
+                        
                         fig_cmj.update_yaxes(title_text="Jump Height (cm)", secondary_y=False)
                         fig_cmj.update_yaxes(title_text="RSI-modified", secondary_y=True)
                         
-                        st.plotly_chart(fig_cmj, use_container_width=True, key=f"cmj_hist_{sel_ath_hist}")
+                        st.plotly_chart(fig_cmj, use_container_width=True, key=f"cmj_hist_plot_{sel_ath_hist}")
                     else:
-                        st.info(f"No CMJ data found for {sel_ath_hist}.")
-                else:
-                    st.warning("CMJ Data Source not connected.")
-
+                        st.info(f"No CMJ test records found for {sel_ath_hist}.")
             # ---------------------------------------------------------
             # SUB-TAB 2: TEAM WEEKLY REVIEW
             # ---------------------------------------------------------
