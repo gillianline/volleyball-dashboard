@@ -1189,24 +1189,25 @@ if check_password():
                 p_full = df[df['Name'] == sel_ath_hist].copy()
                 p_full['Date'] = pd.to_datetime(p_full['Date'])
             
-                # THE FIX: Group by Date and Week, summing metrics but also joining Session Names
-                # This ensures multiple matches on one day become a single "Match Day" entry
+                # SYNC FIX: Group by Date to sum all metrics for the day first
                 daily_raw = p_full.groupby(['Date', 'Week']).agg({
                     **{m: 'sum' for m in metrics_to_score},
-                    'Session_Name': lambda x: ' | '.join(x.astype(str))
+                    'Session_Name': lambda x: ' | '.join(x.astype(str)) # Combine names to check for Matches
                 }).reset_index().sort_values('Date')
             
                 scores_list = []
                 for idx, row in daily_raw.iterrows():
                     row_grades = []
-                    # 30-day rolling lookback on the aggregated daily data
-                    lb = daily_raw[(daily_raw['Date'] >= row['Date'] - timedelta(days=30)) & (daily_raw['Date'] <= row['Date'])]
+                    # Rolling 30-day window based on DAILY TOTALS
+                    lb = daily_raw[(daily_raw['Date'] >= row['Date'] - timedelta(days=30)) & 
+                                   (daily_raw['Date'] <= row['Date'])]
                 
                     for m in metrics_to_score:
                         mx = lb[m].max()
+                        # Calculate score based on the daily sum vs the max daily sum in the window
                         row_grades.append(math.ceil((row[m] / mx) * 100) if mx > 0 else 0)
                 
-                    # Check the combined Session_Name string for "Match" or "Game"
+                    # Check if the combined day contains a Match
                     is_match = any(word in row['Session_Name'].upper() for word in ['MATCH', 'GAME'])
                 
                     scores_list.append({
@@ -1221,36 +1222,27 @@ if check_password():
 
                 st.markdown("### Full Season Performance")
             
-                # Base line remains the same
+                # Creating the chart with two distinct layers for clear Match visibility
                 fig_master = px.line(master_df, x='Display', y='Score', range_y=[0, 165])
-            
-                # Layer 1: Practice Markers (Standard)
+                
+                # Layer 1: Practice (Standard Blue)
                 prac_df = master_df[master_df['Type'] == 'Practice']
                 fig_master.add_trace(go.Scatter(
                     x=prac_df['Display'], y=prac_df['Score'],
                     mode='markers+text', text=prac_df['Score'], 
-                    textposition="top center",
-                    name="Practice", 
-                    marker=dict(size=8, color='#4895DB', line=dict(width=1, color='white')),
-                    showlegend=True
+                    textposition="top center", name="Practice", 
+                    marker=dict(size=8, color='#4895DB', line=dict(width=1, color='white'))
                 ))
 
-                # Layer 2: Match Markers (BOLD, LARGE, ORANGE)
-                # This now represents the combined score of all matches on that day
+                # Layer 2: Match (Bold Orange & Larger)
                 match_points = master_df[master_df['Type'] == 'Match']
                 fig_master.add_trace(go.Scatter(
                     x=match_points['Display'], y=match_points['Score'],
                     mode='markers+text', 
-                    text=[f"<b>{s}</b>" for s in match_points['Score']], # Bold text labels
-                    textposition="top center",
-                    name="Match Day (Combined)", 
-                    marker=dict(
-                        size=15, 
-                        color='#FF8200', 
-                        line=dict(width=3, color='#31333F')
-                    ),
-                    textfont=dict(color='#31333F', size=13),
-                    showlegend=True
+                    text=[f"<b>{s}</b>" for s in match_points['Score']], # Bold labels
+                    textposition="top center", name="Match Day (Combined)", 
+                    marker=dict(size=15, color='#FF8200', line=dict(width=3, color='#31333F')),
+                    textfont=dict(color='#31333F', size=13)
                 ))
 
                 # Week Divider Logic
