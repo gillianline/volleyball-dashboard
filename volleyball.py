@@ -175,7 +175,7 @@ if check_password():
         st.markdown('<div class="main-logo-container" style="text-align: center; margin-top: 10px; margin-bottom: 15px;"><img src="https://upload.wikimedia.org/wikipedia/commons/thumb/f/fc/Tennessee_Lady_Volunteers_logo.svg/1280px-Tennessee_Lady_Volunteers_logo.svg.png" width="120"><div style="color: #FF8200; font-size: 2rem; font-weight: 900; margin-top: 10px;">LADY VOLS VOLLEYBALL PERFORMANCE</div></div>', unsafe_allow_html=True)
 
         
-        tabs = st.tabs(["Individual Profile", "Practice Scores", "Practice Score History", "Counter Movement Jumps", "Match v. Practice", "Match Summary", "Position Analysis", "Phase Analysis", "Practice Planner"])
+        tabs = st.tabs(["Individual Profile", "Practice Scores", "Practice Score History", "Match v. Practice", "Match Summary", "Position Analysis", "Phase Analysis", "Practice Planner"])
         raw_sessions = df[df['Session_Name'].notna()]
         session_list = raw_sessions.sort_values('Date', ascending=False)['Session_Name'].unique().tolist()
 
@@ -1377,130 +1377,130 @@ if check_password():
                                 fig_p.update_layout(height=200, margin=dict(l=20, r=20, t=30, b=20), template="simple_white", xaxis=dict(type='category', title=None))
                                 st.plotly_chart(fig_p, use_container_width=True, config={'displayModeBar': False}, key=f"team_card_{name}_{sel_week}")
 
-        with tabs[3]: # Tab 7: CMJ Comparison
-            st.markdown('<div class="section-header">CMJ Baseline vs. Post-Match Recovery</div>', unsafe_allow_html=True)
+        #with tabs[3]: # Tab 7: CMJ Comparison
+            #st.markdown('<div class="section-header">CMJ Baseline vs. Post-Match Recovery</div>', unsafe_allow_html=True)
             
-            if cmj_df is not None and not cmj_df.empty:
+            #if cmj_df is not None and not cmj_df.empty:
                 # --- 1. SELECTION FILTERS ---
-                all_ath_cmj = sorted(cmj_df['Athlete'].unique())
-                sel_ath_cmj = st.selectbox("Select Athlete", all_ath_cmj, key="cmj_tab_ath")
+                #all_ath_cmj = sorted(cmj_df['Athlete'].unique())
+                #sel_ath_cmj = st.selectbox("Select Athlete", all_ath_cmj, key="cmj_tab_ath")
                 
-                ath_cmj_data = cmj_df[cmj_df['Athlete'] == sel_ath_cmj].sort_values('Test Date')
-                baseline_cmj = ath_cmj_data[ath_cmj_data['Week'] == 4]
+                #ath_cmj_data = cmj_df[cmj_df['Athlete'] == sel_ath_cmj].sort_values('Test Date')
+                #baseline_cmj = ath_cmj_data[ath_cmj_data['Week'] == 4]
                 
                 # Filter for jumps occurring after the Week 4 baseline
-                post_match_cmj = ath_cmj_data[ath_cmj_data['Week'] > 4] 
+                #post_match_cmj = ath_cmj_data[ath_cmj_data['Week'] > 4] 
 
-                if not baseline_cmj.empty:
-                    base_row = baseline_cmj.iloc[-1]
-                    cmj_col = 'Jump Height (Imp-Mom) [cm]'
-                    rsi_col = 'RSI-modified [m/s]'
+                #if not baseline_cmj.empty:
+                    #base_row = baseline_cmj.iloc[-1]
+                    #cmj_col = 'Jump Height (Imp-Mom) [cm]'
+                    #rsi_col = 'RSI-modified [m/s]'
                     
                     # --- 2. SUMMARY METRICS ---
-                    st.markdown("### Performance vs. Week 4 Baseline")
-                    latest_post = post_match_cmj.iloc[-1] if not post_match_cmj.empty else None
+                    #st.markdown("### Performance vs. Week 4 Baseline")
+                    #latest_post = post_match_cmj.iloc[-1] if not post_match_cmj.empty else None
                     
-                    if latest_post is not None:
-                        h_diff = ((latest_post[cmj_col] - base_row[cmj_col]) / base_row[cmj_col]) * 100
-                        rsi_diff = ((latest_post[rsi_col] - base_row[rsi_col]) / base_row[rsi_col]) * 100
+                    #if latest_post is not None:
+                        #h_diff = ((latest_post[cmj_col] - base_row[cmj_col]) / base_row[cmj_col]) * 100
+                        #rsi_diff = ((latest_post[rsi_col] - base_row[rsi_col]) / base_row[rsi_col]) * 100
                         
-                        m1, m2, m3 = st.columns(3)
-                        m1.metric("Baseline", f"{base_row[cmj_col]:.1f} cm")
-                        m2.metric("Latest Jump", f"{latest_post[cmj_col]:.1f} cm", f"{h_diff:+.1f}%")
-                        m3.metric("RSI", f"{latest_post[rsi_col]:.2f}", f"{rsi_diff:+.1f}%")
+                        #m1, m2, m3 = st.columns(3)
+                        #m1.metric("Baseline", f"{base_row[cmj_col]:.1f} cm")
+                        #m2.metric("Latest Jump", f"{latest_post[cmj_col]:.1f} cm", f"{h_diff:+.1f}%")
+                        #m3.metric("RSI", f"{latest_post[rsi_col]:.2f}", f"{rsi_diff:+.1f}%")
 
                     # --- 3. COMPARISON TABLE ---
-                    st.markdown("#### Jump History & Match Context")
-                    comparison_list = []
-                    for _, row in post_match_cmj.iterrows():
-                        jump_date = pd.to_datetime(row['Test Date'])
+                    #st.markdown("#### Jump History & Match Context")
+                    #comparison_list = []
+                    #for _, row in post_match_cmj.iterrows():
+                        #jump_date = pd.to_datetime(row['Test Date'])
                     
                         # Logic to find previous match
-                        try:
-                            prev_matches = df[(df['Name'] == sel_ath_cmj) & 
-                                            (df['Date'] < jump_date) & 
-                                            (df['Session_Name'].str.contains('Match|Game', case=False, na=False))]
-                            prev_match_name = prev_matches.sort_values('Date', ascending=False).iloc[0]['Session_Name']
-                        except:
-                            prev_match_name = "N/A"
+                        #try:
+                            #prev_matches = df[(df['Name'] == sel_ath_cmj) & 
+                                            #(df['Date'] < jump_date) & 
+                                            #(df['Session_Name'].str.contains('Match|Game', case=False, na=False))]
+                            #prev_match_name = prev_matches.sort_values('Date', ascending=False).iloc[0]['Session_Name']
+                        #except:
+                            #prev_match_name = "N/A"
 
                         # THE FIX: Keep the raw numeric difference for the color logic
-                        raw_diff = float(row[cmj_col]) - float(base_row[cmj_col])
+                        #raw_diff = float(row[cmj_col]) - float(base_row[cmj_col])
                     
-                        comparison_list.append({
-                            "Date": jump_date.strftime('%m/%d/%Y'),
-                            "Prev Match": prev_match_name,
-                            "Jump Height": f"{row[cmj_col]:.1f} cm",
-                            "Raw Diff": raw_diff, # Numeric for math
-                            "Display Diff": f"{raw_diff:+.1f} cm", # String for table
-                            "RSI": f"{row[rsi_col]:.2f}"
-                        })
+                        #comparison_list.append({
+                            #"Date": jump_date.strftime('%m/%d/%Y'),
+                            #"Prev Match": prev_match_name,
+                            #"Jump Height": f"{row[cmj_col]:.1f} cm",
+                            #"Raw Diff": raw_diff, # Numeric for math
+                            #"Display Diff": f"{raw_diff:+.1f} cm", # String for table
+                            #"RSI": f"{row[rsi_col]:.2f}"
+                        #})
                 
                     # Manual Centered Table
-                    cmj_table_html = """<table style="width:100%; border-collapse: collapse; text-align: center;">
-                                        <tr style="background-color: #f0f2f6; font-weight: bold;">
-                                            <th style="padding: 10px; border: 1px solid #ddd;">Jump Date</th>
-                                            <th style="padding: 10px; border: 1px solid #ddd;">Previous Match</th>
-                                            <th style="padding: 10px; border: 1px solid #ddd;">Jump Height</th>
-                                            <th style="padding: 10px; border: 1px solid #ddd;">Vs. Baseline</th>
-                                            <th style="padding: 10px; border: 1px solid #ddd;">RSI</th>
-                                        </tr>"""
-                    for item in comparison_list:
+                    #cmj_table_html = """<table style="width:100%; border-collapse: collapse; text-align: center;">
+                                        #<tr style="background-color: #f0f2f6; font-weight: bold;">
+                                            #<th style="padding: 10px; border: 1px solid #ddd;">Jump Date</th>
+                                            #<th style="padding: 10px; border: 1px solid #ddd;">Previous Match</th>
+                                            #<th style="padding: 10px; border: 1px solid #ddd;">Jump Height</th>
+                                            #<th style="padding: 10px; border: 1px solid #ddd;">Vs. Baseline</th>
+                                            #<th style="padding: 10px; border: 1px solid #ddd;">RSI</th>
+                                        #</tr>"""
+                    #for item in comparison_list:
                         # Use the numeric Raw Diff instead of parsing strings
-                        color = "#28a745" if item['Raw Diff'] >= 0 else "#dc3545"
+                        #color = "#28a745" if item['Raw Diff'] >= 0 else "#dc3545"
                     
-                        cmj_table_html += f"""<tr>
-                            <td style="padding: 10px; border: 1px solid #ddd;">{item['Date']}</td>
-                            <td style="padding: 10px; border: 1px solid #ddd;">{item['Prev Match']}</td>
-                            <td style="padding: 10px; border: 1px solid #ddd;">{item['Jump Height']}</td>
-                            <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold; color: {color};">{item['Display Diff']}</td>
-                            <td style="padding: 10px; border: 1px solid #ddd;">{item['RSI']}</td>
-                        </tr>"""
-                    st.markdown(cmj_table_html + "</table>", unsafe_allow_html=True)
+                        #cmj_table_html += f"""<tr>
+                            #<td style="padding: 10px; border: 1px solid #ddd;">{item['Date']}</td>
+                            #<td style="padding: 10px; border: 1px solid #ddd;">{item['Prev Match']}</td>
+                            #<td style="padding: 10px; border: 1px solid #ddd;">{item['Jump Height']}</td>
+                            #<td style="padding: 10px; border: 1px solid #ddd; font-weight: bold; color: {color};">{item['Display Diff']}</td>
+                            #<td style="padding: 10px; border: 1px solid #ddd;">{item['RSI']}</td>
+                        #</tr>"""
+                    #st.markdown(cmj_table_html + "</table>", unsafe_allow_html=True)
                 
                     # --- 4. DUAL-AXIS RECOVERY TRENDLINE ---
-                    st.markdown("#### Height vs. RSI")
-                    from plotly.subplots import make_subplots
+                    #st.markdown("#### Height vs. RSI")
+                    #from plotly.subplots import make_subplots
                     
                     # Create subplots with a secondary y-axis
-                    fig_cmj = make_subplots(specs=[[{"secondary_y": True}]])
+                    #fig_cmj = make_subplots(specs=[[{"secondary_y": True}]])
                     
                     # Jump Height Trace (Primary Y-Axis)
-                    fig_cmj.add_trace(go.Scatter(
-                        x=ath_cmj_data['Test Date'], 
-                        y=ath_cmj_data[cmj_col], 
-                        name="Jump Height (cm)", 
-                        line=dict(color='#4895DB', width=3),
-                        mode='lines+markers'
-                    ), secondary_y=False)
+                    #fig_cmj.add_trace(go.Scatter(
+                        #x=ath_cmj_data['Test Date'], 
+                        #y=ath_cmj_data[cmj_col], 
+                        #name="Jump Height (cm)", 
+                        #line=dict(color='#4895DB', width=3),
+                        #mode='lines+markers'
+                    #), secondary_y=False)
                     
                     # RSI Trace (Secondary Y-Axis)
-                    fig_cmj.add_trace(go.Scatter(
-                        x=ath_cmj_data['Test Date'], 
-                        y=ath_cmj_data[rsi_col], 
-                        name="RSI-mod", 
-                        line=dict(color='#FF8200', width=2, dash='dot'),
-                        mode='lines+markers'
-                    ), secondary_y=True)
+                    #fig_cmj.add_trace(go.Scatter(
+                        #x=ath_cmj_data['Test Date'], 
+                        #y=ath_cmj_data[rsi_col], 
+                        #name="RSI-mod", 
+                        #line=dict(color='#FF8200', width=2, dash='dot'),
+                        #mode='lines+markers'
+                    #), secondary_y=True)
                     
                     # Baseline Line
-                    fig_cmj.add_hline(y=base_row[cmj_col], line_dash="dash", line_color="red")
+                    #fig_cmj.add_hline(y=base_row[cmj_col], line_dash="dash", line_color="red")
                     
-                    fig_cmj.update_layout(
-                        height=400, 
-                        template="simple_white", 
-                        margin=dict(l=10, r=10, t=30, b=10),
-                        legend=dict(orientation="h", yanchor="bottom", y=-0.3, xanchor="center", x=0.5),
-                        xaxis=dict(title="Date", tickformat="%m/%d/%Y")
-                    )
+                    #fig_cmj.update_layout(
+                        #height=400, 
+                        #template="simple_white", 
+                        #margin=dict(l=10, r=10, t=30, b=10),
+                        #legend=dict(orientation="h", yanchor="bottom", y=-0.3, xanchor="center", x=0.5),
+                        #xaxis=dict(title="Date", tickformat="%m/%d/%Y")
+                    #)
 
                     # Labels for both axes
-                    fig_cmj.update_yaxes(title_text="<b>Height (cm)</b>", color="#4895DB", secondary_y=False)
+                    #fig_cmj.update_yaxes(title_text="<b>Height (cm)</b>", color="#4895DB", secondary_y=False)
                     fig_cmj.update_yaxes(title_text="<b>RSI-mod</b>", color="#FF8200", secondary_y=True)
                     
-                    st.plotly_chart(fig_cmj, use_container_width=True, key="cmj_dual_trend")
-                else:
-                    st.warning(f"No Week 4 Baseline data found for {sel_ath_cmj}.")
+                    #st.plotly_chart(fig_cmj, use_container_width=True, key="cmj_dual_trend")
+                #else:
+                    #st.warning(f"No Week 4 Baseline data found for {sel_ath_cmj}.")
                 
     except Exception as e:
         st.error(f"Sync Error: {e}")
