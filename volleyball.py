@@ -1179,17 +1179,19 @@ if check_password():
             metrics_to_score = [m for m in all_metrics if m not in ['High Jumps', 'Moderate Jumps', 'High Intensity Movement']]
 
             # ---------------------------------------------------------
-            # SUB-TAB 1: INDIVIDUAL SEASON PATH & READINESS
+            # SUB-TAB 1: INDIVIDUAL SEASON PATH (Updated for Match Visibility)
             # ---------------------------------------------------------
             with sub_tabs[0]:
                 all_athletes = sorted(df['Name'].unique())
                 sel_ath_hist = st.selectbox("Select Athlete", all_athletes, key="master_ath_sel")
-                
-                # 1. Performance Progression Logic
+            
+                # 1. Performance Data Preparation
                 p_full = df[df['Name'] == sel_ath_hist].copy()
                 p_full['Date'] = pd.to_datetime(p_full['Date'])
+            
+                # THE FIX: Group by Date to combine multiple matches/sessions into one daily score
                 daily_raw = p_full.groupby(['Date', 'Week'])[metrics_to_score].sum().reset_index().sort_values('Date')
-                
+            
                 scores_list = []
                 for idx, row in daily_raw.iterrows():
                     row_grades = []
@@ -1197,28 +1199,65 @@ if check_password():
                     for m in metrics_to_score:
                         mx = lb[m].max()
                         row_grades.append(math.ceil((row[m] / mx) * 100) if mx > 0 else 0)
+                
+                    # Identify if this day contains a Match
+                    is_match = p_full[p_full['Date'] == row['Date']]['Session_Name'].str.contains('Match|Game', case=False, na=False).any()
+                
                     scores_list.append({
                         'Date': row['Date'], 
                         'Display': row['Date'].strftime('%m/%d'), 
                         'Score': round(sum(row_grades)/len(row_grades), 1), 
-                        'Week': str(row['Week'])
+                        'Week': str(row['Week']),
+                        'Type': 'Match' if is_match else 'Practice'
                     })
-                
+            
                 master_df = pd.DataFrame(scores_list).reset_index(drop=True)
 
                 st.markdown("### Full Season Performance")
-                fig_master = px.line(master_df, x='Display', y='Score', markers=True, text='Score', range_y=[0, 150])
+            
+                # Create the Base Line
+                fig_master = px.line(master_df, x='Display', y='Score', range_y=[0, 160])
+            
+                # Layer 1: Practice Markers (Standard)
+                prac_df = master_df[master_df['Type'] == 'Practice']
+                fig_master.add_trace(go.Scatter(
+                    x=prac_df['Display'], y=prac_df['Score'],
+                    mode='markers+text', text=prac_df['Score'], textposition="top center",
+                    name="Practice", marker=dict(size=8, color='#4895DB', line=dict(width=1, color='white')),
+                    showlegend=False
+                ))
+
+                # Layer 2: Match Markers (BOLD & DIFFERENT COLOR)
+                match_points = master_df[master_df['Type'] == 'Match']
+                fig_master.add_trace(go.Scatter(
+                    x=match_points['Display'], y=match_points['Score'],
+                    mode='markers+text', text=match_points['Score'], textposition="top center",
+                    name="Match Day", 
+                    marker=dict(
+                        size=14,           # Significantly Bigger
+                        color='#FF8200',   # Match Orange
+                        symbol='circle',
+                        line=dict(width=3, color='#31333F') # Dark bold border
+                    ),
+                    textfont=dict(weight='bold', color='#31333F', size=12), # Bold Score Text
+                    showlegend=True
+                ))
+
+                # Week Divider Logic
                 for i in range(1, len(master_df)):
                     if master_df.iloc[i]['Week'] != master_df.iloc[i-1]['Week']:
                         fig_master.add_vline(x=i-0.5, line_dash="dash", line_color="#515154", opacity=0.3)
-                        fig_master.add_annotation(x=i-0.5, y=140, text=f"Wk {master_df.iloc[i]['Week']}", showarrow=False, bgcolor="white")
+                        fig_master.add_annotation(x=i-0.5, y=150, text=f"Wk {master_df.iloc[i]['Week']}", showarrow=False, bgcolor="white")
 
-                fig_master.update_traces(line=dict(color='#FF8200', width=3), marker=dict(size=10, color='#4895DB', line=dict(width=2, color='white')), textposition='top center')
-                fig_master.update_layout(template="simple_white", height=400, xaxis=dict(type='category', title="Date"))
+                fig_master.update_layout(
+                    template="simple_white", height=450, 
+                    xaxis=dict(type='category', title="Date"), 
+                    yaxis_title="Practice Score",
+                    legend=dict(orientation="h", y=-0.2, x=0.5, xanchor="center")
+                )
+            
                 st.plotly_chart(fig_master, use_container_width=True, key=f"master_full_flow_{sel_ath_hist}")
-
-                st.markdown("---")
-
+            
                 # 2. INTEGRATED CMJ LOGIC
                 st.markdown("### CMJ Baseline vs. Post-Match Recovery")
                 
