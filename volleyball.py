@@ -1189,10 +1189,10 @@ if check_password():
                 p_full = df[df['Name'] == sel_ath_hist].copy()
                 p_full['Date'] = pd.to_datetime(p_full['Date'])
             
-                # SYNC FIX: Group by Date to sum all metrics for the day first
+                # Group by Date to sum all metrics for the day (handles multiple matches)
                 daily_raw = p_full.groupby(['Date', 'Week']).agg({
                     **{m: 'sum' for m in metrics_to_score},
-                    'Session_Name': lambda x: ' | '.join(x.astype(str)) # Combine names to check for Matches
+                    'Session_Name': lambda x: ' | '.join(x.astype(str))
                 }).reset_index().sort_values('Date')
             
                 scores_list = []
@@ -1204,16 +1204,19 @@ if check_password():
                 
                     for m in metrics_to_score:
                         mx = lb[m].max()
-                        # Calculate score based on the daily sum vs the max daily sum in the window
+                        # Match individual profile: use math.ceil for the metric grade
                         row_grades.append(math.ceil((row[m] / mx) * 100) if mx > 0 else 0)
                 
                     # Check if the combined day contains a Match
                     is_match = any(word in row['Session_Name'].upper() for word in ['MATCH', 'GAME'])
                 
+                    # Calculate final score as a WHOLE NUMBER
+                    final_daily_score = round(sum(row_grades)/len(row_grades), 0)
+                
                     scores_list.append({
                         'Date': row['Date'], 
                         'Display': row['Date'].strftime('%m/%d'), 
-                        'Score': round(sum(row_grades)/len(row_grades), 1), 
+                        'Score': int(final_daily_score), # Cast to int for clean whole number labels
                         'Week': str(row['Week']),
                         'Type': 'Match' if is_match else 'Practice'
                     })
@@ -1222,10 +1225,10 @@ if check_password():
 
                 st.markdown("### Full Season Performance")
             
-                # Creating the chart with two distinct layers for clear Match visibility
-                fig_master = px.line(master_df, x='Display', y='Score', range_y=[0, 165])
-                
-                # Layer 1: Practice (Standard Blue)
+                # Creating the chart with whole number range and logic
+                fig_master = px.line(master_df, x='Display', y='Score', range_y=[0, 160])
+            
+                # Layer 1: Practice (Blue)
                 prac_df = master_df[master_df['Type'] == 'Practice']
                 fig_master.add_trace(go.Scatter(
                     x=prac_df['Display'], y=prac_df['Score'],
@@ -1235,11 +1238,11 @@ if check_password():
                 ))
 
                 # Layer 2: Match (Bold Orange & Larger)
-                match_points = master_df[master_df['Type'] == 'Match']
+                match_points = master_df[match_df['Type'] == 'Match']
                 fig_master.add_trace(go.Scatter(
                     x=match_points['Display'], y=match_points['Score'],
                     mode='markers+text', 
-                    text=[f"<b>{s}</b>" for s in match_points['Score']], # Bold labels
+                    text=[f"<b>{int(s)}</b>" for s in match_points['Score']], # Bold Whole Numbers
                     textposition="top center", name="Match Day (Combined)", 
                     marker=dict(size=15, color='#FF8200', line=dict(width=3, color='#31333F')),
                     textfont=dict(color='#31333F', size=13)
@@ -1249,12 +1252,12 @@ if check_password():
                 for i in range(1, len(master_df)):
                     if master_df.iloc[i]['Week'] != master_df.iloc[i-1]['Week']:
                         fig_master.add_vline(x=i-0.5, line_dash="dash", line_color="#515154", opacity=0.3)
-                        fig_master.add_annotation(x=i-0.5, y=155, text=f"Wk {master_df.iloc[i]['Week']}", showarrow=False, bgcolor="white")
+                        fig_master.add_annotation(x=i-0.5, y=150, text=f"Wk {master_df.iloc[i]['Week']}", showarrow=False, bgcolor="white")
 
                 fig_master.update_layout(
                     template="simple_white", height=480, 
                     xaxis=dict(type='category', title="Date"), 
-                    yaxis_title="Daily Practice Score",
+                    yaxis_title="Daily Performance Score",
                     legend=dict(orientation="h", y=-0.2, x=0.5, xanchor="center")
                 )
             
