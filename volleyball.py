@@ -710,12 +710,16 @@ if check_password():
                 index_metrics = ['Player Load', 'Total Jumps', 'Explosive Efforts']
                 working_matrix[time_col] = pd.to_numeric(working_matrix[time_col], errors='coerce').fillna(0)
                 
-                # --- THE "SINGLE SOURCE" FIX ---
-                # Since you only have one duration per day, we create a Master Season Average for each Phase
-                # This ensures "2 Ball" is always 18.5 mins (or whatever the season avg is) for EVERYONE
-                master_season_avg_mins = working_matrix.groupby('Phase')[time_col].mean().to_dict()
+                # --- THE FIX: SESSION-BASED DURATION ---
+                # 1. Get a list of unique sessions (Date + Phase) and their specific durations
+                # Since you have one entry per period per day, this gets the true 'clock' for each drill
+                unique_sessions = working_matrix.drop_duplicates(subset=['Date', 'Phase'])[[ 'Date', 'Phase', time_col]]
+                
+                # 2. Calculate the Season Average duration for each drill based ONLY on the sessions
+                # This ignores how many people did the drill and only cares how many times the drill was run
+                session_avg_mins = unique_sessions.groupby('Phase')[time_col].mean().to_dict()
 
-                # Calculate individual rates using the raw duration (since it's already one per day)
+                # 3. Calculate individual rates using the raw duration
                 for m in index_metrics:
                     working_matrix[f'{m}_Rate'] = working_matrix[m] / working_matrix[time_col].replace(0, 1)
 
@@ -756,11 +760,11 @@ if check_password():
                 if sel_date != "Season Avg":
                     target_dt = pd.to_datetime(sel_date)
                     filtered_df = filtered_df[filtered_df['Date'] == target_dt]
-                    # On a specific day, we just use the duration from the data
+                    # Daily view: Use the duration from that specific day
                     filtered_df['Display_Mins'] = filtered_df[time_col]
                 else:
-                    # For Season Avg, we FORCE the master phase duration
-                    filtered_df['Display_Mins'] = filtered_df['Phase'].map(master_season_avg_mins)
+                    # Season Avg view: Use our session-based master average
+                    filtered_df['Display_Mins'] = filtered_df['Phase'].map(session_avg_mins)
 
                 # Final Grouping
                 rate_cols = [f'{m}_Rate' for m in index_metrics]
@@ -768,10 +772,11 @@ if check_password():
                 
                 matrix_df = filtered_df.groupby(group_keys).agg({
                     **{f'{m}_Rate': 'mean' for m in index_metrics},
-                    'Display_Mins': 'mean' # Since we mapped the master avg, the mean will be the master avg
+                    'Display_Mins': 'mean' 
                 }).reset_index()
 
                 # --- 4. RENDER TABLE ---
+                # (Standard HTML Table logic remains the same)
                 if metric_mode == "Total Volume":
                     h_load, h_jumps, h_expl = "Total Load", "Total Jumps", "Total Efforts"
                     fmt = "{:.0f}"
