@@ -1185,11 +1185,12 @@ if check_password():
                 all_athletes = sorted(df['Name'].unique())
                 sel_ath_hist = st.selectbox("Select Athlete", all_athletes, key="master_ath_sel")
             
-                # 1. Performance Data Preparation
+                # 1. Preparation
                 p_full = df[df['Name'] == sel_ath_hist].copy()
                 p_full['Date'] = pd.to_datetime(p_full['Date'])
             
-                # Group by Date to sum all metrics for the day
+                # 2. THE COMBINATION STEP: Sum all metrics for the day first
+                # This handles multiple matches/sessions on the same date
                 daily_raw = p_full.groupby(['Date', 'Week']).agg({
                     **{m: 'sum' for m in metrics_to_score},
                     'Session_Name': lambda x: ' | '.join(x.astype(str))
@@ -1198,33 +1199,39 @@ if check_password():
                 scores_list = []
                 for idx, row in daily_raw.iterrows():
                     row_grades = []
-                    lb = daily_raw[(daily_raw['Date'] >= row['Date'] - timedelta(days=30)) & 
-                                   (daily_raw['Date'] <= row['Date'])]
+                    # 3. 30-Day Rolling Window of DAILY SUMS (Matches Gallery Logic)
+                    lb_sums = daily_raw[(daily_raw['Date'] >= row['Date'] - timedelta(days=30)) & 
+                                       (daily_raw['Date'] <= row['Date'])]
                 
                     for m in metrics_to_score:
-                        mx = lb[m].max()
-                        row_grades.append(math.ceil((row[m] / mx) * 100) if mx > 0 else 0)
+                        val = row[m]           # Combined daily total
+                        mx = lb_sums[m].max()  # Peak daily total in the window
+                    
+                        # Grade matches Gallery: math.ceil((Combined Daily / Peak Daily) * 100)
+                        g = math.ceil((val / mx) * 100) if mx > 0 else 0
+                        row_grades.append(g)
                 
+                    # Identify if this combined day contains a Match
                     is_match = any(word in row['Session_Name'].upper() for word in ['MATCH', 'GAME'])
-                    final_daily_score = round(sum(row_grades)/len(row_grades), 0)
+                
+                    # Final Whole Number Score
+                    final_score = math.ceil(sum(row_grades) / len(row_grades))
                 
                     scores_list.append({
                         'Date': row['Date'], 
                         'Display': row['Date'].strftime('%m/%d'), 
-                        'Score': int(final_daily_score),
-                        'Week': str(row['Week']),
-                        'Type': 'Match' if is_match else 'Practice' # Column is defined here
+                        'Score': int(final_score),
+                        'Type': 'Match' if is_match else 'Practice',
+                        'Week': str(row['Week'])
                     })
             
-                # Create master_df ensuring 'Type' exists
                 master_df = pd.DataFrame(scores_list).reset_index(drop=True)
 
+                # 4. BUILD THE GRAPH
                 st.markdown("### Full Season Performance")
-            
-                # chart base
-                fig_master = px.line(master_df, x='Display', y='Score', range_y=[0, 165])
-            
-                # Layer 1: Practice
+                fig_master = px.line(master_df, x='Display', y='Score', range_y=[0, 160])
+
+                # Layer 1: Practice (Standard)
                 prac_df = master_df[master_df['Type'] == 'Practice']
                 if not prac_df.empty:
                     fig_master.add_trace(go.Scatter(
@@ -1234,28 +1241,27 @@ if check_password():
                         marker=dict(size=8, color='#4895DB', line=dict(width=1, color='white'))
                     ))
 
-                # Layer 2: Match (Corrected reference to master_df)
-                match_points = master_df[master_df['Type'] == 'Match']
-                if not match_points.empty:
+                # Layer 2: Combined Match (Large, Bold Orange)
+                match_df = master_df[master_df['Type'] == 'Match']
+                if not match_df.empty:
                     fig_master.add_trace(go.Scatter(
-                        x=match_points['Display'], y=match_points['Score'],
+                        x=match_df['Display'], y=match_df['Score'],
                         mode='markers+text', 
-                        text=[f"<b>{int(s)}</b>" for s in match_points['Score']], 
+                        text=[f"<b>{s}</b>" for s in match_df['Score']], 
                         textposition="top center", name="Match Day (Combined)", 
                         marker=dict(size=15, color='#FF8200', line=dict(width=3, color='#31333F')),
                         textfont=dict(color='#31333F', size=13)
                     ))
 
-                # Week Divider Logic
+                # Week Dividers
                 for i in range(1, len(master_df)):
                     if master_df.iloc[i]['Week'] != master_df.iloc[i-1]['Week']:
                         fig_master.add_vline(x=i-0.5, line_dash="dash", line_color="#515154", opacity=0.3)
-                        fig_master.add_annotation(x=i-0.5, y=155, text=f"Wk {master_df.iloc[i]['Week']}", showarrow=False, bgcolor="white")
+                        fig_master.add_annotation(x=i-0.5, y=150, text=f"Wk {master_df.iloc[i]['Week']}", showarrow=False, bgcolor="white")
 
                 fig_master.update_layout(
                     template="simple_white", height=480, 
                     xaxis=dict(type='category', title="Date"), 
-                    yaxis_title="Daily Performance Score",
                     legend=dict(orientation="h", y=-0.2, x=0.5, xanchor="center")
                 )
             
