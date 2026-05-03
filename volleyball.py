@@ -710,17 +710,16 @@ if check_password():
                 index_metrics = ['Player Load', 'Total Jumps', 'Explosive Efforts']
                 working_matrix[time_col] = pd.to_numeric(working_matrix[time_col], errors='coerce').fillna(0)
                 
-                # --- THE STATED FIX: FORCE ONE CLOCK PER PHASE PER DAY ---
-                # 1. Create a reference map of the MAX duration for every Phase on every Date
-                master_clock_map = working_matrix.groupby(['Date', 'Phase'])[time_col].max().to_dict()
+                # --- THE FIX: FORCED TEAM CLOCK ---
+                # Step A: Identify the max time any player spent in a phase on any given day
+                # This creates the "Official" duration for that drill on that specific date
+                daily_phase_clock = working_matrix.groupby(['Date', 'Phase'])[time_col].max().reset_index()
+                daily_phase_clock.rename(columns={time_col: 'Official_Mins'}, inplace=True)
 
-                # 2. Apply that Master Clock to every row based on its Date and Phase
-                def sync_time(row):
-                    return master_clock_map.get((row['Date'], row['Phase']), row[time_col])
-                
-                working_matrix['Official_Mins'] = working_matrix.apply(sync_time, axis=1)
+                # Step B: Merge that Official Clock back into the main data
+                working_matrix = working_matrix.merge(daily_phase_clock, on=['Date', 'Phase'], how='left')
 
-                # 3. Calculate Rates using the synced clock
+                # Step C: Re-calculate Rates using the Official Mins
                 for m in index_metrics:
                     working_matrix[f'{m}_Rate'] = working_matrix[m] / working_matrix['Official_Mins'].replace(0, 1)
 
@@ -760,11 +759,12 @@ if check_password():
                 if sel_date != "Season Avg":
                     filtered_df = filtered_df[filtered_df['Date'] == pd.to_datetime(sel_date)]
 
-                # --- 4. AGGREGATION & TABLE GEN ---
+                # --- 4. AGGREGATION & SYNCED SEASON AVG ---
                 rate_cols = [f'{m}_Rate' for m in index_metrics]
                 group_keys = ['Position', 'Phase'] if view_mode == "Position" else ['Name', 'Position', 'Phase']
                 
-                # We aggregate by taking the mean of rates, but the mean of the Official Mins
+                # By taking the mean of 'Official_Mins', every position will result in the same 
+                # average duration for that phase over the course of the season.
                 matrix_df = filtered_df.groupby(group_keys).agg({
                     **{f'{m}_Rate': 'mean' for m in index_metrics},
                     'Official_Mins': 'mean' 
@@ -792,15 +792,15 @@ if check_password():
                                 </tr>"""
 
                 for _, row in matrix_df.iterrows():
-                    cur_mins = row['Official_Mins']
-                    l_val = (row['Player Load_Rate'] * cur_mins) if metric_mode == "Total Volume" else row['Player Load_Rate']
-                    j_val = (row['Total Jumps_Rate'] * cur_mins) if metric_mode == "Total Volume" else row['Total Jumps_Rate']
-                    e_val = (row['Explosive Efforts_Rate'] * cur_mins) if metric_mode == "Total Volume" else row['Explosive Efforts_Rate']
+                    # Total Volume is Rate * the Official Mins
+                    l_val = (row['Player Load_Rate'] * row['Official_Mins']) if metric_mode == "Total Volume" else row['Player Load_Rate']
+                    j_val = (row['Total Jumps_Rate'] * row['Official_Mins']) if metric_mode == "Total Volume" else row['Total Jumps_Rate']
+                    e_val = (row['Explosive Efforts_Rate'] * row['Official_Mins']) if metric_mode == "Total Volume" else row['Explosive Efforts_Rate']
 
                     matrix_html += f"""<tr>
                                     <td style="padding: 10px; border: 1px solid #ddd;">{row[sort_col]}</td>
                                     <td style="padding: 10px; border: 1px solid #ddd;">{row['Phase']}</td>
-                                    <td style="padding: 10px; border: 1px solid #ddd;">{cur_mins:.1f}</td>
+                                    <td style="padding: 10px; border: 1px solid #ddd;">{row['Official_Mins']:.1f}</td>
                                     <td style="padding: 10px; border: 1px solid #ddd;">{fmt.format(l_val)}</td>
                                     <td style="padding: 10px; border: 1px solid #ddd;">{fmt.format(j_val)}</td>
                                     <td style="padding: 10px; border: 1px solid #ddd;">{fmt.format(e_val)}</td>
@@ -809,7 +809,7 @@ if check_password():
 
                 st.divider()
 
-                # --- 5. DRILL FREQUENCY TABLE ---
+                # --- 5. DRILL FREQUENCY ---
                 st.markdown("### Drill Frequency (Season Total)")
                 drill_stats = phase_df.copy()
                 drill_stats['Phase'] = drill_stats['Phase'].replace(phase_map)
@@ -823,7 +823,6 @@ if check_password():
                 for _, row in drill_freq.iterrows():
                     freq_html += f"<tr><td style='padding: 8px; border: 1px solid #ddd;'>{row['Phase']}</td><td style='padding: 8px; border: 1px solid #ddd;'>{row['Number of Times']:.0f}</td></tr>"
                 st.markdown(freq_html + "</table>", unsafe_allow_html=True)
-                
                 
                 
         with tabs[7]: # Practice Planner
