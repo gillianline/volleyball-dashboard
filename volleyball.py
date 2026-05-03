@@ -78,6 +78,50 @@ if check_password():
             return "#808080"  # Neutral grey for errors/strings
             
         return "#2D5A27" if score <= 40 else "#D4A017" if score <= 70 else "#A52A2A"
+st.markdown("""
+    <style>
+    @media print {
+        /* 1. Hide Streamlit UI elements that aren't needed on paper */
+        #MainMenu, header, footer, .stSidebar, [data-testid="stSidebar"], .stTabs [role="tablist"] {
+            display: none !important;
+        }
+        
+        /* 2. Remove padding and force full width */
+        .main .block-container {
+            padding-top: 0 !important;
+            padding-bottom: 0 !important;
+            max-width: 100% !important;
+        }
+
+        /* 3. Ensure tables don't get cut off */
+        .scout-table, .standard-table, table {
+            width: 100% !important;
+            font-size: 12px !important;
+        }
+
+        /* 4. Force Page Breaks for specific sections if needed */
+        .section-header {
+            page-break-before: always;
+            margin-top: 20px !important;
+            color: black !important;
+        }
+
+        /* 5. Keep colors consistent */
+        .score-box, .bg-highlight-red {
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+        }
+
+        /* 6. Adjust cards for 2-column print layout */
+        [data-testid="stHorizontalBlock"] {
+            display: flex !important;
+            flex-direction: row !important;
+            flex-wrap: nowrap !important;
+        }
+    }
+    </style>
+""", unsafe_allow_html=True)
+
         
     @st.cache_data(ttl=10)
     def load_all_data():
