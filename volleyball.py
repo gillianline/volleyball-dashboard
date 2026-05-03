@@ -1265,6 +1265,123 @@ if check_password():
                 )
             
                 st.plotly_chart(fig_master, use_container_width=True, key=f"master_full_flow_{sel_ath_hist}")
+
+                # --- 2. INTEGRATED CMJ READINESS SECTION ---
+                st.markdown("### CMJ Baseline vs. Post-Match Recovery")
+                
+                if cmj_df is not None and not cmj_df.empty:
+                    # Sync column naming: handles 'Athlete' vs 'Name'
+                    c_sync = cmj_df.rename(columns={'Athlete': 'Name'}) if 'Athlete' in cmj_df.columns else cmj_df.copy()
+                    
+                    # Filter for the selected athlete and sort by date
+                    ath_cmj_data = c_sync[c_sync['Name'] == sel_ath_hist].sort_values('Test Date')
+                    
+                    # Logic: Baseline is Week 4, Comparison is anything after Week 4
+                    baseline_cmj = ath_cmj_data[ath_cmj_data['Week'] == 4]
+                    post_match_cmj = ath_cmj_data[ath_cmj_data['Week'] > 4] 
+
+                    if not baseline_cmj.empty:
+                        base_row = baseline_cmj.iloc[-1]
+                        cmj_col = 'Jump Height (Imp-Mom) [cm]'
+                        rsi_col = 'RSI-modified [m/s]'
+                        
+                        # A. SUMMARY METRIC CARDS
+                        st.markdown("#### Performance vs. Week 4 Baseline")
+                        latest_post = post_match_cmj.iloc[-1] if not post_match_cmj.empty else None
+                        
+                        if latest_post is not None:
+                            h_diff = ((latest_post[cmj_col] - base_row[cmj_col]) / base_row[cmj_col]) * 100
+                            rsi_diff = ((latest_post[rsi_col] - base_row[rsi_col]) / base_row[rsi_col]) * 100
+                            
+                            m1, m2, m3 = st.columns(3)
+                            m1.metric("Baseline", f"{base_row[cmj_col]:.1f} cm")
+                            m2.metric("Latest Jump", f"{latest_post[cmj_col]:.1f} cm", f"{h_diff:+.1f}%")
+                            m3.metric("RSI", f"{latest_post[rsi_col]:.2f}", f"{rsi_diff:+.1f}%")
+
+                        # B. COMPARISON TABLE WITH MATCH CONTEXT
+                        st.markdown("#### Jump History & Match Context")
+                        comparison_list = []
+                        for _, row in post_match_cmj.iterrows():
+                            jump_date = pd.to_datetime(row['Test Date'])
+                            
+                            # Find the most recent match prior to this jump
+                            try:
+                                prev_matches = df[(df['Name'] == sel_ath_hist) & 
+                                                (df['Date'] < jump_date) & 
+                                                ((df['Session_Name'].str.contains('Match|Game', case=False, na=False)) | 
+                                                 (df['Session Type'].str.contains('Match|Game', case=False, na=False)))]
+                                prev_match_name = prev_matches.sort_values('Date', ascending=False).iloc[0]['Session_Name']
+                            except:
+                                prev_match_name = "N/A"
+
+                            raw_diff = float(row[cmj_col]) - float(base_row[cmj_col])
+                            
+                            comparison_list.append({
+                                "Date": jump_date.strftime('%m/%d/%Y'),
+                                "Prev Match": prev_match_name,
+                                "Jump Height": f"{row[cmj_col]:.1f} cm",
+                                "Raw Diff": raw_diff,
+                                "Display Diff": f"{raw_diff:+.1f} cm",
+                                "RSI": f"{row[rsi_col]:.2f}"
+                            })
+                        
+                        # Render the HTML Table
+                        cmj_table_html = """<table style="width:100%; border-collapse: collapse; text-align: center;">
+                                            <tr style="background-color: #f0f2f6; font-weight: bold;">
+                                                <th style="padding: 10px; border: 1px solid #ddd;">Jump Date</th>
+                                                <th style="padding: 10px; border: 1px solid #ddd;">Previous Match</th>
+                                                <th style="padding: 10px; border: 1px solid #ddd;">Jump Height</th>
+                                                <th style="padding: 10px; border: 1px solid #ddd;">Vs. Baseline</th>
+                                                <th style="padding: 10px; border: 1px solid #ddd;">RSI</th>
+                                            </tr>"""
+                        for item in comparison_list:
+                            color = "#28a745" if item['Raw Diff'] >= 0 else "#dc3545"
+                            cmj_table_html += f"""<tr>
+                                <td style="padding: 10px; border: 1px solid #ddd;">{item['Date']}</td>
+                                <td style="padding: 10px; border: 1px solid #ddd;">{item['Prev Match']}</td>
+                                <td style="padding: 10px; border: 1px solid #ddd;">{item['Jump Height']}</td>
+                                <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold; color: {color};">{item['Display Diff']}</td>
+                                <td style="padding: 10px; border: 1px solid #ddd;">{item['RSI']}</td>
+                            </tr>"""
+                        st.markdown(cmj_table_html + "</table>", unsafe_allow_html=True)
+                        
+                        # C. DUAL-AXIS RECOVERY CHART
+                        st.markdown("#### Height vs. RSI Trend")
+                        from plotly.subplots import make_subplots
+                        
+                        # Explicitly define subplot structure to prevent Sync Errors
+                        fig_cmj = make_subplots(rows=1, cols=1, specs=[[{"secondary_y": True}]])
+                        
+                        # Jump Height Trace (Primary Y)
+                        fig_cmj.add_trace(go.Scatter(
+                            x=ath_cmj_data['Test Date'], y=ath_cmj_data[cmj_col], 
+                            name="Jump Height (cm)", mode='lines+markers',
+                            line=dict(color='#4895DB', width=3)
+                        ), row=1, col=1, secondary_y=False)
+                        
+                        # RSI Trace (Secondary Y)
+                        fig_cmj.add_trace(go.Scatter(
+                            x=ath_cmj_data['Test Date'], y=ath_cmj_data[rsi_col], 
+                            name="RSI-mod", mode='lines+markers',
+                            line=dict(color='#FF8200', width=2, dash='dot')
+                        ), row=1, col=1, secondary_y=True)
+                        
+                        # Red Dashed Baseline Line
+                        fig_cmj.add_hline(y=base_row[cmj_col], line_dash="dash", line_color="red")
+                        
+                        fig_cmj.update_layout(
+                            height=400, template="simple_white", margin=dict(l=10, r=10, t=30, b=10),
+                            legend=dict(orientation="h", y=-0.3, x=0.5, xanchor="center"),
+                            xaxis=dict(title="Date", tickformat="%m/%d")
+                        )
+                        fig_cmj.update_yaxes(title_text="Height (cm)", secondary_y=False)
+                        fig_cmj.update_yaxes(title_text="RSI-mod", secondary_y=True)
+                        
+                        st.plotly_chart(fig_cmj, use_container_width=True, key=f"integrated_cmj_final_{sel_ath_hist}")
+                    else:
+                        st.info(f"No Week 4 Baseline data found for {sel_ath_hist}.")
+                else:
+                    st.error("CMJ Data source is missing or empty.")
             
             # ---------------------------------------------------------
             # SUB-TAB 2: TEAM WEEKLY REVIEW
