@@ -235,7 +235,7 @@ if check_password():
                     st.markdown(f'<table class="scout-table"><thead><tr><th>Metric</th><th>Today Total</th><th>30d Max Day</th><th>Grade</th></tr></thead><tbody>{r_html_prof}</tbody></table>', unsafe_allow_html=True)
 
                 # --- ADDED: LEGEND NOTE UNDER TABLE ---
-                    st.markdown('<p style="font-size:11px; color:grey; font-style:italic; margin-top:-10px;">* Red highlight and arrows indicate a significant change (>10%) from the athlete\'s 30-day session average.</p>', unsafe_allow_html=True)
+                    st.markdown('<p style="font-size:11px; color:grey; font-style:italic; margin-top:-10px;">* Red highlight and arrows indicate a significant change (> or < 10%) from the athlete\'s 30-day session average.</p>', unsafe_allow_html=True)
                 with c3: 
                     st.markdown(f'<div style="display:flex; justify-content:center;"><div class="score-box" style="background-color:{get_flipped_gradient(sc_prof)};">{sc_prof}</div></div><p style="text-align:center; font-weight:bold; color:grey; margin-top:10px;">SESSION SCORE</p>', unsafe_allow_html=True)
 
