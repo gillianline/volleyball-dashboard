@@ -821,6 +821,7 @@ if check_password():
                 st.markdown(freq_html + "</table>", unsafe_allow_html=True)
                 
                 
+                
         with tabs[7]: # Practice Planner
             st.markdown('<div class="section-header">Practice Phase Analysis & Planner</div>', unsafe_allow_html=True)
             
