@@ -1247,7 +1247,7 @@ if check_password():
                         x=match_df['Display'], y=match_df['Score'],
                         mode='markers+text', 
                         text=[f"<b>{s}</b>" for s in match_df['Score']], 
-                        textposition="top center", name="Match Day (Combined)", 
+                        textposition="top center", name="Match Day", 
                         marker=dict(size=15, color='#FF8200', line=dict(width=3, color='#31333F')),
                         textfont=dict(color='#31333F', size=13, weight='bold')
                     ))
