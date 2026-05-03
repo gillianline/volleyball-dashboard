@@ -1189,32 +1189,31 @@ if check_password():
                 p_full = df[df['Name'] == sel_ath_hist].copy()
                 p_full['Date'] = pd.to_datetime(p_full['Date'])
             
-                # 2. THE COMBINATION STEP: Sum all metrics for the day first
-                # This handles multiple matches/sessions on the same date
+                # 2. COMBINATION STEP: Sum metrics and combine both Name and Type columns
                 daily_raw = p_full.groupby(['Date', 'Week']).agg({
                     **{m: 'sum' for m in metrics_to_score},
-                    'Session_Name': lambda x: ' | '.join(x.astype(str))
+                    'Session_Name': lambda x: ' | '.join(x.astype(str)),
+                    'Session Type': lambda x: ' | '.join(x.astype(str)) # Added Session Type tracking
                 }).reset_index().sort_values('Date')
             
                 scores_list = []
                 for idx, row in daily_raw.iterrows():
                     row_grades = []
-                    # 3. 30-Day Rolling Window of DAILY SUMS (Matches Gallery Logic)
                     lb_sums = daily_raw[(daily_raw['Date'] >= row['Date'] - timedelta(days=30)) & 
                                        (daily_raw['Date'] <= row['Date'])]
                 
                     for m in metrics_to_score:
-                        val = row[m]           # Combined daily total
-                        mx = lb_sums[m].max()  # Peak daily total in the window
-                    
-                        # Grade matches Gallery: math.ceil((Combined Daily / Peak Daily) * 100)
+                        val = row[m]
+                        mx = lb_sums[m].max()
                         g = math.ceil((val / mx) * 100) if mx > 0 else 0
                         row_grades.append(g)
                 
-                    # Identify if this combined day contains a Match
-                    is_match = any(word in row['Session_Name'].upper() for word in ['MATCH', 'GAME'])
+                    # THE FIX: Check both Session_Name AND Session Type for Match/Game keywords
+                    # This ensures April 18th is caught even if the title is generic
+                    name_str = str(row['Session_Name']).upper()
+                    type_str = str(row['Session Type']).upper()
+                    is_match = any(word in name_str or word in type_str for word in ['MATCH', 'GAME'])
                 
-                    # Final Whole Number Score
                     final_score = math.ceil(sum(row_grades) / len(row_grades))
                 
                     scores_list.append({
@@ -1227,11 +1226,11 @@ if check_password():
             
                 master_df = pd.DataFrame(scores_list).reset_index(drop=True)
 
-                # 4. BUILD THE GRAPH
+                # 3. BUILD THE GRAPH
                 st.markdown("### Full Season Performance")
                 fig_master = px.line(master_df, x='Display', y='Score', range_y=[0, 160])
 
-                # Layer 1: Practice (Standard)
+                # Layer 1: Practice (Blue)
                 prac_df = master_df[master_df['Type'] == 'Practice']
                 if not prac_df.empty:
                     fig_master.add_trace(go.Scatter(
@@ -1241,7 +1240,7 @@ if check_password():
                         marker=dict(size=8, color='#4895DB', line=dict(width=1, color='white'))
                     ))
 
-                # Layer 2: Combined Match (Large, Bold Orange)
+                # Layer 2: Match (Bold Orange - Now catches April 18th)
                 match_df = master_df[master_df['Type'] == 'Match']
                 if not match_df.empty:
                     fig_master.add_trace(go.Scatter(
@@ -1250,7 +1249,7 @@ if check_password():
                         text=[f"<b>{s}</b>" for s in match_df['Score']], 
                         textposition="top center", name="Match Day (Combined)", 
                         marker=dict(size=15, color='#FF8200', line=dict(width=3, color='#31333F')),
-                        textfont=dict(color='#31333F', size=13)
+                        textfont=dict(color='#31333F', size=13, weight='bold')
                     ))
 
                 # Week Dividers
@@ -1267,84 +1266,6 @@ if check_password():
             
                 st.plotly_chart(fig_master, use_container_width=True, key=f"master_full_flow_{sel_ath_hist}")
             
-                # 2. INTEGRATED CMJ LOGIC
-                st.markdown("### CMJ Baseline vs. Post-Match Recovery")
-                
-                if cmj_df is not None and not cmj_df.empty:
-                    # Column Sync
-                    c_data = cmj_df.rename(columns={'Athlete': 'Name'}) if 'Athlete' in cmj_df.columns else cmj_df.copy()
-                    ath_cmj_data = c_data[c_data['Name'] == sel_ath_hist].sort_values('Test Date')
-                    
-                    baseline_cmj = ath_cmj_data[ath_cmj_data['Week'] == 4]
-                    post_match_cmj = ath_cmj_data[ath_cmj_data['Week'] > 4] 
-
-                    if not baseline_cmj.empty:
-                        base_row = baseline_cmj.iloc[-1]
-                        cmj_col, rsi_col = 'Jump Height (Imp-Mom) [cm]', 'RSI-modified [m/s]'
-                        
-                        # A. Summary Metrics
-                        latest_post = post_match_cmj.iloc[-1] if not post_match_cmj.empty else None
-                        if latest_post is not None:
-                            h_diff = ((latest_post[cmj_col] - base_row[cmj_col]) / base_row[cmj_col]) * 100
-                            rsi_diff = ((latest_post[rsi_col] - base_row[rsi_col]) / base_row[rsi_col]) * 100
-                            m1, m2, m3 = st.columns(3)
-                            m1.metric("Baseline", f"{base_row[cmj_col]:.1f} cm")
-                            m2.metric("Latest Jump", f"{latest_post[cmj_col]:.1f} cm", f"{h_diff:+.1f}%")
-                            m3.metric("RSI", f"{latest_post[rsi_col]:.2f}", f"{rsi_diff:+.1f}%")
-
-                        # B. RESTORED COMPARISON TABLE
-                        st.markdown("#### Jump History & Match Context")
-                        comparison_list = []
-                        for _, row in post_match_cmj.iterrows():
-                            jump_date = pd.to_datetime(row['Test Date'])
-                            try:
-                                prev_m = df[(df['Name'] == sel_ath_hist) & (df['Date'] < jump_date) & 
-                                            (df['Session_Name'].str.contains('Match|Game', case=False, na=False))]
-                                prev_match_name = prev_m.sort_values('Date', ascending=False).iloc[0]['Session_Name']
-                            except: prev_match_name = "N/A"
-
-                            raw_diff = float(row[cmj_col]) - float(base_row[cmj_col])
-                            comparison_list.append({
-                                "Date": jump_date.strftime('%m/%d/%Y'),
-                                "Prev Match": prev_match_name,
-                                "Jump Height": f"{row[cmj_col]:.1f} cm",
-                                "Raw Diff": raw_diff,
-                                "Display Diff": f"{raw_diff:+.1f} cm",
-                                "RSI": f"{row[rsi_col]:.2f}"
-                            })
-                        
-                        table_html = """<table style="width:100%; border-collapse: collapse; text-align: center;">
-                                        <tr style="background-color: #f0f2f6; font-weight: bold;">
-                                            <th style="padding: 10px; border: 1px solid #ddd;">Jump Date</th>
-                                            <th style="padding: 10px; border: 1px solid #ddd;">Previous Match</th>
-                                            <th style="padding: 10px; border: 1px solid #ddd;">Jump Height</th>
-                                            <th style="padding: 10px; border: 1px solid #ddd;">Vs. Baseline</th>
-                                            <th style="padding: 10px; border: 1px solid #ddd;">RSI</th>
-                                        </tr>"""
-                        for item in comparison_list:
-                            color = "#28a745" if item['Raw Diff'] >= 0 else "#dc3545"
-                            table_html += f"""<tr>
-                                <td style="padding: 10px; border: 1px solid #ddd;">{item['Date']}</td>
-                                <td style="padding: 10px; border: 1px solid #ddd;">{item['Prev Match']}</td>
-                                <td style="padding: 10px; border: 1px solid #ddd;">{item['Jump Height']}</td>
-                                <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold; color: {color};">{item['Display Diff']}</td>
-                                <td style="padding: 10px; border: 1px solid #ddd;">{item['RSI']}</td>
-                            </tr>"""
-                        st.markdown(table_html + "</table>", unsafe_allow_html=True)
-                        
-                        # C. Dual-Axis Chart FIX
-                        st.markdown("#### Height vs. RSI Trend")
-                        from plotly.subplots import make_subplots
-                        fig_cmj = make_subplots(rows=1, cols=1, specs=[[{"secondary_y": True}]])
-                        fig_cmj.add_trace(go.Scatter(x=ath_cmj_data['Test Date'], y=ath_cmj_data[cmj_col], name="Height (cm)", line=dict(color='#4895DB', width=3)), row=1, col=1, secondary_y=False)
-                        fig_cmj.add_trace(go.Scatter(x=ath_cmj_data['Test Date'], y=ath_cmj_data[rsi_col], name="RSI-mod", line=dict(color='#FF8200', width=2, dash='dot')), row=1, col=1, secondary_y=True)
-                        fig_cmj.add_hline(y=base_row[cmj_col], line_dash="dash", line_color="red")
-                        fig_cmj.update_layout(height=400, template="simple_white", margin=dict(l=10, r=10, t=10, b=10), legend=dict(orientation="h", y=-0.3, x=0.5, xanchor="center"), xaxis=dict(title="Date", tickformat="%m/%d"))
-                        fig_cmj.update_yaxes(title_text="Height (cm)", secondary_y=False)
-                        fig_cmj.update_yaxes(title_text="RSI-mod", secondary_y=True)
-                        st.plotly_chart(fig_cmj, use_container_width=True, key=f"integrated_cmj_{sel_ath_hist}")
-                    else:
-                        st.warning(f"No Week 4 Baseline found for {sel_ath_hist}.")
             # ---------------------------------------------------------
             # SUB-TAB 2: TEAM WEEKLY REVIEW
             # ---------------------------------------------------------
