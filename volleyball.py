@@ -710,18 +710,19 @@ if check_password():
                 index_metrics = ['Player Load', 'Total Jumps', 'Explosive Efforts']
                 working_matrix[time_col] = pd.to_numeric(working_matrix[time_col], errors='coerce').fillna(0)
                 
-                # --- THE FIX: SESSION-BASED DURATION ---
-                # 1. Get a list of unique sessions (Date + Phase) and their specific durations
-                # Since you have one entry per period per day, this gets the true 'clock' for each drill
-                unique_sessions = working_matrix.drop_duplicates(subset=['Date', 'Phase'])[[ 'Date', 'Phase', time_col]]
-                
-                # 2. Calculate the Season Average duration for each drill based ONLY on the sessions
-                # This ignores how many people did the drill and only cares how many times the drill was run
-                session_avg_mins = unique_sessions.groupby('Phase')[time_col].mean().to_dict()
+                # --- THE SESSION-BASED FIX ---
+                # Calculate the Season Average for Mins and Metrics based strictly on Sessions (Date + Phase)
+                # This ensures the 'Standard' for a drill is based on how it was run, not who ran it.
+                session_summary = working_matrix.groupby(['Date', 'Phase']).agg({
+                    time_col: 'max',
+                    **{m: 'mean' for m in index_metrics} # Average per-session output
+                }).reset_index()
 
-                # 3. Calculate individual rates using the raw duration
-                for m in index_metrics:
-                    working_matrix[f'{m}_Rate'] = working_matrix[m] / working_matrix[time_col].replace(0, 1)
+                # Master dictionary for Season Averages (One entry per Drill/Phase)
+                master_averages = session_summary.groupby('Phase').agg({
+                    time_col: 'mean',
+                    **{m: 'mean' for m in index_metrics}
+                }).to_dict('index')
 
                 # --- 2. UI FILTERS ---
                 f_col1, f_col2, f_col3, f_col4 = st.columns(4)
@@ -756,27 +757,29 @@ if check_password():
                 if sel_phase != "All Phases":
                     filtered_df = filtered_df[filtered_df['Phase'] == sel_phase]
                 
-                # Handling Date Selection vs Season Avg
+                # Apply Date Filter vs Season Average Logic
                 if sel_date != "Season Avg":
                     target_dt = pd.to_datetime(sel_date)
-                    filtered_df = filtered_df[filtered_df['Date'] == target_dt]
-                    # Daily view: Use the duration from that specific day
-                    filtered_df['Display_Mins'] = filtered_df[time_col]
+                    display_df = filtered_df[filtered_df['Date'] == target_dt].copy()
                 else:
-                    # Season Avg view: Use our session-based master average
-                    filtered_df['Display_Mins'] = filtered_df['Phase'].map(session_avg_mins)
+                    display_df = filtered_df.copy()
 
-                # Final Grouping
-                rate_cols = [f'{m}_Rate' for m in index_metrics]
+                # Grouping Logic
                 group_keys = ['Position', 'Phase'] if view_mode == "Position" else ['Name', 'Position', 'Phase']
-                
-                matrix_df = filtered_df.groupby(group_keys).agg({
-                    **{f'{m}_Rate': 'mean' for m in index_metrics},
-                    'Display_Mins': 'mean' 
+                matrix_df = display_df.groupby(group_keys).agg({
+                    **{m: 'mean' for m in index_metrics},
+                    time_col: 'mean'
                 }).reset_index()
 
+                # Syncing the "Standard" columns if in Season Avg mode
+                if sel_date == "Season Avg":
+                    for idx, row in matrix_df.iterrows():
+                        phase_name = row['Phase']
+                        if phase_name in master_averages:
+                            # Force the Duration to be the Session Average duration
+                            matrix_df.at[idx, time_col] = master_averages[phase_name][time_col]
+
                 # --- 4. RENDER TABLE ---
-                # (Standard HTML Table logic remains the same)
                 if metric_mode == "Total Volume":
                     h_load, h_jumps, h_expl = "Total Load", "Total Jumps", "Total Efforts"
                     fmt = "{:.0f}"
@@ -799,18 +802,23 @@ if check_password():
                                 </tr>"""
 
                 for _, row in matrix_df.iterrows():
-                    d_mins = row['Display_Mins']
-                    l_val = (row['Player Load_Rate'] * d_mins) if metric_mode == "Total Volume" else row['Player Load_Rate']
-                    j_val = (row['Total Jumps_Rate'] * d_mins) if metric_mode == "Total Volume" else row['Total Jumps_Rate']
-                    e_val = (row['Explosive Efforts_Rate'] * d_mins) if metric_mode == "Total Volume" else row['Explosive Efforts_Rate']
+                    d_mins = row[time_col]
+                    # Work Index calculation: Metric / Duration
+                    l_rate = row['Player Load'] / d_mins if d_mins > 0 else 0
+                    j_rate = row['Total Jumps'] / d_mins if d_mins > 0 else 0
+                    e_rate = row['Explosive Efforts'] / d_mins if d_mins > 0 else 0
+
+                    l_disp = row['Player Load'] if metric_mode == "Total Volume" else l_rate
+                    j_disp = row['Total Jumps'] if metric_mode == "Total Volume" else j_rate
+                    e_disp = row['Explosive Efforts'] if metric_mode == "Total Volume" else e_rate
 
                     matrix_html += f"""<tr>
                                     <td style="padding: 10px; border: 1px solid #ddd;">{row[sort_col]}</td>
                                     <td style="padding: 10px; border: 1px solid #ddd;">{row['Phase']}</td>
                                     <td style="padding: 10px; border: 1px solid #ddd;">{d_mins:.1f}</td>
-                                    <td style="padding: 10px; border: 1px solid #ddd;">{fmt.format(l_val)}</td>
-                                    <td style="padding: 10px; border: 1px solid #ddd;">{fmt.format(j_val)}</td>
-                                    <td style="padding: 10px; border: 1px solid #ddd;">{fmt.format(e_val)}</td>
+                                    <td style="padding: 10px; border: 1px solid #ddd;">{fmt.format(l_disp)}</td>
+                                    <td style="padding: 10px; border: 1px solid #ddd;">{fmt.format(j_disp)}</td>
+                                    <td style="padding: 10px; border: 1px solid #ddd;">{fmt.format(e_disp)}</td>
                                   </tr>"""
                 st.markdown(matrix_html + "</table>", unsafe_allow_html=True)
                 
