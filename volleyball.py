@@ -324,7 +324,7 @@ if check_password():
             # --- 1. CLEAN DROPDOWN LIST ---
             # We filter the session list so that any match on 4/4/26 is replaced by one "GT Spring Tournament" entry
             target_date_str = "2026-04-04"
-            tournament_label = "GT Spring Tournament"
+            tournament_label = "GT Spring Tournament 4-4-26"
             
             clean_session_list = []
             tourney_added = False
@@ -350,7 +350,6 @@ if check_password():
                 # If tournament is selected, grab all data for that specific date
                 curr_date_gal = pd.to_datetime(target_date_str)
                 display_df = df[df['Date'] == curr_date_gal].groupby(['Name', 'Position', 'PhotoURL']).sum(numeric_only=True).reset_index()
-                st.success(f"🏆 Combined Tournament Stats for {tournament_label}")
             else:
                 # Normal session view
                 display_df = df[df['Session_Name'] == selected_session_gal].copy()
