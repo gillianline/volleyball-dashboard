@@ -705,16 +705,22 @@ if check_password():
                 if 'Phase' in working_matrix.columns:
                     working_matrix['Phase'] = working_matrix['Phase'].replace(phase_map)
 
-                # Calculation logic for Rates
                 time_col, index_metrics = 'Duration', ['Player Load', 'Total Jumps', 'Explosive Efforts']
                 working_matrix[time_col] = pd.to_numeric(working_matrix[time_col], errors='coerce').fillna(0)
                 
+                # --- THE FIX: SYNCED DURATION ---
+                # Calculate the "Master Clock" for each Phase per Day
+                # This ensures the 'Mins' column is identical for everyone in '6v6', 'Warmup', etc.
+                phase_clock = working_matrix.groupby(['Date', 'Phase'])[time_col].transform('max')
+                working_matrix[time_col] = phase_clock
+
+                # Calculate Rates based on the synced Master Clock
                 for m in index_metrics:
                     working_matrix[f'{m}_Rate'] = working_matrix.apply(
                         lambda x: x[m] / x[time_col] if x[time_col] > 0 else 0, axis=1
                     )
 
-                # --- 2. UI FILTERS (Now includes Phase Filter) ---
+                # --- 2. UI FILTERS ---
                 f_col1, f_col2, f_col3, f_col4 = st.columns(4)
                 with f_col1:
                     view_mode = st.radio("Group By", ["Position", "Individual"], horizontal=True, key="wi_view")
@@ -733,7 +739,6 @@ if check_password():
                             working_matrix = working_matrix[working_matrix['Name'] == sel_sub_filter]
                 
                 with f_col3:
-                    # NEW: Phase Filter
                     phase_list = ["All Phases"] + sorted(working_matrix['Phase'].unique().tolist())
                     sel_phase = st.selectbox("Select Drill/Phase", phase_list, key="wi_phase_filter")
                     if sel_phase != "All Phases":
@@ -746,10 +751,15 @@ if check_password():
                     if sel_date != "Season Avg":
                         working_matrix = working_matrix[working_matrix['Date'] == pd.to_datetime(sel_date)]
 
-                # --- 3. MAIN WORK INDEX TABLE (TOP) ---
+                # --- 3. MAIN TABLE (TOP) ---
                 rate_cols = [f'{m}_Rate' for m in index_metrics]
                 group_keys = ['Position', 'Phase'] if view_mode == "Position" else ['Name', 'Position', 'Phase']
-                matrix_df = working_matrix.groupby(group_keys)[rate_cols + [time_col]].mean().reset_index()
+                
+                # Aggregate using mean for rates, but keep the synced Duration
+                matrix_df = working_matrix.groupby(group_keys).agg({
+                    **{f'{m}_Rate': 'mean' for m in index_metrics},
+                    time_col: 'mean' 
+                }).reset_index()
 
                 if metric_mode == "Total Volume":
                     h_load, h_jumps, h_expl = "Total Load", "Total Jumps", "Total Efforts"
@@ -785,30 +795,23 @@ if check_password():
                                     <td style="padding: 10px; border: 1px solid #ddd;">{fmt.format(j_val)}</td>
                                     <td style="padding: 10px; border: 1px solid #ddd;">{fmt.format(e_val)}</td>
                                   </tr>"""
-                matrix_html += "</table>"
-                st.markdown(matrix_html, unsafe_allow_html=True)
+                st.markdown(matrix_html + "</table>", unsafe_allow_html=True)
 
                 st.divider()
 
-                # --- 4. DRILL FREQUENCY TABLE (BOTTOM) ---
+                # --- 4. DRILL FREQUENCY (BOTTOM) ---
                 st.markdown("### Drill Frequency (Season Total)")
-                # We use the original filtered working_matrix before the Date/Phase UI filters 
-                # or a fresh copy if you want the absolute season frequency.
                 drill_stats = phase_df.copy()
                 drill_stats['Phase'] = drill_stats['Phase'].replace(phase_map)
-                drill_freq = drill_stats.groupby('Phase')['Number of Times'].sum().reset_index()
-                drill_freq = drill_freq.sort_values('Number of Times', ascending=False)
+                drill_freq = drill_stats.groupby('Phase')['Number of Times'].sum().reset_index().sort_values('Number of Times', ascending=False)
                 
-                freq_html = """<table style="width:100%; border-collapse: collapse; text-align: center; margin-bottom: 20px;">
+                freq_html = """<table style="width:100%; border-collapse: collapse; text-align: center;">
                                 <tr style="background-color: #f0f2f6; font-weight: bold;">
                                     <th style="padding: 10px; border: 1px solid #ddd;">Drill/Phase</th>
                                     <th style="padding: 10px; border: 1px solid #ddd;">Season Frequency</th>
                                 </tr>"""
                 for _, row in drill_freq.iterrows():
-                    freq_html += f"""<tr>
-                                    <td style="padding: 8px; border: 1px solid #ddd;">{row['Phase']}</td>
-                                    <td style="padding: 8px; border: 1px solid #ddd;">{row['Number of Times']:.0f}</td>
-                                  </tr>"""
+                    freq_html += f"<tr><td style='padding: 8px; border: 1px solid #ddd;'>{row['Phase']}</td><td style='padding: 8px; border: 1px solid #ddd;'>{row['Number of Times']:.0f}</td></tr>"
                 st.markdown(freq_html + "</table>", unsafe_allow_html=True)
                 
                 
