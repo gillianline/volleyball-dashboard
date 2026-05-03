@@ -705,25 +705,7 @@ if check_password():
                 if 'Phase' in working_matrix.columns:
                     working_matrix['Phase'] = working_matrix['Phase'].replace(phase_map)
 
-                # --- 2. DRILL FREQUENCY TABLE ---
-                st.markdown("### Drill Frequency")
-                drill_stats = working_matrix.groupby('Phase')['Number of Times'].sum().reset_index()
-                drill_stats = drill_stats.sort_values('Number of Times', ascending=False)
-                
-                freq_html = """<table style="width:100%; border-collapse: collapse; text-align: center;">
-                                <tr style="background-color: #f0f2f6; font-weight: bold;">
-                                    <th style="padding: 8px; border: 1px solid #ddd;">Drill/Phase</th>
-                                    <th style="padding: 8px; border: 1px solid #ddd;">Frequency</th>
-                                </tr>"""
-                for _, row in drill_stats.iterrows():
-                    freq_html += f"""<tr>
-                                    <td style="padding: 8px; border: 1px solid #ddd;">{row['Phase']}</td>
-                                    <td style="padding: 8px; border: 1px solid #ddd;">{row['Number of Times']:.0f}</td>
-                                  </tr>"""
-                freq_html += "</table>"
-                st.markdown(freq_html, unsafe_allow_html=True)
-
-                # --- 3. CALCULATION LOGIC ---
+                # Calculation logic for Rates
                 time_col, index_metrics = 'Duration', ['Player Load', 'Total Jumps', 'Explosive Efforts']
                 working_matrix[time_col] = pd.to_numeric(working_matrix[time_col], errors='coerce').fillna(0)
                 
@@ -732,11 +714,12 @@ if check_password():
                         lambda x: x[m] / x[time_col] if x[time_col] > 0 else 0, axis=1
                     )
 
-                # --- 4. UI FILTERS ---
-                f_col1, f_col2, f_col3 = st.columns(3)
+                # --- 2. UI FILTERS (Now includes Phase Filter) ---
+                f_col1, f_col2, f_col3, f_col4 = st.columns(4)
                 with f_col1:
                     view_mode = st.radio("Group By", ["Position", "Individual"], horizontal=True, key="wi_view")
                     metric_mode = st.radio("Data Mode", ["Work Index (per minute)", "Total Volume"], horizontal=True, key="wi_mode")
+                
                 with f_col2:
                     if view_mode == "Position":
                         pos_list = ["All Positions"] + sorted([p for p in working_matrix['Position'].unique() if p not in ["nan", "N/A"]])
@@ -748,20 +731,26 @@ if check_password():
                         sel_sub_filter = st.selectbox("Select Player", player_list)
                         if sel_sub_filter != "All Players":
                             working_matrix = working_matrix[working_matrix['Name'] == sel_sub_filter]
+                
                 with f_col3:
+                    # NEW: Phase Filter
+                    phase_list = ["All Phases"] + sorted(working_matrix['Phase'].unique().tolist())
+                    sel_phase = st.selectbox("Select Drill/Phase", phase_list, key="wi_phase_filter")
+                    if sel_phase != "All Phases":
+                        working_matrix = working_matrix[working_matrix['Phase'] == sel_phase]
+                
+                with f_col4:
                     valid_dates = working_matrix['Date'].dropna().unique()
                     date_opts = ["Season Avg"] + sorted([d.strftime('%Y-%m-%d') for d in valid_dates], reverse=True)
                     sel_date = st.selectbox("Select Date", date_opts, key="wi_volume_date")
+                    if sel_date != "Season Avg":
+                        working_matrix = working_matrix[working_matrix['Date'] == pd.to_datetime(sel_date)]
 
-                if sel_date != "Season Avg":
-                    working_matrix = working_matrix[working_matrix['Date'] == pd.to_datetime(sel_date)]
-
-                # --- 5. AGGREGATION & HEADER LOGIC ---
+                # --- 3. MAIN WORK INDEX TABLE (TOP) ---
                 rate_cols = [f'{m}_Rate' for m in index_metrics]
                 group_keys = ['Position', 'Phase'] if view_mode == "Position" else ['Name', 'Position', 'Phase']
                 matrix_df = working_matrix.groupby(group_keys)[rate_cols + [time_col]].mean().reset_index()
 
-                # --- NEW HEADER LOGIC ---
                 if metric_mode == "Total Volume":
                     h_load, h_jumps, h_expl = "Total Load", "Total Jumps", "Total Efforts"
                     fmt = "{:.0f}"
@@ -769,37 +758,58 @@ if check_password():
                     h_load, h_jumps, h_expl = "Player Load/Min", "Jumps/Min", "Explosive Efforts/Min"
                     fmt = "{:.2f}"
 
-                # --- 6. MANUAL HTML TABLE ---
                 st.markdown(f"### {metric_mode}")
                 sort_col = 'Position' if view_mode == "Position" else 'Name'
                 matrix_df = matrix_df.sort_values([sort_col, 'Phase'])
 
                 matrix_html = f"""<table style="width:100%; border-collapse: collapse; text-align: center;">
-                                <tr style="background-color: #f0f2f6; font-weight: bold;">
-                                    <th style="padding: 8px; border: 1px solid #ddd;">{sort_col}</th>
-                                    <th style="padding: 8px; border: 1px solid #ddd;">Phase</th>
-                                    <th style="padding: 8px; border: 1px solid #ddd;">Mins</th>
-                                    <th style="padding: 8px; border: 1px solid #ddd;">{h_load}</th>
-                                    <th style="padding: 8px; border: 1px solid #ddd;">{h_jumps}</th>
-                                    <th style="padding: 8px; border: 1px solid #ddd;">{h_expl}</th>
+                                <tr style="background-color: #31333F; color: white; font-weight: bold;">
+                                    <th style="padding: 12px; border: 1px solid #ddd;">{sort_col}</th>
+                                    <th style="padding: 12px; border: 1px solid #ddd;">Phase</th>
+                                    <th style="padding: 12px; border: 1px solid #ddd;">Mins</th>
+                                    <th style="padding: 12px; border: 1px solid #ddd;">{h_load}</th>
+                                    <th style="padding: 12px; border: 1px solid #ddd;">{h_jumps}</th>
+                                    <th style="padding: 12px; border: 1px solid #ddd;">{h_expl}</th>
                                 </tr>"""
 
                 for _, row in matrix_df.iterrows():
-                    # Math check
-                    load_val = (row['Player Load_Rate'] * row[time_col]) if metric_mode == "Total Volume" else row['Player Load_Rate']
-                    jump_val = (row['Total Jumps_Rate'] * row[time_col]) if metric_mode == "Total Volume" else row['Total Jumps_Rate']
-                    expl_val = (row['Explosive Efforts_Rate'] * row[time_col]) if metric_mode == "Total Volume" else row['Explosive Efforts_Rate']
+                    l_val = (row['Player Load_Rate'] * row[time_col]) if metric_mode == "Total Volume" else row['Player Load_Rate']
+                    j_val = (row['Total Jumps_Rate'] * row[time_col]) if metric_mode == "Total Volume" else row['Total Jumps_Rate']
+                    e_val = (row['Explosive Efforts_Rate'] * row[time_col]) if metric_mode == "Total Volume" else row['Explosive Efforts_Rate']
 
                     matrix_html += f"""<tr>
-                                    <td style="padding: 8px; border: 1px solid #ddd;">{row[sort_col]}</td>
-                                    <td style="padding: 8px; border: 1px solid #ddd;">{row['Phase']}</td>
-                                    <td style="padding: 8px; border: 1px solid #ddd;">{row[time_col]:.1f}</td>
-                                    <td style="padding: 8px; border: 1px solid #ddd;">{fmt.format(load_val)}</td>
-                                    <td style="padding: 8px; border: 1px solid #ddd;">{fmt.format(jump_val)}</td>
-                                    <td style="padding: 8px; border: 1px solid #ddd;">{fmt.format(expl_val)}</td>
+                                    <td style="padding: 10px; border: 1px solid #ddd;">{row[sort_col]}</td>
+                                    <td style="padding: 10px; border: 1px solid #ddd;">{row['Phase']}</td>
+                                    <td style="padding: 10px; border: 1px solid #ddd;">{row[time_col]:.1f}</td>
+                                    <td style="padding: 10px; border: 1px solid #ddd;">{fmt.format(l_val)}</td>
+                                    <td style="padding: 10px; border: 1px solid #ddd;">{fmt.format(j_val)}</td>
+                                    <td style="padding: 10px; border: 1px solid #ddd;">{fmt.format(e_val)}</td>
                                   </tr>"""
                 matrix_html += "</table>"
                 st.markdown(matrix_html, unsafe_allow_html=True)
+
+                st.divider()
+
+                # --- 4. DRILL FREQUENCY TABLE (BOTTOM) ---
+                st.markdown("### Drill Frequency (Season Total)")
+                # We use the original filtered working_matrix before the Date/Phase UI filters 
+                # or a fresh copy if you want the absolute season frequency.
+                drill_stats = phase_df.copy()
+                drill_stats['Phase'] = drill_stats['Phase'].replace(phase_map)
+                drill_freq = drill_stats.groupby('Phase')['Number of Times'].sum().reset_index()
+                drill_freq = drill_freq.sort_values('Number of Times', ascending=False)
+                
+                freq_html = """<table style="width:100%; border-collapse: collapse; text-align: center; margin-bottom: 20px;">
+                                <tr style="background-color: #f0f2f6; font-weight: bold;">
+                                    <th style="padding: 10px; border: 1px solid #ddd;">Drill/Phase</th>
+                                    <th style="padding: 10px; border: 1px solid #ddd;">Season Frequency</th>
+                                </tr>"""
+                for _, row in drill_freq.iterrows():
+                    freq_html += f"""<tr>
+                                    <td style="padding: 8px; border: 1px solid #ddd;">{row['Phase']}</td>
+                                    <td style="padding: 8px; border: 1px solid #ddd;">{row['Number of Times']:.0f}</td>
+                                  </tr>"""
+                st.markdown(freq_html + "</table>", unsafe_allow_html=True)
                 
                 
         with tabs[7]: # Practice Planner
