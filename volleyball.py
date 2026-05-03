@@ -494,19 +494,18 @@ if check_password():
                     
                     # Calculate percentage difference (Match vs Practice)
                     gap = ((m_rate - p_rate) / p_rate * 100) if p_rate > 0 else 0
-                    gap_color = "#dc3545" if gap > 0 else "#28a745" # Red if match is more intense
                     
                     overall_html += f"""
                         <tr>
                             <td style="padding: 10px; border: 1px solid #ddd;"><b>{metrics_dict[m]}</b></td>
                             <td style="padding: 10px; border: 1px solid #ddd;">{p_rate:.2f}</td>
                             <td style="padding: 10px; border: 1px solid #ddd;">{m_rate:.2f}</td>
-                            <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold; color: {gap_color};">{gap:+.1f}%</td>
+                            <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold;">{gap:+.1f}%</td>
                         </tr>"""
                 
                 st.markdown(overall_html + "</table>", unsafe_allow_html=True)
                 
-                st.info("💡 **Intensity Rate** is calculated as the total metric volume divided by the session duration (minutes). A positive gap indicates that match demands are higher than average practice intensity.")
+                st.info(" **Intensity Rate** is calculated as the total metric volume divided by the session duration (minutes). A positive gap indicates that match demands are higher than average practice intensity.")
             else:
                 st.warning("Ensure both Practice and Match data are loaded for this selection.")
                 
