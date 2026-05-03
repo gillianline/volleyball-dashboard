@@ -6,52 +6,63 @@ from plotly.subplots import make_subplots
 import math 
 from datetime import timedelta
 
+st.markdown("""
+    <style>
+    @media print {
+        /* 1. Eliminate Streamlit UI Navigation & Sidebars */
+        #MainMenu, header, footer, .stSidebar, [data-testid="stSidebar"], 
+        [data-testid="stHeader"], .stTabs [role="tablist"], [data-testid="stDecoration"] {
+            display: none !important;
+        }
+        
+        /* 2. Wipe out ALL Input Widgets (Selectboxes, Sliders, Radio Buttons) */
+        [data-testid="stSelectbox"], [data-testid="stRadio"], 
+        [data-testid="stMultiSelect"], [data-testid="stSlider"],
+        [data-testid="stNumberInput"], [data-testid="stTextInput"],
+        [data-testid="stButton"], .stSelectbox, .stRadio {
+            display: none !important;
+        }
+
+        /* 3. Expand content to full page width */
+        .main .block-container {
+            padding-top: 10px !important;
+            padding-bottom: 10px !important;
+            max-width: 100% !important;
+        }
+
+        /* 4. Force Tables to stay professional and centered */
+        .scout-table, table {
+            width: 100% !important;
+            font-size: 11px !important;
+            border: 1px solid #ddd !important;
+        }
+
+        /* 5. Ensure Chart & Box colors are preserved in print */
+        .score-box, .bg-highlight-red, .section-header {
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+        }
+
+        /* 6. Section Breaks */
+        .section-header {
+            page-break-before: auto;
+            border-bottom: 2px solid #31333F !important;
+            color: black !important;
+        }
+        
+        /* 7. Fix for horizontal card layouts in Gallery/Individual */
+        [data-testid="stHorizontalBlock"] {
+            display: flex !important;
+            flex-direction: row !important;
+            flex-wrap: nowrap !important;
+        }
+    }
+    </style>
+""", unsafe_allow_html=True)
+
 # --- PAGE CONFIG ---
 st.set_page_config(page_title="Lady Vols VB Performance", layout="wide")
 
-st.markdown("""
-        <style>
-        @media print {
-            /* 1. Hide Streamlit UI elements that aren't needed on paper */
-            #MainMenu, header, footer, .stSidebar, [data-testid="stSidebar"], .stTabs [role="tablist"] {
-                display: none !important;
-            }
-        
-            /* 2. Remove padding and force full width */
-            .main .block-container {
-                padding-top: 0 !important;
-                padding-bottom: 0 !important;
-                max-width: 100% !important;
-            }
-
-            /* 3. Ensure tables don't get cut off */
-            .scout-table, .standard-table, table {
-                width: 100% !important;
-                font-size: 12px !important;
-            }
-
-            /* 4. Force Page Breaks for specific sections if needed */
-            .section-header {
-                page-break-before: always;
-                margin-top: 20px !important;
-                color: black !important;
-            }
-
-            /* 5. Keep colors consistent */
-            .score-box, .bg-highlight-red {
-                -webkit-print-color-adjust: exact !important;
-                print-color-adjust: exact !important;
-            }
-
-            /* 6. Adjust cards for 2-column print layout */
-            [data-testid="stHorizontalBlock"] {
-                display: flex !important;
-                flex-direction: row !important;
-                flex-wrap: nowrap !important;
-            }
-        }
-        </style>
-    """, unsafe_allow_html=True)
 
 # --- PASSWORD PROTECTION ---
 def check_password():
