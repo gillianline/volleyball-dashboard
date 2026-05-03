@@ -321,28 +321,43 @@ if check_password():
                     
         
         with tabs[1]: # Tab 1: Gallery
+            # --- 1. CLEAN DROPDOWN LIST ---
+            # We filter the session list so that any match on 4/4/26 is replaced by one "GT Spring Tournament" entry
+            target_date_str = "2026-04-04"
+            tournament_label = "GT Spring Tournament"
+            
+            clean_session_list = []
+            tourney_added = False
+            
+            for s in session_list:
+                # Check if this specific session name belongs to the tournament date in the main df
+                s_date = df[df['Session_Name'] == s]['Date'].dt.strftime('%Y-%m-%d').iloc[0]
+                if s_date == target_date_str:
+                    if not tourney_added:
+                        clean_session_list.append(tournament_label)
+                        tourney_added = True
+                else:
+                    clean_session_list.append(s)
+
             c_gal1, c_gal2 = st.columns(2)
             with c_gal1: 
-                selected_session_gal = st.selectbox("Session Selection", session_list, index=0, key="nav_sel_gal")
+                selected_session_gal = st.selectbox("Session Selection", clean_session_list, index=0, key="nav_sel_gal")
             with c_gal2: 
                 pos_f_gal = st.selectbox("Position Filter", ["All Positions"] + sorted([p for p in df['Position'].unique() if p != "N/A"]), key="nav_pos_gal")
             
-            # 1. Identify date of selected session
-            temp_df = df[df['Session_Name'] == selected_session_gal].copy()
-            
-            if not temp_df.empty:
-                curr_date_gal = temp_df['Date'].iloc[0]
-                target_date = pd.to_datetime("2026-04-04")
-                
-                # 2. COMBINATION LOGIC: If 4/4/26, sum all matches for each athlete
-                if curr_date_gal == target_date:
-                    st.success("🏆 Displaying combined stats for: GT Spring Tournament")
-                    # Sum all numeric metrics for each athlete on this specific date
-                    display_df = df[df['Date'] == target_date].groupby(['Name', 'Position', 'PhotoURL']).sum(numeric_only=True).reset_index()
-                else:
-                    # Normal session-only view
-                    display_df = temp_df
-                
+            # --- 2. DATA AGGREGATION LOGIC ---
+            if selected_session_gal == tournament_label:
+                # If tournament is selected, grab all data for that specific date
+                curr_date_gal = pd.to_datetime(target_date_str)
+                display_df = df[df['Date'] == curr_date_gal].groupby(['Name', 'Position', 'PhotoURL']).sum(numeric_only=True).reset_index()
+                st.success(f"🏆 Combined Tournament Stats for {tournament_label}")
+            else:
+                # Normal session view
+                display_df = df[df['Session_Name'] == selected_session_gal].copy()
+                if not display_df.empty:
+                    curr_date_gal = display_df['Date'].iloc[0]
+
+            if not display_df.empty:
                 # Apply Position Filter
                 if pos_f_gal != "All Positions": 
                     display_df = display_df[display_df['Position'] == pos_f_gal]
@@ -356,43 +371,35 @@ if check_password():
                     for j in range(2):
                         if i + j < len(athlete_names):
                             name = athlete_names[i + j]
-                            
-                            # Get athlete row (either aggregated or single session)
                             p_session_row = display_df[display_df['Name'] == name].iloc[0]
-                            p_full_g = df[df['Name'] == name]
                             
-                            # 3. Baseline: 30-day peak daily sum (Synced with Individual Review)
+                            # Baseline: 30-day peak daily sum
+                            p_full_g = df[df['Name'] == name]
                             daily_sums_g = p_full_g.groupby('Date')[all_metrics].sum().reset_index()
                             lb_sums = daily_sums_g[(daily_sums_g['Date'] >= curr_date_gal - timedelta(days=30)) & 
                                                    (daily_sums_g['Date'] <= curr_date_gal)]
                             
                             r_html = ""; t_grade = 0; c_metrics = 0
-                            
-                            # 4. Build Table
                             for k in filtered_metrics_gal:
                                 val = p_session_row[k]
                                 mx = lb_sums[k].max()
                                 avg = lb_sums[k].mean()
-                                
                                 g = math.ceil((val / mx) * 100) if mx > 0 else 0
                                 t_grade += g
                                 c_metrics += 1
-                                
                                 diff = (val - avg) / avg if avg != 0 else 0
                                 h_class = "class='bg-highlight-red'" if abs(diff) > 0.15 else ""
                                 arr_val = f"<span class='arrow-red'>{'↑' if diff > 0.15 else '↓'}</span>" if abs(diff) > 0.15 else ""
-                                
                                 r_html += f"<tr><td>{k}</td><td {h_class}>{val:.1f} {arr_val}</td><td>{mx:.1f}</td><td>{g}</td></tr>"
                             
                             sc_g = math.ceil(t_grade / c_metrics) if c_metrics > 0 else 0
                             
-                            # 5. Render Card
                             with cols[j]: 
                                 st.markdown(f"""
                                     <div style="border:1px solid #E5E5E7; border-radius:15px; padding:15px; margin-bottom:20px; background-color:white;">
                                         <div style="display:flex; align-items:center; gap:10px;">
                                             <div style="flex:1.2; text-align:center;">
-                                                <img src="{p_session_row["PhotoURL"]}" class="gallery-photo" style="width:70px; height:70px; border-radius:50%; object-fit:cover;">
+                                                <img src="{p_session_row["PhotoURL"]}" class="gallery-photo">
                                                 <p style="font-weight:bold; font-size:15px; margin-top:8px; color:#333;">{name}</p>
                                             </div>
                                             <div style="flex:3;">
@@ -411,8 +418,6 @@ if check_password():
                                         </div>
                                     </div>
                                 """, unsafe_allow_html=True)
-            else:
-                st.info("No data found for the selected session.")
                 
                 
         with tabs[3]: # Tab 4: Game v Practice
