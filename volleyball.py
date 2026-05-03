@@ -710,12 +710,17 @@ if check_password():
                 index_metrics = ['Player Load', 'Total Jumps', 'Explosive Efforts']
                 working_matrix[time_col] = pd.to_numeric(working_matrix[time_col], errors='coerce').fillna(0)
                 
-                # --- THE DURATION SYNC FIX ---
-                # We identify the 'Official Mins' for each drill on each date (the max time any player recorded)
-                # This ensures the "Mins" column is identical for everyone in a specific drill
-                working_matrix['Official_Mins'] = working_matrix.groupby(['Date', 'Phase'])[time_col].transform('max')
+                # --- THE STATED FIX: FORCE ONE CLOCK PER PHASE PER DAY ---
+                # 1. Create a reference map of the MAX duration for every Phase on every Date
+                master_clock_map = working_matrix.groupby(['Date', 'Phase'])[time_col].max().to_dict()
 
-                # Calculate Rates based on the official drill clock
+                # 2. Apply that Master Clock to every row based on its Date and Phase
+                def sync_time(row):
+                    return master_clock_map.get((row['Date'], row['Phase']), row[time_col])
+                
+                working_matrix['Official_Mins'] = working_matrix.apply(sync_time, axis=1)
+
+                # 3. Calculate Rates using the synced clock
                 for m in index_metrics:
                     working_matrix[f'{m}_Rate'] = working_matrix[m] / working_matrix['Official_Mins'].replace(0, 1)
 
@@ -729,34 +734,38 @@ if check_password():
                     if view_mode == "Position":
                         pos_list = ["All Positions"] + sorted([p for p in working_matrix['Position'].unique() if p not in ["nan", "N/A"]])
                         sel_sub_filter = st.selectbox("Select Position", pos_list)
-                        if sel_sub_filter != "All Positions":
-                            working_matrix = working_matrix[working_matrix['Position'] == sel_sub_filter]
                     else:
                         player_list = ["All Players"] + sorted(working_matrix['Name'].unique())
                         sel_sub_filter = st.selectbox("Select Player", player_list)
-                        if sel_sub_filter != "All Players":
-                            working_matrix = working_matrix[working_matrix['Name'] == sel_sub_filter]
                 
                 with f_col3:
-                    # Phase Filter
                     phase_list = ["All Phases"] + sorted(working_matrix['Phase'].unique().tolist())
                     sel_phase = st.selectbox("Select Drill/Phase", phase_list, key="wi_phase_filter")
-                    if sel_phase != "All Phases":
-                        working_matrix = working_matrix[working_matrix['Phase'] == sel_phase]
                 
                 with f_col4:
                     valid_dates = working_matrix['Date'].dropna().unique()
                     date_opts = ["Season Avg"] + sorted([d.strftime('%Y-%m-%d') for d in valid_dates], reverse=True)
                     sel_date = st.selectbox("Select Date", date_opts, key="wi_volume_date")
-                    if sel_date != "Season Avg":
-                        working_matrix = working_matrix[working_matrix['Date'] == pd.to_datetime(sel_date)]
 
-                # --- 3. MAIN WORK INDEX TABLE (TOP) ---
+                # --- 3. FILTER EXECUTION ---
+                filtered_df = working_matrix.copy()
+                if view_mode == "Position" and sel_sub_filter != "All Positions":
+                    filtered_df = filtered_df[filtered_df['Position'] == sel_sub_filter]
+                elif view_mode == "Individual" and sel_sub_filter != "All Players":
+                    filtered_df = filtered_df[filtered_df['Name'] == sel_sub_filter]
+                
+                if sel_phase != "All Phases":
+                    filtered_df = filtered_df[filtered_df['Phase'] == sel_phase]
+                
+                if sel_date != "Season Avg":
+                    filtered_df = filtered_df[filtered_df['Date'] == pd.to_datetime(sel_date)]
+
+                # --- 4. AGGREGATION & TABLE GEN ---
                 rate_cols = [f'{m}_Rate' for m in index_metrics]
                 group_keys = ['Position', 'Phase'] if view_mode == "Position" else ['Name', 'Position', 'Phase']
                 
-                # Aggregate using mean for rates, but use the official duration
-                matrix_df = working_matrix.groupby(group_keys).agg({
+                # We aggregate by taking the mean of rates, but the mean of the Official Mins
+                matrix_df = filtered_df.groupby(group_keys).agg({
                     **{f'{m}_Rate': 'mean' for m in index_metrics},
                     'Official_Mins': 'mean' 
                 }).reset_index()
@@ -783,41 +792,36 @@ if check_password():
                                 </tr>"""
 
                 for _, row in matrix_df.iterrows():
-                    m_mins = row['Official_Mins']
-                    l_val = (row['Player Load_Rate'] * m_mins) if metric_mode == "Total Volume" else row['Player Load_Rate']
-                    j_val = (row['Total Jumps_Rate'] * m_mins) if metric_mode == "Total Volume" else row['Total Jumps_Rate']
-                    e_val = (row['Explosive Efforts_Rate'] * m_mins) if metric_mode == "Total Volume" else row['Explosive Efforts_Rate']
+                    cur_mins = row['Official_Mins']
+                    l_val = (row['Player Load_Rate'] * cur_mins) if metric_mode == "Total Volume" else row['Player Load_Rate']
+                    j_val = (row['Total Jumps_Rate'] * cur_mins) if metric_mode == "Total Volume" else row['Total Jumps_Rate']
+                    e_val = (row['Explosive Efforts_Rate'] * cur_mins) if metric_mode == "Total Volume" else row['Explosive Efforts_Rate']
 
                     matrix_html += f"""<tr>
                                     <td style="padding: 10px; border: 1px solid #ddd;">{row[sort_col]}</td>
                                     <td style="padding: 10px; border: 1px solid #ddd;">{row['Phase']}</td>
-                                    <td style="padding: 10px; border: 1px solid #ddd;">{m_mins:.1f}</td>
+                                    <td style="padding: 10px; border: 1px solid #ddd;">{cur_mins:.1f}</td>
                                     <td style="padding: 10px; border: 1px solid #ddd;">{fmt.format(l_val)}</td>
                                     <td style="padding: 10px; border: 1px solid #ddd;">{fmt.format(j_val)}</td>
                                     <td style="padding: 10px; border: 1px solid #ddd;">{fmt.format(e_val)}</td>
                                   </tr>"""
-                matrix_html += "</table>"
-                st.markdown(matrix_html, unsafe_allow_html=True)
+                st.markdown(matrix_html + "</table>", unsafe_allow_html=True)
 
                 st.divider()
 
-                # --- 4. DRILL FREQUENCY TABLE (BOTTOM) ---
+                # --- 5. DRILL FREQUENCY TABLE ---
                 st.markdown("### Drill Frequency (Season Total)")
                 drill_stats = phase_df.copy()
                 drill_stats['Phase'] = drill_stats['Phase'].replace(phase_map)
-                drill_freq = drill_stats.groupby('Phase')['Number of Times'].sum().reset_index()
-                drill_freq = drill_freq.sort_values('Number of Times', ascending=False)
+                drill_freq = drill_stats.groupby('Phase')['Number of Times'].sum().reset_index().sort_values('Number of Times', ascending=False)
                 
-                freq_html = """<table style="width:100%; border-collapse: collapse; text-align: center; margin-bottom: 20px;">
+                freq_html = """<table style="width:100%; border-collapse: collapse; text-align: center;">
                                 <tr style="background-color: #f0f2f6; font-weight: bold;">
                                     <th style="padding: 10px; border: 1px solid #ddd;">Drill/Phase</th>
                                     <th style="padding: 10px; border: 1px solid #ddd;">Season Frequency</th>
                                 </tr>"""
                 for _, row in drill_freq.iterrows():
-                    freq_html += f"""<tr>
-                                    <td style="padding: 8px; border: 1px solid #ddd;">{row['Phase']}</td>
-                                    <td style="padding: 8px; border: 1px solid #ddd;">{row['Number of Times']:.0f}</td>
-                                  </tr>"""
+                    freq_html += f"<tr><td style='padding: 8px; border: 1px solid #ddd;'>{row['Phase']}</td><td style='padding: 8px; border: 1px solid #ddd;'>{row['Number of Times']:.0f}</td></tr>"
                 st.markdown(freq_html + "</table>", unsafe_allow_html=True)
                 
                 
