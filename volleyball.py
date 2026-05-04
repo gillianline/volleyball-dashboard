@@ -1438,7 +1438,7 @@ if check_password():
                                     st.markdown(f"""
                                     <div style="border:1px solid #E5E5E7; border-top:4px solid #FF8200; border-radius:10px 10px 0 0; padding:10px; background:white;">
                                         <div style="display:flex; align-items:center; gap:12px;">
-                                            <img src="{p_meta["PhotoURL"]}" style="width:35px; height:35px; border-radius:50%; object-fit:cover; border:1px solid #eee;">
+                                            <img src="{p_meta["PhotoURL"]}" style="width:50px; height:50px; border-radius:50%; object-fit:cover; border:1px solid #eee;">
                                             <p style="margin:0; font-weight:900; font-size:15px; color:#31333F;">{name}</p>
                                         </div>
                                     </div>
