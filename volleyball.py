@@ -1246,7 +1246,7 @@ if check_password():
                 master_df = pd.DataFrame(scores_list).reset_index(drop=True)
 
                 # 3. BUILD THE GRAPH
-                st.markdown(### <div class="print-only">Full Season Performance: {sel_ath_hist}</div>, unsafe_allow_html=True)
+                st.markdown(### "Full Season Performance: {sel_ath_hist}", unsafe_allow_html=True)
                 fig_master = px.line(master_df, x='Display', y='Score', range_y=[0, 160])
 
                 # Layer 1: Practice (Blue)
