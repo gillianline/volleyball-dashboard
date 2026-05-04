@@ -238,7 +238,7 @@ if check_password():
         with tabs[0]: # Tab 0: Individual Profile
             # --- 1. CLEAN DROPDOWN LIST (Tournament Sync) ---
             target_date_str = "2026-04-04"
-            tournament_label = "GT Spring Tournament"
+            tournament_label = "GT Spring Tournament 4-4-26"
             
             clean_session_list_prof = []
             tourney_added_prof = False
