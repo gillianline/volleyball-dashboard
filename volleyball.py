@@ -236,27 +236,51 @@ if check_password():
         session_list = raw_sessions.sort_values('Date', ascending=False)['Session_Name'].unique().tolist()
 
         with tabs[0]: # Tab 0: Individual Profile
+            # --- 1. CLEAN DROPDOWN LIST (Tournament Sync) ---
+            target_date_str = "2026-04-04"
+            tournament_label = "GT Spring Tournament"
+            
+            clean_session_list_prof = []
+            tourney_added_prof = False
+            
+            for s in session_list:
+                s_date = df[df['Session_Name'] == s]['Date'].dt.strftime('%Y-%m-%d').iloc[0]
+                if s_date == target_date_str:
+                    if not tourney_added_prof:
+                        clean_session_list_prof.append(tournament_label)
+                        tourney_added_prof = True
+                else:
+                    clean_session_list_prof.append(s)
+
             c_prof1, c_prof2 = st.columns(2)
             with c_prof1:
-                # Standardized session selection
-                selected_session_prof = st.selectbox("Session Selection", session_list, index=0, key="nav_sel_prof")
+                selected_session_prof = st.selectbox("Session Selection", clean_session_list_prof, index=0, key="nav_sel_prof")
             with c_prof2:
                 all_athletes = sorted(df['Name'].unique())
                 selected_athlete_prof = st.selectbox("Athlete Selection", all_athletes, key="nav_ath_prof")
 
-            # Filter for the specific session row
-            p_session_data = df[(df['Name'] == selected_athlete_prof) & 
-                                (df['Session_Name'] == selected_session_prof)]
+            # --- 2. DATA AGGREGATION LOGIC ---
+            if selected_session_prof == tournament_label:
+                curr_date_prof = pd.to_datetime(target_date_str)
+                # Filter for all sessions on this date for the selected athlete and sum them
+                p_session_data = df[(df['Name'] == selected_athlete_prof) & (df['Date'] == curr_date_prof)].copy()
+                if not p_session_data.empty:
+                    p_row = p_session_data.groupby(['Name', 'Position', 'PhotoURL', 'Date']).sum(numeric_only=True).reset_index().iloc[0]
+                    p_meta = p_session_data.iloc[0] # Keep metadata (Photo/Pos) from original row
+                else:
+                    p_row = pd.Series()
+            else:
+                p_session_data = df[(df['Name'] == selected_athlete_prof) & (df['Session_Name'] == selected_session_prof)]
+                if not p_session_data.empty:
+                    p_row = p_session_data.iloc[0]
+                    curr_date_prof = p_row['Date']
+                    p_meta = p_row 
+                else:
+                    p_row = pd.Series()
 
-            if not p_session_data.empty:
-                p_row = p_session_data.iloc[0]
-                curr_date_prof = p_row['Date']
-                p_meta = p_row 
-                
+            if not p_row.empty:
                 # --- BASELINE LOGIC ---
                 p_full_prof = df[df['Name'] == selected_athlete_prof]
-                
-                # 30-Day History for Score Card Max/Avg
                 daily_sums_prof = p_full_prof.groupby('Date')[all_metrics].sum().reset_index()
                 lb_prof = daily_sums_prof[(daily_sums_prof['Date'] >= pd.to_datetime(curr_date_prof) - timedelta(days=30)) & 
                                           (daily_sums_prof['Date'] <= pd.to_datetime(curr_date_prof))]
@@ -283,18 +307,15 @@ if check_password():
 
                 sc_prof = math.ceil(t_grade_prof / c_metrics_prof) if c_metrics_prof > 0 else 0
                 
-                # --- UI DISPLAY: SCOUT CARD ---
+
                 c1, c2, c3 = st.columns([1.2, 2.5, 1.2])
                 with c1: 
                     st.markdown(f'<div style="text-align:center;"><img src="{p_meta["PhotoURL"]}" class="player-photo-large"></div><h3 style="text-align:center;">{p_meta["Name"]}</h3>', unsafe_allow_html=True)
                 with c2: 
                     st.markdown(f'<table class="scout-table"><thead><tr><th>Metric</th><th>Today Total</th><th>30d Max Day</th><th>Grade</th></tr></thead><tbody>{r_html_prof}</tbody></table>', unsafe_allow_html=True)
-
-                # --- ADDED: LEGEND NOTE UNDER TABLE ---
                     st.markdown('<p style="font-size:11px; color:grey; font-style:italic; margin-top:-10px;">* Red highlight and arrows indicate a significant change (> or < 10%) from the athlete\'s 30-day session average.</p>', unsafe_allow_html=True)
                 with c3: 
                     st.markdown(f'<div style="display:flex; justify-content:center;"><div class="score-box" style="background-color:{get_flipped_gradient(sc_prof)};">{sc_prof}</div></div><p style="text-align:center; font-weight:bold; color:grey; margin-top:10px;">SESSION SCORE</p>', unsafe_allow_html=True)
-
                 # --- READINESS PROFILE (CMJ) ---
                 st.markdown('<div class="section-header">Weekly Readiness Profile</div>', unsafe_allow_html=True)
                 jc1, jc2 = st.columns([1.5, 3.5])
