@@ -1434,18 +1434,12 @@ if check_password():
                                 p_meta = p_all.iloc[0]
                                 
                                 with cols[j]:
-                                # PHOTO FIX: Added 'min-width' and 'object-position' to prevent cutoff
                                     st.markdown(f"""
                                     <div style="border:1px solid #E5E5E7; border-top:4px solid #FF8200; border-radius:10px 10px 0 0; padding:10px; background:white;">
                                         <div style="display:flex; align-items:center; gap:12px;">
-                                            <img src="{p_meta["PhotoURL"]}" style="
-                                                width:60px; 
-                                                height:60px; 
-                                                min-width:60px; 
-                                                border-radius:50%; 
-                                                object-fit:cover; 
-                                                object-position:center; 
-                                                border:2px solid #eee;">
+                                            <div style="width:60px; height:60px; border-radius:50%; background-color: #eee; overflow: hidden; display: flex; align-items: center; justify-content: center; border: 2px solid white; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+                                                <img src="{p_meta["PhotoURL"]}" style="width:100%; height:100%; object-fit:contain; object-position:center;">
+                                            </div>
                                             <p style="margin:0; font-weight:900; font-size:16px; color:#31333F;">{name}</p>
                                         </div>
                                     </div>
