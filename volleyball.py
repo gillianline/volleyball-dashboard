@@ -1434,15 +1434,22 @@ if check_password():
                                 p_meta = p_all.iloc[0]
                                 
                                 with cols[j]:
-                                    # RESTORED PHOTO FORMATTING
-                                    st.markdown(f"""
-                                    <div style="border:1px solid #E5E5E7; border-top:4px solid #FF8200; border-radius:10px 10px 0 0; padding:10px; background:white;">
-                                        <div style="display:flex; align-items:center; gap:12px;">
-                                            <img src="{p_meta["PhotoURL"]}" style="width:50px; height:50px; border-radius:50%; object-fit:cover; border:1px solid #eee;">
-                                            <p style="margin:0; font-weight:900; font-size:15px; color:#31333F;">{name}</p>
-                                        </div>
+                                # PHOTO FIX: Added 'min-width' and 'object-position' to prevent cutoff
+                                st.markdown(f"""
+                                <div style="border:1px solid #E5E5E7; border-top:4px solid #FF8200; border-radius:10px 10px 0 0; padding:10px; background:white;">
+                                    <div style="display:flex; align-items:center; gap:12px;">
+                                        <img src="{p_meta["PhotoURL"]}" style="
+                                            width:60px; 
+                                            height:60px; 
+                                            min-width:60px; 
+                                            border-radius:50%; 
+                                            object-fit:cover; 
+                                            object-position:center; 
+                                            border:2px solid #eee;">
+                                        <p style="margin:0; font-weight:900; font-size:16px; color:#31333F;">{name}</p>
                                     </div>
-                                    """, unsafe_allow_html=True)
+                                </div>
+                                """, unsafe_allow_html=True)
                                     
                                     # GRAPH WITH LABEL FIXES
                                     fig_p = px.line(pd.DataFrame(card_scores), x='Display', y='Score', 
