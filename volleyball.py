@@ -8,57 +8,32 @@ from datetime import timedelta
 
 st.markdown("""
     <style>
+    /* Center table text and style metrics */
+    th, td {text-align: center !important;}
+    [data-testid="stMetricValue"] {font-size: 24px;}
+    
     @media print {
-        /* 1. Eliminate Streamlit UI Navigation & Sidebars */
-        #MainMenu, header, footer, .stSidebar, [data-testid="stSidebar"], 
-        [data-testid="stHeader"], .stTabs [role="tablist"], [data-testid="stDecoration"] {
+        /* 1. REMOVE the 'display: none' from selectboxes and multiselects */
+        /* 2. Hide only the sidebar and the very top app bar to save space */
+        [data-testid="stSidebar"], [data-testid="stHeader"] {
             display: none !important;
         }
         
-        /* 2. Wipe out ALL Input Widgets (Selectboxes, Sliders, Radio Buttons) */
-        [data-testid="stSelectbox"], [data-testid="stRadio"], 
-        [data-testid="stMultiSelect"], [data-testid="stSlider"],
-        [data-testid="stNumberInput"], [data-testid="stTextInput"],
-        [data-testid="stButton"], .stSelectbox, .stRadio {
-            display: none !important;
-        }
-
-        /* 3. Expand content to full page width */
+        /* 3. Force the main container to be full width on paper */
         .main .block-container {
-            padding-top: 10px !important;
-            padding-bottom: 10px !important;
+            padding: 1rem !important;
+            margin: 0 !important;
             max-width: 100% !important;
         }
 
-        /* 4. Force Tables to stay professional and centered */
-        .scout-table, table {
-            width: 100% !important;
-            font-size: 11px !important;
-            border: 1px solid #ddd !important;
-        }
-
-        /* 5. Ensure Chart & Box colors are preserved in print */
-        .score-box, .bg-highlight-red, .section-header {
+        /* 4. Ensure colors (like the orange) show up on the printout */
+        body {
             -webkit-print-color-adjust: exact !important;
             print-color-adjust: exact !important;
         }
-
-        /* 6. Section Breaks */
-        .section-header {
-            page-break-before: auto;
-            border-bottom: 2px solid #31333F !important;
-            color: black !important;
-        }
-        
-        /* 7. Fix for horizontal card layouts in Gallery/Individual */
-        [data-testid="stHorizontalBlock"] {
-            display: flex !important;
-            flex-direction: row !important;
-            flex-wrap: nowrap !important;
-        }
     }
     </style>
-""", unsafe_allow_html=True)
+    """, unsafe_allow_html=True)
 
 # --- PAGE CONFIG ---
 st.set_page_config(page_title="Lady Vols VB Performance", layout="wide")
