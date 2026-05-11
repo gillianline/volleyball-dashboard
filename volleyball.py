@@ -574,33 +574,41 @@ if check_password():
             
             if players_in_pos:
                 tr_metrics = ["Player Load", "Estimated Distance (y)", "Explosive Efforts", "Total Jumps"]
-                pos_4wk_avg = tr_df[tr_metrics].mean()
+                
+                # Calculate Positional Baseline: Average of the Weekly Totals
+                # 1. Sum by Week and Name to get every athlete's total for each week
+                pos_weekly_sums = tr_df.groupby(['Week', 'Name'])[tr_metrics].sum().reset_index()
+                # 2. Average those weekly totals for the "Position Average Total"
+                pos_avg_weekly_total = pos_weekly_sums[tr_metrics].mean()
 
                 for name in players_in_pos:
                     p_data = tr_df[tr_df['Name'] == name]
-                    p_4wk_avg = p_data[tr_metrics].mean()
+                    
+                    # Calculate Athlete's Weekly Average Total
+                    p_weekly_sums = p_data.groupby('Week')[tr_metrics].sum().reset_index()
+                    p_avg_weekly_total = p_weekly_sums[tr_metrics].mean()
 
-                    # --- FIXED: TABLE IS NOW INSIDE THE SAME MARKDOWN BLOCK AS THE PHOTO/DIV ---
-                    # This prevents Streamlit from injecting a "bar" (gutter) between the elements.
                     c_card1, c_card2 = st.columns([1.5, 3], gap="large")
                     
                     with c_card1:
-                        # Combine everything (Div Start + Photo + Name + Table) into one single call
                         profile_and_table_html = f"""
                             <div class="player-row-container" style="padding: 20px; border: 1px solid #E5E5E7; border-radius:15px; background:white; margin-bottom: 0px;">
                                 <div style="text-align:center; padding:15px; background:#f8f9fa; border-bottom:2px solid #FF8200; border-radius: 12px;">
-                                    <img src="{p_data["PhotoURL"].iloc[0]}" style="border-radius: 50%; width: 90px; height: 90px; object-fit: contain; background-color: white; border: 3px solid #FF8200; display: block; margin: 0 auto 10px auto;">
+                                    <div style="width:90px; height:90px; border-radius:50%; background-color: white; overflow: hidden; display: flex; align-items: center; justify-content: center; border: 3px solid #FF8200; margin: 0 auto 10px auto;">
+                                        <img src="{p_data["PhotoURL"].iloc[0]}" style="width:100%; height:100%; object-fit: contain;">
+                                    </div>
                                     <p style="margin:0; font-weight:900; color:#1D1D1F; font-size:18px;">{name}</p>
+                                    <p style="margin:0; font-size:12px; color:grey;">Weekly Volume (4-Week Avg)</p>
                                 </div>
                                 <table class="scout-table" style="width:100%; margin-top:15px;">
                                     <thead>
-                                        <tr><th>Metric</th><th>{name[:20]}</th><th>Pos. Avg</th></tr>
+                                        <tr><th>Metric</th><th>Athlete Total</th><th>Pos. Avg Total</th></tr>
                                     </thead>
                                     <tbody>
-                                        <tr><td style="font-weight:700;">Player Load</td><td>{p_4wk_avg['Player Load']:.0f}</td><td>{pos_4wk_avg['Player Load']:.0f}</td></tr>
-                                        <tr><td style="font-weight:700;">Est. Dist (y)</td><td>{p_4wk_avg['Estimated Distance (y)']:.0f}</td><td>{pos_4wk_avg['Estimated Distance (y)']:.0f}</td></tr>
-                                        <tr><td style="font-weight:700;">Explosive</td><td>{p_4wk_avg['Explosive Efforts']:.0f}</td><td>{pos_4wk_avg['Explosive Efforts']:.0f}</td></tr>
-                                        <tr><td style="font-weight:700;">Total Jumps</td><td>{p_4wk_avg['Total Jumps']:.0f}</td><td>{pos_4wk_avg['Total Jumps']:.0f}</td></tr>
+                                        <tr><td style="font-weight:700;">Player Load</td><td>{p_avg_weekly_total['Player Load']:.0f}</td><td>{pos_avg_weekly_total['Player Load']:.0f}</td></tr>
+                                        <tr><td style="font-weight:700;">Est. Dist (y)</td><td>{p_avg_weekly_total['Estimated Distance (y)']:.0f}</td><td>{pos_avg_weekly_total['Estimated Distance (y)']:.0f}</td></tr>
+                                        <tr><td style="font-weight:700;">Explosive</td><td>{p_avg_weekly_total['Explosive Efforts']:.0f}</td><td>{pos_avg_weekly_total['Explosive Efforts']:.0f}</td></tr>
+                                        <tr><td style="font-weight:700;">Total Jumps</td><td>{p_avg_weekly_total['Total Jumps']:.0f}</td><td>{pos_avg_weekly_total['Total Jumps']:.0f}</td></tr>
                                     </tbody>
                                 </table>
                             </div>
@@ -608,30 +616,33 @@ if check_password():
                         st.markdown(profile_and_table_html, unsafe_allow_html=True)
 
                     with c_card2:
-                        # Keep your graphs exactly as they were
                         st.write("<div style='height: 10px;'></div>", unsafe_allow_html=True)
                         t_cols = st.columns(2) 
                         for i, m in enumerate(tr_metrics):
                             col_idx = i % 2
                             with t_cols[col_idx]:
                                 fig_t = go.Figure()
-                                p_t = p_data.groupby('Week')[m].mean().reset_index()
+                                
+                                # Athlete Line: Total per Week
+                                p_t = p_data.groupby('Week')[m].sum().reset_index()
                                 fig_t.add_trace(go.Scatter(x=p_t['Week'], y=p_t[m], name="Athlete", line=dict(color='#4895DB', width=4), mode='lines+markers'))
-                                g_t = tr_df.groupby('Week')[m].mean().reset_index()
+                                
+                                # Pos. Avg Line: Average of Weekly Totals across all athletes in position
+                                g_t = tr_df.groupby(['Week', 'Name'])[m].sum().reset_index().groupby('Week')[m].mean().reset_index()
                                 fig_t.add_trace(go.Scatter(x=g_t['Week'], y=g_t[m], name="Pos. Avg", line=dict(color='#FF8200', dash='dash', width=2), mode='lines'))
                                 
                                 fig_t.update_layout(
-                                    title=dict(text=f"<b>{m}</b>", font=dict(size=12), x=0.5),
+                                    title=dict(text=f"<b>Weekly Total: {m}</b>", font=dict(size=12), x=0.5),
                                     xaxis=dict(dtick=1, showgrid=False, title="Week"), 
-                                    yaxis=dict(showgrid=True, gridcolor='#F5F5F7'),
+                                    yaxis=dict(showgrid=True, gridcolor='#F5F5F7', rangemode='tozero'), # Start at 0
                                     height=220, margin=dict(l=10, r=10, t=30, b=40),
                                     showlegend=True, legend=dict(orientation="h", y=-0.6, x=0.5, xanchor="center"),
                                     template="simple_white"
                                 )
                                 st.plotly_chart(fig_t, use_container_width=True, config=LOCKED_CONFIG, key=f"trend_{name}_{m}")
                     
-                    # Add a small vertical space between athletes, but not inside the card
                     st.write("<div style='height: 30px;'></div>", unsafe_allow_html=True)
+                    
                     
         with tabs[4]: # Match Summary
             custom_colors = [
