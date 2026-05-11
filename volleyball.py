@@ -598,7 +598,7 @@ if check_password():
                                         <img src="{p_data["PhotoURL"].iloc[0]}" style="width:100%; height:100%; object-fit: contain;">
                                     </div>
                                     <p style="margin:0; font-weight:900; color:#1D1D1F; font-size:18px;">{name}</p>
-                                    <p style="margin:0; font-size:12px; color:grey;">Weekly Volume (4-Week Avg)</p>
+                                    <p style="margin:0; font-size:12px; color:grey;">Weekly Volume</p>
                                 </div>
                                 <table class="scout-table" style="width:100%; margin-top:15px;">
                                     <thead>
