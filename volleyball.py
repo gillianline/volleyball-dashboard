@@ -156,7 +156,7 @@ if check_password():
         # --- THE SEASON SPLIT RULE ---
         # Everything before this week is Spring. This week and onwards is Summer.
         for frame in [df, match_df]:
-            frame['Season'] = frame['Week'].apply(lambda w: 'Summer' if w >= current_active_week else 'Spring')
+            frame['Season'] = frame['Week'].apply(lambda w: 'Spring' if w >= current_active_week else 'Summer')
 
         # Process CMJ
         cmj_df = pd.read_csv(st.secrets["CMJ_SHEET_URL"])
