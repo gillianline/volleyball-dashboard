@@ -164,7 +164,7 @@ if check_password():
         cmj_df['Test Date'] = pd.to_datetime(cmj_df['Test Date'], errors='coerce')
         if 'Week' in cmj_df.columns:
             cmj_df['Week'] = pd.to_numeric(cmj_df['Week'].astype(str).str.extract('(\d+)', expand=False), errors='coerce').fillna(0).astype(int)
-            cmj_df['Season'] = cmj_df['Week'].apply(lambda w: 'Summer' if w >= current_active_week else 'Spring')
+            cmj_df['Season'] = cmj_df['Week'].apply(lambda w: 'Spring' if w >= current_active_week else 'Summer')
         else:
             cmj_df['Season'] = 'Spring'
 
