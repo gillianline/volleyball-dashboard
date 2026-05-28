@@ -212,7 +212,7 @@ if check_password():
         df, match_df, cmj_df, phase_df, thresh_df = load_all_data()
 
         # --- GLOBAL SEASON FILTER SIDEBAR CONFIG ---
-        st.sidebar.markdown("### 🗓️ Timeline Control")
+        st.sidebar.markdown("### Season")
         selected_season = st.sidebar.radio(
             "Select Active Season Context", 
             ["Spring", "Summer"], 
