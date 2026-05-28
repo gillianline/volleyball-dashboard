@@ -705,11 +705,20 @@ if check_password():
                     st.rerun()
                 st.markdown('<div class="section-header">Match Comparison Selection</div>', unsafe_allow_html=True)
                 c_ts1, c_ts2 = st.columns([2, 1])
+                
                 with c_ts1:
-                    match_list_t = match_df.sort_values(['Date', 'Sheet_Order'])['Session_Name'].unique()
-                    if "matches_state" not in st.session_state: 
-                        st.session_state.matches_state = match_list_t[-3:] if len(match_list_t) >=3 else match_list_t
+                    # 1. Grab matches ONLY for the active season
+                    match_list_t = match_df.sort_values(['Date', 'Sheet_Order'])['Session_Name'].unique().tolist()
+                    
+                    # 2. SELF-CORRECTING DEFAULT LOGIC:
+                    # If session state is empty OR contains old matches from the opposite season,
+                    # automatically reset the default choice to the most recent matches available right now.
+                    if "matches_state" not in st.session_state or not all(m in match_list_t for m in st.session_state.matches_state):
+                        st.session_state.matches_state = match_list_t[-3:] if len(match_list_t) >= 3 else match_list_t
+                    
+                    # 3. Safe select widget bound to active season options
                     st.session_state.matches_state = st.multiselect("Select Matches", match_list_t, default=st.session_state.matches_state)
+                
                 with c_ts2:
                     if "pos_state" not in st.session_state: st.session_state.pos_state = "All Positions"
                     st.session_state.pos_state = st.selectbox("Filter by Position", ["All Positions"] + sorted(list(match_df['Position'].unique())), index=0)
