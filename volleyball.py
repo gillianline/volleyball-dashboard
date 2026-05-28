@@ -184,20 +184,6 @@ if check_password():
         cmj_df['Test Date'] = pd.to_datetime(cmj_df['Test Date'], errors='coerce')
         cmj_df['Season'] = cmj_df['Test Date'].apply(assign_season)
 
-        # Process CMJ
-        cmj_df = pd.read_csv(st.secrets["CMJ_SHEET_URL"])
-        cmj_df.columns = cmj_df.columns.str.strip()
-        cmj_df['Test Date'] = pd.to_datetime(cmj_df['Test Date'], errors='coerce')
-        if 'Week' in cmj_df.columns:
-            cmj_df['Week'] = pd.to_numeric(cmj_df['Week'].astype(str).str.extract('(\d+)', expand=False), errors='coerce').fillna(0).astype(int)
-            cmj_df['Season'] = cmj_df['Week'].apply(lambda w: 'Spring' if w >= current_active_week else 'Summer')
-        else:
-            cmj_df['Season'] = 'Spring'
-
-        for col in ['Jump Height (Imp-Mom) [cm]', 'RSI-modified [m/s]']:
-            if col in cmj_df.columns:
-                cmj_df[col] = pd.to_numeric(cmj_df[col].astype(str).str.replace(r'[^0-9.]', '', regex=True), errors='coerce').fillna(0).astype(float)
-
         # Process Phases
         phase_df = pd.read_csv(st.secrets["PHASES_SHEET_URL"])
         phase_df = heavy_sanitize(phase_df)
