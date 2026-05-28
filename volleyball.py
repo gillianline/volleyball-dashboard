@@ -214,7 +214,7 @@ if check_password():
         # --- GLOBAL SEASON FILTER SIDEBAR CONFIG ---
         st.sidebar.markdown("### Season")
         selected_season = st.sidebar.radio(
-            "Select Active Season Context", 
+            "Select Season", 
             ["Spring", "Summer"], 
             index=1, # Default straight to Summer context
             key="global_season_toggle"
