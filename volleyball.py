@@ -155,8 +155,34 @@ if check_password():
         
         # --- THE SEASON SPLIT RULE ---
         # Everything before this week is Spring. This week and onwards is Summer.
-        for frame in [df, match_df]:
-            frame['Season'] = frame['Week'].apply(lambda w: 'Spring' if w >= current_active_week else 'Summer')
+        def assign_season(date_val):
+            if pd.isna(date_val):
+                return 'Spring' # Fallback default
+            
+            # Extract month and day for year-agnostic routing
+            m = date_val.month
+            d = date_val.day
+            
+            # January (1) through April (4)
+            if 1 <= m <= 4:
+                return 'Spring'
+            # May 26th and onwards (Months 5 through 12, starting at day 26 for May)
+            elif m == 5 and d >= 26:
+                return 'Summer'
+            elif m > 5:
+                return 'Summer'
+            else:
+                return 'Spring' # Fallback for May 1st - May 25th interim if data exists
+
+        # Apply the explicit date routing rule across main tracking tables
+        df['Season'] = df['Date'].apply(assign_season)
+        match_df['Season'] = match_df['Date'].apply(assign_season)
+
+        # Process CMJ
+        cmj_df = pd.read_csv(st.secrets["CMJ_SHEET_URL"])
+        cmj_df.columns = cmj_df.columns.str.strip()
+        cmj_df['Test Date'] = pd.to_datetime(cmj_df['Test Date'], errors='coerce')
+        cmj_df['Season'] = cmj_df['Test Date'].apply(assign_season)
 
         # Process CMJ
         cmj_df = pd.read_csv(st.secrets["CMJ_SHEET_URL"])
