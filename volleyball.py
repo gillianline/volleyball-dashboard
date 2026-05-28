@@ -114,8 +114,6 @@ if check_password():
     def load_all_data():
         def heavy_sanitize(frame):
             frame.columns = frame.columns.str.strip()
-            # 1. AUTO-FIND COLUMNS (The 'Search and Rescue' Logic)
-            # This looks for names even if they are slightly different
             for col in frame.columns:
                 c_low = col.lower()
                 if 'player' in c_low and 'load' in c_low: frame.rename(columns={col: 'Player Load'}, inplace=True)
@@ -124,17 +122,13 @@ if check_password():
                 if 'explosive' in c_low: frame.rename(columns={col: 'Explosive Efforts'}, inplace=True)
                 if 'duration' in c_low: frame.rename(columns={col: 'Duration'}, inplace=True)
 
-            # 2. FORCE NUMERIC (The 'Nuclear' Sanitizer)
-            # List of columns we expect to be numbers
             math_cols = ['Player Load', 'Total Jumps', 'Estimated Distance (y)', 'Explosive Efforts', 'Duration', 
                          'Moderate Jumps', 'High Jumps', 'Jump Load', 'High Intensity Movement']
             
             for col in math_cols:
                 if col in frame.columns:
-                    # This turns ANY string (like "-", "N/A", " yards") into 0.0
                     frame[col] = pd.to_numeric(frame[col].astype(str).str.replace(r'[^0-9.]', '', regex=True), errors='coerce').fillna(0).astype(float)
                 else:
-                    # If a column is missing entirely, create it as 0 so the charts don't crash
                     frame[col] = 0.0
             return frame
 
@@ -156,11 +150,24 @@ if check_password():
             frame['PhotoURL'] = frame.groupby('Name')['PhotoURL'].ffill().bfill().fillna("https://www.w3schools.com/howto/img_avatar.png")
             frame['Session_Type'] = frame['Activity'].apply(lambda x: 'Game' if any(w in str(x).lower() for w in ['game', 'match', 'v.']) else 'Practice')
 
+        # Find the threshold split: the latest week in your tracking sheet is the boundary
+        current_active_week = df['Week'].max()
+        
+        # --- THE SEASON SPLIT RULE ---
+        # Everything before this week is Spring. This week and onwards is Summer.
+        for frame in [df, match_df]:
+            frame['Season'] = frame['Week'].apply(lambda w: 'Summer' if w >= current_active_week else 'Spring')
+
         # Process CMJ
         cmj_df = pd.read_csv(st.secrets["CMJ_SHEET_URL"])
         cmj_df.columns = cmj_df.columns.str.strip()
         cmj_df['Test Date'] = pd.to_datetime(cmj_df['Test Date'], errors='coerce')
-        # Specific Hawkin metrics
+        if 'Week' in cmj_df.columns:
+            cmj_df['Week'] = pd.to_numeric(cmj_df['Week'].astype(str).str.extract('(\d+)', expand=False), errors='coerce').fillna(0).astype(int)
+            cmj_df['Season'] = cmj_df['Week'].apply(lambda w: 'Summer' if w >= current_active_week else 'Spring')
+        else:
+            cmj_df['Season'] = 'Spring'
+
         for col in ['Jump Height (Imp-Mom) [cm]', 'RSI-modified [m/s]']:
             if col in cmj_df.columns:
                 cmj_df[col] = pd.to_numeric(cmj_df[col].astype(str).str.replace(r'[^0-9.]', '', regex=True), errors='coerce').fillna(0).astype(float)
@@ -171,10 +178,13 @@ if check_password():
         if 'Phases' in phase_df.columns: phase_df = phase_df.rename(columns={'Phases': 'Phase'})
         phase_df['Date'] = pd.to_datetime(phase_df['Date'], errors='coerce')
         
+        # Cross reference phases sheet by matching date to the main df to get accurate season bounds
+        date_season_map = df.drop_duplicates('Date').set_index('Date')['Season'].to_dict()
+        phase_df['Season'] = phase_df['Date'].map(date_season_map).fillna('Spring')
+        
         try:
             thresh_df = pd.read_csv(st.secrets["THRESH_SHEET_URL"])
             thresh_df.columns = thresh_df.columns.str.strip()
-            # Clean Thresholds
             for col in ['Load_Limit', 'Jump_Limit']:
                 if col in thresh_df.columns:
                     thresh_df[col] = pd.to_numeric(thresh_df[col].astype(str).str.replace(r'[^0-9.]', '', regex=True), errors='coerce').fillna(0).astype(float)
@@ -182,13 +192,30 @@ if check_password():
             thresh_df = None
             
         return df.dropna(subset=['Date']), match_df.dropna(subset=['Date']), cmj_df, phase_df, thresh_df
-        
 
     LOCKED_CONFIG = {'staticPlot': True, 'displayModeBar': False}
 
     try:
-        # UPDATE THIS LINE TO INCLUDE thresh_df
+        # Load your datasets
         df, match_df, cmj_df, phase_df, thresh_df = load_all_data()
+
+        # --- GLOBAL SEASON FILTER SIDEBAR CONFIG ---
+        st.sidebar.markdown("### 🗓️ Timeline Control")
+        selected_season = st.sidebar.radio(
+            "Select Active Season Context", 
+            ["Spring", "Summer"], 
+            index=1, # Default straight to Summer context
+            key="global_season_toggle"
+        )
+        
+        # Dynamically filter all primary data collections down to selected season subset
+        df = df[df['Season'] == selected_season].copy()
+        match_df = match_df[match_df['Season'] == selected_season].copy()
+        cmj_df = cmj_df[cmj_df['Season'] == selected_season].copy()
+        phase_df = phase_df[phase_df['Season'] == selected_season].copy()
+        
+        # Inform the user on screen which season context they are auditing
+        st.sidebar.info(f"Currently displaying: {selected_season} Season Performance Data.")
 
         phase_map = {
                 "Mini Games (Set 1)": "Mini Games", 
