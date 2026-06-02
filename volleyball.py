@@ -1326,7 +1326,7 @@ if check_password():
                             xaxis=dict(type='category', title="Date"), 
                             yaxis=dict(
                                 range=[0, 115], 
-                                cliponaxis=False,
+                                automargin=True,
                                 tickvals=[0, 20, 40, 60, 80, 100] # Keeps clean standard lines
                             ),
                             legend=dict(orientation="h", y=-0.2, x=0.5, xanchor="center")
