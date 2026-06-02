@@ -1281,7 +1281,7 @@ if check_password():
 
                 # 3. BUILD THE GRAPH
                 st.markdown(f"### Full Season Performance: {sel_ath_hist}")
-                fig_master = px.line(master_df, x='Display', y='Score', range_y=[0, 160])
+                fig_master = px.line(master_df, x='Display', y='Score', range_y=[0, 105])
 
                 # Layer 1: Practice (Blue)
                 prac_df = master_df[master_df['Type'] == 'Practice']
@@ -1309,7 +1309,7 @@ if check_password():
                 for i in range(1, len(master_df)):
                     if master_df.iloc[i]['Week'] != master_df.iloc[i-1]['Week']:
                         fig_master.add_vline(x=i-0.5, line_dash="dash", line_color="#515154", opacity=0.3)
-                        fig_master.add_annotation(x=i-0.5, y=150, text=f"Wk {master_df.iloc[i]['Week']}", showarrow=False, bgcolor="white")
+                        fig_master.add_annotation(x=i-0.5, y=100, text=f"Wk {master_df.iloc[i]['Week']}", showarrow=False, bgcolor="white")
 
                 fig_master.update_layout(
                     template="simple_white", height=480, 
