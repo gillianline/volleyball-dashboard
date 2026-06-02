@@ -1325,7 +1325,7 @@ if check_password():
                             template="simple_white", height=480, 
                             xaxis=dict(type='category', title="Date"), 
                             yaxis=dict(
-                                range=[0, 115], 
+                                range=[0, 120], 
                                 automargin=True,
                                 tickvals=[0, 20, 40, 60, 80, 100] # Keeps clean standard lines
                             ),
