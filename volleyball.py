@@ -1281,7 +1281,7 @@ if check_password():
 
                 # 3. BUILD THE GRAPH
                 st.markdown(f"### Full Season Performance: {sel_ath_hist}")
-                fig_master = px.line(master_df, x='Display', y='Score', range_y=[0, 110])
+                fig_master = px.line(master_df, x='Display', y='Score', range_y=[0, 120])
 
                 # Layer 1: Practice (Blue)
                 prac_df = master_df[master_df['Type'] == 'Practice']
