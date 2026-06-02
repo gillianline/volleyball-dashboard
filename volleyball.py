@@ -1281,7 +1281,7 @@ if check_password():
 
                 # 3. BUILD THE GRAPH
                 st.markdown(f"### Full Season Performance: {sel_ath_hist}")
-                fig_master = px.line(master_df, x='Display', y='Score', range_y=[0, 120])
+                fig_master = px.line(master_df, x='Display', y='Score', range_y=[0, 110])
 
                 # Layer 1: Practice (Blue)
                 prac_df = master_df[master_df['Type'] == 'Practice']
@@ -1306,16 +1306,23 @@ if check_password():
                     ))
 
                 # Week Dividers
+                # Week Dividers
                 for i in range(1, len(master_df)):
                     if master_df.iloc[i]['Week'] != master_df.iloc[i-1]['Week']:
                         fig_master.add_vline(x=i-0.5, line_dash="dash", line_color="#515154", opacity=0.3)
-                        fig_master.add_annotation(x=i-0.5, y=100, text=f"Wk {master_df.iloc[i]['Week']}", showarrow=False, bgcolor="white")
-
-                fig_master.update_layout(
-                    template="simple_white", height=480, 
-                    xaxis=dict(type='category', title="Date"), 
-                    legend=dict(orientation="h", y=-0.2, x=0.5, xanchor="center")
-                )
+                        
+                        # THE POSITION FIX: Use 'paper' coordinates to lock the text 
+                        # to the very top edge of the graph layout, safely away from data labels.
+                        fig_master.add_annotation(
+                            x=i-0.5, 
+                            y=0.98, 
+                            yref="paper", # Anchors the math to the canvas layout instead of data numbers
+                            text=f"Wk {master_df.iloc[i]['Week']}", 
+                            showarrow=False, 
+                            bgcolor="white",
+                            font=dict(size=10, color="#515154"),
+                            yanchor="top"
+                        )
             
                 st.plotly_chart(fig_master, use_container_width=True, key=f"master_full_flow_{sel_ath_hist}")
 
