@@ -69,7 +69,7 @@ if check_password():
         .bg-highlight-red { background-color: #ffcccc !important; font-weight: 900; }
         .arrow-red { color: #b30000 !important; font-weight: 900; margin-left: 4px; }
         .player-photo-large { border-radius: 50%; width: 220px; height: 220px; object-fit: contain; border: 6px solid #FF8200; }
-        .score-box { padding: 12px 20px; border-radius: 12px; font-size: 28px; font-weight: 800; min-width: 100px; color: #FFFFFF; line-height: 1.2; text-align: center;}
+        .score-box { padding: 12px 20px; border-radius: 12px; font-size: 24px; font-weight: 800; min-width: 100px; color: #FFFFFF; line-height: 1.2; text-align: center;}
         .info-box { background-color: #f8f9fa; border-left: 5px solid #FF8200; padding: 12px; margin-top: 10px; font-size: 12px; color: #1D1D1F; font-weight: 600; line-height: 1.4; }
         
         .player-row-container { 
@@ -132,7 +132,7 @@ if check_password():
             elif m > 5: return 'Summer'
             else: return 'Spring'
 
-        # Load GPS Data
+        # Load Primary Sheets
         df = pd.read_csv(st.secrets["GOOGLE_SHEET_URL"])
         match_df = pd.read_csv(st.secrets["MATCHES_SHEET_URL"])
         
@@ -148,27 +148,27 @@ if check_password():
             frame['Session_Type'] = frame['Activity'].apply(lambda x: 'Game' if any(w in str(x).lower() for w in ['game', 'match', 'v.']) else 'Practice')
             frame['Season'] = frame['Date'].apply(assign_season)
 
-        # 1. Process CMJ Lower Body Sheet
+        # CMJ Sheet Lookups
         cmj_df = pd.read_csv(st.secrets["CMJ_SHEET_URL"])
         cmj_df.columns = cmj_df.columns.str.strip()
         cmj_df.rename(columns={'Athlete': 'Name'}, inplace=True)
         cmj_df['Test Date'] = pd.to_datetime(cmj_df['Test Date'], errors='coerce')
         cmj_df['Season'] = cmj_df['Test Date'].apply(assign_season)
 
-        # 2. Process split Left/Right and I/Y ASH Sheet
+        # ASH Sheet Split Lookup
         try:
             ash_df = pd.read_csv(st.secrets["ASH_SHEET_URL"])
             ash_df.columns = ash_df.columns.str.strip()
             ash_df.rename(columns={'Athlete': 'Name', 'Date': 'Test Date'}, inplace=True)
             ash_df['Test Date'] = pd.to_datetime(ash_df['Test Date'], errors='coerce')
-            for col in ['Left I [N]', 'Right I [N]', 'Left Y [N]', 'Right Y [N]']:
+            for col in ['Peak Vertical Force [N] (L)', 'Peak Vertical Force [N] (R)', 'Peak Vertical Force [N] (Asym)(%)']:
                 if col in ash_df.columns:
-                    ash_df[col] = pd.to_numeric(ash_df[col], errors='coerce')
+                    ash_df[col] = pd.to_numeric(ash_df[col].astype(str).str.replace(r'[^0-9.-]', '', regex=True), errors='coerce')
             ash_df['Season'] = ash_df['Test Date'].apply(assign_season)
         except:
-            ash_df = pd.DataFrame(columns=['Name', 'Test Date', 'Left I [N]', 'Right I [N]', 'Left Y [N]', 'Right Y [N]', 'Season'])
+            ash_df = pd.DataFrame(columns=['Name', 'Test Date', 'Isometric Type', 'Peak Vertical Force [N] (L)', 'Peak Vertical Force [N] (R)', 'Peak Vertical Force [N] (Asym)(%)', 'Season'])
 
-        # 3. Process External Rotation Sheet
+        # ER Sheet Lookup
         try:
             er_df = pd.read_csv(st.secrets["ER_SHEET_URL"])
             er_df.columns = er_df.columns.str.strip()
@@ -185,7 +185,6 @@ if check_password():
         phase_df = heavy_sanitize(phase_df)
         if 'Phases' in phase_df.columns: phase_df = phase_df.rename(columns={'Phases': 'Phase'})
         phase_df['Date'] = pd.to_datetime(phase_df['Date'], errors='coerce')
-        
         date_season_map = df.drop_duplicates('Date').set_index('Date')['Season'].to_dict()
         phase_df['Season'] = phase_df['Date'].map(date_season_map).fillna('Spring')
         
@@ -205,7 +204,7 @@ if check_password():
     try:
         df, match_df, cmj_df, phase_df, thresh_df, ash_df, er_df = load_all_data()
 
-        # --- GLOBAL SEASON FILTER SIDEBAR CONFIG ---
+        # --- SIDEBAR SEASON FILTER ---
         st.sidebar.markdown("### Season")
         selected_season = st.sidebar.radio("Select Season", ["Spring", "Summer"], index=1, key="global_season_toggle")
         
@@ -284,14 +283,19 @@ if check_password():
 
                 c1, c2, c3 = st.columns([1.2, 2.5, 1.2])
                 with c1: st.markdown(f'<div style="text-align:center;"><img src="{p_meta["PhotoURL"]}" class="player-photo-large"></div><h3 style="text-align:center;">{p_meta["Name"]}</h3>', unsafe_allow_html=True)
-                with c2: 
-                    st.markdown(f'<table class="scout-table"><thead><tr><th>Metric</th><th>Today Total</th><th>30d Max Day</th><th>Grade</th></tr></thead><tbody>{r_html_prof}</tbody></table>', unsafe_allow_html=True)
+                with c2: st.markdown(f'<table class="scout-table"><thead><tr><th>Metric</th><th>Today Total</th><th>30d Max Day</th><th>Grade</th></tr></thead><tbody>{r_html_prof}</tbody></table>', unsafe_allow_html=True)
                 with c3: st.markdown(f'<div style="display:flex; justify-content:center;"><div class="score-box" style="background-color:{get_flipped_gradient(sc_prof)};">{sc_prof}</div></div><p style="text-align:center; font-weight:bold; color:grey; margin-top:10px;">SESSION SCORE</p>', unsafe_allow_html=True)
                 
-                # --- READINESS PROFILE (CMJ, ASH 4-WAY, ER) ---
+                # =========================================================================
+                # --- MASTER READINESS STACK: CMJ -> ASH -> EXTERNAL ROTATION ---
+                # =========================================================================
                 st.markdown('<div class="section-header">Weekly Readiness Profile</div>', unsafe_allow_html=True)
-                jc1, jc2 = st.columns([1.6, 3.4])
                 
+                # -------------------------------------------------------------------------
+                # BLOCK 1: COUNTERMOVEMENT JUMP (CMJ)
+                # -------------------------------------------------------------------------
+                st.markdown('<h4 style="color:#4895DB; font-weight:800; margin-bottom:5px;">LOWER BODY: COUNTERMOVEMENT JUMP</h4>', unsafe_allow_html=True)
+                jc1, jc2 = st.columns([1.5, 3.5])
                 p_cmj_hist = cmj_df[(cmj_df['Name'] == selected_athlete_prof) & (cmj_df['Test Date'] <= curr_date_prof)].sort_values('Test Date')
                 cmj_col = 'Jump Height (Imp-Mom) [cm]'
                 rsi_col = 'RSI-modified [m/s]'
@@ -308,20 +312,7 @@ if check_password():
                         latest_cmj = p_cmj_hist.iloc[-1]
                         cur_h, cur_rsi = latest_cmj[cmj_col], latest_cmj[rsi_col]
                         p_diff = ((cur_h - base_h) / base_h) * 100 if base_h > 0 else 0
-                        
-                        label, color = ("ELITE", "#28a745") if cur_h >= base_h and cur_rsi >= base_rsi else \
-                                       ("FATIGUED", "#dc3545") if cur_h < base_h and cur_rsi < base_rsi else \
-                                       ("GRINDER", "#ffc107")
-                        
-                        # Separate multi-sheet snapshot lookups for today
-                        p_ash_today = ash_df[(ash_df['Name'] == selected_athlete_prof) & (ash_df['Test Date'] <= curr_date_prof)].sort_values('Test Date')
-                        p_er_today = er_df[(er_df['Name'] == selected_athlete_prof) & (er_df['Test Date'] <= curr_date_prof)].sort_values('Test Date')
-                        
-                        li = p_ash_today.iloc[-1]['Left I [N]'] if not p_ash_today.empty and 'Left I [N]' in p_ash_today.columns else 0.0
-                        ri = p_ash_today.iloc[-1]['Right I [N]'] if not p_ash_today.empty and 'Right I [N]' in p_ash_today.columns else 0.0
-                        ly = p_ash_today.iloc[-1]['Left Y [N]'] if not p_ash_today.empty and 'Left Y [N]' in p_ash_today.columns else 0.0
-                        ry = p_ash_today.iloc[-1]['Right Y [N]'] if not p_ash_today.empty and 'Right Y [N]' in p_ash_today.columns else 0.0
-                        er_val = p_er_today.iloc[-1]['External Rotation [N]'] if not p_er_today.empty and 'External Rotation [N]' in p_er_today.columns else 0.0
+                        label, color = ("ELITE", "#28a745") if cur_h >= base_h and cur_rsi >= base_rsi else ("FATIGUED", "#dc3545") if cur_h < base_h and cur_rsi < base_rsi else ("GRINDER", "#ffc107")
 
                         st.markdown(f"""
                             <div style="text-align:center;">
@@ -330,27 +321,115 @@ if check_password():
                                     <span style="font-size:10px; display:block; font-weight:bold; margin-top:2px;">{label}</span>
                                 </div>
                             </div>
-                            <div class="info-box">
-                                <p style="margin:0 0 4px 0; text-align:center; font-size:12px; color:#FF8200;"><b>CMJ:</b> {cur_h:.1f} cm (Base: {base_h:.1f})</p>
-                                <hr style="display:block !important; margin: 4px 0; border:0; border-top:1px solid #ddd;"/>
-                                <p style="margin:0; font-weight:700; text-transform:uppercase; font-size:10px; color:grey; margin-bottom:2px;">ASH Shoulder Isometric [N]</p>
-                                <table style="width:100%; font-size:11px; margin-bottom:4px; border-collapse:collapse;">
-                                    <tr><td><b>Left I:</b> {li:.0f} N</td><td><b>Right I:</b> {ri:.0f} N</td></tr>
-                                    <tr><td><b>Left Y:</b> {ly:.0f} N</td><td><b>Right Y:</b> {ry:.0f} N</td></tr>
-                                </table>
-                                <hr style="display:block !important; margin: 4px 0; border:0; border-top:1px solid #ddd;"/>
-                                <p style="margin:0; font-size:11px;"><b>External Rotation:</b> <span style="font-weight:700;">{er_val:.1f} N</span></p>
+                            <div class="info-box" style="text-align:center; margin-top:10px;">
+                                <p style="margin:0; font-size:11px; color:grey;"><b>Base:</b> {base_h:.1f} cm | {base_rsi:.2f}</p>
+                                <p style="margin:0; font-size:13px; color:#FF8200;"><b>Today:</b> {cur_h:.1f} cm | {cur_rsi:.2f}</p>
                             </div>
                         """, unsafe_allow_html=True)
-
                 with jc2:
                     if not p_cmj_hist.empty:
                         fig = make_subplots(specs=[[{"secondary_y": True}]])
                         fig.add_trace(go.Scatter(x=p_cmj_hist['Test Date'], y=p_cmj_hist[cmj_col], name="Height", line=dict(color='#FF8200', width=3)), secondary_y=False)
                         fig.add_trace(go.Scatter(x=p_cmj_hist['Test Date'], y=p_cmj_hist[rsi_col], name="RSI", line=dict(color='#4895DB', dash='dot')), secondary_y=True)
-                        fig.update_layout(height=260, margin=dict(l=0, r=0, t=10, b=0), showlegend=False, template="simple_white")
-                        st.plotly_chart(fig, use_container_width=True, config=LOCKED_CONFIG)
+                        fig.update_layout(height=180, margin=dict(l=0, r=0, t=10, b=0), showlegend=False, template="simple_white")
+                        st.plotly_chart(fig, use_container_width=True, config=LOCKED_CONFIG, key="cmj_top_chart")
+
+                # -------------------------------------------------------------------------
+                # BLOCK 2: ASH TEST SPLIT (LEFT/RIGHT & ISO TYPE DROPDOWN)
+                # -------------------------------------------------------------------------
+                st.markdown('<hr style="display:block !important; margin:15px 0; border:0; border-top:1px solid #E5E5E7;" />', unsafe_allow_html=True)
+                st.markdown('<h4 style="color:#4895DB; font-weight:800; margin-bottom:5px;">UPPER BODY: ASH ISO-TEST</h4>', unsafe_allow_html=True)
                 
+                p_ash_all = ash_df[(ash_df['Name'] == selected_athlete_prof) & (ash_df['Test Date'] <= curr_date_prof)].sort_values('Test Date')
+                
+                if not p_ash_all.empty:
+                    unique_types = sorted(p_ash_all['Isometric Type'].dropna().unique())
+                    sel_iso_type = st.selectbox("Select ASH Test Variation", unique_types, key="profile_ash_iso_selector")
+                    p_ash_hist = p_ash_all[p_ash_all['Isometric Type'] == sel_iso_type]
+                    
+                    ac1, ac2 = st.columns([1.5, 3.5])
+                    with ac1:
+                        # Starting today - Base is the first entry available for this summer block
+                        baseline_ash = p_ash_hist.head(1)
+                        if not baseline_ash.empty and not p_ash_hist.empty:
+                            base_l = baseline_ash.iloc[-1]['Peak Vertical Force [N] (L)']
+                            base_r = baseline_ash.iloc[-1]['Peak Vertical Force [N] (R)']
+                            
+                            latest_ash = p_ash_hist.iloc[-1]
+                            cur_l = latest_ash['Peak Vertical Force [N] (L)']
+                            cur_r = latest_ash['Peak Vertical Force [N] (R)']
+                            cur_asym = latest_ash['Peak Vertical Force [N] (Asym)(%)']
+                            
+                            ash_diff_l = ((cur_l - base_l) / base_l * 100) if base_l > 0 else 0
+                            ash_diff_r = ((cur_r - base_r) / base_r * 100) if base_r > 0 else 0
+                            avg_ash_diff = (ash_diff_l + ash_diff_r) / 2
+                            
+                            label_ash, color_ash = ("STABLE", "#28a745") if abs(cur_asym) <= 10 else ("ASYMMETRIC", "#ffc107") if abs(cur_asym) <= 15 else ("RISK WATCH", "#dc3545")
+                            
+                            st.markdown(f"""
+                                <div style="text-align:center;">
+                                    <div class="score-box" style="background-color:{color_ash}; line-height:1.2; padding-top:15px; height:80px; width:100%;">
+                                        <span style="font-size:18px;">{cur_asym:+.1f}%</span>
+                                        <span style="font-size:10px; display:block; font-weight:bold; margin-top:2px;">{label_ash} ASYM</span>
+                                    </div>
+                                </div>
+                                <div class="info-box" style="margin-top:10px; font-size:11px;">
+                                    <p style="margin:0;"><b>Base Force:</b> L: {base_l:.0f} N | R: {base_r:.0f} N</p>
+                                    <p style="margin:0; color:#FF8200;"><b>Today Force:</b> L: {cur_l:.0f} N ({ash_diff_l:+.1f}%) | R: {cur_r:.0f} N ({ash_diff_r:+.1f}%)</p>
+                                </div>
+                            """, unsafe_allow_html=True)
+                    with ac2:
+                        if not p_ash_hist.empty:
+                            fig_ash = make_subplots(specs=[[{"secondary_y": True}]])
+                            fig_ash.add_trace(go.Scatter(x=p_ash_hist['Test Date'], y=p_ash_hist['Peak Vertical Force [N] (L)'], name="Left Peak Force", line=dict(color='#4895DB', width=3)), secondary_y=False)
+                            fig_ash.add_trace(go.Scatter(x=p_ash_hist['Test Date'], y=p_ash_hist['Peak Vertical Force [N] (R)'], name="Right Peak Force", line=dict(color='#FF8200', width=3, dash='dash')), secondary_y=False)
+                            fig_ash.add_trace(go.Scatter(x=p_ash_hist['Test Date'], y=p_ash_hist['Peak Vertical Force [N] (Asym)(%)'], name="Asym %", line=dict(color='red', width=1.5, dash='dot')), secondary_y=True)
+                            fig_ash.update_layout(height=180, margin=dict(l=0, r=0, t=10, b=0), showlegend=False, template="simple_white")
+                            st.plotly_chart(fig_ash, use_container_width=True, config=LOCKED_CONFIG, key="ash_profile_chart")
+                else:
+                    st.info("No explicit ASH test dataset entry parsed for this athlete setup.")
+
+                # -------------------------------------------------------------------------
+                # BLOCK 3: EXTERNAL ROTATION
+                # -------------------------------------------------------------------------
+                st.markdown('<hr style="display:block !important; margin:15px 0; border:0; border-top:1px solid #E5E5E7;" />', unsafe_allow_html=True)
+                st.markdown('<h4 style="color:#4895DB; font-weight:800; margin-bottom:5px;">ROTATOR CUFF: EXTERNAL ROTATION</h4>', unsafe_allow_html=True)
+                
+                p_er_hist = er_df[(er_df['Name'] == selected_athlete_prof) & (er_df['Test Date'] <= curr_date_prof)].sort_values('Test Date')
+                er_col = 'External Rotation [N]'
+                
+                if not p_er_hist.empty:
+                    ec1, ac2 = st.columns([1.5, 3.5])
+                    with ec1:
+                        baseline_er = p_er_hist.head(1)
+                        if not baseline_er.empty and not p_er_hist.empty:
+                            base_er_val = baseline_er.iloc[-1][er_col]
+                            latest_er = p_er_hist.iloc[-1]
+                            cur_er_val = latest_er[er_col]
+                            er_diff = ((cur_er_val - base_er_val) / base_er_val * 100) if base_er_val > 0 else 0
+                            
+                            color_er = "#28a745" if er_diff >= -5 else "#ffc107" if er_diff >= -12 else "#dc3545"
+                            
+                            st.markdown(f"""
+                                <div style="text-align:center;">
+                                    <div class="score-box" style="background-color:{color_er}; line-height:1.2; padding-top:15px; height:80px; width:100%;">
+                                        <span style="font-size:18px;">{er_diff:+.1f}%</span>
+                                        <span style="font-size:10px; display:block; font-weight:bold; margin-top:2px;">CUSHION VS BASELINE</span>
+                                    </div>
+                                </div>
+                                <div class="info-box" style="text-align:center; margin-top:10px;">
+                                    <p style="margin:0; font-size:11px; color:grey;"><b>Base ER Force:</b> {base_er_val:.1f} N</p>
+                                    <p style="margin:0; font-size:13px; color:#FF8200;"><b>Today ER Force:</b> {cur_er_val:.1f} N</p>
+                                </div>
+                            """, unsafe_allow_html=True)
+                    with ac2:
+                        fig_er = go.Figure()
+                        fig_er.add_trace(go.Scatter(x=p_er_hist['Test Date'], y=p_er_hist[er_col], name="ER Force", line=dict(color='#A52A2A', width=3), mode='lines+markers'))
+                        fig_er.update_layout(height=180, margin=dict(l=0, r=0, t=10, b=0), showlegend=False, template="simple_white")
+                        st.plotly_chart(fig_er, use_container_width=True, config=LOCKED_CONFIG, key="er_profile_chart")
+                else:
+                    st.info("No distinct Rotator Cuff External Rotation logs recorded for this athlete profile yet.")
+
                 st.divider()
 
                 # --- PRACTICE PHASE BREAKDOWN ---
@@ -365,18 +444,22 @@ if check_password():
                     fig_ph.update_yaxes(title_text="Total Jumps", secondary_y=True)
                     st.plotly_chart(fig_ph, use_container_width=True, config=LOCKED_CONFIG)
                     
-        with tabs[1]: # Tab 1: Leaderboard Gallery
+        with tabs[1]: # Tab 1: Gallery
             c_gal1, c_gal2 = st.columns(2)
-            with c_gal1: selected_session_gal = st.selectbox("Session Selection", clean_session_list_prof, index=0, key="nav_sel_gal")
+            with c_gal1: selected_session_gal = st.selectbox("Session Selection", clean_session_list, index=0, key="nav_sel_gal")
             with c_gal2: pos_f_gal = st.selectbox("Position Filter", ["All Positions"] + sorted([p for p in df['Position'].unique() if p != "N/A"]), key="nav_pos_gal")
             
-            display_df = df[df['Session_Name'] == selected_session_gal].copy() if selected_session_gal != tournament_label else df[df['Date'] == pd.to_datetime(target_date_str)].groupby(['Name', 'Position', 'PhotoURL']).sum(numeric_only=True).reset_index()
-            curr_date_gal = pd.to_datetime(target_date_str) if selected_session_gal == tournament_label else (display_df['Date'].iloc[0] if not display_df.empty else None)
+            if selected_session_gal == tournament_label:
+                curr_date_gal = pd.to_datetime(target_date_str)
+                display_df = df[df['Date'] == curr_date_gal].groupby(['Name', 'Position', 'PhotoURL']).sum(numeric_only=True).reset_index()
+            else:
+                display_df = df[df['Session_Name'] == selected_session_gal].copy()
+                if not display_df.empty: curr_date_gal = display_df['Date'].iloc[0]
 
             if not display_df.empty:
                 if pos_f_gal != "All Positions": display_df = display_df[display_df['Position'] == pos_f_gal]
                 athlete_names = sorted(display_df['Name'].unique())
-                filtered_metrics_gal = [m for m in all_metrics if m not in ['High Jumps', 'Moderate Jumps', 'High Intensity Movement']]
+                filtered_metrics_gal = [m for m in all_metrics if m not in metrics_to_exclude]
 
                 for i in range(0, len(athlete_names), 2):
                     cols = st.columns(2)
@@ -417,7 +500,6 @@ if check_password():
         with tabs[2]: # Tab 2: Performance History Review
             st.markdown('<div class="section-header">Season History & Team Weekly Review</div>', unsafe_allow_html=True)
             sub_tabs = st.tabs(["Individual Review", "Team Weekly Review"])
-            metrics_to_score = [m for m in all_metrics if m not in ['High Jumps', 'Moderate Jumps', 'High Intensity Movement']]
 
             with sub_tabs[0]:
                 sel_ath_hist = st.selectbox("Select Athlete", sorted(df['Name'].unique()), key="master_ath_sel")
@@ -432,7 +514,7 @@ if check_password():
                         mx = lb_sums[m].max() if not lb_sums[m].empty else 1
                         row_grades.append(math.ceil((row[m] / mx) * 100) if mx > 0 else 0)
                     is_match = any(w in str(row['Session_Name']).upper() or w in str(row['Session_Type']).upper() for w in ['MATCH', 'GAME'])
-                    scores_list.append({'Display': row['Date'].strftime('%m/%d'), 'Score': math.ceil(sum(row_grades)/len(row_grades)), 'Type': 'Match' if is_match else 'Practice', 'Week': str(row['Week'])})
+                    scores_list.append({'Date': row['Date'], 'Display': row['Date'].strftime('%m/%d'), 'Score': math.ceil(sum(row_grades)/len(row_grades)), 'Type': 'Match' if is_match else 'Practice', 'Week': str(row['Week'])})
                 
                 master_df = pd.DataFrame(scores_list)
                 if not master_df.empty:
@@ -441,21 +523,19 @@ if check_password():
                     if not prac_df.empty: fig_master.add_trace(go.Scatter(x=prac_df['Display'], y=prac_df['Score'], mode='markers+text', text=prac_df['Score'], textposition="top center", name="Practice", marker=dict(size=8, color='#4895DB')))
                     match_df_line = master_df[master_df['Type'] == 'Match']
                     if not match_df_line.empty: fig_master.add_trace(go.Scatter(x=match_df_line['Display'], y=match_df_line['Score'], mode='markers+text', text=[f"<b>{s}</b>" for s in match_df_line['Score']], textposition="top center", name="Match Day", marker=dict(size=15, color='#FF8200')))
-                    fig_master.update_layout(template="simple_white", height=380, legend=dict(orientation="h", y=-0.2, x=0.5, xanchor="center"), margin=dict(l=10, r=10, t=10, b=10))
+                    fig_master.update_layout(template="simple_white", height=380, legend=dict(orientation="h", y=-0.2, x=0.5, xanchor="center"))
                     st.plotly_chart(fig_master, use_container_width=True)
 
-                # --- MULTI-SHEET TIMELINE ALIGNMENT FOR HIGH-GRANULARITY KINETICS ---
-                st.markdown("### Combined Testing Metrics & Shoulder Kinetics History")
+                # --- MULTI-SHEET TIMELINE ALIGNMENT FOR HISTORICAL READINESS ---
+                st.markdown("### Combined Lower & Upper Body Kinetics History")
                 ath_cmj = cmj_df[cmj_df['Name'] == sel_ath_hist].sort_values('Test Date')
                 ath_ash = ash_df[ash_df['Name'] == sel_ath_hist].sort_values('Test Date')
                 ath_er = er_df[er_df['Name'] == sel_ath_hist].sort_values('Test Date')
 
                 if selected_season == 'Summer':
                     baseline_cmj = ath_cmj[ath_cmj['Season'] == 'Summer'].head(1)
-                    post_match_cmj = ath_cmj[ath_cmj['Season'] == 'Summer']
                 else:
                     baseline_cmj = cmj_df[(cmj_df['Name'] == sel_ath_hist) & (cmj_df['Week'] == 4)]
-                    post_match_cmj = ath_cmj[ath_cmj['Week'] > 4]
 
                 if not baseline_cmj.empty:
                     base_row = baseline_cmj.iloc[-1]
@@ -470,11 +550,10 @@ if check_password():
                         h_val = cmj_day.iloc[-1][cmj_col] if not cmj_day.empty else None
                         rsi_val = cmj_day.iloc[-1][rsi_col] if not cmj_day.empty else None
                         
-                        li_val = ash_day.iloc[-1]['Left I [N]'] if not ash_day.empty and 'Left I [N]' in ash_day.columns else None
-                        ri_val = ash_day.iloc[-1]['Right I [N]'] if not ash_day.empty and 'Right I [N]' in ash_day.columns else None
-                        ly_val = ash_day.iloc[-1]['Left Y [N]'] if not ash_day.empty and 'Left Y [N]' in ash_day.columns else None
-                        ry_val = ash_day.iloc[-1]['Right Y [N]'] if not ash_day.empty and 'Right Y [N]' in ash_day.columns else None
-                        er_val = er_day.iloc[-1]['External Rotation [N]'] if not er_day.empty and 'External Rotation [N]' in er_day.columns else None
+                        li_val = ash_day.iloc[-1]['Peak Vertical Force [N] (L)'] if not ash_day.empty else None
+                        ri_val = ash_day.iloc[-1]['Peak Vertical Force [N] (R)'] if not ash_day.empty else None
+                        asym_val = ash_day.iloc[-1]['Peak Vertical Force [N] (Asym)(%)'] if not ash_day.empty else None
+                        er_val = er_day.iloc[-1]['External Rotation [N]'] if not er_day.empty else None
 
                         raw_diff = (h_val - base_row[cmj_col]) if h_val else 0.0
                         display_diff = f"{raw_diff:+.1f} cm" if h_val else "N/A"
@@ -485,15 +564,15 @@ if check_password():
                             "Raw Diff": raw_diff,
                             "Display Diff": display_diff,
                             "RSI": f"{rsi_val:.2f}" if rsi_val else "N/A",
-                            "ASH_I": f"{li_val:.0f} L / {ri_val:.0f} R" if li_val and ri_val else "N/A",
-                            "ASH_Y": f"{ly_val:.0f} L / {ry_val:.0f} R" if ly_val and ry_val else "N/A",
+                            "ASH_F": f"L: {li_val:.0f} / R: {ri_val:.0f}" if li_val and ri_val else "N/A",
+                            "ASH_ASYM": f"{asym_val:+.1f}%" if asym_val else "N/A",
                             "ER": f"{er_val:.0f} N" if er_val else "N/A"
                         })
 
                     cmj_table_html = """<table class="scout-table">
                                         <thead><tr style="background-color: #f0f2f6; font-weight: bold;">
                                             <th>Test Date</th><th>Jump Height</th><th>Vs. Baseline</th><th>RSI-mod</th>
-                                            <th>ASH Test: I (L/R)</th><th>ASH Test: Y (L/R)</th><th>Ext. Rotation</th>
+                                            <th>ASH Forces [N]</th><th>ASH Asym %</th><th>Ext. Rotation</th>
                                         </tr></thead><tbody>"""
                     for item in comparison_list:
                         color = "#28a745" if item['Raw Diff'] >= 0 else "#dc3545"
@@ -501,18 +580,18 @@ if check_password():
                         cmj_table_html += f"""<tr>
                             <td>{item['Date']}</td><td>{item['Height']}</td>
                             <td style="font-weight: bold; color: {color};">{item['Display Diff']}</td><td>{item['RSI']}</td>
-                            <td style="font-weight:700;">{item['ASH_I']}</td><td style="font-weight:700;">{item['ASH_Y']}</td>
+                            <td style="font-weight:700;">{item['ASH_F']}</td><td style="font-weight:700;">{item['ASH_ASYM']}</td>
                             <td style="font-weight:700;">{item['ER']}</td>
                         </tr>"""
                     st.markdown(cmj_table_html + "</tbody></table>", unsafe_allow_html=True)
 
-                    # Coordinated Kinetic Lines Trend Plot
+                    # Kinetics Tracking Plot
                     fig_cmj = make_subplots(specs=[[{"secondary_y": True}]])
                     if not ath_cmj.empty:
                         fig_cmj.add_trace(go.Scatter(x=ath_cmj['Test Date'], y=ath_cmj[cmj_col], name="Jump Height (cm)", mode='lines+markers', line=dict(color='#4895DB', width=3)), secondary_y=False)
                     if not ath_ash.empty:
-                        fig_cmj.add_trace(go.Scatter(x=ath_ash['Test Date'], y=ath_ash['Left I [N]'], name="Left I Force (N)", mode='lines+markers', line=dict(color='#FF8200', width=2)), secondary_y=False)
-                        fig_cmj.add_trace(go.Scatter(x=ath_ash['Test Date'], y=ath_ash['Right I [N]'], name="Right I Force (N)", mode='lines+markers', line=dict(color='#FF8200', dash='dot', width=2)), secondary_y=False)
+                        fig_cmj.add_trace(go.Scatter(x=ath_ash['Test Date'], y=ath_ash['Peak Vertical Force [N] (L)'], name="ASH Left Force", mode='lines+markers', line=dict(color='#FF8200', width=2)), secondary_y=False)
+                        fig_cmj.add_trace(go.Scatter(x=ath_ash['Test Date'], y=ath_ash['Peak Vertical Force [N] (R)'], name="ASH Right Force", mode='lines+markers', line=dict(color='#FF8200', dash='dot', width=2)), secondary_y=False)
                     if not ath_er.empty:
                         fig_cmj.add_trace(go.Scatter(x=ath_er['Test Date'], y=ath_er['External Rotation [N]'], name="Ext Rotation (N)", mode='lines+markers', line=dict(color='#A52A2A', width=2)), secondary_y=False)
                     
@@ -531,11 +610,7 @@ if check_password():
                         for j in range(2):
                             if i + j < len(ath_names):
                                 name = ath_names[i+j]
-                                p_all = df[df['Name'] == name].copy()
-                                p_daily = p_all.groupby(['Date', 'Week'])[metrics_to_score].sum().reset_index()
-                                w_daily = p_daily[p_daily['Week'] == sel_week]
-                                if not w_daily.empty:
-                                    st.write(f"**{name}** Profile Tracked")
+                                st.write(f"**{name}** Processed")
 
         with tabs[3]: # Tab 3: Match v Practice
             st.markdown('<div class="section-header">Season Preparation Intensity vs Match Density</div>', unsafe_allow_html=True)
@@ -600,7 +675,7 @@ if check_password():
                 available_phases = sorted(phase_df['Phase'].unique())
                 selected_build = st.multiselect("Select Training Phase Drill Sequence", available_phases, key="planner_t7")
                 if selected_build:
-                    st.info("Planned Drill Sequence Loaded. Adjust minutes in the timeline view to project total volumes.")
+                    st.info("Planned Drill Sequence Loaded.")
 
     except Exception as e:
         st.error(f"Dashboard Integration Sync Error: {e}")
