@@ -323,8 +323,7 @@ if check_password():
                                 </div>
                             </div>
                             <div class="info-box" style="text-align:center; margin-top:10px;">
-                                <p style="margin:0; font-size:12px; color:grey;"><b>Base:</b> {base_h:.1f} cm | {base_rsi:.2f}</p>
-                                <p style="margin:0; font-size:13px; color:#FF8200;"><b>Today:</b> {cur_h:.1f} cm | {cur_rsi:.2f}</p>
+                                <p style="margin:0; font-size:13px; color:#FF8200;"><b>CMJ:</b> {cur_h:.1f} cm (Base: {base_h:.1f})</p>
                             </div>
                         """, unsafe_allow_html=True)
                 with jc2:
@@ -390,7 +389,7 @@ if check_password():
                 else:
                     st.info("No explicit ASH shoulder test dataset records parsed for this athlete.")
 
-                # --- BLOCK 3: ROTATOR CUFF EXTERNAL ROTATION (ROM REFACTOR) ---
+                # --- BLOCK 3: ROTATOR CUFF EXTERNAL ROTATION ROM ---
                 st.markdown('<hr style="display:block !important; margin:15px 0; border:0; border-top:1px solid #E5E5E7;" />', unsafe_allow_html=True)
                 st.markdown('<h4 style="color:#4895DB; font-weight:800; margin-bottom:5px;">ROTATOR CUFF: EXTERNAL ROTATION ROM</h4>', unsafe_allow_html=True)
                 
@@ -597,16 +596,16 @@ if check_password():
                         </tr>"""
                     st.markdown(cmj_table_html + "</tbody></table>", unsafe_allow_html=True)
 
-                    # Kinetics Tracking Plot
+                    # Kinetics & ROM Joint Coordinated Plot
                     fig_cmj = make_subplots(specs=[[{"secondary_y": True}]])
                     if not ath_cmj.empty:
                         fig_cmj.add_trace(go.Scatter(x=ath_cmj['Test Date'], y=ath_cmj[cmj_col], name="Jump Height (cm)", mode='lines+markers', line=dict(color='#4895DB', width=3)), secondary_y=False)
                     if not ath_ash.empty:
                         ash_i_plot = ath_ash[ath_ash['Isometric Type'].str.contains('I', case=False, na=False)]
                         if not ash_i_plot.empty:
-                            fig_cmj.add_trace(go.Scatter(x=ash_i_plot['Test Date'], y=ash_i_plot['Peak Vertical Force [N] (L)'], name="ASH Left Force", mode='lines+markers', line=dict(color='#FF8200', width=2)), secondary_y=False)
+                            fig_cmj.add_trace(go.Scatter(x=ash_i_plot['Test Date'], y=ash_i_plot['Peak Vertical Force [N] (L)'], name="ASH Left Force (N)", mode='lines+markers', line=dict(color='#FF8200', width=2)), secondary_y=False)
                     if not ath_er.empty:
-                        fig_cmj.add_trace(go.Scatter(x=ath_er['Test Date'], y=ath_er['L Max ROM (°)'], name="ER Left ROM (°)", mode='lines+markers', line=dict(color='#A52A2A', width=2)), secondary_y=False)
+                        fig_cmj.add_trace(go.Scatter(x=ath_er['Test Date'], y=ath_er['L Max ROM (°)'], name="ER Left ROM (°)", mode='lines+markers', line=dict(color='#A52A2A', width=2)), secondary_y=True)
                     
                     fig_cmj.add_hline(y=base_row[cmj_col], line_dash="dash", line_color="red")
                     fig_cmj.update_layout(height=380, template="simple_white", legend=dict(orientation="h", y=-0.3, x=0.5, xanchor="center"))
