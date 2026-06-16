@@ -148,14 +148,14 @@ if check_password():
             frame['Session_Type'] = frame['Activity'].apply(lambda x: 'Game' if any(w in str(x).lower() for w in ['game', 'match', 'v.']) else 'Practice')
             frame['Season'] = frame['Date'].apply(assign_season)
 
-        # 1. Process CMJ Sheet
+        # 1. Process CMJ Lower Body Sheet
         cmj_df = pd.read_csv(st.secrets["CMJ_SHEET_URL"])
         cmj_df.columns = cmj_df.columns.str.strip()
         cmj_df.rename(columns={'Athlete': 'Name'}, inplace=True)
         cmj_df['Test Date'] = pd.to_datetime(cmj_df['Test Date'], errors='coerce')
         cmj_df['Season'] = cmj_df['Test Date'].apply(assign_season)
 
-        # 2. Process ASH Sheet
+        # 2. Process ASH Upper Body Sheet
         try:
             ash_df = pd.read_csv(st.secrets["ASH_SHEET_URL"])
             ash_df.columns = ash_df.columns.str.strip()
@@ -169,17 +169,19 @@ if check_password():
         except:
             ash_df = pd.DataFrame(columns=['Name', 'Test Date', 'Isometric Type', 'Peak Vertical Force [N] (L)', 'Peak Vertical Force [N] (R)', 'Peak Vertical Force [N] (Asym)(%)', 'Season'])
 
-        # 3. Process External Rotation Sheet
+        # 3. Process External Rotation Range of Motion Sheet
         try:
             er_df = pd.read_csv(st.secrets["ER_SHEET_URL"])
             er_df.columns = er_df.columns.str.strip()
             er_df.rename(columns={'Athlete': 'Name', 'Date': 'Test Date'}, inplace=True)
             er_df['Test Date'] = pd.to_datetime(er_df['Test Date'], errors='coerce')
-            if 'External Rotation [N]' in er_df.columns:
-                er_df['External Rotation [N]'] = pd.to_numeric(er_df['External Rotation [N]'], errors='coerce').fillna(0.0)
+            
+            for col in ['L Max ROM (°)', 'R Max ROM (°)', 'ROM Asymmetry (%)']:
+                if col in er_df.columns:
+                    er_df[col] = pd.to_numeric(er_df[col].astype(str).str.replace(r'[^0-9.-]', '', regex=True), errors='coerce').fillna(0.0)
             er_df['Season'] = er_df['Test Date'].apply(assign_season)
         except:
-            er_df = pd.DataFrame(columns=['Name', 'Test Date', 'External Rotation [N]', 'Season'])
+            er_df = pd.DataFrame(columns=['Name', 'Test Date', 'Movement', 'L Max ROM (°)', 'R Max ROM (°)', 'ROM Asymmetry (%)', 'Season'])
 
         # Process Drill Phases
         phase_df = pd.read_csv(st.secrets["PHASES_SHEET_URL"])
@@ -288,7 +290,7 @@ if check_password():
                 with c3: st.markdown(f'<div style="display:flex; justify-content:center;"><div class="score-box" style="background-color:{get_flipped_gradient(sc_prof)};">{sc_prof}</div></div><p style="text-align:center; font-weight:bold; color:grey; margin-top:10px;">SESSION SCORE</p>', unsafe_allow_html=True)
                 
                 # =========================================================================
-                # --- WEEKLY READINESS PROFILE MATRICES STACK (ORIGINAL DESIGN STYLE) ---
+                # --- WEEKLY READINESS PROFILE MATRICES STACK ---
                 # =========================================================================
                 st.markdown('<div class="section-header">Weekly Readiness Profile</div>', unsafe_allow_html=True)
                 
@@ -351,7 +353,6 @@ if check_password():
                         ri = row_i.iloc[-1]['Peak Vertical Force [N] (R)'] if not row_i.empty else 0.0
                         asym_i = row_i.iloc[-1]['Peak Vertical Force [N] (Asym)(%)'] if not row_i.empty else 0.0
                         
-                        # Summer Dynamic Baseline Lookup logic
                         if selected_season == 'Summer':
                             baseline_ash = p_ash_all[(p_ash_all['Season'] == 'Summer') & (p_ash_all['Isometric Type'].str.contains('I', case=False, na=False))].head(1)
                         else:
@@ -360,7 +361,6 @@ if check_password():
                         base_li = baseline_ash.iloc[-1]['Peak Vertical Force [N] (L)'] if not baseline_ash.empty else 0.0
                         base_ri = baseline_ash.iloc[-1]['Peak Vertical Force [N] (R)'] if not baseline_ash.empty else 0.0
                         
-                        # Average Left and Right performance delta vs baseline
                         pct_l = ((li - base_li) / base_li * 100) if base_li > 0 else 0
                         pct_r = ((ri - base_ri) / base_ri * 100) if base_ri > 0 else 0
                         ash_avg_diff = (pct_l + pct_r) / 2
@@ -390,12 +390,11 @@ if check_password():
                 else:
                     st.info("No explicit ASH shoulder test dataset records parsed for this athlete.")
 
-                # --- BLOCK 3: ROTATOR CUFF EXTERNAL ROTATION ---
+                # --- BLOCK 3: ROTATOR CUFF EXTERNAL ROTATION (ROM REFACTOR) ---
                 st.markdown('<hr style="display:block !important; margin:15px 0; border:0; border-top:1px solid #E5E5E7;" />', unsafe_allow_html=True)
-                st.markdown('<h4 style="color:#4895DB; font-weight:800; margin-bottom:5px;">EXTERNAL ROTATION</h4>', unsafe_allow_html=True)
+                st.markdown('<h4 style="color:#4895DB; font-weight:800; margin-bottom:5px;">ROTATOR CUFF: EXTERNAL ROTATION ROM</h4>', unsafe_allow_html=True)
                 
                 p_er_hist = er_df[(er_df['Name'] == selected_athlete_prof) & (er_df['Test Date'] <= curr_date_prof)].sort_values('Test Date')
-                er_col = 'External Rotation [N]'
                 
                 if not p_er_hist.empty:
                     ec1, ec2 = st.columns([1.5, 3.5])
@@ -406,32 +405,40 @@ if check_password():
                             baseline_er = p_er_hist.head(1)
                             
                         if not baseline_er.empty:
-                            base_er_val = baseline_er.iloc[-1][er_col]
+                            base_l_rom = baseline_er.iloc[-1]['L Max ROM (°)']
+                            base_r_rom = baseline_er.iloc[-1]['R Max ROM (°)']
+                            
                             latest_er = p_er_hist.iloc[-1]
-                            cur_er_val = latest_er[er_col]
-                            er_diff = ((cur_er_val - base_er_val) / base_er_val * 100) if base_er_val > 0 else 0
-                            label_er = "ELITE" if er_diff >= 0 else "FATIGUED" if er_diff < -8 else "GRINDER"
-                            color_er = "#28a745" if er_diff >= -5 else "#ffc107" if er_diff >= -12 else "#dc3545"
+                            cur_l_rom = latest_er['L Max ROM (°)']
+                            cur_r_rom = latest_er['R Max ROM (°)']
+                            cur_asym_rom = latest_er['ROM Asymmetry (%)']
+                            
+                            rom_pct_l = ((cur_l_rom - base_l_rom) / base_l_rom * 100) if base_l_rom > 0 else 0
+                            rom_pct_r = ((cur_r_rom - base_r_rom) / base_r_rom * 100) if base_r_rom > 0 else 0
+                            er_avg_diff = (rom_pct_l + rom_pct_r) / 2
+                            
+                            label_er, color_er = ("ELITE", "#28a745") if er_avg_diff >= 0 and abs(cur_asym_rom) <= 10 else ("FATIGUED", "#dc3545") if er_avg_diff < -6 else ("GRINDER", "#ffc107")
                             
                             st.markdown(f"""
                                 <div style="text-align:center;">
                                     <div class="score-box" style="background-color:{color_er}; line-height:1.2; padding-top:15px; height:80px; width:100%;">
-                                        <span style="font-size:18px;">{er_diff:+.1f}%</span>
-                                        <span style="font-size:10px; display:block; font-weight:bold; margin-top:2px;">{label_er}</span>
+                                        <span style="font-size:18px;">{cur_asym_rom:+.1f}%</span>
+                                        <span style="font-size:10px; display:block; font-weight:bold; margin-top:2px;">{label_er} (Asym ROM)</span>
                                     </div>
                                 </div>
                                 <div class="info-box" style="text-align:center; margin-top:10px;">
-                                    <p style="margin:0; font-size:11px; color:grey;"><b>Base ER Force:</b> {base_er_val:.1f} N</p>
-                                    <p style="margin:0; font-size:13px; color:#FF8200;"><b>Today ER Force:</b> {cur_er_val:.1f} N</p>
+                                    <p style="margin:0; font-size:11px; color:grey;"><b>Base ROM:</b> L: {base_l_rom:.1f}° | R: {base_r_rom:.1f}°</p>
+                                    <p style="margin:0; font-size:13px; color:#FF8200;"><b>Today ROM:</b> L: {cur_l_rom:.1f}° | R: {cur_r_rom:.1f}°</p>
                                 </div>
                             """, unsafe_allow_html=True)
                     with ec2:
                         fig_er = go.Figure()
-                        fig_er.add_trace(go.Scatter(x=p_er_hist['Test Date'], y=p_er_hist[er_col], name="ER Force", line=dict(color='#A52A2A', width=3), mode='lines+markers'))
+                        fig_er.add_trace(go.Scatter(x=p_er_hist['Test Date'], y=p_er_hist['L Max ROM (°)'], name="Left ROM", line=dict(color='#4895DB', width=2.5)))
+                        fig_er.add_trace(go.Scatter(x=p_er_hist['Test Date'], y=p_er_hist['R Max ROM (°)'], name="Right ROM", line=dict(color='#FF8200', width=2.5, dash='dash')))
                         fig_er.update_layout(height=160, margin=dict(l=0, r=0, t=10, b=0), showlegend=False, template="simple_white")
                         st.plotly_chart(fig_er, use_container_width=True, config=LOCKED_CONFIG, key="er_profile_chart")
                 else:
-                    st.info("No External Rotation logs recorded for this athlete profile.")
+                    st.info("No Rotator Cuff External Rotation logs recorded for this athlete profile.")
 
                 st.divider()
 
@@ -554,7 +561,10 @@ if check_password():
                         li_val = ash_i_filter.iloc[-1]['Peak Vertical Force [N] (L)'] if not ash_i_filter.empty else None
                         ri_val = ash_i_filter.iloc[-1]['Peak Vertical Force [N] (R)'] if not ash_i_filter.empty else None
                         asym_val = ash_i_filter.iloc[-1]['Peak Vertical Force [N] (Asym)(%)'] if not ash_i_filter.empty else None
-                        er_val = er_day.iloc[-1]['External Rotation [N]'] if not er_day.empty else None
+                        
+                        er_l_val = er_day.iloc[-1]['L Max ROM (°)'] if not er_day.empty else None
+                        er_r_val = er_day.iloc[-1]['R Max ROM (°)'] if not er_day.empty else None
+                        er_asym_val = er_day.iloc[-1]['ROM Asymmetry (%)'] if not er_day.empty else None
 
                         raw_diff = (h_val - base_row[cmj_col]) if h_val else 0.0
                         display_diff = f"{raw_diff:+.1f} cm" if h_val else "N/A"
@@ -567,13 +577,14 @@ if check_password():
                             "RSI": f"{rsi_val:.2f}" if rsi_val else "N/A",
                             "ASH_F": f"L: {li_val:.0f} / R: {ri_val:.0f}" if li_val and ri_val else "N/A",
                             "ASH_ASYM": f"{asym_val:+.1f}%" if asym_val else "N/A",
-                            "ER": f"{er_val:.0f} N" if er_val else "N/A"
+                            "ER_ROM": f"L: {er_l_val:.1f}° / R: {er_r_val:.1f}°" if er_l_val and er_r_val else "N/A",
+                            "ER_ASYM": f"{er_asym_val:+.1f}%" if er_asym_val else "N/A"
                         })
 
                     cmj_table_html = """<table class="scout-table">
                                         <thead><tr style="background-color: #f0f2f6; font-weight: bold;">
                                             <th>Test Date</th><th>Jump Height</th><th>Vs. Baseline</th><th>RSI-mod</th>
-                                            <th>ASH Forces (I)</th><th>ASH Asym %</th><th>Ext. Rotation</th>
+                                            <th>ASH Forces (I)</th><th>ASH Asym %</th><th>ER Max ROM</th><th>ER Asym %</th>
                                         </tr></thead><tbody>"""
                     for item in comparison_list:
                         color = "#28a745" if item['Raw Diff'] >= 0 else "#dc3545"
@@ -582,7 +593,7 @@ if check_password():
                             <td>{item['Date']}</td><td>{item['Height']}</td>
                             <td style="font-weight: bold; color: {color};">{item['Display Diff']}</td><td>{item['RSI']}</td>
                             <td style="font-weight:700;">{item['ASH_F']}</td><td style="font-weight:700;">{item['ASH_ASYM']}</td>
-                            <td style="font-weight:700;">{item['ER']}</td>
+                            <td style="font-weight:700;">{item['ER_ROM']}</td><td style="font-weight:700;">{item['ER_ASYM']}</td>
                         </tr>"""
                     st.markdown(cmj_table_html + "</tbody></table>", unsafe_allow_html=True)
 
@@ -595,7 +606,7 @@ if check_password():
                         if not ash_i_plot.empty:
                             fig_cmj.add_trace(go.Scatter(x=ash_i_plot['Test Date'], y=ash_i_plot['Peak Vertical Force [N] (L)'], name="ASH Left Force", mode='lines+markers', line=dict(color='#FF8200', width=2)), secondary_y=False)
                     if not ath_er.empty:
-                        fig_cmj.add_trace(go.Scatter(x=ath_er['Test Date'], y=ath_er['External Rotation [N]'], name="Ext Rotation (N)", mode='lines+markers', line=dict(color='#A52A2A', width=2)), secondary_y=False)
+                        fig_cmj.add_trace(go.Scatter(x=ath_er['Test Date'], y=ath_er['L Max ROM (°)'], name="ER Left ROM (°)", mode='lines+markers', line=dict(color='#A52A2A', width=2)), secondary_y=False)
                     
                     fig_cmj.add_hline(y=base_row[cmj_col], line_dash="dash", line_color="red")
                     fig_cmj.update_layout(height=380, template="simple_white", legend=dict(orientation="h", y=-0.3, x=0.5, xanchor="center"))
