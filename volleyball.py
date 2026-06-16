@@ -148,14 +148,14 @@ if check_password():
             frame['Session_Type'] = frame['Activity'].apply(lambda x: 'Game' if any(w in str(x).lower() for w in ['game', 'match', 'v.']) else 'Practice')
             frame['Season'] = frame['Date'].apply(assign_season)
 
-        # 1. Process CMJ Lower Body Sheet
+        # 1. Process CMJ Sheet
         cmj_df = pd.read_csv(st.secrets["CMJ_SHEET_URL"])
         cmj_df.columns = cmj_df.columns.str.strip()
         cmj_df.rename(columns={'Athlete': 'Name'}, inplace=True)
         cmj_df['Test Date'] = pd.to_datetime(cmj_df['Test Date'], errors='coerce')
         cmj_df['Season'] = cmj_df['Test Date'].apply(assign_season)
 
-        # 2. Process ASH Upper Body Sheet
+        # 2. Process ASH Sheet
         try:
             ash_df = pd.read_csv(st.secrets["ASH_SHEET_URL"])
             ash_df.columns = ash_df.columns.str.strip()
@@ -288,7 +288,7 @@ if check_password():
                 with c3: st.markdown(f'<div style="display:flex; justify-content:center;"><div class="score-box" style="background-color:{get_flipped_gradient(sc_prof)};">{sc_prof}</div></div><p style="text-align:center; font-weight:bold; color:grey; margin-top:10px;">SESSION SCORE</p>', unsafe_allow_html=True)
                 
                 # =========================================================================
-                # --- WEEKLY READINESS PROFILE MATRICES STACK ---
+                # --- WEEKLY READINESS PROFILE MATRICES STACK (ORIGINAL DESIGN STYLE) ---
                 # =========================================================================
                 st.markdown('<div class="section-header">Weekly Readiness Profile</div>', unsafe_allow_html=True)
                 
@@ -321,7 +321,8 @@ if check_password():
                                 </div>
                             </div>
                             <div class="info-box" style="text-align:center; margin-top:10px;">
-                                <p style="margin:0; font-size:13px; color:#FF8200;"><b>CMJ:</b> {cur_h:.1f} cm (Base: {base_h:.1f})</p>
+                                <p style="margin:0; font-size:12px; color:grey;"><b>Base:</b> {base_h:.1f} cm | {base_rsi:.2f}</p>
+                                <p style="margin:0; font-size:13px; color:#FF8200;"><b>Today:</b> {cur_h:.1f} cm | {cur_rsi:.2f}</p>
                             </div>
                         """, unsafe_allow_html=True)
                 with jc2:
@@ -350,7 +351,7 @@ if check_password():
                         ri = row_i.iloc[-1]['Peak Vertical Force [N] (R)'] if not row_i.empty else 0.0
                         asym_i = row_i.iloc[-1]['Peak Vertical Force [N] (Asym)(%)'] if not row_i.empty else 0.0
                         
-                        # Summer Baseline Dynamic Shift (Locks to last week's earliest summer test row)
+                        # Summer Dynamic Baseline Lookup logic
                         if selected_season == 'Summer':
                             baseline_ash = p_ash_all[(p_ash_all['Season'] == 'Summer') & (p_ash_all['Isometric Type'].str.contains('I', case=False, na=False))].head(1)
                         else:
@@ -359,19 +360,23 @@ if check_password():
                         base_li = baseline_ash.iloc[-1]['Peak Vertical Force [N] (L)'] if not baseline_ash.empty else 0.0
                         base_ri = baseline_ash.iloc[-1]['Peak Vertical Force [N] (R)'] if not baseline_ash.empty else 0.0
                         
-                        color_ash = "#28a745" if abs(asym_i) <= 10 else "#ffc107" if abs(asym_i) <= 15 else "#dc3545"
+                        # Average Left and Right performance delta vs baseline
+                        pct_l = ((li - base_li) / base_li * 100) if base_li > 0 else 0
+                        pct_r = ((ri - base_ri) / base_ri * 100) if base_ri > 0 else 0
+                        ash_avg_diff = (pct_l + pct_r) / 2
+                        
+                        label_ash, color_ash = ("ELITE", "#28a745") if ash_avg_diff >= 0 and abs(asym_i) <= 10 else ("FATIGUED", "#dc3545") if ash_avg_diff < -8 else ("GRINDER", "#ffc107")
 
                         st.markdown(f"""
                             <div style="text-align:center;">
                                 <div class="score-box" style="background-color:{color_ash}; line-height:1.2; padding-top:15px; height:80px; width:100%;">
-                                    <span style="font-size:18px;">{asym_i:+.1f}%</span>
-                                    <span style="font-size:10px; display:block; font-weight:bold; margin-top:2px;">I-TEST ASYMMETRY</span>
+                                    <span style="font-size:18px;">{ash_avg_diff:+.1f}%</span>
+                                    <span style="font-size:10px; display:block; font-weight:bold; margin-top:2px;">{label_ash} (Asym: {asym_i:+.1f}%)</span>
                                 </div>
                             </div>
-                            <div class="info-box" style="margin-top:10px; text-align:center;">
-                                <p style="margin:0 0 2px 0; font-weight:bold; color:#FF8200;">ASH Shoulder Isometric [N]</p>
-                                <p style="margin:0; font-size:13px; color:#1D1D1F;"><b>Left I:</b> {li:.0f} N (Base: {base_li:.0f} N)</p>
-                                <p style="margin:0; font-size:13px; color:#1D1D1F;"><b>Right I:</b> {ri:.0f} N (Base: {base_ri:.0f} N)</p>
+                            <div class="info-box" style="text-align:center; margin-top:10px;">
+                                <p style="margin:0; font-size:11px; color:grey;"><b>Base Force:</b> L: {base_li:.0f} N | R: {base_ri:.0f} N</p>
+                                <p style="margin:0; font-size:13px; color:#FF8200;"><b>Today Force:</b> L: {li:.0f} N | R: {ri:.0f} N</p>
                             </div>
                         """, unsafe_allow_html=True)
                     with ac2:
@@ -387,7 +392,7 @@ if check_password():
 
                 # --- BLOCK 3: ROTATOR CUFF EXTERNAL ROTATION ---
                 st.markdown('<hr style="display:block !important; margin:15px 0; border:0; border-top:1px solid #E5E5E7;" />', unsafe_allow_html=True)
-                st.markdown('<h4 style="color:#4895DB; font-weight:800; margin-bottom:5px;">EXTERNAL ROTATION</h4>', unsafe_allow_html=True)
+                st.markdown('<h4 style="color:#4895DB; font-weight:800; margin-bottom:5px;">ROTATOR CUFF: EXTERNAL ROTATION</h4>', unsafe_allow_html=True)
                 
                 p_er_hist = er_df[(er_df['Name'] == selected_athlete_prof) & (er_df['Test Date'] <= curr_date_prof)].sort_values('Test Date')
                 er_col = 'External Rotation [N]'
@@ -395,7 +400,6 @@ if check_password():
                 if not p_er_hist.empty:
                     ec1, ec2 = st.columns([1.5, 3.5])
                     with ec1:
-                        # Summer Baseline Dynamic Shift (Locks to last week's earliest summer ER log row)
                         if selected_season == 'Summer':
                             baseline_er = p_er_hist[p_er_hist['Season'] == 'Summer'].head(1)
                         else:
@@ -406,17 +410,19 @@ if check_password():
                             latest_er = p_er_hist.iloc[-1]
                             cur_er_val = latest_er[er_col]
                             er_diff = ((cur_er_val - base_er_val) / base_er_val * 100) if base_er_val > 0 else 0
+                            label_er = "ELITE" if er_diff >= 0 else "FATIGUED" if er_diff < -8 else "GRINDER"
                             color_er = "#28a745" if er_diff >= -5 else "#ffc107" if er_diff >= -12 else "#dc3545"
                             
                             st.markdown(f"""
                                 <div style="text-align:center;">
                                     <div class="score-box" style="background-color:{color_er}; line-height:1.2; padding-top:15px; height:80px; width:100%;">
                                         <span style="font-size:18px;">{er_diff:+.1f}%</span>
-                                        <span style="font-size:10px; display:block; font-weight:bold; margin-top:2px;">VS BASELINE</span>
+                                        <span style="font-size:10px; display:block; font-weight:bold; margin-top:2px;">{label_er}</span>
                                     </div>
                                 </div>
                                 <div class="info-box" style="text-align:center; margin-top:10px;">
-                                    <p style="margin:0; font-size:13px; color:#1D1D1F;"><b>External Rotation:</b> {cur_er_val:.1f} N (Base: {base_er_val:.1f} N)</p>
+                                    <p style="margin:0; font-size:11px; color:grey;"><b>Base ER Force:</b> {base_er_val:.1f} N</p>
+                                    <p style="margin:0; font-size:13px; color:#FF8200;"><b>Today ER Force:</b> {cur_er_val:.1f} N</p>
                                 </div>
                             """, unsafe_allow_html=True)
                     with ec2:
@@ -425,7 +431,7 @@ if check_password():
                         fig_er.update_layout(height=160, margin=dict(l=0, r=0, t=10, b=0), showlegend=False, template="simple_white")
                         st.plotly_chart(fig_er, use_container_width=True, config=LOCKED_CONFIG, key="er_profile_chart")
                 else:
-                    st.info("No External Rotation logs recorded for this athlete profile.")
+                    st.info("No Rotator Cuff External Rotation logs recorded for this athlete profile.")
 
                 st.divider()
 
