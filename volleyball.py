@@ -391,7 +391,7 @@ if check_password():
 
                 # --- BLOCK 3: ROTATOR CUFF EXTERNAL ROTATION ROM ---
                 st.markdown('<hr style="display:block !important; margin:15px 0; border:0; border-top:1px solid #E5E5E7;" />', unsafe_allow_html=True)
-                st.markdown('<h4 style="color:#4895DB; font-weight:800; margin-bottom:5px;">ROTATOR CUFF: EXTERNAL ROTATION ROM</h4>', unsafe_allow_html=True)
+                st.markdown('<h4 style="color:#4895DB; font-weight:800; margin-bottom:5px;">EXTERNAL ROTATION: ROM</h4>', unsafe_allow_html=True)
                 
                 p_er_hist = er_df[(er_df['Name'] == selected_athlete_prof) & (er_df['Test Date'] <= curr_date_prof)].sort_values('Test Date')
                 
@@ -437,7 +437,7 @@ if check_password():
                         fig_er.update_layout(height=160, margin=dict(l=0, r=0, t=10, b=0), showlegend=False, template="simple_white")
                         st.plotly_chart(fig_er, use_container_width=True, config=LOCKED_CONFIG, key="er_profile_chart")
                 else:
-                    st.info("No Rotator Cuff External Rotation logs recorded for this athlete profile.")
+                    st.info("External Rotation logs recorded for this athlete profile.")
 
                 st.divider()
 
