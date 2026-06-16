@@ -155,14 +155,13 @@ if check_password():
         cmj_df['Test Date'] = pd.to_datetime(cmj_df['Test Date'], errors='coerce')
         cmj_df['Season'] = cmj_df['Test Date'].apply(assign_season)
 
-        # 2. Process ASH Sheet (Dynamically Handle Export Column Text)
+        # 2. Process ASH Upper Body Sheet
         try:
             ash_df = pd.read_csv(st.secrets["ASH_SHEET_URL"])
             ash_df.columns = ash_df.columns.str.strip()
             ash_df.rename(columns={'Athlete': 'Name', 'Date': 'Test Date'}, inplace=True)
             ash_df['Test Date'] = pd.to_datetime(ash_df['Test Date'], errors='coerce')
             
-            # Map structural vertical forces cleanly
             for col in ['Peak Vertical Force [N] (L)', 'Peak Vertical Force [N] (R)', 'Peak Vertical Force [N] (Asym)(%)']:
                 if col in ash_df.columns:
                     ash_df[col] = pd.to_numeric(ash_df[col].astype(str).str.replace(r'[^0-9.-]', '', regex=True), errors='coerce').fillna(0.0)
@@ -182,7 +181,7 @@ if check_password():
         except:
             er_df = pd.DataFrame(columns=['Name', 'Test Date', 'External Rotation [N]', 'Season'])
 
-        # Process Phases
+        # Process Drill Phases
         phase_df = pd.read_csv(st.secrets["PHASES_SHEET_URL"])
         phase_df = heavy_sanitize(phase_df)
         if 'Phases' in phase_df.columns: phase_df = phase_df.rename(columns={'Phases': 'Phase'})
@@ -289,11 +288,11 @@ if check_password():
                 with c3: st.markdown(f'<div style="display:flex; justify-content:center;"><div class="score-box" style="background-color:{get_flipped_gradient(sc_prof)};">{sc_prof}</div></div><p style="text-align:center; font-weight:bold; color:grey; margin-top:10px;">SESSION SCORE</p>', unsafe_allow_html=True)
                 
                 # =========================================================================
-                # --- WEEKLY READINESS PROFILE: INDEPENDENT STACKED LOOKUPS ---
+                # --- WEEKLY READINESS PROFILE MATRICES STACK ---
                 # =========================================================================
                 st.markdown('<div class="section-header">Weekly Readiness Profile</div>', unsafe_allow_html=True)
                 
-                # --- BLOCK 1: COUNTERMOVEMENT JUMP (CMJ) ---
+                # --- BLOCK 1: LOWER BODY JUMP PROFILE (CMJ) ---
                 st.markdown('<h4 style="color:#4895DB; font-weight:800; margin-bottom:5px;">LOWER BODY: COUNTERMOVEMENT JUMP</h4>', unsafe_allow_html=True)
                 jc1, jc2 = st.columns([1.5, 3.5])
                 p_cmj_hist = cmj_df[(cmj_df['Name'] == selected_athlete_prof) & (cmj_df['Test Date'] <= curr_date_prof)].sort_values('Test Date')
@@ -334,7 +333,7 @@ if check_password():
                         fig.update_layout(height=160, margin=dict(l=0, r=0, t=10, b=0), showlegend=False, template="simple_white")
                         st.plotly_chart(fig, use_container_width=True, config=LOCKED_CONFIG, key="cmj_top_chart")
 
-                # --- BLOCK 2: ASH SHOULDER ISOMETRIC (LEFT/RIGHT & ROW PARSING) ---
+                # --- BLOCK 2: UPPER BODY ISOMETRIC PROFILE (ASH TEST) ---
                 st.markdown('<hr style="display:block !important; margin:15px 0; border:0; border-top:1px solid #E5E5E7;" />', unsafe_allow_html=True)
                 st.markdown('<h4 style="color:#4895DB; font-weight:800; margin-bottom:5px;">UPPER BODY: ASH SHOULDER ISOMETRIC</h4>', unsafe_allow_html=True)
                 
@@ -343,7 +342,6 @@ if check_password():
                 if not p_ash_all.empty:
                     ac1, ac2 = st.columns([1.5, 3.5])
                     with ac1:
-                        # Extract both I and Y metrics out of rows matching today's latest snapshot logs
                         latest_date_ash = p_ash_all['Test Date'].iloc[-1]
                         today_ash_rows = p_ash_all[p_ash_all['Test Date'] == latest_date_ash]
                         
@@ -353,9 +351,8 @@ if check_password():
                         li = row_i.iloc[-1]['Peak Vertical Force [N] (L)'] if not row_i.empty else 0.0
                         ri = row_i.iloc[-1]['Peak Vertical Force [N] (R)'] if not row_i.empty else 0.0
                         ly = row_y.iloc[-1]['Peak Vertical Force [N] (L)'] if not row_y.empty else 0.0
-                        ry = row_y.iloc[-1]['Right Y' if 'Right Y' in today_ash_rows.columns else 'Peak Vertical Force [N] (R)'] if not row_y.empty else 0.0
+                        ry = row_y.iloc[-1]['Peak Vertical Force [N] (R)'] if not row_y.empty else 0.0
                         
-                        # Asymmetry output on I-Test
                         asym_i = row_i.iloc[-1]['Peak Vertical Force [N] (Asym)(%)'] if not row_i.empty else 0.0
                         color_ash = "#28a745" if abs(asym_i) <= 10 else "#ffc107" if abs(asym_i) <= 15 else "#dc3545"
 
@@ -372,7 +369,6 @@ if check_password():
                             </div>
                         """, unsafe_allow_html=True)
                     with ac2:
-                        # Timeline of I-Test Left vs Right Trends
                         p_ash_i_only = p_ash_all[p_ash_all['Isometric Type'].str.contains('I', case=False, na=False)]
                         if not p_ash_i_only.empty:
                             fig_ash = go.Figure()
@@ -431,6 +427,8 @@ if check_password():
                     fig_ph.add_trace(go.Bar(x=p_ph['Phase'], y=p_ph['Player Load'], name="Player Load", marker_color='#4895DB'), secondary_y=False)
                     fig_ph.add_trace(go.Scatter(x=p_ph['Phase'], y=p_ph['Total Jumps'], name="Total Jumps", line=dict(color='#FF8200', width=4), mode='lines+markers'), secondary_y=True)
                     fig_ph.update_layout(height=350, showlegend=True, template="simple_white", legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1), margin=dict(l=0, r=0, t=30, b=0))
+                    fig_ph.update_yaxes(title_text="Player Load", secondary_y=False)
+                    fig_ph.update_yaxes(title_text="Total Jumps", secondary_y=True)
                     st.plotly_chart(fig_ph, use_container_width=True, config=LOCKED_CONFIG)
                     
         with tabs[1]: # Tab 1: Leaderboard Gallery
@@ -512,7 +510,7 @@ if check_password():
                     fig_master.update_layout(template="simple_white", height=380, legend=dict(orientation="h", y=-0.2, x=0.5, xanchor="center"))
                     st.plotly_chart(fig_master, use_container_width=True)
 
-                # --- HISTORICAL TESTING LOG MERGE TABLE ---
+                # --- MULTI-SHEET TIMELINE ALIGNMENT FOR HISTORICAL READINESS ---
                 st.markdown("### Combined Lower & Upper Body Kinetics History")
                 ath_cmj = cmj_df[cmj_df['Name'] == sel_ath_hist].sort_values('Test Date')
                 ath_ash = ash_df[ash_df['Name'] == sel_ath_hist].sort_values('Test Date')
@@ -536,7 +534,6 @@ if check_password():
                         h_val = cmj_day.iloc[-1][cmj_col] if not cmj_day.empty else None
                         rsi_val = cmj_day.iloc[-1][rsi_col] if not cmj_day.empty else None
                         
-                        # Fetch and display I-Test breakdown on history table
                         ash_i_filter = ash_day[ash_day['Isometric Type'].str.contains('I', case=False, na=False)]
                         li_val = ash_i_filter.iloc[-1]['Peak Vertical Force [N] (L)'] if not ash_i_filter.empty else None
                         ri_val = ash_i_filter.iloc[-1]['Peak Vertical Force [N] (R)'] if not ash_i_filter.empty else None
@@ -607,4 +604,64 @@ if check_password():
             with c_mode: view_mode = st.radio("View Level Context", ["Team", "Position", "Individual"], horizontal=True, key="gp_view_mode_t3")
             
             if view_mode == "Individual":
-                gp_p = st.selectbox("Select Athlete Profile
+                gp_p = st.selectbox("Select Athlete Profile", sorted(df['Name'].unique()), key="gp_p_vf_t3")
+                main_filtered = df[df['Name'] == gp_p].copy()
+                match_filtered = match_df[match_df['Name'] == gp_p].copy()
+            elif view_mode == "Position":
+                gp_pos = st.selectbox("Select Position Group Context", sorted(df['Position'].unique().tolist()), key="gp_pos_vf_t3")
+                main_filtered = df[df['Position'] == gp_pos].copy()
+                match_filtered = match_df[match_df['Position'] == gp_pos].copy()
+            else:
+                main_filtered = df.copy()
+                match_filtered = match_df.copy()
+
+            if not main_filtered.empty and not match_filtered.empty:
+                s_prac_all = main_filtered[main_filtered['Session_Type'] == 'Practice']
+                s_p_avg = s_prac_all[['Player Load', 'Jump Load', 'Total Jumps', 'Explosive Efforts', 'Duration']].mean()
+                s_m_avg = match_filtered[['Player Load', 'Jump Load', 'Total Jumps', 'Explosive Efforts', 'Duration']].mean()
+                
+                tab3_html = """<table class="scout-table"><thead><tr><th>Metric (Rate/Min)</th><th>Practice Average Density</th><th>Match Load Density</th><th>Intensity Gap</th></tr></thead><tbody>"""
+                for m in ['Player Load', 'Jump Load', 'Total Jumps', 'Explosive Efforts']:
+                    p_rate = s_p_avg[m] / s_p_avg['Duration'] if s_p_avg['Duration'] > 0 else 0
+                    m_rate = s_m_avg[m] / s_m_avg['Duration'] if s_m_avg['Duration'] > 0 else 0
+                    gap = ((m_rate - p_rate) / p_rate * 100) if p_rate > 0 else 0
+                    tab3_html += f"<tr><td><b>{m}</b></td><td>{p_rate:.2f}</td><td>{m_rate:.2f}</td><td style='font-weight:bold;'>{gap:+.1f}%</td></tr>"
+                st.markdown(tab3_html + "</tbody></table>", unsafe_allow_html=True)
+
+        with tabs[4]: # Tab 4: Match Summary Cards
+            selected_matches = st.multiselect("Select Matches to Analyze", match_df.sort_values(['Date', 'Sheet_Order'])['Session_Name'].unique().tolist(), key="matches_t4")
+            if selected_matches:
+                tourney_df = match_df[match_df['Session_Name'].isin(selected_matches)].sort_values(['Date', 'Sheet_Order'])
+                for name in sorted(tourney_df['Name'].unique()):
+                    ad = tourney_df[tourney_df['Name'] == name]
+                    st.markdown(f"#### Match Summary Profile: {name}")
+                    st.dataframe(ad[['Session_Name', 'Total Jumps', 'Player Load', 'Explosive Efforts']], use_container_width=True, hide_index=True)
+
+        with tabs[5]: # Tab 5: Position Trends Matrix
+            st.markdown('<div class="section-header">Positional Performance Tracking Over Time</div>', unsafe_allow_html=True)
+            pos_filter_an = st.selectbox("Select Position Group to Monitor", sorted([p for p in df['Position'].unique() if p != "N/A"]), key="pos_an_filt_t5")
+            tr_df = df[df['Position'] == pos_filter_an]
+            if not tr_df.empty:
+                pos_sums = tr_df.groupby(['Week', 'Name'])[['Player Load', 'Total Jumps']].sum().reset_index()
+                st.dataframe(pos_sums, use_container_width=True, hide_index=True)
+
+        with tabs[6]: # Tab 6: Phase Work Index Matrix
+            st.markdown('<div class="section-header">Work Index Density Matrix by Training Drill</div>', unsafe_allow_html=True)
+            if not phase_df.empty:
+                phase_df['Phase'] = phase_df['Phase'].replace(phase_map)
+                wi_df = phase_df.groupby('Phase')[['Player Load', 'Total Jumps', 'Duration']].mean().reset_index()
+                wi_df['Load / Min'] = wi_df['Player Load'] / wi_df['Duration']
+                wi_df['Jumps / Min'] = wi_df['Total Jumps'] / wi_df['Duration']
+                st.dataframe(wi_df[['Phase', 'Duration', 'Load / Min', 'Jumps / Min']], use_container_width=True, hide_index=True)
+
+        with tabs[7]: # Tab 7: Practice Planner Engine
+            st.markdown('<div class="section-header">Neuromuscular Practice Planner Sequence</div>', unsafe_allow_html=True)
+            if not phase_df.empty:
+                phase_df['Phase'] = phase_df['Phase'].replace(phase_map)
+                available_phases = sorted(phase_df['Phase'].unique())
+                selected_build = st.multiselect("Select Training Phase Drill Sequence", available_phases, key="planner_t7")
+                if selected_build:
+                    st.info("Planned Drill Sequence Loaded.")
+
+    except Exception as e:
+        st.error(f"Dashboard Integration Sync Error: {e}")
