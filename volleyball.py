@@ -321,8 +321,7 @@ if check_password():
                                 </div>
                             </div>
                             <div class="info-box" style="text-align:center; margin-top:10px;">
-                                <p style="margin:0; font-size:11px; color:grey;"><b>Base CMJ:</b> {base_h:.1f} cm | {base_rsi:.2f}</p>
-                                <p style="margin:0; font-size:13px; color:#FF8200;"><b>Today CMJ:</b> {cur_h:.1f} cm | {cur_rsi:.2f}</p>
+                                <p style="margin:0; font-size:13px; color:#FF8200;"><b>CMJ:</b> {cur_h:.1f} cm (Base: {base_h:.1f})</p>
                             </div>
                         """, unsafe_allow_html=True)
                 with jc2:
@@ -346,14 +345,20 @@ if check_password():
                         today_ash_rows = p_ash_all[p_ash_all['Test Date'] == latest_date_ash]
                         
                         row_i = today_ash_rows[today_ash_rows['Isometric Type'].str.contains('I', case=False, na=False)]
-                        row_y = today_ash_rows[today_ash_rows['Isometric Type'].str.contains('Y', case=False, na=False)]
                         
                         li = row_i.iloc[-1]['Peak Vertical Force [N] (L)'] if not row_i.empty else 0.0
                         ri = row_i.iloc[-1]['Peak Vertical Force [N] (R)'] if not row_i.empty else 0.0
-                        ly = row_y.iloc[-1]['Peak Vertical Force [N] (L)'] if not row_y.empty else 0.0
-                        ry = row_y.iloc[-1]['Peak Vertical Force [N] (R)'] if not row_y.empty else 0.0
-                        
                         asym_i = row_i.iloc[-1]['Peak Vertical Force [N] (Asym)(%)'] if not row_i.empty else 0.0
+                        
+                        # Summer Baseline Dynamic Shift (Locks to last week's earliest summer test row)
+                        if selected_season == 'Summer':
+                            baseline_ash = p_ash_all[(p_ash_all['Season'] == 'Summer') & (p_ash_all['Isometric Type'].str.contains('I', case=False, na=False))].head(1)
+                        else:
+                            baseline_ash = p_ash_all[p_ash_all['Isometric Type'].str.contains('I', case=False, na=False)].head(1)
+                        
+                        base_li = baseline_ash.iloc[-1]['Peak Vertical Force [N] (L)'] if not baseline_ash.empty else 0.0
+                        base_ri = baseline_ash.iloc[-1]['Peak Vertical Force [N] (R)'] if not baseline_ash.empty else 0.0
+                        
                         color_ash = "#28a745" if abs(asym_i) <= 10 else "#ffc107" if abs(asym_i) <= 15 else "#dc3545"
 
                         st.markdown(f"""
@@ -363,9 +368,10 @@ if check_password():
                                     <span style="font-size:10px; display:block; font-weight:bold; margin-top:2px;">I-TEST ASYMMETRY</span>
                                 </div>
                             </div>
-                            <div class="info-box" style="margin-top:10px;">
-                                <p style="margin:0 0 2px 0;"><b>Left I:</b> {li:.0f} N | <b>Right I:</b> {ri:.0f} N</p>
-                                <p style="margin:0;"><b>Left Y:</b> {ly:.0f} N | <b>Right Y:</b> {ry:.0f} N</p>
+                            <div class="info-box" style="margin-top:10px; text-align:center;">
+                                <p style="margin:0 0 2px 0; font-weight:bold; color:#FF8200;">ASH Shoulder Isometric [N]</p>
+                                <p style="margin:0; font-size:13px; color:#1D1D1F;"><b>Left I:</b> {li:.0f} N (Base: {base_li:.0f} N)</p>
+                                <p style="margin:0; font-size:13px; color:#1D1D1F;"><b>Right I:</b> {ri:.0f} N (Base: {base_ri:.0f} N)</p>
                             </div>
                         """, unsafe_allow_html=True)
                     with ac2:
@@ -389,7 +395,12 @@ if check_password():
                 if not p_er_hist.empty:
                     ec1, ec2 = st.columns([1.5, 3.5])
                     with ec1:
-                        baseline_er = p_er_hist.head(1)
+                        # Summer Baseline Dynamic Shift (Locks to last week's earliest summer ER log row)
+                        if selected_season == 'Summer':
+                            baseline_er = p_er_hist[p_er_hist['Season'] == 'Summer'].head(1)
+                        else:
+                            baseline_er = p_er_hist.head(1)
+                            
                         if not baseline_er.empty:
                             base_er_val = baseline_er.iloc[-1][er_col]
                             latest_er = p_er_hist.iloc[-1]
@@ -405,8 +416,7 @@ if check_password():
                                     </div>
                                 </div>
                                 <div class="info-box" style="text-align:center; margin-top:10px;">
-                                    <p style="margin:0;"><b>Base Force:</b> {base_er_val:.1f} N</p>
-                                    <p style="margin:0; color:#FF8200;"><b>Today ER Force:</b> {cur_er_val:.1f} N</p>
+                                    <p style="margin:0; font-size:13px; color:#1D1D1F;"><b>External Rotation:</b> {cur_er_val:.1f} N (Base: {base_er_val:.1f} N)</p>
                                 </div>
                             """, unsafe_allow_html=True)
                     with ec2:
