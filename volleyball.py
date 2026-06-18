@@ -232,7 +232,7 @@ if check_password():
 
         tabs = st.tabs(["Individual Profile", "Practice Scores", "Practice History", "Match v. Practice", "Match Summary", "Position Analysis", "Phase Analysis", "Practice Planner"])
         
-        # Build master list of distinct athletes across GPS and Jump datasets
+        # Build unified distinct list of names across all analytics components
         master_athlete_list = sorted(list(set(df['Name'].unique()) | set(cmj_df['Name'].unique()) | set(ash_df['Name'].unique()) | set(er_df['Name'].unique())))
         session_list = df[df['Session_Name'].notna()].sort_values('Date', ascending=False)['Session_Name'].unique().tolist()
 
@@ -273,11 +273,9 @@ if check_password():
                 curr_date_prof = p_row['Date'] if not p_row.empty else None
                 p_meta = p_row
 
-            # --- FALLBACK OBJECT FOR USERS WITH ONLY JUMP DATA ---
+            # --- FALLBACK GENERATION FOR ATHLETES LACKING GPS TRACKS ---
             if p_row.empty:
                 curr_date_prof = pd.to_datetime(target_date_str) if selected_session_prof == tournament_label else pd.to_datetime(df['Date'].max() if not df.empty else "2026-01-01")
-                
-                # Fetch fallback profile aesthetics from anywhere available
                 meta_lookup = df[df['Name'] == selected_athlete_prof]
                 pos_val = meta_lookup['Position'].iloc[0] if not meta_lookup.empty else "N/A"
                 photo_val = meta_lookup['PhotoURL'].iloc[0] if not meta_lookup.empty else "https://www.w3schools.com/howto/img_avatar.png"
@@ -349,32 +347,17 @@ if check_password():
                         </div>
                     """, unsafe_allow_html=True)
                 else:
-                    st.warning("No lower body baseline metric values calculated for context window thresholds.")
+                    st.warning("No baseline records found matching current testing threshold requirements.")
 
             with jc2:
                 if not p_cmj_hist.empty:
                     fig = make_subplots(specs=[[{"secondary_y": True}]])
-                    
-                    # Height trace with Line Labels
-                    fig.add_trace(go.Scatter(
-                        x=p_cmj_hist['Test Date'], y=p_cmj_hist[cmj_col], 
-                        name="Height", mode='lines+markers+text',
-                        text=p_cmj_hist[cmj_col].round(1), textposition="top center",
-                        line=dict(color='#FF8200', width=3)
-                    ), secondary_y=False)
-                    
-                    # RSI trace with Line Labels
-                    fig.add_trace(go.Scatter(
-                        x=p_cmj_hist['Test Date'], y=p_cmj_hist[rsi_col], 
-                        name="RSI", mode='lines+markers+text',
-                        text=p_cmj_hist[rsi_col].round(2), textposition="bottom center",
-                        line=dict(color='#4895DB', dash='dot', width=2)
-                    ), secondary_y=True)
-                    
-                    fig.update_layout(height=180, margin=dict(l=20, r=20, t=20, b=10), showlegend=False, template="simple_white")
+                    fig.add_trace(go.Scatter(x=p_cmj_hist['Test Date'], y=p_cmj_hist[cmj_col], name="Jump Height", mode='lines+markers', line=dict(color='#FF8200', width=3)), secondary_y=False)
+                    fig.add_trace(go.Scatter(x=p_cmj_hist['Test Date'], y=p_cmj_hist[rsi_col], name="RSI Modified", mode='lines+markers', line=dict(color='#4895DB', dash='dot', width=2)), secondary_y=True)
+                    fig.update_layout(height=160, margin=dict(l=0, r=0, t=10, b=0), showlegend=True, legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0), template="simple_white")
                     st.plotly_chart(fig, use_container_width=True, config=LOCKED_CONFIG, key="cmj_top_chart")
                 else:
-                    st.info("No Countermovement Jump history recorded for this profile configuration.")
+                    st.info("No Countermovement Jump metrics logged for this profile combination.")
 
             # --- BLOCK 2: UPPER BODY ISOMETRIC PROFILE (ASH TEST) ---
             st.markdown('<hr style="display:block !important; margin:15px 0; border:0; border-top:1px solid #E5E5E7;" />', unsafe_allow_html=True)
@@ -423,19 +406,9 @@ if check_password():
                     p_ash_i_only = p_ash_all[p_ash_all['Isometric Type'].str.contains('I', case=False, na=False)]
                     if not p_ash_i_only.empty:
                         fig_ash = go.Figure()
-                        fig_ash.add_trace(go.Scatter(
-                            x=p_ash_i_only['Test Date'], y=p_ash_i_only['Peak Vertical Force [N] (L)'], 
-                            name="Left I Force", mode='lines+markers+text',
-                            text=p_ash_i_only['Peak Vertical Force [N] (L)'].round(0), textposition="top left",
-                            line=dict(color='#4895DB', width=2.5)
-                        ))
-                        fig_ash.add_trace(go.Scatter(
-                            x=p_ash_i_only['Test Date'], y=p_ash_i_only['Peak Vertical Force [N] (R)'], 
-                            name="Right I Force", mode='lines+markers+text',
-                            text=p_ash_i_only['Peak Vertical Force [N] (R)'].round(0), textposition="bottom right",
-                            line=dict(color='#FF8200', width=2.5, dash='dash')
-                        ))
-                        fig_ash.update_layout(height=180, margin=dict(l=20, r=20, t=20, b=10), showlegend=False, template="simple_white")
+                        fig_ash.add_trace(go.Scatter(x=p_ash_i_only['Test Date'], y=p_ash_i_only['Peak Vertical Force [N] (L)'], name="Left Peak Force", mode='lines+markers', line=dict(color='#4895DB', width=2.5)))
+                        fig_ash.add_trace(go.Scatter(x=p_ash_i_only['Test Date'], y=p_ash_i_only['Peak Vertical Force [N] (R)'], name="Right Peak Force", mode='lines+markers', line=dict(color='#FF8200', width=2.5, dash='dash')))
+                        fig_ash.update_layout(height=160, margin=dict(l=0, r=0, t=10, b=0), showlegend=True, legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0), template="simple_white")
                         st.plotly_chart(fig_ash, use_container_width=True, config=LOCKED_CONFIG, key="ash_profile_chart")
             else:
                 st.info("No explicit ASH shoulder test dataset records parsed for this athlete.")
@@ -483,19 +456,9 @@ if check_password():
                         """, unsafe_allow_html=True)
                 with ec2:
                     fig_er = go.Figure()
-                    fig_er.add_trace(go.Scatter(
-                        x=p_er_hist['Test Date'], y=p_er_hist['L Max ROM (°)'], 
-                        name="Left ROM", mode='lines+markers+text',
-                        text=p_er_hist['L Max ROM (°)'].round(1), textposition="top left",
-                        line=dict(color='#4895DB', width=2.5)
-                    ))
-                    fig_er.add_trace(go.Scatter(
-                        x=p_er_hist['Test Date'], y=p_er_hist['R Max ROM (°)'], 
-                        name="Right ROM", mode='lines+markers+text',
-                        text=p_er_hist['R Max ROM (°)'].round(1), textposition="bottom right",
-                        line=dict(color='#FF8200', width=2.5, dash='dash')
-                    ))
-                    fig_er.update_layout(height=180, margin=dict(l=20, r=20, t=20, b=10), showlegend=False, template="simple_white")
+                    fig_er.add_trace(go.Scatter(x=p_er_hist['Test Date'], y=p_er_hist['L Max ROM (°)'], name="Left Max ROM", mode='lines+markers', line=dict(color='#4895DB', width=2.5)))
+                    fig_er.add_trace(go.Scatter(x=p_er_hist['Test Date'], y=p_er_hist['R Max ROM (°)'], name="Right Max ROM", mode='lines+markers', line=dict(color='#FF8200', width=2.5, dash='dash')))
+                    fig_er.update_layout(height=160, margin=dict(l=0, r=0, t=10, b=0), showlegend=True, legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0), template="simple_white")
                     st.plotly_chart(fig_er, use_container_width=True, config=LOCKED_CONFIG, key="er_profile_chart")
             else:
                 st.info("External Rotation logs recorded for this athlete profile.")
@@ -508,7 +471,7 @@ if check_password():
                 st.markdown('<div class="section-header">Practice Phase Analysis</div>', unsafe_allow_html=True)
                 fig_ph = make_subplots(specs=[[{"secondary_y": True}]])
                 fig_ph.add_trace(go.Bar(x=p_ph['Phase'], y=p_ph['Player Load'], name="Player Load", marker_color='#4895DB'), secondary_y=False)
-                fig_ph.add_trace(go.Scatter(x=p_ph['Phase'], y=p_ph['Total Jumps'], name="Total Jumps", line=dict(color='#FF8200', width=4), mode='lines+markers+text', text=p_ph['Total Jumps'].round(0), textposition="top center"), secondary_y=True)
+                fig_ph.add_trace(go.Scatter(x=p_ph['Phase'], y=p_ph['Total Jumps'], name="Total Jumps", line=dict(color='#FF8200', width=4), mode='lines+markers'), secondary_y=True)
                 fig_ph.update_layout(height=350, showlegend=True, template="simple_white", legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1), margin=dict(l=0, r=0, t=30, b=0))
                 fig_ph.update_yaxes(title_text="Player Load", secondary_y=False)
                 fig_ph.update_yaxes(title_text="Total Jumps", secondary_y=True)
@@ -661,19 +624,19 @@ if check_password():
                         </tr>"""
                     st.markdown(cmj_table_html + "</tbody></table>", unsafe_allow_html=True)
 
-                    # Kinetics & ROM Joint Coordinated Plot
+                    # Kinetics & ROM Joint Coordinated Plot (With Clean Legend Labels Enabled)
                     fig_cmj = make_subplots(specs=[[{"secondary_y": True}]])
                     if not ath_cmj.empty:
-                        fig_cmj.add_trace(go.Scatter(x=ath_cmj['Test Date'], y=ath_cmj[cmj_col], name="Jump Height (cm)", mode='lines+markers+text', text=ath_cmj[cmj_col].round(1), textposition="top center", line=dict(color='#4895DB', width=3)), secondary_y=False)
+                        fig_cmj.add_trace(go.Scatter(x=ath_cmj['Test Date'], y=ath_cmj[cmj_col], name="Jump Height (cm)", mode='lines+markers', line=dict(color='#4895DB', width=3)), secondary_y=False)
                     if not ath_ash.empty:
                         ash_i_plot = ath_ash[ath_ash['Isometric Type'].str.contains('I', case=False, na=False)]
                         if not ash_i_plot.empty:
-                            fig_cmj.add_trace(go.Scatter(x=ash_i_plot['Test Date'], y=ash_i_plot['Peak Vertical Force [N] (L)'], name="ASH Left Force (N)", mode='lines+markers+text', text=ash_i_plot['Peak Vertical Force [N] (L)'].round(0), textposition="bottom center", line=dict(color='#FF8200', width=2)), secondary_y=False)
+                            fig_cmj.add_trace(go.Scatter(x=ash_i_plot['Test Date'], y=ash_i_plot['Peak Vertical Force [N] (L)'], name="ASH Left Force (N)", mode='lines+markers', line=dict(color='#FF8200', width=2)), secondary_y=False)
                     if not ath_er.empty:
-                        fig_cmj.add_trace(go.Scatter(x=ath_er['Test Date'], y=ath_er['L Max ROM (°)'], name="ER Left ROM (°)", mode='lines+markers+text', text=ath_er['L Max ROM (°)'].round(1), textposition="top left", line=dict(color='#A52A2A', width=2)), secondary_y=True)
+                        fig_cmj.add_trace(go.Scatter(x=ath_er['Test Date'], y=ath_er['L Max ROM (°)'], name="ER Left ROM (°)", mode='lines+markers', line=dict(color='#A52A2A', width=2)), secondary_y=True)
                     
-                    fig_cmj.add_hline(y=base_row[cmj_col], line_dash="dash", line_color="red")
-                    fig_cmj.update_layout(height=380, template="simple_white", legend=dict(orientation="h", y=-0.3, x=0.5, xanchor="center"))
+                    fig_cmj.add_hline(y=base_row[cmj_col], line_dash="dash", line_color="red", name="Baseline Jump Height")
+                    fig_cmj.update_layout(height=380, template="simple_white", showlegend=True, legend=dict(orientation="h", y=-0.3, x=0.5, xanchor="center"))
                     st.plotly_chart(fig_cmj, use_container_width=True)
 
             with sub_tabs[1]:
