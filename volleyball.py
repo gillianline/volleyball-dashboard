@@ -1329,7 +1329,7 @@ if check_password():
                 merged_comp['Peak Change (%)'] = ((merged_comp['Summer Peak'] - merged_comp[target_spring_col]) / merged_comp[target_spring_col] * 100).fillna(0)
                 
                 # Render Clean HTML Grid Row Blocks
-                st.markdown(f"### Spring v. Summer({comp_metric_label})")
+                st.markdown(f"### Rostered Workload Delta ({comp_metric_label})")
                 
                 tbl_html = f"""<table class="scout-table">
                     <thead>
@@ -1359,8 +1359,8 @@ if check_password():
                 st.divider()
                 
                 # 6. Summer Practice Cards Graded against Spring Benchmarks
-                st.markdown("### Summer Session Scores")
-                target_ath_comp = st.selectbox("Select Athlete for Session Breakdown", sorted(merged_comp['Name'].unique()), key="ss_ath_select")
+                st.markdown("### Summer Session Review Cards")
+                target_ath_comp = st.selectbox("Select Target Athlete for Session Breakdown", sorted(merged_comp['Name'].unique()), key="ss_ath_select")
                 
                 # Flat reference check to extract metadata metrics
                 meta_rows = full_df_unfiltered[full_df_unfiltered['Name'] == target_ath_comp]
@@ -1438,3 +1438,7 @@ if check_password():
                                             </div>
                                         </div>
                                     """, unsafe_allow_html=True)
+
+    # --- SCRIPT-WIDE ERROR AND PASSWORD CLOSURES ---
+    except Exception as e:
+        st.error(f"Sync Error: {e}")
