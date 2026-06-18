@@ -1419,13 +1419,13 @@ if check_password():
                                                 <div style="flex:3;">
                                                     <table class="scout-table">
                                                         <thead>
-                                                            <tr><th>Metric</th><th>Volume</th><th>Spring Max</th><th>Benchmark %</th></tr>
+                                                            <tr><th>Metric</th><th>Volume</th><th>Spring Max</th><th>Shift vs Max</th></tr>
                                                         </thead>
                                                         <tbody>
-                                                            <tr><td>Player Load</td><td>{row_day['Player Load']:.1f}</td><td>{b_load:.1f}</td><td>{g_load}% ({load_diff:+.0f}%)</td></tr>
-                                                            <tr><td>Total Jumps</td><td>{int(row_day['Total Jumps'])}</td><td>{int(b_jumps)}</td><td>{g_jumps}% ({jumps_diff:+.0f}%)</td></tr>
-                                                            <tr><td>Explosive Efforts</td><td>{int(row_day['Explosive Efforts'])}</td><td>{int(b_efforts)}</td><td>{g_efforts}% ({efforts_diff:+.0f}%)</td></tr>
-                                                            <tr><td>Est. Distance (y)</td><td>{row_day['Estimated Distance (y)']:.1f}</td><td>{b_dist:.1f}</td><td>{g_dist}% ({dist_diff:+.0f}%)</td></tr>
+                                                            <tr><td>Player Load</td><td>{row_day['Player Load']:.1f}</td><td>{b_load:.1f}</td><td style="font-weight:bold;">{load_diff:+.0f}%</td></tr>
+                                                            <tr><td>Total Jumps</td><td>{int(row_day['Total Jumps'])}</td><td>{int(b_jumps)}</td><td style="font-weight:bold;">{jumps_diff:+.0f}%</td></tr>
+                                                            <tr><td>Explosive Efforts</td><td>{int(row_day['Explosive Efforts'])}</td><td>{int(b_efforts)}</td><td style="font-weight:bold;">{efforts_diff:+.0f}%</td></tr>
+                                                            <tr><td>Est. Distance (y)</td><td>{row_day['Estimated Distance (y)']:.1f}</td><td>{b_dist:.1f}</td><td style="font-weight:bold;">{dist_diff:+.0f}%</td></tr>
                                                         </tbody>
                                                     </table>
                                                 </div>
