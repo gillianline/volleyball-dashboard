@@ -1283,7 +1283,7 @@ if check_password():
                                     st.info(f"**{name}**: No data for Week {sel_week}")
 
 
-       # =========================================================================
+        # =========================================================================
         # NEW TAB 8: SPRING V. SUMMER PRACTICES
         # =========================================================================
         with tabs[8]:
@@ -1364,7 +1364,7 @@ if check_password():
                 st.markdown("### Summer Session Review Cards")
                 target_ath_comp = st.selectbox("Select Target Athlete for Session Breakdown", sorted(merged_comp['Name'].unique()), key="ss_ath_select")
                 
-                # Inline protection loop to secure individual metadata elements safely
+                # Safe, flat lookup for metadata elements without nested syntax danger
                 meta_rows = full_df_unfiltered[full_df_unfiltered['Name'] == target_ath_comp]
                 if not meta_rows.empty:
                     correct_photo = meta_rows.iloc[0].get('PhotoURL', "https://www.w3schools.com/howto/img_avatar.png")
