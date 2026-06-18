@@ -1154,7 +1154,7 @@ if check_password():
                 fig_master.update_layout(
                     template="simple_white", height=480, xaxis=dict(type='category', title="Date"), 
                     yaxis=dict(range=[0, 120], automargin=True, tickvals=[0, 20, 40, 60, 80, 100]),
-                    legend=dict(orientation="h", y=-0.2, x=0.5, xanchor="center")
+                    legend=dict(orientation="h", yanchor="bottom", y=-0.2, x=0.5, xanchor="center")
                 )
                 st.plotly_chart(fig_master, use_container_width=True, key=f"master_full_flow_{sel_ath_hist}")
 
@@ -1226,7 +1226,7 @@ if check_password():
                         
                         fig_cmj.update_layout(
                             height=400, template="simple_white", margin=dict(l=10, r=10, t=30, b=10),
-                            legend=dict(orientation="h", y=-0.3, x=0.5, xanchor="center"), xaxis=dict(title="Date", tickformat="%m/%d")
+                            legend=dict(orientation="h", yanchor="bottom", y=-0.3, x=0.5, xanchor="center"), xaxis=dict(title="Date", tickformat="%m/%d")
                         )
                         fig_cmj.update_yaxes(title_text="Height (cm)", secondary_y=False)
                         fig_cmj.update_yaxes(title_text="RSI-mod", secondary_y=True)
@@ -1289,14 +1289,12 @@ if check_password():
         with tabs[8]:
             st.markdown('<div class="section-header">Spring Benchmarks vs. Summer Development</div>', unsafe_allow_html=True)
             
-            # 1. Filter raw data out into precise Season datasets (isolated from global toggle)
+            # 1. Filter raw data out into precise Season datasets
             spring_gps = full_df_unfiltered[(full_df_unfiltered['Season'] == 'Spring') & (full_df_unfiltered['Session_Type'] == 'Practice')].copy()
             summer_gps = full_df_unfiltered[(full_df_unfiltered['Season'] == 'Summer') & (full_df_unfiltered['Session_Type'] == 'Practice')].copy()
             
-            if spring_gps.empty:
-                st.warning("No Spring Practice datasets discovered to establish benchmarks.")
-            elif summer_gps.empty:
-                st.info("No Summer practices loaded yet to generate comparison trends.")
+            if spring_gps.empty or summer_gps.empty:
+                st.warning("Data check: Ensure both Spring and Summer practice records are loaded to generate card pairings.")
             else:
                 # 2. Extract every single single-day volume total per athlete
                 spring_daily = spring_gps.groupby(['Name', 'Date'])[['Player Load', 'Total Jumps', 'Explosive Efforts']].sum().reset_index()
@@ -1322,9 +1320,7 @@ if check_password():
                 target_spring_col = spring_col_map[comp_metric_label]
                 
                 # 5. Build Aggregated Grid Overview Table
-                summer_summary = summer_daily.groupby('Name').agg({
-                    comp_metric_label: ['max', 'mean']
-                }).reset_index()
+                summer_summary = summer_daily.groupby('Name').agg({comp_metric_label: ['max', 'mean']}).reset_index()
                 summer_summary.columns = ['Name', 'Summer Peak', 'Summer Avg']
                 
                 merged_comp = pd.merge(spring_peaks[['Name', target_spring_col]], summer_summary, on='Name', how='inner')
@@ -1364,20 +1360,21 @@ if check_password():
                 st.markdown("### Summer Session Review Cards")
                 target_ath_comp = st.selectbox("Select Target Athlete for Session Breakdown", sorted(merged_comp['Name'].unique()), key="ss_ath_select")
                 
-                # Safe, flat lookup for metadata elements without nested syntax danger
+                # Flat reference check to extract metadata metrics
                 meta_rows = full_df_unfiltered[full_df_unfiltered['Name'] == target_ath_comp]
+                correct_photo = "https://www.w3schools.com/howto/img_avatar.png"
+                pos_label = "N/A"
                 if not meta_rows.empty:
                     correct_photo = meta_rows.iloc[0].get('PhotoURL', "https://www.w3schools.com/howto/img_avatar.png")
                     pos_label = meta_rows.iloc[0].get('Position', "N/A")
-                else:
-                    correct_photo = "https://www.w3schools.com/howto/img_avatar.png"
-                    pos_label = "N/A"
 
                 # Pull benchmarks
                 ath_benchmarks = spring_peaks[spring_peaks['Name'] == target_ath_comp]
                 ath_summer_days = summer_daily[summer_daily['Name'] == target_ath_comp].sort_values('Date', ascending=False)
                 
-                if not ath_benchmarks.empty and not ath_summer_days.empty:
+                if ath_benchmarks.empty or ath_summer_days.empty:
+                    st.info(f"Insufficient historical data pairings found to build benchmarks for {target_ath_comp}.")
+                else:
                     b_load = ath_benchmarks.iloc[0]['Spring Peak Load']
                     b_jumps = ath_benchmarks.iloc[0]['Spring Peak Jumps']
                     b_efforts = ath_benchmarks.iloc[0]['Spring Peak Efforts']
@@ -1435,5 +1432,6 @@ if check_password():
                                             </div>
                                         </div>
                                     """, unsafe_allow_html=True)
-                else:
-                    st.info(f"Insufficient historical data pairings found to build benchmarks for {target_ath_comp}.")
+
+    except Exception as e:
+        st.error(f"Sync Error: {e}")
