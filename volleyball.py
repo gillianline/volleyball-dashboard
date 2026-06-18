@@ -461,7 +461,7 @@ if check_password():
                     fig_er.update_layout(height=160, margin=dict(l=0, r=0, t=10, b=0), showlegend=True, legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0), template="simple_white")
                     st.plotly_chart(fig_er, use_container_width=True, config=LOCKED_CONFIG, key="er_profile_chart")
             else:
-                st.info("External Rotation logs recorded for this athlete profile.")
+                st.info("No External Rotation logs recorded.")
 
             st.divider()
 
