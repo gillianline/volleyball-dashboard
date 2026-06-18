@@ -342,7 +342,7 @@ if check_password():
                         </div>
                     """, unsafe_allow_html=True)
                 else:
-                    st.warning("No baseline records found matching current testing threshold requirements.")
+                    st.warning("No data recorded.")
 
             with jc2:
                 if not p_cmj_hist.empty:
@@ -352,7 +352,7 @@ if check_password():
                     fig.update_layout(height=160, margin=dict(l=0, r=0, t=10, b=0), showlegend=True, legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0), template="simple_white")
                     st.plotly_chart(fig, use_container_width=True, config=LOCKED_CONFIG, key="cmj_top_chart")
                 else:
-                    st.info("No Countermovement Jump metrics logged for this profile combination.")
+                    st.info("No Countermovement Jump metrics recorded.")
 
             # --- BLOCK 2: UPPER BODY ISOMETRIC PROFILE (ASH TEST) ---
             st.markdown('<hr style="display:block !important; margin:15px 0; border:0; border-top:1px solid #E5E5E7;" />', unsafe_allow_html=True)
@@ -406,7 +406,7 @@ if check_password():
                         fig_ash.update_layout(height=160, margin=dict(l=0, r=0, t=10, b=0), showlegend=True, legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0), template="simple_white")
                         st.plotly_chart(fig_ash, use_container_width=True, config=LOCKED_CONFIG, key="ash_profile_chart")
             else:
-                st.info("No explicit ASH shoulder test dataset records parsed for this athlete.")
+                st.info("No ASH shoulder test dataset recorded.")
 
             # --- BLOCK 3: ROTATOR CUFF EXTERNAL ROTATION ROM ---
             st.markdown('<hr style="display:block !important; margin:15px 0; border:0; border-top:1px solid #E5E5E7;" />', unsafe_allow_html=True)
