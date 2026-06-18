@@ -1296,26 +1296,28 @@ if check_password():
             if spring_gps.empty or summer_gps.empty:
                 st.warning("Data check: Ensure both Spring and Summer practice records are loaded to generate card pairings.")
             else:
-                # 2. Extract every single single-day volume total per athlete
-                spring_daily = spring_gps.groupby(['Name', 'Date'])[['Player Load', 'Total Jumps', 'Explosive Efforts']].sum().reset_index()
-                summer_daily = summer_gps.groupby(['Name', 'Date'])[['Player Load', 'Total Jumps', 'Explosive Efforts', 'Session_Name']].agg({
+                # 2. Extract every single single-day volume total per athlete (Including Distance)
+                spring_daily = spring_gps.groupby(['Name', 'Date'])[['Player Load', 'Total Jumps', 'Explosive Efforts', 'Estimated Distance (y)']].sum().reset_index()
+                summer_daily = summer_gps.groupby(['Name', 'Date'])[['Player Load', 'Total Jumps', 'Explosive Efforts', 'Estimated Distance (y)', 'Session_Name']].agg({
                     'Player Load': 'sum',
                     'Total Jumps': 'sum',
                     'Explosive Efforts': 'sum',
+                    'Estimated Distance (y)': 'sum',
                     'Session_Name': lambda x: ' | '.join(x.astype(str).unique())
                 }).reset_index()
                 
                 # 3. Pull the Absolute Highest Day across each metric during Spring (The Benchmarks)
-                spring_peaks = spring_daily.groupby('Name')[['Player Load', 'Total Jumps', 'Explosive Efforts']].max().reset_index()
-                spring_peaks.columns = ['Name', 'Spring Peak Load', 'Spring Peak Jumps', 'Spring Peak Efforts']
+                spring_peaks = spring_daily.groupby('Name')[['Player Load', 'Total Jumps', 'Explosive Efforts', 'Estimated Distance (y)']].max().reset_index()
+                spring_peaks.columns = ['Name', 'Spring Peak Load', 'Spring Peak Jumps', 'Spring Peak Efforts', 'Spring Peak Distance']
                 
                 # 4. Metric Selectors
-                comp_metric_label = st.selectbox("Select Core Vector to Compare", ["Player Load", "Total Jumps", "Explosive Efforts"], key="ss_metric_select")
+                comp_metric_label = st.selectbox("Select Core Vector to Compare", ["Player Load", "Total Jumps", "Explosive Efforts", "Estimated Distance (y)"], key="ss_metric_select")
                 
                 spring_col_map = {
                     "Player Load": "Spring Peak Load",
                     "Total Jumps": "Spring Peak Jumps",
-                    "Explosive Efforts": "Spring Peak Efforts"
+                    "Explosive Efforts": "Spring Peak Efforts",
+                    "Estimated Distance (y)": "Spring Peak Distance"
                 }
                 target_spring_col = spring_col_map[comp_metric_label]
                 
@@ -1327,7 +1329,7 @@ if check_password():
                 merged_comp['Peak Change (%)'] = ((merged_comp['Summer Peak'] - merged_comp[target_spring_col]) / merged_comp[target_spring_col] * 100).fillna(0)
                 
                 # Render Clean HTML Grid Row Blocks
-                st.markdown(f"### Rostered Workload Delta ({comp_metric_label})")
+                st.markdown(f"### Spring v. Summer({comp_metric_label})")
                 
                 tbl_html = f"""<table class="scout-table">
                     <thead>
@@ -1357,8 +1359,8 @@ if check_password():
                 st.divider()
                 
                 # 6. Summer Practice Cards Graded against Spring Benchmarks
-                st.markdown("### Summer Session Review Cards")
-                target_ath_comp = st.selectbox("Select Target Athlete for Session Breakdown", sorted(merged_comp['Name'].unique()), key="ss_ath_select")
+                st.markdown("### Summer Session Scores")
+                target_ath_comp = st.selectbox("Select Athlete for Session Breakdown", sorted(merged_comp['Name'].unique()), key="ss_ath_select")
                 
                 # Flat reference check to extract metadata metrics
                 meta_rows = full_df_unfiltered[full_df_unfiltered['Name'] == target_ath_comp]
@@ -1378,6 +1380,7 @@ if check_password():
                     b_load = ath_benchmarks.iloc[0]['Spring Peak Load']
                     b_jumps = ath_benchmarks.iloc[0]['Spring Peak Jumps']
                     b_efforts = ath_benchmarks.iloc[0]['Spring Peak Efforts']
+                    b_dist = ath_benchmarks.iloc[0]['Spring Peak Distance']
                     
                     # Split cards layout systematically into 2-wide blocks
                     ath_days_list = ath_summer_days.to_dict('records')
@@ -1391,14 +1394,16 @@ if check_password():
                                 g_load = math.ceil((row_day['Player Load'] / b_load) * 100) if b_load > 0 else 0
                                 g_jumps = math.ceil((row_day['Total Jumps'] / b_jumps) * 100) if b_jumps > 0 else 0
                                 g_efforts = math.ceil((row_day['Explosive Efforts'] / b_efforts) * 100) if b_efforts > 0 else 0
+                                g_dist = math.ceil((row_day['Estimated Distance (y)'] / b_dist) * 100) if b_dist > 0 else 0
                                 
-                                # Combined summary session grade
-                                total_session_score = math.ceil((g_load + g_jumps + g_efforts) / 3)
+                                # Combined summary session grade (now balancing all 4 parameters)
+                                total_session_score = math.ceil((g_load + g_jumps + g_efforts + g_dist) / 4)
                                 
                                 # Build row text elements with quick percentage change hints against the baseline
                                 load_diff = ((row_day['Player Load'] - b_load) / b_load) * 100 if b_load > 0 else 0
                                 jumps_diff = ((row_day['Total Jumps'] - b_jumps) / b_jumps) * 100 if b_jumps > 0 else 0
                                 efforts_diff = ((row_day['Explosive Efforts'] - b_efforts) / b_efforts) * 100 if b_efforts > 0 else 0
+                                dist_diff = ((row_day['Estimated Distance (y)'] - b_dist) / b_dist) * 100 if b_dist > 0 else 0
                                 
                                 with card_cols[col_offset]:
                                     st.markdown(f"""
@@ -1420,6 +1425,7 @@ if check_password():
                                                             <tr><td>Player Load</td><td>{row_day['Player Load']:.1f}</td><td>{b_load:.1f}</td><td>{g_load}% ({load_diff:+.0f}%)</td></tr>
                                                             <tr><td>Total Jumps</td><td>{int(row_day['Total Jumps'])}</td><td>{int(b_jumps)}</td><td>{g_jumps}% ({jumps_diff:+.0f}%)</td></tr>
                                                             <tr><td>Explosive Efforts</td><td>{int(row_day['Explosive Efforts'])}</td><td>{int(b_efforts)}</td><td>{g_efforts}% ({efforts_diff:+.0f}%)</td></tr>
+                                                            <tr><td>Est. Distance (y)</td><td>{row_day['Estimated Distance (y)']:.1f}</td><td>{b_dist:.1f}</td><td>{g_dist}% ({dist_diff:+.0f}%)</td></tr>
                                                         </tbody>
                                                     </table>
                                                 </div>
@@ -1432,6 +1438,3 @@ if check_password():
                                             </div>
                                         </div>
                                     """, unsafe_allow_html=True)
-
-    except Exception as e:
-        st.error(f"Sync Error: {e}")
