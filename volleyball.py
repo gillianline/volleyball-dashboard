@@ -313,7 +313,7 @@ if check_password():
                         latest_cmj = p_cmj_hist.iloc[-1]
                         cur_h, cur_rsi = latest_cmj[cmj_col], latest_cmj[rsi_col]
                         p_diff = ((cur_h - base_h) / base_h) * 100 if base_h > 0 else 0
-                        label, color = ("ELITE", "#28a745") if cur_h >= base_h and cur_rsi >= base_rsi else ("FATIGUED", "#dc3545") if cur_h < base_h and cur_rsi < base_rsi else ("GRINDER", "#ffc107")
+                        label, color = (" ", "#28a745") if cur_h >= base_h and cur_rsi >= base_rsi else (" ", "#dc3545") if cur_h < base_h and cur_rsi < base_rsi else (" ", "#ffc107")
 
                         st.markdown(f"""
                             <div style="text-align:center;">
@@ -364,7 +364,7 @@ if check_password():
                         pct_r = ((ri - base_ri) / base_ri * 100) if base_ri > 0 else 0
                         ash_avg_diff = (pct_l + pct_r) / 2
                         
-                        label_ash, color_ash = ("ELITE", "#28a745") if ash_avg_diff >= 0 and abs(asym_i) <= 10 else ("FATIGUED", "#dc3545") if ash_avg_diff < -8 else ("GRINDER", "#ffc107")
+                        label_ash, color_ash = (" ", "#28a745") if ash_avg_diff >= 0 and abs(asym_i) <= 10 else (" ", "#dc3545") if ash_avg_diff < -8 else (" ", "#ffc107")
 
                         st.markdown(f"""
                             <div style="text-align:center;">
@@ -416,7 +416,7 @@ if check_password():
                             rom_pct_r = ((cur_r_rom - base_r_rom) / base_r_rom * 100) if base_r_rom > 0 else 0
                             er_avg_diff = (rom_pct_l + rom_pct_r) / 2
                             
-                            label_er, color_er = ("ELITE", "#28a745") if er_avg_diff >= 0 and abs(cur_asym_rom) <= 10 else ("FATIGUED", "#dc3545") if er_avg_diff < -6 else ("GRINDER", "#ffc107")
+                            label_er, color_er = (" ", "#28a745") if er_avg_diff >= 0 and abs(cur_asym_rom) <= 10 else (" ", "#dc3545") if er_avg_diff < -6 else (" ", "#ffc107")
                             
                             st.markdown(f"""
                                 <div style="text-align:center;">
