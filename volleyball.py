@@ -347,7 +347,7 @@ if check_password():
                         </div>
                     """, unsafe_allow_html=True)
                 else:
-                    st.warning("No baseline records found matching current testing threshold requirements.")
+                    st.warning("No records logged.")
 
             with jc2:
                 if not p_cmj_hist.empty:
@@ -357,7 +357,7 @@ if check_password():
                     fig.update_layout(height=160, margin=dict(l=0, r=0, t=10, b=0), showlegend=True, legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0), template="simple_white")
                     st.plotly_chart(fig, use_container_width=True, config=LOCKED_CONFIG, key="cmj_top_chart")
                 else:
-                    st.info("No Countermovement Jump metrics logged for this profile combination.")
+                    st.info("No Countermovement Jump metrics logged.")
 
             # --- BLOCK 2: UPPER BODY ISOMETRIC PROFILE (ASH TEST) ---
             st.markdown('<hr style="display:block !important; margin:15px 0; border:0; border-top:1px solid #E5E5E7;" />', unsafe_allow_html=True)
@@ -411,7 +411,7 @@ if check_password():
                         fig_ash.update_layout(height=160, margin=dict(l=0, r=0, t=10, b=0), showlegend=True, legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0), template="simple_white")
                         st.plotly_chart(fig_ash, use_container_width=True, config=LOCKED_CONFIG, key="ash_profile_chart")
             else:
-                st.info("No explicit ASH shoulder test dataset records parsed for this athlete.")
+                st.info("No ASH shoulder test records logged.")
 
             # --- BLOCK 3: ROTATOR CUFF EXTERNAL ROTATION ROM ---
             st.markdown('<hr style="display:block !important; margin:15px 0; border:0; border-top:1px solid #E5E5E7;" />', unsafe_allow_html=True)
@@ -558,7 +558,7 @@ if check_password():
                         fig_master.update_layout(template="simple_white", height=380, legend=dict(orientation="h", y=-0.2, x=0.5, xanchor="center"))
                         st.plotly_chart(fig_master, use_container_width=True)
                 else:
-                    st.info("No timeline track history found inside active tracker fields for selected name context.")
+                    st.info("No data logged.")
 
                 # --- MULTI-SHEET TIMELINE ALIGNMENT FOR HISTORICAL READINESS ---
                 st.markdown("### Combined Lower & Upper Body Kinetics History")
