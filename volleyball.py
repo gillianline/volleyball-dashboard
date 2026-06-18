@@ -202,7 +202,7 @@ if check_password():
             
         return df.dropna(subset=['Date']), match_df.dropna(subset=['Date']), cmj_df, phase_df, thresh_df, ash_df, er_df
 
-    LOCKED_CONFIG = {'staticPlot': True, 'displayModeBar': False}
+    LOCKED_CONFIG = {'staticPlot': False, 'displayModeBar': False}
 
     try:
         df, match_df, cmj_df, phase_df, thresh_df, ash_df, er_df = load_all_data()
@@ -231,6 +231,9 @@ if check_password():
         st.markdown('<div class="main-logo-container" style="text-align: center; margin-top: 10px; margin-bottom: 15px;"><img src="https://upload.wikimedia.org/wikipedia/commons/thumb/f/fc/Tennessee_Lady_Volunteers_logo.svg/1280px-Tennessee_Lady_Volunteers_logo.svg.png" width="120"><div style="color: #FF8200; font-size: 2rem; font-weight: 900; margin-top: 10px;">LADY VOLS VOLLEYBALL PERFORMANCE</div></div>', unsafe_allow_html=True)
 
         tabs = st.tabs(["Individual Profile", "Practice Scores", "Practice History", "Match v. Practice", "Match Summary", "Position Analysis", "Phase Analysis", "Practice Planner"])
+        
+        # Build master list of distinct athletes across GPS and Jump datasets
+        master_athlete_list = sorted(list(set(df['Name'].unique()) | set(cmj_df['Name'].unique()) | set(ash_df['Name'].unique()) | set(er_df['Name'].unique())))
         session_list = df[df['Session_Name'].notna()].sort_values('Date', ascending=False)['Session_Name'].unique().tolist()
 
         with tabs[0]: # Tab 0: Individual Profile
@@ -240,17 +243,24 @@ if check_password():
             clean_session_list_prof = []
             tourney_added_prof = False
             for s in session_list:
-                s_date = df[df['Session_Name'] == s]['Date'].dt.strftime('%Y-%m-%d').iloc[0]
-                if s_date == target_date_str:
-                    if not tourney_added_prof:
-                        clean_session_list_prof.append(tournament_label)
-                        tourney_added_prof = True
+                s_date_series = df[df['Session_Name'] == s]['Date']
+                if not s_date_series.empty:
+                    s_date = s_date_series.dt.strftime('%Y-%m-%d').iloc[0]
+                    if s_date == target_date_str:
+                        if not tourney_added_prof:
+                            clean_session_list_prof.append(tournament_label)
+                            tourney_added_prof = True
+                    else:
+                        clean_session_list_prof.append(s)
                 else:
                     clean_session_list_prof.append(s)
+            
+            if not clean_session_list_prof:
+                clean_session_list_prof = [tournament_label]
 
             c_prof1, c_prof2 = st.columns(2)
             with c_prof1: selected_session_prof = st.selectbox("Session Selection", clean_session_list_prof, index=0, key="nav_sel_prof")
-            with c_prof2: selected_athlete_prof = st.selectbox("Athlete Selection", sorted(df['Name'].unique()), key="nav_ath_prof")
+            with c_prof2: selected_athlete_prof = st.selectbox("Athlete Selection", master_athlete_list, key="nav_ath_prof")
 
             if selected_session_prof == tournament_label:
                 curr_date_prof = pd.to_datetime(target_date_str)
@@ -263,195 +273,246 @@ if check_password():
                 curr_date_prof = p_row['Date'] if not p_row.empty else None
                 p_meta = p_row
 
-            if not p_row.empty:
-                p_full_prof = df[df['Name'] == selected_athlete_prof]
-                daily_sums_prof = p_full_prof.groupby('Date')[all_metrics].sum().reset_index()
-                lb_prof = daily_sums_prof[(daily_sums_prof['Date'] >= pd.to_datetime(curr_date_prof) - timedelta(days=30)) & (daily_sums_prof['Date'] <= pd.to_datetime(curr_date_prof))]
-
-                filtered_metrics_prof = [m for m in all_metrics if m not in ['High Jumps', 'Moderate Jumps', 'High Intensity Movement']]
-                r_html_prof = ""; t_grade_prof = 0; c_metrics_prof = 0
-
-                for k in filtered_metrics_prof:
-                    val = p_row[k]
-                    mx = lb_prof[k].max() if not lb_prof[k].empty else 1
-                    avg = lb_prof[k].mean() if not lb_prof[k].empty else 1
-                    g = math.ceil((val / mx) * 100) if mx > 0 else 0
-                    t_grade_prof += g; c_metrics_prof += 1
-                    diff = (val - avg) / avg if avg != 0 else 0
-                    h_class = "class='bg-highlight-red'" if abs(diff) > 0.10 else ""
-                    arr_val = f"<span class='arrow-red'>{'↑' if diff > 0.10 else '↓'}</span>" if abs(diff) > 0.10 else ""
-                    r_html_prof += f"<tr><td>{k}</td><td {h_class}>{val:.1f} {arr_val}</td><td>{mx:.1f}</td><td>{g}</td></tr>"
-
-                sc_prof = math.ceil(t_grade_prof / c_metrics_prof) if c_metrics_prof > 0 else 0
-
-                c1, c2, c3 = st.columns([1.2, 2.5, 1.2])
-                with c1: st.markdown(f'<div style="text-align:center;"><img src="{p_meta["PhotoURL"]}" class="player-photo-large"></div><h3 style="text-align:center;">{p_meta["Name"]}</h3>', unsafe_allow_html=True)
-                with c2: st.markdown(f'<table class="scout-table"><thead><tr><th>Metric</th><th>Today Total</th><th>30d Max Day</th><th>Grade</th></tr></thead><tbody>{r_html_prof}</tbody></table>', unsafe_allow_html=True)
-                with c3: st.markdown(f'<div style="display:flex; justify-content:center;"><div class="score-box" style="background-color:{get_flipped_gradient(sc_prof)};">{sc_prof}</div></div><p style="text-align:center; font-weight:bold; color:grey; margin-top:10px;">SESSION SCORE</p>', unsafe_allow_html=True)
+            # --- FALLBACK OBJECT FOR USERS WITH ONLY JUMP DATA ---
+            if p_row.empty:
+                curr_date_prof = pd.to_datetime(target_date_str) if selected_session_prof == tournament_label else pd.to_datetime(df['Date'].max() if not df.empty else "2026-01-01")
                 
-                # =========================================================================
-                # --- WEEKLY READINESS PROFILE MATRICES STACK ---
-                # =========================================================================
-                st.markdown('<div class="section-header">Weekly Readiness Profile</div>', unsafe_allow_html=True)
+                # Fetch fallback profile aesthetics from anywhere available
+                meta_lookup = df[df['Name'] == selected_athlete_prof]
+                pos_val = meta_lookup['Position'].iloc[0] if not meta_lookup.empty else "N/A"
+                photo_val = meta_lookup['PhotoURL'].iloc[0] if not meta_lookup.empty else "https://www.w3schools.com/howto/img_avatar.png"
                 
-                # --- BLOCK 1: LOWER BODY JUMP PROFILE (CMJ) ---
-                st.markdown('<h4 style="color:#4895DB; font-weight:800; margin-bottom:5px;">LOWER BODY: COUNTERMOVEMENT JUMP</h4>', unsafe_allow_html=True)
-                jc1, jc2 = st.columns([1.5, 3.5])
-                p_cmj_hist = cmj_df[(cmj_df['Name'] == selected_athlete_prof) & (cmj_df['Test Date'] <= curr_date_prof)].sort_values('Test Date')
-                cmj_col = 'Jump Height (Imp-Mom) [cm]'
-                rsi_col = 'RSI-modified [m/s]'
+                p_meta = pd.Series({'Name': selected_athlete_prof, 'Position': pos_val, 'PhotoURL': photo_val})
+                p_row = pd.Series({m: 0.0 for m in all_metrics})
+                p_row['Name'] = selected_athlete_prof
 
-                with jc1:
-                    if selected_season == 'Summer':
-                        baseline_cmj = p_cmj_hist[p_cmj_hist['Season'] == 'Summer'].head(1)
-                    else:
-                        baseline_cmj = cmj_df[(cmj_df['Name'] == selected_athlete_prof) & (cmj_df['Week'] == 4)]
+            p_full_prof = df[df['Name'] == selected_athlete_prof]
+            daily_sums_prof = p_full_prof.groupby('Date')[all_metrics].sum().reset_index()
+            lb_prof = daily_sums_prof[(daily_sums_prof['Date'] >= pd.to_datetime(curr_date_prof) - timedelta(days=30)) & (daily_sums_prof['Date'] <= pd.to_datetime(curr_date_prof))]
+
+            filtered_metrics_prof = [m for m in all_metrics if m not in ['High Jumps', 'Moderate Jumps', 'High Intensity Movement']]
+            r_html_prof = ""; t_grade_prof = 0; c_metrics_prof = 0
+
+            for k in filtered_metrics_prof:
+                val = p_row.get(k, 0.0)
+                mx = lb_prof[k].max() if (not lb_prof.empty and k in lb_prof.columns and lb_prof[k].max() > 0) else 1.0
+                avg = lb_prof[k].mean() if (not lb_prof.empty and k in lb_prof.columns and lb_prof[k].mean() > 0) else 1.0
+                g = math.ceil((val / mx) * 100) if mx > 0 else 0
+                t_grade_prof += g; c_metrics_prof += 1
+                diff = (val - avg) / avg if avg != 0 else 0
+                h_class = "class='bg-highlight-red'" if abs(diff) > 0.10 else ""
+                arr_val = f"<span class='arrow-red'>{'↑' if diff > 0.10 else '↓'}</span>" if abs(diff) > 0.10 else ""
+                r_html_prof += f"<tr><td>{k}</td><td {h_class}>{val:.1f} {arr_val}</td><td>{mx:.1f}</td><td>{g}</td></tr>"
+
+            sc_prof = math.ceil(t_grade_prof / c_metrics_prof) if c_metrics_prof > 0 else 0
+
+            c1, c2, c3 = st.columns([1.2, 2.5, 1.2])
+            with c1: st.markdown(f'<div style="text-align:center;"><img src="{p_meta.get("PhotoURL", "https://www.w3schools.com/howto/img_avatar.png")}" class="player-photo-large"></div><h3 style="text-align:center;">{p_meta.get("Name", selected_athlete_prof)}</h3>', unsafe_allow_html=True)
+            with c2: st.markdown(f'<table class="scout-table"><thead><tr><th>Metric</th><th>Today Total</th><th>30d Max Day</th><th>Grade</th></tr></thead><tbody>{r_html_prof}</tbody></table>', unsafe_allow_html=True)
+            with c3: st.markdown(f'<div style="display:flex; justify-content:center;"><div class="score-box" style="background-color:{get_flipped_gradient(sc_prof)};">{sc_prof}</div></div><p style="text-align:center; font-weight:bold; color:grey; margin-top:10px;">SESSION SCORE</p>', unsafe_allow_html=True)
+            
+            # =========================================================================
+            # --- WEEKLY READINESS PROFILE MATRICES STACK ---
+            # =========================================================================
+            st.markdown('<div class="section-header">Weekly Readiness Profile</div>', unsafe_allow_html=True)
+            
+            # --- BLOCK 1: LOWER BODY JUMP PROFILE (CMJ) ---
+            st.markdown('<h4 style="color:#4895DB; font-weight:800; margin-bottom:5px;">LOWER BODY: COUNTERMOVEMENT JUMP</h4>', unsafe_allow_html=True)
+            jc1, jc2 = st.columns([1.5, 3.5])
+            p_cmj_hist = cmj_df[(cmj_df['Name'] == selected_athlete_prof) & (cmj_df['Test Date'] <= curr_date_prof)].sort_values('Test Date')
+            cmj_col = 'Jump Height (Imp-Mom) [cm]'
+            rsi_col = 'RSI-modified [m/s]'
+
+            with jc1:
+                if selected_season == 'Summer':
+                    baseline_cmj = p_cmj_hist[p_cmj_hist['Season'] == 'Summer'].head(1)
+                else:
+                    baseline_cmj = cmj_df[(cmj_df['Name'] == selected_athlete_prof) & (cmj_df['Week'] == 4)]
+                
+                if not baseline_cmj.empty and not p_cmj_hist.empty:
+                    base_h = baseline_cmj.iloc[-1][cmj_col]
+                    base_rsi = baseline_cmj.iloc[-1][rsi_col]
+                    latest_cmj = p_cmj_hist.iloc[-1]
+                    cur_h, cur_rsi = latest_cmj[cmj_col], latest_cmj[rsi_col]
+                    p_diff = ((cur_h - base_h) / base_h) * 100 if base_h > 0 else 0
+                    label, color = (" ", "#28a745") if cur_h >= base_h and cur_rsi >= base_rsi else (" ", "#dc3545") if cur_h < base_h and cur_rsi < base_rsi else (" ", "#ffc107")
+
+                    st.markdown(f"""
+                        <div style="text-align:center;">
+                            <div class="score-box" style="background-color:{color}; line-height:1.2; padding-top:15px; height:80px; width:100%;">
+                                <span style="font-size:18px;">{p_diff:+.1f}%</span>
+                                <span style="font-size:10px; display:block; font-weight:bold; margin-top:2px;">{label}</span>
+                            </div>
+                        </div>
+                        <div class="info-box" style="text-align:center; margin-top:10px;">
+                            <p style="margin:0; font-size:13px; color:#FF8200;"><b>CMJ:</b> {cur_h:.1f} cm (Base: {base_h:.1f})</p>
+                        </div>
+                    """, unsafe_allow_html=True)
+                else:
+                    st.warning("No lower body baseline metric values calculated for context window thresholds.")
+
+            with jc2:
+                if not p_cmj_hist.empty:
+                    fig = make_subplots(specs=[[{"secondary_y": True}]])
                     
-                    if not baseline_cmj.empty and not p_cmj_hist.empty:
-                        base_h = baseline_cmj.iloc[-1][cmj_col]
-                        base_rsi = baseline_cmj.iloc[-1][rsi_col]
-                        latest_cmj = p_cmj_hist.iloc[-1]
-                        cur_h, cur_rsi = latest_cmj[cmj_col], latest_cmj[rsi_col]
-                        p_diff = ((cur_h - base_h) / base_h) * 100 if base_h > 0 else 0
-                        label, color = (" ", "#28a745") if cur_h >= base_h and cur_rsi >= base_rsi else (" ", "#dc3545") if cur_h < base_h and cur_rsi < base_rsi else (" ", "#ffc107")
+                    # Height trace with Line Labels
+                    fig.add_trace(go.Scatter(
+                        x=p_cmj_hist['Test Date'], y=p_cmj_hist[cmj_col], 
+                        name="Height", mode='lines+markers+text',
+                        text=p_cmj_hist[cmj_col].round(1), textposition="top center",
+                        line=dict(color='#FF8200', width=3)
+                    ), secondary_y=False)
+                    
+                    # RSI trace with Line Labels
+                    fig.add_trace(go.Scatter(
+                        x=p_cmj_hist['Test Date'], y=p_cmj_hist[rsi_col], 
+                        name="RSI", mode='lines+markers+text',
+                        text=p_cmj_hist[rsi_col].round(2), textposition="bottom center",
+                        line=dict(color='#4895DB', dash='dot', width=2)
+                    ), secondary_y=True)
+                    
+                    fig.update_layout(height=180, margin=dict(l=20, r=20, t=20, b=10), showlegend=False, template="simple_white")
+                    st.plotly_chart(fig, use_container_width=True, config=LOCKED_CONFIG, key="cmj_top_chart")
+                else:
+                    st.info("No Countermovement Jump history recorded for this profile configuration.")
 
+            # --- BLOCK 2: UPPER BODY ISOMETRIC PROFILE (ASH TEST) ---
+            st.markdown('<hr style="display:block !important; margin:15px 0; border:0; border-top:1px solid #E5E5E7;" />', unsafe_allow_html=True)
+            st.markdown('<h4 style="color:#4895DB; font-weight:800; margin-bottom:5px;">UPPER BODY: ASH SHOULDER ISOMETRIC</h4>', unsafe_allow_html=True)
+            
+            p_ash_all = ash_df[(ash_df['Name'] == selected_athlete_prof) & (ash_df['Test Date'] <= curr_date_prof)].sort_values('Test Date')
+            
+            if not p_ash_all.empty:
+                ac1, ac2 = st.columns([1.5, 3.5])
+                with ac1:
+                    latest_date_ash = p_ash_all['Test Date'].iloc[-1]
+                    today_ash_rows = p_ash_all[p_ash_all['Test Date'] == latest_date_ash]
+                    row_i = today_ash_rows[today_ash_rows['Isometric Type'].str.contains('I', case=False, na=False)]
+                    
+                    li = row_i.iloc[-1]['Peak Vertical Force [N] (L)'] if not row_i.empty else 0.0
+                    ri = row_i.iloc[-1]['Peak Vertical Force [N] (R)'] if not row_i.empty else 0.0
+                    asym_i = row_i.iloc[-1]['Peak Vertical Force [N] (Asym)(%)'] if not row_i.empty else 0.0
+                    
+                    if selected_season == 'Summer':
+                        baseline_ash = p_ash_all[(p_ash_all['Season'] == 'Summer') & (p_ash_all['Isometric Type'].str.contains('I', case=False, na=False))].head(1)
+                    else:
+                        baseline_ash = p_ash_all[p_ash_all['Isometric Type'].str.contains('I', case=False, na=False)].head(1)
+                    
+                    base_li = baseline_ash.iloc[-1]['Peak Vertical Force [N] (L)'] if not baseline_ash.empty else 0.0
+                    base_ri = baseline_ash.iloc[-1]['Peak Vertical Force [N] (R)'] if not baseline_ash.empty else 0.0
+                    
+                    pct_l = ((li - base_li) / base_li * 100) if base_li > 0 else 0
+                    pct_r = ((ri - base_ri) / base_ri * 100) if base_ri > 0 else 0
+                    ash_avg_diff = (pct_l + pct_r) / 2
+                    
+                    label_ash, color_ash = (" ", "#28a745") if ash_avg_diff >= 0 and abs(asym_i) <= 10 else (" ", "#dc3545") if ash_avg_diff < -8 else (" ", "#ffc107")
+
+                    st.markdown(f"""
+                        <div style="text-align:center;">
+                            <div class="score-box" style="background-color:{color_ash}; line-height:1.2; padding-top:15px; height:80px; width:100%;">
+                                <span style="font-size:18px;">{ash_avg_diff:+.1f}%</span>
+                                <span style="font-size:10px; display:block; font-weight:bold; margin-top:2px;">{label_ash} (Asym: {asym_i:+.1f}%)</span>
+                            </div>
+                        </div>
+                        <div class="info-box" style="text-align:center; margin-top:10px;">
+                            <p style="margin:0; font-size:11px; color:grey;"><b>Base Force:</b> L: {base_li:.0f} N | R: {base_ri:.0f} N</p>
+                            <p style="margin:0; font-size:13px; color:#FF8200;"><b>Today Force:</b> L: {li:.0f} N | R: {ri:.0f} N</p>
+                        </div>
+                    """, unsafe_allow_html=True)
+                with ac2:
+                    p_ash_i_only = p_ash_all[p_ash_all['Isometric Type'].str.contains('I', case=False, na=False)]
+                    if not p_ash_i_only.empty:
+                        fig_ash = go.Figure()
+                        fig_ash.add_trace(go.Scatter(
+                            x=p_ash_i_only['Test Date'], y=p_ash_i_only['Peak Vertical Force [N] (L)'], 
+                            name="Left I Force", mode='lines+markers+text',
+                            text=p_ash_i_only['Peak Vertical Force [N] (L)'].round(0), textposition="top left",
+                            line=dict(color='#4895DB', width=2.5)
+                        ))
+                        fig_ash.add_trace(go.Scatter(
+                            x=p_ash_i_only['Test Date'], y=p_ash_i_only['Peak Vertical Force [N] (R)'], 
+                            name="Right I Force", mode='lines+markers+text',
+                            text=p_ash_i_only['Peak Vertical Force [N] (R)'].round(0), textposition="bottom right",
+                            line=dict(color='#FF8200', width=2.5, dash='dash')
+                        ))
+                        fig_ash.update_layout(height=180, margin=dict(l=20, r=20, t=20, b=10), showlegend=False, template="simple_white")
+                        st.plotly_chart(fig_ash, use_container_width=True, config=LOCKED_CONFIG, key="ash_profile_chart")
+            else:
+                st.info("No explicit ASH shoulder test dataset records parsed for this athlete.")
+
+            # --- BLOCK 3: ROTATOR CUFF EXTERNAL ROTATION ROM ---
+            st.markdown('<hr style="display:block !important; margin:15px 0; border:0; border-top:1px solid #E5E5E7;" />', unsafe_allow_html=True)
+            st.markdown('<h4 style="color:#4895DB; font-weight:800; margin-bottom:5px;">EXTERNAL ROTATION: ROM</h4>', unsafe_allow_html=True)
+            
+            p_er_hist = er_df[(er_df['Name'] == selected_athlete_prof) & (er_df['Test Date'] <= curr_date_prof)].sort_values('Test Date')
+            
+            if not p_er_hist.empty:
+                ec1, ec2 = st.columns([1.5, 3.5])
+                with ec1:
+                    if selected_season == 'Summer':
+                        baseline_er = p_er_hist[p_er_hist['Season'] == 'Summer'].head(1)
+                    else:
+                        baseline_er = p_er_hist.head(1)
+                        
+                    if not baseline_er.empty:
+                        base_l_rom = baseline_er.iloc[-1]['L Max ROM (°)']
+                        base_r_rom = baseline_er.iloc[-1]['R Max ROM (°)']
+                        
+                        latest_er = p_er_hist.iloc[-1]
+                        cur_l_rom = latest_er['L Max ROM (°)']
+                        cur_r_rom = latest_er['R Max ROM (°)']
+                        cur_asym_rom = latest_er['ROM Asymmetry (%)']
+                        
+                        rom_pct_l = ((cur_l_rom - base_l_rom) / base_l_rom * 100) if base_l_rom > 0 else 0
+                        rom_pct_r = ((cur_r_rom - base_r_rom) / base_r_rom * 100) if base_r_rom > 0 else 0
+                        er_avg_diff = (rom_pct_l + rom_pct_r) / 2
+                        
+                        label_er, color_er = (" ", "#28a745") if er_avg_diff >= 0 and abs(cur_asym_rom) <= 10 else (" ", "#dc3545") if er_avg_diff < -6 else (" ", "#ffc107")
+                        
                         st.markdown(f"""
                             <div style="text-align:center;">
-                                <div class="score-box" style="background-color:{color}; line-height:1.2; padding-top:15px; height:80px; width:100%;">
-                                    <span style="font-size:18px;">{p_diff:+.1f}%</span>
-                                    <span style="font-size:10px; display:block; font-weight:bold; margin-top:2px;">{label}</span>
+                                <div class="score-box" style="background-color:{color_er}; line-height:1.2; padding-top:15px; height:80px; width:100%;">
+                                    <span style="font-size:18px;">{cur_asym_rom:+.1f}%</span>
+                                    <span style="font-size:10px; display:block; font-weight:bold; margin-top:2px;">{label_er} (Asym ROM)</span>
                                 </div>
                             </div>
                             <div class="info-box" style="text-align:center; margin-top:10px;">
-                                <p style="margin:0; font-size:13px; color:#FF8200;"><b>CMJ:</b> {cur_h:.1f} cm (Base: {base_h:.1f})</p>
+                                <p style="margin:0; font-size:11px; color:grey;"><b>Base ROM:</b> L: {base_l_rom:.1f}° | R: {base_r_rom:.1f}°</p>
+                                <p style="margin:0; font-size:13px; color:#FF8200;"><b>Today ROM:</b> L: {cur_l_rom:.1f}° | R: {cur_r_rom:.1f}°</p>
                             </div>
                         """, unsafe_allow_html=True)
-                with jc2:
-                    if not p_cmj_hist.empty:
-                        fig = make_subplots(specs=[[{"secondary_y": True}]])
-                        fig.add_trace(go.Scatter(x=p_cmj_hist['Test Date'], y=p_cmj_hist[cmj_col], name="Height", line=dict(color='#FF8200', width=3)), secondary_y=False)
-                        fig.add_trace(go.Scatter(x=p_cmj_hist['Test Date'], y=p_cmj_hist[rsi_col], name="RSI", line=dict(color='#4895DB', dash='dot')), secondary_y=True)
-                        fig.update_layout(height=160, margin=dict(l=0, r=0, t=10, b=0), showlegend=False, template="simple_white")
-                        st.plotly_chart(fig, use_container_width=True, config=LOCKED_CONFIG, key="cmj_top_chart")
+                with ec2:
+                    fig_er = go.Figure()
+                    fig_er.add_trace(go.Scatter(
+                        x=p_er_hist['Test Date'], y=p_er_hist['L Max ROM (°)'], 
+                        name="Left ROM", mode='lines+markers+text',
+                        text=p_er_hist['L Max ROM (°)'].round(1), textposition="top left",
+                        line=dict(color='#4895DB', width=2.5)
+                    ))
+                    fig_er.add_trace(go.Scatter(
+                        x=p_er_hist['Test Date'], y=p_er_hist['R Max ROM (°)'], 
+                        name="Right ROM", mode='lines+markers+text',
+                        text=p_er_hist['R Max ROM (°)'].round(1), textposition="bottom right",
+                        line=dict(color='#FF8200', width=2.5, dash='dash')
+                    ))
+                    fig_er.update_layout(height=180, margin=dict(l=20, r=20, t=20, b=10), showlegend=False, template="simple_white")
+                    st.plotly_chart(fig_er, use_container_width=True, config=LOCKED_CONFIG, key="er_profile_chart")
+            else:
+                st.info("External Rotation logs recorded for this athlete profile.")
 
-                # --- BLOCK 2: UPPER BODY ISOMETRIC PROFILE (ASH TEST) ---
-                st.markdown('<hr style="display:block !important; margin:15px 0; border:0; border-top:1px solid #E5E5E7;" />', unsafe_allow_html=True)
-                st.markdown('<h4 style="color:#4895DB; font-weight:800; margin-bottom:5px;">UPPER BODY: ASH SHOULDER ISOMETRIC</h4>', unsafe_allow_html=True)
-                
-                p_ash_all = ash_df[(ash_df['Name'] == selected_athlete_prof) & (ash_df['Test Date'] <= curr_date_prof)].sort_values('Test Date')
-                
-                if not p_ash_all.empty:
-                    ac1, ac2 = st.columns([1.5, 3.5])
-                    with ac1:
-                        latest_date_ash = p_ash_all['Test Date'].iloc[-1]
-                        today_ash_rows = p_ash_all[p_ash_all['Test Date'] == latest_date_ash]
-                        
-                        row_i = today_ash_rows[today_ash_rows['Isometric Type'].str.contains('I', case=False, na=False)]
-                        
-                        li = row_i.iloc[-1]['Peak Vertical Force [N] (L)'] if not row_i.empty else 0.0
-                        ri = row_i.iloc[-1]['Peak Vertical Force [N] (R)'] if not row_i.empty else 0.0
-                        asym_i = row_i.iloc[-1]['Peak Vertical Force [N] (Asym)(%)'] if not row_i.empty else 0.0
-                        
-                        if selected_season == 'Summer':
-                            baseline_ash = p_ash_all[(p_ash_all['Season'] == 'Summer') & (p_ash_all['Isometric Type'].str.contains('I', case=False, na=False))].head(1)
-                        else:
-                            baseline_ash = p_ash_all[p_ash_all['Isometric Type'].str.contains('I', case=False, na=False)].head(1)
-                        
-                        base_li = baseline_ash.iloc[-1]['Peak Vertical Force [N] (L)'] if not baseline_ash.empty else 0.0
-                        base_ri = baseline_ash.iloc[-1]['Peak Vertical Force [N] (R)'] if not baseline_ash.empty else 0.0
-                        
-                        pct_l = ((li - base_li) / base_li * 100) if base_li > 0 else 0
-                        pct_r = ((ri - base_ri) / base_ri * 100) if base_ri > 0 else 0
-                        ash_avg_diff = (pct_l + pct_r) / 2
-                        
-                        label_ash, color_ash = (" ", "#28a745") if ash_avg_diff >= 0 and abs(asym_i) <= 10 else (" ", "#dc3545") if ash_avg_diff < -8 else (" ", "#ffc107")
+            st.divider()
 
-                        st.markdown(f"""
-                            <div style="text-align:center;">
-                                <div class="score-box" style="background-color:{color_ash}; line-height:1.2; padding-top:15px; height:80px; width:100%;">
-                                    <span style="font-size:18px;">{ash_avg_diff:+.1f}%</span>
-                                    <span style="font-size:10px; display:block; font-weight:bold; margin-top:2px;">{label_ash} (Asym: {asym_i:+.1f}%)</span>
-                                </div>
-                            </div>
-                            <div class="info-box" style="text-align:center; margin-top:10px;">
-                                <p style="margin:0; font-size:11px; color:grey;"><b>Base Force:</b> L: {base_li:.0f} N | R: {base_ri:.0f} N</p>
-                                <p style="margin:0; font-size:13px; color:#FF8200;"><b>Today Force:</b> L: {li:.0f} N | R: {ri:.0f} N</p>
-                            </div>
-                        """, unsafe_allow_html=True)
-                    with ac2:
-                        p_ash_i_only = p_ash_all[p_ash_all['Isometric Type'].str.contains('I', case=False, na=False)]
-                        if not p_ash_i_only.empty:
-                            fig_ash = go.Figure()
-                            fig_ash.add_trace(go.Scatter(x=p_ash_i_only['Test Date'], y=p_ash_i_only['Peak Vertical Force [N] (L)'], name="Left I Force", line=dict(color='#4895DB', width=2.5)))
-                            fig_ash.add_trace(go.Scatter(x=p_ash_i_only['Test Date'], y=p_ash_i_only['Peak Vertical Force [N] (R)'], name="Right I Force", line=dict(color='#FF8200', width=2.5, dash='dash')))
-                            fig_ash.update_layout(height=160, margin=dict(l=0, r=0, t=10, b=0), showlegend=False, template="simple_white")
-                            st.plotly_chart(fig_ash, use_container_width=True, config=LOCKED_CONFIG, key="ash_profile_chart")
-                else:
-                    st.info("No explicit ASH shoulder test dataset records parsed for this athlete.")
-
-                # --- BLOCK 3: ROTATOR CUFF EXTERNAL ROTATION ROM ---
-                st.markdown('<hr style="display:block !important; margin:15px 0; border:0; border-top:1px solid #E5E5E7;" />', unsafe_allow_html=True)
-                st.markdown('<h4 style="color:#4895DB; font-weight:800; margin-bottom:5px;">EXTERNAL ROTATION: ROM</h4>', unsafe_allow_html=True)
-                
-                p_er_hist = er_df[(er_df['Name'] == selected_athlete_prof) & (er_df['Test Date'] <= curr_date_prof)].sort_values('Test Date')
-                
-                if not p_er_hist.empty:
-                    ec1, ec2 = st.columns([1.5, 3.5])
-                    with ec1:
-                        if selected_season == 'Summer':
-                            baseline_er = p_er_hist[p_er_hist['Season'] == 'Summer'].head(1)
-                        else:
-                            baseline_er = p_er_hist.head(1)
-                            
-                        if not baseline_er.empty:
-                            base_l_rom = baseline_er.iloc[-1]['L Max ROM (°)']
-                            base_r_rom = baseline_er.iloc[-1]['R Max ROM (°)']
-                            
-                            latest_er = p_er_hist.iloc[-1]
-                            cur_l_rom = latest_er['L Max ROM (°)']
-                            cur_r_rom = latest_er['R Max ROM (°)']
-                            cur_asym_rom = latest_er['ROM Asymmetry (%)']
-                            
-                            rom_pct_l = ((cur_l_rom - base_l_rom) / base_l_rom * 100) if base_l_rom > 0 else 0
-                            rom_pct_r = ((cur_r_rom - base_r_rom) / base_r_rom * 100) if base_r_rom > 0 else 0
-                            er_avg_diff = (rom_pct_l + rom_pct_r) / 2
-                            
-                            label_er, color_er = (" ", "#28a745") if er_avg_diff >= 0 and abs(cur_asym_rom) <= 10 else (" ", "#dc3545") if er_avg_diff < -6 else (" ", "#ffc107")
-                            
-                            st.markdown(f"""
-                                <div style="text-align:center;">
-                                    <div class="score-box" style="background-color:{color_er}; line-height:1.2; padding-top:15px; height:80px; width:100%;">
-                                        <span style="font-size:18px;">{cur_asym_rom:+.1f}%</span>
-                                        <span style="font-size:10px; display:block; font-weight:bold; margin-top:2px;">{label_er} (Asym ROM)</span>
-                                    </div>
-                                </div>
-                                <div class="info-box" style="text-align:center; margin-top:10px;">
-                                    <p style="margin:0; font-size:11px; color:grey;"><b>Base ROM:</b> L: {base_l_rom:.1f}° | R: {base_r_rom:.1f}°</p>
-                                    <p style="margin:0; font-size:13px; color:#FF8200;"><b>Today ROM:</b> L: {cur_l_rom:.1f}° | R: {cur_r_rom:.1f}°</p>
-                                </div>
-                            """, unsafe_allow_html=True)
-                    with ec2:
-                        fig_er = go.Figure()
-                        fig_er.add_trace(go.Scatter(x=p_er_hist['Test Date'], y=p_er_hist['L Max ROM (°)'], name="Left ROM", line=dict(color='#4895DB', width=2.5)))
-                        fig_er.add_trace(go.Scatter(x=p_er_hist['Test Date'], y=p_er_hist['R Max ROM (°)'], name="Right ROM", line=dict(color='#FF8200', width=2.5, dash='dash')))
-                        fig_er.update_layout(height=160, margin=dict(l=0, r=0, t=10, b=0), showlegend=False, template="simple_white")
-                        st.plotly_chart(fig_er, use_container_width=True, config=LOCKED_CONFIG, key="er_profile_chart")
-                else:
-                    st.info("External Rotation logs recorded for this athlete profile.")
-
-                st.divider()
-
-                # --- PRACTICE PHASE BREAKDOWN ---
-                p_ph = phase_df[(phase_df['Name'] == selected_athlete_prof) & (phase_df['Date'] == curr_date_prof)].copy()
-                if not p_ph.empty:
-                    st.markdown('<div class="section-header">Practice Phase Analysis</div>', unsafe_allow_html=True)
-                    fig_ph = make_subplots(specs=[[{"secondary_y": True}]])
-                    fig_ph.add_trace(go.Bar(x=p_ph['Phase'], y=p_ph['Player Load'], name="Player Load", marker_color='#4895DB'), secondary_y=False)
-                    fig_ph.add_trace(go.Scatter(x=p_ph['Phase'], y=p_ph['Total Jumps'], name="Total Jumps", line=dict(color='#FF8200', width=4), mode='lines+markers'), secondary_y=True)
-                    fig_ph.update_layout(height=350, showlegend=True, template="simple_white", legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1), margin=dict(l=0, r=0, t=30, b=0))
-                    fig_ph.update_yaxes(title_text="Player Load", secondary_y=False)
-                    fig_ph.update_yaxes(title_text="Total Jumps", secondary_y=True)
-                    st.plotly_chart(fig_ph, use_container_width=True, config=LOCKED_CONFIG)
+            # --- PRACTICE PHASE BREAKDOWN ---
+            p_ph = phase_df[(phase_df['Name'] == selected_athlete_prof) & (phase_df['Date'] == curr_date_prof)].copy()
+            if not p_ph.empty:
+                st.markdown('<div class="section-header">Practice Phase Analysis</div>', unsafe_allow_html=True)
+                fig_ph = make_subplots(specs=[[{"secondary_y": True}]])
+                fig_ph.add_trace(go.Bar(x=p_ph['Phase'], y=p_ph['Player Load'], name="Player Load", marker_color='#4895DB'), secondary_y=False)
+                fig_ph.add_trace(go.Scatter(x=p_ph['Phase'], y=p_ph['Total Jumps'], name="Total Jumps", line=dict(color='#FF8200', width=4), mode='lines+markers+text', text=p_ph['Total Jumps'].round(0), textposition="top center"), secondary_y=True)
+                fig_ph.update_layout(height=350, showlegend=True, template="simple_white", legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1), margin=dict(l=0, r=0, t=30, b=0))
+                fig_ph.update_yaxes(title_text="Player Load", secondary_y=False)
+                fig_ph.update_yaxes(title_text="Total Jumps", secondary_y=True)
+                st.plotly_chart(fig_ph, use_container_width=True, config=LOCKED_CONFIG)
                     
         with tabs[1]: # Tab 1: Leaderboard Gallery
             c_gal1, c_gal2 = st.columns(2)
@@ -508,29 +569,33 @@ if check_password():
             metrics_to_score = [m for m in all_metrics if m not in ['High Jumps', 'Moderate Jumps', 'High Intensity Movement']]
 
             with sub_tabs[0]:
-                sel_ath_hist = st.selectbox("Select Athlete", sorted(df['Name'].unique()), key="master_ath_sel")
+                sel_ath_hist = st.selectbox("Select Athlete", master_athlete_list, key="master_ath_sel")
                 p_full = df[df['Name'] == sel_ath_hist].copy()
-                daily_raw = p_full.groupby(['Date', 'Week']).agg({**{m: 'sum' for m in metrics_to_score}, 'Session_Name': lambda x: ' | '.join(x.astype(str)), 'Session_Type': lambda x: ' | '.join(x.astype(str))}).reset_index().sort_values('Date')
                 
-                scores_list = []
-                for idx, row in daily_raw.iterrows():
-                    row_grades = []
-                    lb_sums = daily_raw[(daily_raw['Date'] >= row['Date'] - timedelta(days=30)) & (daily_raw['Date'] <= row['Date'])]
-                    for m in metrics_to_score:
-                        mx = lb_sums[m].max() if not lb_sums[m].empty else 1
-                        row_grades.append(math.ceil((row[m] / mx) * 100) if mx > 0 else 0)
-                    is_match = any(w in str(row['Session_Name']).upper() or w in str(row['Session_Type']).upper() for w in ['MATCH', 'GAME'])
-                    scores_list.append({'Date': row['Date'], 'Display': row['Date'].strftime('%m/%d'), 'Score': math.ceil(sum(row_grades)/len(row_grades)), 'Type': 'Match' if is_match else 'Practice', 'Week': str(row['Week'])})
-                
-                master_df = pd.DataFrame(scores_list)
-                if not master_df.empty:
-                    fig_master = px.line(master_df, x='Display', y='Score', range_y=[0, 110])
-                    prac_df = master_df[master_df['Type'] == 'Practice']
-                    if not prac_df.empty: fig_master.add_trace(go.Scatter(x=prac_df['Display'], y=prac_df['Score'], mode='markers+text', text=prac_df['Score'], textposition="top center", name="Practice", marker=dict(size=8, color='#4895DB')))
-                    match_df_line = master_df[master_df['Type'] == 'Match']
-                    if not match_df_line.empty: fig_master.add_trace(go.Scatter(x=match_df_line['Display'], y=match_df_line['Score'], mode='markers+text', text=[f"<b>{s}</b>" for s in match_df_line['Score']], textposition="top center", name="Match Day", marker=dict(size=15, color='#FF8200')))
-                    fig_master.update_layout(template="simple_white", height=380, legend=dict(orientation="h", y=-0.2, x=0.5, xanchor="center"))
-                    st.plotly_chart(fig_master, use_container_width=True)
+                if not p_full.empty:
+                    daily_raw = p_full.groupby(['Date', 'Week']).agg({**{m: 'sum' for m in metrics_to_score}, 'Session_Name': lambda x: ' | '.join(x.astype(str)), 'Session_Type': lambda x: ' | '.join(x.astype(str))}).reset_index().sort_values('Date')
+                    
+                    scores_list = []
+                    for idx, row in daily_raw.iterrows():
+                        row_grades = []
+                        lb_sums = daily_raw[(daily_raw['Date'] >= row['Date'] - timedelta(days=30)) & (daily_raw['Date'] <= row['Date'])]
+                        for m in metrics_to_score:
+                            mx = lb_sums[m].max() if not lb_sums[m].empty else 1
+                            row_grades.append(math.ceil((row[m] / mx) * 100) if mx > 0 else 0)
+                        is_match = any(w in str(row['Session_Name']).upper() or w in str(row['Session_Type']).upper() for w in ['MATCH', 'GAME'])
+                        scores_list.append({'Date': row['Date'], 'Display': row['Date'].strftime('%m/%d'), 'Score': math.ceil(sum(row_grades)/len(row_grades)), 'Type': 'Match' if is_match else 'Practice', 'Week': str(row['Week'])})
+                    
+                    master_df = pd.DataFrame(scores_list)
+                    if not master_df.empty:
+                        fig_master = px.line(master_df, x='Display', y='Score', range_y=[0, 110])
+                        prac_df = master_df[master_df['Type'] == 'Practice']
+                        if not prac_df.empty: fig_master.add_trace(go.Scatter(x=prac_df['Display'], y=prac_df['Score'], mode='markers+text', text=prac_df['Score'], textposition="top center", name="Practice", marker=dict(size=8, color='#4895DB')))
+                        match_df_line = master_df[master_df['Type'] == 'Match']
+                        if not match_df_line.empty: fig_master.add_trace(go.Scatter(x=match_df_line['Display'], y=match_df_line['Score'], mode='markers+text', text=[f"<b>{s}</b>" for s in match_df_line['Score']], textposition="top center", name="Match Day", marker=dict(size=15, color='#FF8200')))
+                        fig_master.update_layout(template="simple_white", height=380, legend=dict(orientation="h", y=-0.2, x=0.5, xanchor="center"))
+                        st.plotly_chart(fig_master, use_container_width=True)
+                else:
+                    st.info("No timeline track history found inside active tracker fields for selected name context.")
 
                 # --- MULTI-SHEET TIMELINE ALIGNMENT FOR HISTORICAL READINESS ---
                 st.markdown("### Combined Lower & Upper Body Kinetics History")
@@ -599,13 +664,13 @@ if check_password():
                     # Kinetics & ROM Joint Coordinated Plot
                     fig_cmj = make_subplots(specs=[[{"secondary_y": True}]])
                     if not ath_cmj.empty:
-                        fig_cmj.add_trace(go.Scatter(x=ath_cmj['Test Date'], y=ath_cmj[cmj_col], name="Jump Height (cm)", mode='lines+markers', line=dict(color='#4895DB', width=3)), secondary_y=False)
+                        fig_cmj.add_trace(go.Scatter(x=ath_cmj['Test Date'], y=ath_cmj[cmj_col], name="Jump Height (cm)", mode='lines+markers+text', text=ath_cmj[cmj_col].round(1), textposition="top center", line=dict(color='#4895DB', width=3)), secondary_y=False)
                     if not ath_ash.empty:
                         ash_i_plot = ath_ash[ath_ash['Isometric Type'].str.contains('I', case=False, na=False)]
                         if not ash_i_plot.empty:
-                            fig_cmj.add_trace(go.Scatter(x=ash_i_plot['Test Date'], y=ash_i_plot['Peak Vertical Force [N] (L)'], name="ASH Left Force (N)", mode='lines+markers', line=dict(color='#FF8200', width=2)), secondary_y=False)
+                            fig_cmj.add_trace(go.Scatter(x=ash_i_plot['Test Date'], y=ash_i_plot['Peak Vertical Force [N] (L)'], name="ASH Left Force (N)", mode='lines+markers+text', text=ash_i_plot['Peak Vertical Force [N] (L)'].round(0), textposition="bottom center", line=dict(color='#FF8200', width=2)), secondary_y=False)
                     if not ath_er.empty:
-                        fig_cmj.add_trace(go.Scatter(x=ath_er['Test Date'], y=ath_er['L Max ROM (°)'], name="ER Left ROM (°)", mode='lines+markers', line=dict(color='#A52A2A', width=2)), secondary_y=True)
+                        fig_cmj.add_trace(go.Scatter(x=ath_er['Test Date'], y=ath_er['L Max ROM (°)'], name="ER Left ROM (°)", mode='lines+markers+text', text=ath_er['L Max ROM (°)'].round(1), textposition="top left", line=dict(color='#A52A2A', width=2)), secondary_y=True)
                     
                     fig_cmj.add_hline(y=base_row[cmj_col], line_dash="dash", line_color="red")
                     fig_cmj.update_layout(height=380, template="simple_white", legend=dict(orientation="h", y=-0.3, x=0.5, xanchor="center"))
@@ -630,7 +695,7 @@ if check_password():
             with c_mode: view_mode = st.radio("View Level Context", ["Team", "Position", "Individual"], horizontal=True, key="gp_view_mode_t3")
             
             if view_mode == "Individual":
-                gp_p = st.selectbox("Select Athlete Profile", sorted(df['Name'].unique()), key="gp_p_vf_t3")
+                gp_p = st.selectbox("Select Athlete Profile", master_athlete_list, key="gp_p_vf_t3")
                 main_filtered = df[df['Name'] == gp_p].copy()
                 match_filtered = match_df[match_df['Name'] == gp_p].copy()
             elif view_mode == "Position":
