@@ -1283,7 +1283,7 @@ if check_password():
                                     st.info(f"**{name}**: No data for Week {sel_week}")
 
 
-        # =========================================================================
+       # =========================================================================
         # NEW TAB 8: SPRING V. SUMMER PRACTICES
         # =========================================================================
         with tabs[8]:
@@ -1300,7 +1300,12 @@ if check_password():
             else:
                 # 2. Extract every single single-day volume total per athlete
                 spring_daily = spring_gps.groupby(['Name', 'Date'])[['Player Load', 'Total Jumps', 'Explosive Efforts']].sum().reset_index()
-                summer_daily = summer_gps.groupby(['Name', 'Date'])[['Player Load', 'Total Jumps', 'Explosive Efforts']].sum().reset_index()
+                summer_daily = summer_gps.groupby(['Name', 'Date'])[['Player Load', 'Total Jumps', 'Explosive Efforts', 'Session_Name']].agg({
+                    'Player Load': 'sum',
+                    'Total Jumps': 'sum',
+                    'Explosive Efforts': 'sum',
+                    'Session_Name': lambda x: ' | '.join(x.astype(str).unique())
+                }).reset_index()
                 
                 # 3. Pull the Absolute Highest Day across each metric during Spring (The Benchmarks)
                 spring_peaks = spring_daily.groupby('Name')[['Player Load', 'Total Jumps', 'Explosive Efforts']].max().reset_index()
@@ -1326,7 +1331,7 @@ if check_password():
                 merged_comp['Peak Change (%)'] = ((merged_comp['Summer Peak'] - merged_comp[target_spring_col]) / merged_comp[target_spring_col] * 100).fillna(0)
                 
                 # Render Clean HTML Grid Row Blocks
-                st.markdown(f"### Rostered Workload Delta ({comp_metric_label})")
+                st.markdown(f"### Summer v. Spring ({comp_metric_label})")
                 
                 tbl_html = f"""<table class="scout-table">
                     <thead>
@@ -1353,53 +1358,82 @@ if check_password():
                 st.markdown(tbl_html + "</tbody></table>", unsafe_allow_html=True)
                 
                 st.write("<br>", unsafe_allow_html=True)
+                st.divider()
                 
-                # 6. Interactive Individual Longitudinal Progression Plot
-                st.markdown("### Longitudinal Practice Timeline Chart")
-                target_ath_comp = st.selectbox("Select Target Athlete for Historical Flow", sorted(merged_comp['Name'].unique()), key="ss_ath_select")
+                # 6. REPLACED: Summer Practice Cards Graded against Spring Benchmarks
+                st.markdown("### Summer Session Review Cards")
+                target_ath_comp = st.selectbox("Select Target Athlete for Session Breakdown", sorted(merged_comp['Name'].unique()), key="ss_ath_select")
                 
-                ath_spring_peaks = merged_comp[merged_comp['Name'] == target_ath_comp].iloc[0]
-                ath_spring_val = ath_spring_peaks[target_spring_col]
-                
-                # Collect chronological timeline string array for Summer sessions
-                ath_summer_timeline = summer_daily[summer_daily['Name'] == target_ath_comp].sort_values('Date').copy()
-                ath_summer_timeline['Date_Str'] = ath_summer_timeline['Date'].dt.strftime('%m/%d')
-                
-                if not ath_summer_timeline.empty:
-                    fig_ss = go.Figure()
-                    
-                    # Line plot tracing Summer performance sequence
-                    fig_ss.add_trace(go.Scatter(
-                        x=ath_summer_timeline['Date_Str'],
-                        y=ath_summer_timeline[comp_metric_label],
-                        mode='lines+markers+text',
-                        name='Summer Practice Day Volume',
-                        text=ath_summer_timeline[comp_metric_label].round(1),
-                        textposition='top center',
-                        line=dict(color='#FF8200', width=3.5),
-                        marker=dict(size=8, color='#4895DB')
-                    ))
-                    
-                    # Horizontal baseline marker demonstrating the reference high point established in Spring
-                    fig_ss.add_hline(
-                        y=ath_spring_val,
-                        line_dash="dash",
-                        line_color="#515154",
-                        line_width=2.5,
-                        annotation_text=f"Max Spring Benchmark Peak ({ath_spring_val:.1f})",
-                        annotation_position="bottom left"
-                    )
-                    
-                    fig_ss.update_layout(
-                        height=400,
-                        template="simple_white",
-                        xaxis=dict(title="Chronological Summer Calendar Dates (Practices Only)", type='category'),
-                        yaxis=dict(title=f"Absolute Day Volume ({comp_metric_label})", rangemode='tozero'),
-                        margin=dict(l=10, r=10, t=20, b=10)
-                    )
-                    st.plotly_chart(fig_ss, use_container_width=True, config=LOCKED_CONFIG, key=f"ss_progression_chart_{target_ath_comp}")
-                else:
-                    st.info(f"No specific summer practices cataloged under {target_ath_comp}.")
+                # Get this individual's photo URL and position info safely
+                try:
+                    meta_lookup = full_df_unfiltered[full_df_unfiltered['Name'] == target_ath_comp].iloc[0]
+                    correct_photo = meta_lookup['PhotoURL']
+                    pos_label = meta_lookup['Position']
+                except:
+                    correct_photo = "https://www.w3schools.com/howto/img_avatar.png"
+                    pos_label = "N/A"
 
-    except Exception as e:
-        st.error(f"Sync Error: {e}")
+                # Pull benchmarks
+                ath_benchmarks = spring_peaks[spring_peaks['Name'] == target_ath_comp]
+                ath_summer_days = summer_daily[summer_daily['Name'] == target_ath_comp].sort_values('Date', ascending=False)
+                
+                if not ath_benchmarks.empty and not ath_summer_days.empty:
+                    b_load = ath_benchmarks.iloc[0]['Spring Peak Load']
+                    b_jumps = ath_benchmarks.iloc[0]['Spring Peak Jumps']
+                    b_efforts = ath_benchmarks.iloc[0]['Spring Peak Efforts']
+                    
+                    # Split cards layout systematically into 2-wide blocks
+                    ath_days_list = ath_summer_days.to_dict('records')
+                    for s_idx in range(0, len(ath_days_list), 2):
+                        card_cols = st.columns(2)
+                        for col_offset in range(2):
+                            if s_idx + col_offset < len(ath_days_list):
+                                row_day = ath_days_list[s_idx + col_offset]
+                                
+                                # Score calculations based strictly on Spring benchmark maxima
+                                g_load = math.ceil((row_day['Player Load'] / b_load) * 100) if b_load > 0 else 0
+                                g_jumps = math.ceil((row_day['Total Jumps'] / b_jumps) * 100) if b_jumps > 0 else 0
+                                g_efforts = math.ceil((row_day['Explosive Efforts'] / b_efforts) * 100) if b_efforts > 0 else 0
+                                
+                                # Combined summary session grade
+                                total_session_score = math.ceil((g_load + g_jumps + g_efforts) / 3)
+                                
+                                # Build row text elements with quick percentage change hints against the baseline
+                                load_diff = ((row_day['Player Load'] - b_load) / b_load) * 100 if b_load > 0 else 0
+                                jumps_diff = ((row_day['Total Jumps'] - b_jumps) / b_jumps) * 100 if b_jumps > 0 else 0
+                                efforts_diff = ((row_day['Explosive Efforts'] - b_efforts) / b_efforts) * 100 if b_efforts > 0 else 0
+                                
+                                with card_cols[col_offset]:
+                                    st.markdown(f"""
+                                        <div style="border:1px solid #E5E5E7; border-radius:15px; padding:15px; margin-bottom:20px; background-color:white;">
+                                            <div style="display:flex; align-items:center; gap:12px; margin-bottom:10px; padding-bottom:8px; border-bottom:2px solid #FF8200;">
+                                                <img src="{correct_photo}" class="gallery-photo" style="width:55px; height:55px;">
+                                                <div>
+                                                    <p style="margin:0; font-weight:900; color:#1D1D1F; font-size:15px;">{row_day['Session_Name']}</p>
+                                                    <p style="margin:0; color:#4895DB; font-weight:700; font-size:12px;">{row_day['Date'].strftime('%m/%d/%Y')} | {pos_label}</p>
+                                                </div>
+                                            </div>
+                                            <div style="display:flex; align-items:center; gap:10px;">
+                                                <div style="flex:3;">
+                                                    <table class="scout-table">
+                                                        <thead>
+                                                            <tr><th>Metric</th><th>Volume</th><th>Spring Max</th><th>Benchmark %</th></tr>
+                                                        </thead>
+                                                        <tbody>
+                                                            <tr><td>Player Load</td><td>{row_day['Player Load']:.1f}</td><td>{b_load:.1f}</td><td>{g_load}% ({load_diff:+.0f}%)</td></tr>
+                                                            <tr><td>Total Jumps</td><td>{int(row_day['Total Jumps'])}</td><td>{int(b_jumps)}</td><td>{g_jumps}% ({jumps_diff:+.0f}%)</td></tr>
+                                                            <tr><td>Explosive Efforts</td><td>{int(row_day['Explosive Efforts'])}</td><td>{int(b_efforts)}</td><td>{g_efforts}% ({efforts_diff:+.0f}%)</td></tr>
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                                <div style="flex:1; text-align:center;">
+                                                    <div class="score-box" style="background-color:{get_flipped_gradient(total_session_score)}; font-size:26px; padding:10px 5px; min-width:70px; margin:0 auto;">
+                                                        {total_session_score}
+                                                    </div>
+                                                    <p style="margin:5px 0 0 0; font-size:9px; font-weight:bold; color:grey; text-transform:uppercase;">Output intensity</p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    """, unsafe_allow_html=True)
+                else:
+                    st.info(f"Insufficient historical data pairings found to build benchmarks for {target_ath_comp}.")
