@@ -1433,7 +1433,7 @@ if check_password():
                                                     <div class="score-box" style="background-color:{get_flipped_gradient(total_session_score)}; font-size:26px; padding:10px 5px; min-width:70px; margin:0 auto;">
                                                         {total_session_score}
                                                     </div>
-                                                    <p style="margin:5px 0 0 0; font-size:9px; font-weight:bold; color:grey; text-transform:uppercase;">Output intensity</p>
+                                                    <p style="margin:5px 0 0 0; font-size:9px; font-weight:bold; color:grey; text-transform:uppercase;"></p>
                                                 </div>
                                             </div>
                                         </div>
