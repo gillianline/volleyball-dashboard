@@ -1417,7 +1417,7 @@ if check_password():
                                                 <div style="flex:3;">
                                                     <table class="scout-table">
                                                         <thead>
-                                                            <tr><th>Metric</th><th>Volume</th><th>Spring Max</th></tr>
+                                                            <tr><th>Metric</th><th>Summer</th><th>Spring Max</th></tr>
                                                         </thead>
                                                         <tbody>
                                                             <tr><td>Player Load</td><td>{row_day['Player Load']:.1f}</td><td>{b_load:.1f}</td></tr>
