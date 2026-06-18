@@ -1331,7 +1331,7 @@ if check_password():
                 merged_comp['Peak Change (%)'] = ((merged_comp['Summer Peak'] - merged_comp[target_spring_col]) / merged_comp[target_spring_col] * 100).fillna(0)
                 
                 # Render Clean HTML Grid Row Blocks
-                st.markdown(f"### Summer v. Spring ({comp_metric_label})")
+                st.markdown(f"### Rostered Workload Delta ({comp_metric_label})")
                 
                 tbl_html = f"""<table class="scout-table">
                     <thead>
@@ -1360,16 +1360,16 @@ if check_password():
                 st.write("<br>", unsafe_allow_html=True)
                 st.divider()
                 
-                # 6. REPLACED: Summer Practice Cards Graded against Spring Benchmarks
+                # 6. Summer Practice Cards Graded against Spring Benchmarks
                 st.markdown("### Summer Session Review Cards")
                 target_ath_comp = st.selectbox("Select Target Athlete for Session Breakdown", sorted(merged_comp['Name'].unique()), key="ss_ath_select")
                 
-                # Get this individual's photo URL and position info safely
-                try:
-                    meta_lookup = full_df_unfiltered[full_df_unfiltered['Name'] == target_ath_comp].iloc[0]
-                    correct_photo = meta_lookup['PhotoURL']
-                    pos_label = meta_lookup['Position']
-                except:
+                # Inline protection loop to secure individual metadata elements safely
+                meta_rows = full_df_unfiltered[full_df_unfiltered['Name'] == target_ath_comp]
+                if not meta_rows.empty:
+                    correct_photo = meta_rows.iloc[0].get('PhotoURL', "https://www.w3schools.com/howto/img_avatar.png")
+                    pos_label = meta_rows.iloc[0].get('Position', "N/A")
+                else:
                     correct_photo = "https://www.w3schools.com/howto/img_avatar.png"
                     pos_label = "N/A"
 
