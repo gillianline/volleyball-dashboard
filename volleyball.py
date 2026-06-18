@@ -232,7 +232,6 @@ if check_password():
 
         tabs = st.tabs(["Individual Profile", "Practice Scores", "Practice History", "Match v. Practice", "Match Summary", "Position Analysis", "Phase Analysis", "Practice Planner"])
         
-        # Build unified distinct list of names across all analytics components
         master_athlete_list = sorted(list(set(df['Name'].unique()) | set(cmj_df['Name'].unique()) | set(ash_df['Name'].unique()) | set(er_df['Name'].unique())))
         session_list = df[df['Session_Name'].notna()].sort_values('Date', ascending=False)['Session_Name'].unique().tolist()
 
@@ -273,7 +272,6 @@ if check_password():
                 curr_date_prof = p_row['Date'] if not p_row.empty else None
                 p_meta = p_row
 
-            # --- FALLBACK GENERATION FOR ATHLETES LACKING GPS TRACKS ---
             if p_row.empty:
                 curr_date_prof = pd.to_datetime(target_date_str) if selected_session_prof == tournament_label else pd.to_datetime(df['Date'].max() if not df.empty else "2026-01-01")
                 meta_lookup = df[df['Name'] == selected_athlete_prof]
@@ -309,9 +307,6 @@ if check_password():
             with c2: st.markdown(f'<table class="scout-table"><thead><tr><th>Metric</th><th>Today Total</th><th>30d Max Day</th><th>Grade</th></tr></thead><tbody>{r_html_prof}</tbody></table>', unsafe_allow_html=True)
             with c3: st.markdown(f'<div style="display:flex; justify-content:center;"><div class="score-box" style="background-color:{get_flipped_gradient(sc_prof)};">{sc_prof}</div></div><p style="text-align:center; font-weight:bold; color:grey; margin-top:10px;">SESSION SCORE</p>', unsafe_allow_html=True)
             
-            # =========================================================================
-            # --- WEEKLY READINESS PROFILE MATRICES STACK ---
-            # =========================================================================
             st.markdown('<div class="section-header">Weekly Readiness Profile</div>', unsafe_allow_html=True)
             
             # --- BLOCK 1: LOWER BODY JUMP PROFILE (CMJ) ---
@@ -347,7 +342,7 @@ if check_password():
                         </div>
                     """, unsafe_allow_html=True)
                 else:
-                    st.warning("No records logged.")
+                    st.warning("No baseline records found matching current testing threshold requirements.")
 
             with jc2:
                 if not p_cmj_hist.empty:
@@ -357,7 +352,7 @@ if check_password():
                     fig.update_layout(height=160, margin=dict(l=0, r=0, t=10, b=0), showlegend=True, legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0), template="simple_white")
                     st.plotly_chart(fig, use_container_width=True, config=LOCKED_CONFIG, key="cmj_top_chart")
                 else:
-                    st.info("No Countermovement Jump metrics logged.")
+                    st.info("No Countermovement Jump metrics logged for this profile combination.")
 
             # --- BLOCK 2: UPPER BODY ISOMETRIC PROFILE (ASH TEST) ---
             st.markdown('<hr style="display:block !important; margin:15px 0; border:0; border-top:1px solid #E5E5E7;" />', unsafe_allow_html=True)
@@ -411,7 +406,7 @@ if check_password():
                         fig_ash.update_layout(height=160, margin=dict(l=0, r=0, t=10, b=0), showlegend=True, legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0), template="simple_white")
                         st.plotly_chart(fig_ash, use_container_width=True, config=LOCKED_CONFIG, key="ash_profile_chart")
             else:
-                st.info("No ASH shoulder test records logged.")
+                st.info("No explicit ASH shoulder test dataset records parsed for this athlete.")
 
             # --- BLOCK 3: ROTATOR CUFF EXTERNAL ROTATION ROM ---
             st.markdown('<hr style="display:block !important; margin:15px 0; border:0; border-top:1px solid #E5E5E7;" />', unsafe_allow_html=True)
@@ -461,7 +456,7 @@ if check_password():
                     fig_er.update_layout(height=160, margin=dict(l=0, r=0, t=10, b=0), showlegend=True, legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0), template="simple_white")
                     st.plotly_chart(fig_er, use_container_width=True, config=LOCKED_CONFIG, key="er_profile_chart")
             else:
-                st.info("No External Rotation logs recorded.")
+                st.info("External Rotation logs recorded for this athlete profile.")
 
             st.divider()
 
@@ -477,7 +472,7 @@ if check_password():
                 fig_ph.update_yaxes(title_text="Total Jumps", secondary_y=True)
                 st.plotly_chart(fig_ph, use_container_width=True, config=LOCKED_CONFIG)
                     
-        with tabs[1]: # Tab 1: Leaderboard Gallery
+        with tabs[1]: # Tab 1: Practice Scores Leaderboard
             c_gal1, c_gal2 = st.columns(2)
             with c_gal1: selected_session_gal = st.selectbox("Session Selection", clean_session_list_prof, index=0, key="nav_sel_gal")
             with c_gal2: pos_f_gal = st.selectbox("Position Filter", ["All Positions"] + sorted([p for p in df['Position'].unique() if p != "N/A"]), key="nav_pos_gal")
@@ -552,92 +547,54 @@ if check_password():
                     if not master_df.empty:
                         fig_master = px.line(master_df, x='Display', y='Score', range_y=[0, 110])
                         prac_df = master_df[master_df['Type'] == 'Practice']
-                        if not prac_df.empty: fig_master.add_trace(go.Scatter(x=prac_df['Display'], y=prac_df['Score'], mode='markers+text', text=prac_df['Score'], textposition="top center", name="Practice", marker=dict(size=8, color='#4895DB')))
+                        if not prac_df.empty: fig_master.add_trace(go.Scatter(x=prac_df['Display'], y=prac_df['Score'], mode='markers', name="Practice", marker=dict(size=8, color='#4895DB')))
                         match_df_line = master_df[master_df['Type'] == 'Match']
-                        if not match_df_line.empty: fig_master.add_trace(go.Scatter(x=match_df_line['Display'], y=match_df_line['Score'], mode='markers+text', text=[f"<b>{s}</b>" for s in match_df_line['Score']], textposition="top center", name="Match Day", marker=dict(size=15, color='#FF8200')))
-                        fig_master.update_layout(template="simple_white", height=380, legend=dict(orientation="h", y=-0.2, x=0.5, xanchor="center"))
+                        if not match_df_line.empty: fig_master.add_trace(go.Scatter(x=match_df_line['Display'], y=match_df_line['Score'], mode='markers', name="Match Day", marker=dict(size=15, color='#FF8200')))
+                        fig_master.update_layout(template="simple_white", height=350, showlegend=True, legend=dict(orientation="h", y=-0.2, x=0.5, xanchor="center"))
                         st.plotly_chart(fig_master, use_container_width=True)
-                else:
-                    st.info("No data logged.")
 
-                # --- MULTI-SHEET TIMELINE ALIGNMENT FOR HISTORICAL READINESS ---
-                st.markdown("### Combined Lower & Upper Body Kinetics History")
+                # --- NEW SEPARATED KINETICS & ROM DATA VIEWS ---
+                st.markdown("### Separated Neuromuscular Kinetics History")
                 ath_cmj = cmj_df[cmj_df['Name'] == sel_ath_hist].sort_values('Test Date')
                 ath_ash = ash_df[ash_df['Name'] == sel_ath_hist].sort_values('Test Date')
                 ath_er = er_df[er_df['Name'] == sel_ath_hist].sort_values('Test Date')
 
-                if selected_season == 'Summer':
-                    baseline_cmj = ath_cmj[ath_cmj['Season'] == 'Summer'].head(1)
+                # 1. Countermovement Jump (CMJ) Block
+                st.markdown("#### Lower Body: Countermovement Jump Performance")
+                if not ath_cmj.empty:
+                    fig_cmj_separate = make_subplots(specs=[[{"secondary_y": True}]])
+                    fig_cmj_separate.add_trace(go.Scatter(x=ath_cmj['Test Date'], y=ath_cmj[cmj_col], name="Jump Height (cm)", mode='lines+markers', line=dict(color='#FF8200', width=2.5)), secondary_y=False)
+                    fig_cmj_separate.add_trace(go.Scatter(x=ath_cmj['Test Date'], y=ath_cmj[rsi_col], name="RSI Modified", mode='lines+markers', line=dict(color='#4895DB', width=2, dash='dot')), secondary_y=True)
+                    fig_cmj_separate.update_layout(height=260, template="simple_white", showlegend=True, legend=dict(orientation="h", y=-0.3, x=0, xanchor="left"))
+                    st.plotly_chart(fig_cmj_separate, use_container_width=True, key="sep_cmj_chart")
+                    st.dataframe(ath_cmj[['Test Date', cmj_col, rsi_col]].rename(columns={'Test Date': 'Date'}), use_container_width=True, hide_index=True)
                 else:
-                    baseline_cmj = cmj_df[(cmj_df['Name'] == sel_ath_hist) & (cmj_df['Week'] == 4)]
+                    st.info("No countermovement jump logs tracking for this athlete profile.")
 
-                if not baseline_cmj.empty:
-                    base_row = baseline_cmj.iloc[-1]
-                    all_testing_dates = pd.Index(set(ath_cmj['Test Date'].dropna()) | set(ath_ash['Test Date'].dropna()) | set(ath_er['Test Date'].dropna())).sort_values()
+                # 2. ASH shoulder isometric block
+                st.markdown("#### Upper Body: ASH Shoulder Isometric Forces")
+                ash_i_plot = ath_ash[ath_ash['Isometric Type'].str.contains('I', case=False, na=False)] if not ath_ash.empty else pd.DataFrame()
+                if not ash_i_plot.empty:
+                    fig_ash_separate = go.Figure()
+                    fig_ash_separate.add_trace(go.Scatter(x=ash_i_plot['Test Date'], y=ash_i_plot['Peak Vertical Force [N] (L)'], name="Left Peak Force (N)", mode='lines+markers', line=dict(color='#4895DB', width=2.5)))
+                    fig_ash_separate.add_trace(go.Scatter(x=ash_i_plot['Test Date'], y=ash_i_plot['Peak Vertical Force [N] (R)'], name="Right Peak Force (N)", mode='lines+markers', line=dict(color='#FF8200', width=2.5, dash='dash')))
+                    fig_ash_separate.update_layout(height=260, template="simple_white", showlegend=True, legend=dict(orientation="h", y=-0.3, x=0, xanchor="left"))
+                    st.plotly_chart(fig_ash_separate, use_container_width=True, key="sep_ash_chart")
+                    st.dataframe(ash_i_plot[['Test Date', 'Peak Vertical Force [N] (L)', 'Peak Vertical Force [N] (R)', 'Peak Vertical Force [N] (Asym)(%)']].rename(columns={'Test Date': 'Date'}), use_container_width=True, hide_index=True)
+                else:
+                    st.info("No shoulder isometric data points logging for this athlete profile.")
 
-                    comparison_list = []
-                    for t_date in all_testing_dates:
-                        cmj_day = ath_cmj[ath_cmj['Test Date'] == t_date]
-                        ash_day = ath_ash[ash_df['Test Date'] == t_date]
-                        er_day = ath_er[er_df['Test Date'] == t_date]
-
-                        h_val = cmj_day.iloc[-1][cmj_col] if not cmj_day.empty else None
-                        rsi_val = cmj_day.iloc[-1][rsi_col] if not cmj_day.empty else None
-                        
-                        ash_i_filter = ash_day[ash_day['Isometric Type'].str.contains('I', case=False, na=False)]
-                        li_val = ash_i_filter.iloc[-1]['Peak Vertical Force [N] (L)'] if not ash_i_filter.empty else None
-                        ri_val = ash_i_filter.iloc[-1]['Peak Vertical Force [N] (R)'] if not ash_i_filter.empty else None
-                        asym_val = ash_i_filter.iloc[-1]['Peak Vertical Force [N] (Asym)(%)'] if not ash_i_filter.empty else None
-                        
-                        er_l_val = er_day.iloc[-1]['L Max ROM (°)'] if not er_day.empty else None
-                        er_r_val = er_day.iloc[-1]['R Max ROM (°)'] if not er_day.empty else None
-                        er_asym_val = er_day.iloc[-1]['ROM Asymmetry (%)'] if not er_day.empty else None
-
-                        raw_diff = (h_val - base_row[cmj_col]) if h_val else 0.0
-                        display_diff = f"{raw_diff:+.1f} cm" if h_val else "N/A"
-
-                        comparison_list.append({
-                            "Date": t_date.strftime('%m/%d/%Y'),
-                            "Height": f"{h_val:.1f} cm" if h_val else "N/A",
-                            "Raw Diff": raw_diff,
-                            "Display Diff": display_diff,
-                            "RSI": f"{rsi_val:.2f}" if rsi_val else "N/A",
-                            "ASH_F": f"L: {li_val:.0f} / R: {ri_val:.0f}" if li_val and ri_val else "N/A",
-                            "ASH_ASYM": f"{asym_val:+.1f}%" if asym_val else "N/A",
-                            "ER_ROM": f"L: {er_l_val:.1f}° / R: {er_r_val:.1f}°" if er_l_val and er_r_val else "N/A",
-                            "ER_ASYM": f"{er_asym_val:+.1f}%" if er_asym_val else "N/A"
-                        })
-
-                    cmj_table_html = """<table class="scout-table">
-                                        <thead><tr style="background-color: #f0f2f6; font-weight: bold;">
-                                            <th>Test Date</th><th>Jump Height</th><th>Vs. Baseline</th><th>RSI-mod</th>
-                                            <th>ASH Forces (I)</th><th>ASH Asym %</th><th>ER Max ROM</th><th>ER Asym %</th>
-                                        </tr></thead><tbody>"""
-                    for item in comparison_list:
-                        color = "#28a745" if item['Raw Diff'] >= 0 else "#dc3545"
-                        if item['Height'] == "N/A": color = "#1D1D1F"
-                        cmj_table_html += f"""<tr>
-                            <td>{item['Date']}</td><td>{item['Height']}</td>
-                            <td style="font-weight: bold; color: {color};">{item['Display Diff']}</td><td>{item['RSI']}</td>
-                            <td style="font-weight:700;">{item['ASH_F']}</td><td style="font-weight:700;">{item['ASH_ASYM']}</td>
-                            <td style="font-weight:700;">{item['ER_ROM']}</td><td style="font-weight:700;">{item['ER_ASYM']}</td>
-                        </tr>"""
-                    st.markdown(cmj_table_html + "</tbody></table>", unsafe_allow_html=True)
-
-                    # Kinetics & ROM Joint Coordinated Plot (With Clean Legend Labels Enabled)
-                    fig_cmj = make_subplots(specs=[[{"secondary_y": True}]])
-                    if not ath_cmj.empty:
-                        fig_cmj.add_trace(go.Scatter(x=ath_cmj['Test Date'], y=ath_cmj[cmj_col], name="Jump Height (cm)", mode='lines+markers', line=dict(color='#4895DB', width=3)), secondary_y=False)
-                    if not ath_ash.empty:
-                        ash_i_plot = ath_ash[ath_ash['Isometric Type'].str.contains('I', case=False, na=False)]
-                        if not ash_i_plot.empty:
-                            fig_cmj.add_trace(go.Scatter(x=ash_i_plot['Test Date'], y=ash_i_plot['Peak Vertical Force [N] (L)'], name="ASH Left Force (N)", mode='lines+markers', line=dict(color='#FF8200', width=2)), secondary_y=False)
-                    if not ath_er.empty:
-                        fig_cmj.add_trace(go.Scatter(x=ath_er['Test Date'], y=ath_er['L Max ROM (°)'], name="ER Left ROM (°)", mode='lines+markers', line=dict(color='#A52A2A', width=2)), secondary_y=True)
-                    
-                    fig_cmj.add_hline(y=base_row[cmj_col], line_dash="dash", line_color="red", name="Baseline Jump Height")
-                    fig_cmj.update_layout(height=380, template="simple_white", showlegend=True, legend=dict(orientation="h", y=-0.3, x=0.5, xanchor="center"))
-                    st.plotly_chart(fig_cmj, use_container_width=True)
+                # 3. External Rotation ROM Block
+                st.markdown("#### Flexibility: External Rotation Range of Motion")
+                if not ath_er.empty:
+                    fig_er_separate = go.Figure()
+                    fig_er_separate.add_trace(go.Scatter(x=ath_er['Test Date'], y=ath_er['L Max ROM (°)'], name="Left Max ROM (°)", mode='lines+markers', line=dict(color='#A52A2A', width=2.5)))
+                    fig_er_separate.add_trace(go.Scatter(x=ath_er['Test Date'], y=ath_er['R Max ROM (°)'], name="Right Max ROM (°)", mode='lines+markers', line=dict(color='#FF8200', width=2.5, dash='dot')))
+                    fig_er_separate.update_layout(height=260, template="simple_white", showlegend=True, legend=dict(orientation="h", y=-0.3, x=0, xanchor="left"))
+                    st.plotly_chart(fig_er_separate, use_container_width=True, key="sep_er_chart")
+                    st.dataframe(ath_er[['Test Date', 'L Max ROM (°)', 'R Max ROM (°)', 'ROM Asymmetry (%)']].rename(columns={'Test Date': 'Date'}), use_container_width=True, hide_index=True)
+                else:
+                    st.info("No range of motion benchmarks tracked for this profile.")
 
             with sub_tabs[1]:
                 avail_weeks = sorted(df['Week'].unique(), reverse=True)
@@ -691,13 +648,44 @@ if check_password():
                     st.markdown(f"#### Match Summary Profile: {name}")
                     st.dataframe(ad[['Session_Name', 'Total Jumps', 'Player Load', 'Explosive Efforts']], use_container_width=True, hide_index=True)
 
-        with tabs[5]: # Tab 5: Position Trends Matrix
+        with tabs[5]: # Tab 5: Position Trends Matrix & Card View RESTORED
             st.markdown('<div class="section-header">Positional Performance Tracking Over Time</div>', unsafe_allow_html=True)
             pos_filter_an = st.selectbox("Select Position Group to Monitor", sorted([p for p in df['Position'].unique() if p != "N/A"]), key="pos_an_filt_t5")
-            tr_df = df[df['Position'] == pos_filter_an]
+            
+            tr_df = df[df['Position'] == pos_filter_an].copy()
             if not tr_df.empty:
-                pos_sums = tr_df.groupby(['Week', 'Name'])[['Player Load', 'Total Jumps']].sum().reset_index()
-                st.dataframe(pos_sums, use_container_width=True, hide_index=True)
+                pos_sums = tr_df.groupby('Name')[['Player Load', 'Total Jumps', 'Jump Load', 'Duration']].mean().reset_index()
+                
+                # Render Graphic Trends comparing group
+                fig_pos = px.bar(pos_sums, x='Name', y=['Player Load', 'Total Jumps'], barmode='group',
+                                 title=f"Average Output Distribution: {pos_filter_an}",
+                                 color_discrete_sequence=['#4895DB', '#FF8200'])
+                fig_pos.update_layout(template="simple_white", height=320, legend=dict(orientation="h", y=-0.2, x=0.5, xanchor="center"))
+                st.plotly_chart(fig_pos, use_container_width=True)
+                
+                st.markdown("#### Position Squad Profile Summaries")
+                for index, row in pos_sums.iterrows():
+                    meta_lookup = tr_df[tr_df['Name'] == row['Name']]
+                    photo_val = meta_lookup['PhotoURL'].iloc[0] if not meta_lookup.empty else "https://www.w3schools.com/howto/img_avatar.png"
+                    
+                    st.markdown(f"""
+                        <div style="border:1px solid #E5E5E7; border-radius:12px; padding:15px; margin-bottom:15px; background-color:white;">
+                            <div style="display:flex; align-items:center; gap:20px;">
+                                <img src="{photo_val}" style="border-radius:50%; width:70px; height:70px; object-fit:cover; border:3px solid #FF8200;">
+                                <div>
+                                    <h5 style="margin:0; color:#1D1D1F; font-size:16px;"><b>{row['Name']}</b></h5>
+                                    <p style="margin:2px 0 0 0; color:grey; font-size:12px;">Avg Workload Duration: {row['Duration']:.1f} mins</p>
+                                </div>
+                                <div style="margin-left:auto; display:flex; gap:30px; text-align:center;">
+                                    <div><span style="display:block; font-size:18px; font-weight:800; color:#4895DB;">{row['Player Load']:.1f}</span><span style="font-size:10px; color:grey; text-transform:uppercase;">Avg Load</span></div>
+                                    <div><span style="display:block; font-size:18px; font-weight:800; color:#FF8200;">{row['Total Jumps']:.0f}</span><span style="font-size:10px; color:grey; text-transform:uppercase;">Avg Jumps</span></div>
+                                    <div><span style="display:block; font-size:18px; font-weight:800; color:#A52A2A;">{row['Jump Load']:.1f}</span><span style="font-size:10px; color:grey; text-transform:uppercase;">Jump Load</span></div>
+                                </div>
+                            </div>
+                        </div>
+                    """, unsafe_allow_html=True)
+            else:
+                st.info("No historical entries matched this positional designation layer.")
 
         with tabs[6]: # Tab 6: Phase Work Index Matrix
             st.markdown('<div class="section-header">Work Index Density Matrix by Training Drill</div>', unsafe_allow_html=True)
