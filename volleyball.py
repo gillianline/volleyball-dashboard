@@ -324,24 +324,46 @@ if check_password():
                     baseline_cmj = p_cmj_hist[p_cmj_hist['Season'] == 'Summer'].head(1)
                 else:
                     baseline_cmj = cmj_df[(cmj_df['Name'] == selected_athlete_prof) & (cmj_df['Week'] == 4)]
-                
+    
                 if not baseline_cmj.empty and not p_cmj_hist.empty:
                     base_h = baseline_cmj.iloc[-1][cmj_col]
                     base_rsi = baseline_cmj.iloc[-1][rsi_col]
                     latest_cmj = p_cmj_hist.iloc[-1]
                     cur_h, cur_rsi = latest_cmj[cmj_col], latest_cmj[rsi_col]
-                    p_diff = ((cur_h - base_h) / base_h) * 100 if base_h > 0 else 0
-                    label, color = (" ", "#28a745") if cur_h >= base_h and cur_rsi >= base_rsi else (" ", "#dc3545") if cur_h < base_h and cur_rsi < base_rsi else (" ", "#ffc107")
+        
+                    # Calculate percentage differences for the details section
+                    p_diff_h = ((cur_h - base_h) / base_h * 100) if base_h > 0 else 0
+                    p_diff_rsi = ((cur_rsi - base_rsi) / base_rsi * 100) if base_rsi > 0 else 0
+        
+                    # Colors based on whether current value meets or exceeds baseline thresholds
+                    color_h = "#28a745" if cur_h >= base_h else "#dc3545"
+                    color_rsi = "#28a745" if cur_rsi >= base_rsi else "#dc3545"
+
+                    # Side-by-side split columns for raw metric boxes
+                    sc1, sc2 = st.columns(2)
+                    with sc1:
+                        st.markdown(f"""
+                            <div style="text-align:center;">
+                                <div class="score-box" style="background-color:{color_h}; line-height:1.2; padding-top:15px; height:80px; width:100%;">
+                                    <span style="font-size:18px;">{cur_h:.1f} cm</span>
+                                    <span style="font-size:10px; display:block; font-weight:bold; margin-top:2px;">CMJ HEIGHT</span>
+                                </div>
+                            </div>
+                        """, unsafe_allow_html=True)
+                    with sc2:
+                        st.markdown(f"""
+                            <div style="text-align:center;">
+                                <div class="score-box" style="background-color:{color_rsi}; line-height:1.2; padding-top:15px; height:80px; width:100%;">
+                                    <span style="font-size:18px;">{cur_rsi:.2f}</span>
+                                    <span style="font-size:10px; display:block; font-weight:bold; margin-top:2px;">RSI MOD</span>
+                                </div>
+                            </div>
+                        """, unsafe_allow_html=True)
 
                     st.markdown(f"""
-                        <div style="text-align:center;">
-                            <div class="score-box" style="background-color:{color}; line-height:1.2; padding-top:15px; height:80px; width:100%;">
-                                <span style="font-size:18px;">{p_diff:+.1f}%</span>
-                                <span style="font-size:10px; display:block; font-weight:bold; margin-top:2px;">{label}</span>
-                            </div>
-                        </div>
                         <div class="info-box" style="text-align:center; margin-top:10px;">
-                            <p style="margin:0; font-size:13px; color:#FF8200;"><b>CMJ:</b> {cur_h:.1f} cm (Base: {base_h:.1f})</p>
+                            <p style="margin:0; font-size:11px; color:grey;"><b>% Change from Base:</b> CMJ: {p_diff_h:+.1f}% | RSI: {p_diff_rsi:+.1f}%</p>
+                            <p style="margin:0; font-size:11px; color:grey;"><b>Base Values:</b> CMJ: {base_h:.1f} cm | RSI: {base_rsi:.2f}</p>
                         </div>
                     """, unsafe_allow_html=True)
                 else:
