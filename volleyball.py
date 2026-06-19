@@ -453,22 +453,36 @@ if check_password():
             
                         rom_pct_l = ((cur_l_rom - base_l_rom) / base_l_rom * 100) if base_l_rom > 0 else 0
                         rom_pct_r = ((cur_r_rom - base_r_rom) / base_r_rom * 100) if base_r_rom > 0 else 0
-                        er_avg_diff = (rom_pct_l + rom_pct_r) / 2
             
-                        # Use the lowest current ROM between L and R to determine the color status
-                        min_current_rom = min(cur_l_rom, cur_r_rom)
+                        # Color thresholds applied individually to Left and Right current values
+                        color_er_l = "#28a745" if cur_l_rom >= 110 else "#ffc107" if 90 <= cur_l_rom <= 109 else "#dc3545"
+                        color_er_r = "#28a745" if cur_r_rom >= 110 else "#ffc107" if 90 <= cur_r_rom <= 109 else "#dc3545"
             
-                        # New color assignment logic based on ROM thresholds
-                        label_er, color_er = (" ", "#28a745") if min_current_rom >= 110 else (" ", "#ffc107") if 90 <= min_current_rom <= 109 else (" ", "#dc3545")
-            
-                        st.markdown(f"""
-                            <div style="text-align:center;">
-                                <div class="score-box" style="background-color:{color_er}; line-height:1.2; padding-top:15px; height:80px; width:100%;">
-                                    <span style="font-size:18px;">{cur_asym_rom:+.1f}%</span>
-                                    <span style="font-size:10px; display:block; font-weight:bold; margin-top:2px;">{label_er} (Asym ROM)</span>
+                        # Nested layout: Split the metric zone into two side-by-side columns
+                        sc1, sc2 = st.columns(2)
+                        with sc1:
+                            st.markdown(f"""
+                                <div style="text-align:center;">
+                                    <div class="score-box" style="background-color:{color_er_l}; line-height:1.2; padding-top:15px; height:80px; width:100%;">
+                                        <span style="font-size:18px;">{rom_pct_l:+.1f}%</span>
+                                        <span style="font-size:10px; display:block; font-weight:bold; margin-top:2px;">LEFT</span>
+                                    </div>
                                 </div>
-                            </div>
+                            """, unsafe_allow_html=True)
+                        with sc2:
+                            st.markdown(f"""
+                                <div style="text-align:center;">
+                                    <div class="score-box" style="background-color:{color_er_r}; line-height:1.2; padding-top:15px; height:80px; width:100%;">
+                                        <span style="font-size:18px;">{rom_pct_r:+.1f}%</span>
+                                        <span style="font-size:10px; display:block; font-weight:bold; margin-top:2px;">RIGHT</span>
+                                    </div>
+                                </div>
+                            """, unsafe_allow_html=True)
+
+                        # Labels and text block placed directly beneath the two indicator boxes
+                        st.markdown(f"""
                             <div class="info-box" style="text-align:center; margin-top:10px;">
+                                <p style="margin:0; font-size:11px; color:grey;"><b>Asymmetry:</b> {cur_asym_rom:+.1f}%</p>
                                 <p style="margin:0; font-size:11px; color:grey;"><b>Base ROM:</b> L: {base_l_rom:.1f}° | R: {base_r_rom:.1f}°</p>
                                 <p style="margin:0; font-size:13px; color:#FF8200;"><b>Today ROM:</b> L: {cur_l_rom:.1f}° | R: {cur_r_rom:.1f}°</p>
                             </div>
