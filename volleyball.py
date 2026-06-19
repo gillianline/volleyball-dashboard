@@ -360,7 +360,7 @@ if check_password():
             # --- BLOCK 2: UPPER BODY ISOMETRIC PROFILE (ASH TEST) ---
             st.markdown('<hr style="display:block !important; margin:15px 0; border:0; border-top:1px solid #E5E5E7;" />', unsafe_allow_html=True)
             st.markdown('<h4 style="color:#4895DB; font-weight:800; margin-bottom:5px;">UPPER BODY: ASH SHOULDER ISOMETRIC</h4>', unsafe_allow_html=True)
-            
+                
             p_ash_all = ash_df[(ash_df['Name'] == selected_athlete_prof) & (ash_df['Test Date'] <= curr_date_prof)].sort_values('Test Date')
             
             if not p_ash_all.empty:
@@ -385,17 +385,17 @@ if check_password():
                     pct_l = ((li - base_li) / base_li * 100) if base_li > 0 else 0
                     pct_r = ((ri - base_ri) / base_ri * 100) if base_ri > 0 else 0
         
-                    # Color thresholds applied individually (100+ Green, <100 Red)
+                    # Color thresholds: 100+ Green, <100 Red
                     color_ash_l = "#28a745" if li >= 100 else "#dc3545"
                     color_ash_r = "#28a745" if ri >= 100 else "#dc3545"
 
-                    # Split the container into two columns for Left and Right boxes
+                    # Side-by-side Left/Right boxes containing raw force numbers (N)
                     sc1, sc2 = st.columns(2)
                     with sc1:
                         st.markdown(f"""
                             <div style="text-align:center;">
                                 <div class="score-box" style="background-color:{color_ash_l}; line-height:1.2; padding-top:15px; height:80px; width:100%;">
-                                    <span style="font-size:18px;">{pct_l:+.1f}%</span>
+                                    <span style="font-size:18px;">{li:.0f} N</span>
                                     <span style="font-size:10px; display:block; font-weight:bold; margin-top:2px;">LEFT</span>
                                 </div>
                             </div>
@@ -404,7 +404,7 @@ if check_password():
                         st.markdown(f"""
                             <div style="text-align:center;">
                                 <div class="score-box" style="background-color:{color_ash_r}; line-height:1.2; padding-top:15px; height:80px; width:100%;">
-                                    <span style="font-size:18px;">{pct_r:+.1f}%</span>
+                                    <span style="font-size:18px;">{ri:.0f} N</span>
                                     <span style="font-size:10px; display:block; font-weight:bold; margin-top:2px;">RIGHT</span>
                                 </div>
                             </div>
@@ -413,8 +413,8 @@ if check_password():
                     st.markdown(f"""
                         <div class="info-box" style="text-align:center; margin-top:10px;">
                             <p style="margin:0; font-size:11px; color:grey;"><b>Asymmetry:</b> {asym_i:+.1f}%</p>
+                            <p style="margin:0; font-size:11px; color:grey;"><b>% Change from Base:</b> L: {pct_l:+.1f}% | R: {pct_r:+.1f}%</p>
                             <p style="margin:0; font-size:11px; color:grey;"><b>Base Force:</b> L: {base_li:.0f} N | R: {base_ri:.0f} N</p>
-                            <p style="margin:0; font-size:13px; color:#FF8200;"><b>Today Force:</b> L: {li:.0f} N | R: {ri:.0f} N</p>
                         </div>
                     """, unsafe_allow_html=True)
                 with ac2:
@@ -454,17 +454,17 @@ if check_password():
                         rom_pct_l = ((cur_l_rom - base_l_rom) / base_l_rom * 100) if base_l_rom > 0 else 0
                         rom_pct_r = ((cur_r_rom - base_r_rom) / base_r_rom * 100) if base_r_rom > 0 else 0
             
-                        # Color thresholds applied individually to Left and Right current values
+                        # Color thresholds: 110+ Green, 90-109 Yellow, <90 Red
                         color_er_l = "#28a745" if cur_l_rom >= 110 else "#ffc107" if 90 <= cur_l_rom <= 109 else "#dc3545"
                         color_er_r = "#28a745" if cur_r_rom >= 110 else "#ffc107" if 90 <= cur_r_rom <= 109 else "#dc3545"
             
-                        # Nested layout: Split the metric zone into two side-by-side columns
-                        sc1, sc2 = st.columns(2)
-                        with sc1:
+                            # Side-by-side Left/Right boxes containing raw ROM degrees (°)
+                            sc1, sc2 = st.columns(2)
+                                            with sc1:
                             st.markdown(f"""
                                 <div style="text-align:center;">
                                     <div class="score-box" style="background-color:{color_er_l}; line-height:1.2; padding-top:15px; height:80px; width:100%;">
-                                        <span style="font-size:18px;">{rom_pct_l:+.1f}%</span>
+                                        <span style="font-size:18px;">{cur_l_rom:.1f}°</span>
                                         <span style="font-size:10px; display:block; font-weight:bold; margin-top:2px;">LEFT</span>
                                     </div>
                                 </div>
@@ -473,20 +473,19 @@ if check_password():
                             st.markdown(f"""
                                 <div style="text-align:center;">
                                     <div class="score-box" style="background-color:{color_er_r}; line-height:1.2; padding-top:15px; height:80px; width:100%;">
-                                        <span style="font-size:18px;">{rom_pct_r:+.1f}%</span>
+                                        <span style="font-size:18px;">{cur_r_rom:.1f}°</span>
                                         <span style="font-size:10px; display:block; font-weight:bold; margin-top:2px;">RIGHT</span>
                                     </div>
                                 </div>
                             """, unsafe_allow_html=True)
 
-                        # Labels and text block placed directly beneath the two indicator boxes
-                        st.markdown(f"""
-                            <div class="info-box" style="text-align:center; margin-top:10px;">
-                                <p style="margin:0; font-size:11px; color:grey;"><b>Asymmetry:</b> {cur_asym_rom:+.1f}%</p>
-                                <p style="margin:0; font-size:11px; color:grey;"><b>Base ROM:</b> L: {base_l_rom:.1f}° | R: {base_r_rom:.1f}°</p>
-                                <p style="margin:0; font-size:13px; color:#FF8200;"><b>Today ROM:</b> L: {cur_l_rom:.1f}° | R: {cur_r_rom:.1f}°</p>
-                            </div>
-                        """, unsafe_allow_html=True)
+                    st.markdown(f"""
+                        <div class="info-box" style="text-align:center; margin-top:10px;">
+                            <p style="margin:0; font-size:11px; color:grey;"><b>Asymmetry:</b> {cur_asym_rom:+.1f}%</p>
+                            <p style="margin:0; font-size:11px; color:grey;"><b>% Change from Base:</b> L: {rom_pct_l:+.1f}% | R: {rom_pct_r:+.1f}%</p>
+                            <p style="margin:0; font-size:11px; color:grey;"><b>Base ROM:</b> L: {base_l_rom:.1f}° | R: {base_r_rom:.1f}°</p>
+                        </div>
+                    """, unsafe_allow_html=True)
                 with ec2:
                     fig_er = go.Figure()
                     fig_er.add_trace(go.Scatter(x=p_er_hist['Test Date'], y=p_er_hist['L Max ROM (°)'], name="Left Max ROM", mode='lines+markers', line=dict(color='#4895DB', width=2.5)))
