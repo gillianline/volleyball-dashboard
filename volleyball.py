@@ -369,33 +369,50 @@ if check_password():
                     latest_date_ash = p_ash_all['Test Date'].iloc[-1]
                     today_ash_rows = p_ash_all[p_ash_all['Test Date'] == latest_date_ash]
                     row_i = today_ash_rows[today_ash_rows['Isometric Type'].str.contains('I', case=False, na=False)]
-                    
+        
                     li = row_i.iloc[-1]['Peak Vertical Force [N] (L)'] if not row_i.empty else 0.0
                     ri = row_i.iloc[-1]['Peak Vertical Force [N] (R)'] if not row_i.empty else 0.0
                     asym_i = row_i.iloc[-1]['Peak Vertical Force [N] (Asym)(%)'] if not row_i.empty else 0.0
-                    
+        
                     if selected_season == 'Summer':
                         baseline_ash = p_ash_all[(p_ash_all['Season'] == 'Summer') & (p_ash_all['Isometric Type'].str.contains('I', case=False, na=False))].head(1)
                     else:
                         baseline_ash = p_ash_all[p_ash_all['Isometric Type'].str.contains('I', case=False, na=False)].head(1)
-                    
+        
                     base_li = baseline_ash.iloc[-1]['Peak Vertical Force [N] (L)'] if not baseline_ash.empty else 0.0
                     base_ri = baseline_ash.iloc[-1]['Peak Vertical Force [N] (R)'] if not baseline_ash.empty else 0.0
-                    
+        
                     pct_l = ((li - base_li) / base_li * 100) if base_li > 0 else 0
                     pct_r = ((ri - base_ri) / base_ri * 100) if base_ri > 0 else 0
-                    ash_avg_diff = (pct_l + pct_r) / 2
-                    
-                    label_ash, color_ash = (" ", "#28a745") if ash_avg_diff >= 0 and abs(asym_i) <= 10 else (" ", "#dc3545") if ash_avg_diff < -8 else (" ", "#ffc107")
+        
+                    # Color thresholds applied individually (100+ Green, <100 Red)
+                    color_ash_l = "#28a745" if li >= 100 else "#dc3545"
+                    color_ash_r = "#28a745" if ri >= 100 else "#dc3545"
+
+                    # Split the container into two columns for Left and Right boxes
+                    sc1, sc2 = st.columns(2)
+                    with sc1:
+                        st.markdown(f"""
+                            <div style="text-align:center;">
+                                <div class="score-box" style="background-color:{color_ash_l}; line-height:1.2; padding-top:15px; height:80px; width:100%;">
+                                    <span style="font-size:18px;">{pct_l:+.1f}%</span>
+                                    <span style="font-size:10px; display:block; font-weight:bold; margin-top:2px;">LEFT</span>
+                                </div>
+                            </div>
+                        """, unsafe_allow_html=True)
+                    with sc2:
+                        st.markdown(f"""
+                            <div style="text-align:center;">
+                                <div class="score-box" style="background-color:{color_ash_r}; line-height:1.2; padding-top:15px; height:80px; width:100%;">
+                                    <span style="font-size:18px;">{pct_r:+.1f}%</span>
+                                    <span style="font-size:10px; display:block; font-weight:bold; margin-top:2px;">RIGHT</span>
+                                </div>
+                            </div>
+                        """, unsafe_allow_html=True)
 
                     st.markdown(f"""
-                        <div style="text-align:center;">
-                            <div class="score-box" style="background-color:{color_ash}; line-height:1.2; padding-top:15px; height:80px; width:100%;">
-                                <span style="font-size:18px;">{ash_avg_diff:+.1f}%</span>
-                                <span style="font-size:10px; display:block; font-weight:bold; margin-top:2px;">{label_ash} (Asym: {asym_i:+.1f}%)</span>
-                            </div>
-                        </div>
                         <div class="info-box" style="text-align:center; margin-top:10px;">
+                            <p style="margin:0; font-size:11px; color:grey;"><b>Asymmetry:</b> {asym_i:+.1f}%</p>
                             <p style="margin:0; font-size:11px; color:grey;"><b>Base Force:</b> L: {base_li:.0f} N | R: {base_ri:.0f} N</p>
                             <p style="margin:0; font-size:13px; color:#FF8200;"><b>Today Force:</b> L: {li:.0f} N | R: {ri:.0f} N</p>
                         </div>
@@ -424,22 +441,26 @@ if check_password():
                         baseline_er = p_er_hist[p_er_hist['Season'] == 'Summer'].head(1)
                     else:
                         baseline_er = p_er_hist.head(1)
-                        
+            
                     if not baseline_er.empty:
                         base_l_rom = baseline_er.iloc[-1]['L Max ROM (°)']
                         base_r_rom = baseline_er.iloc[-1]['R Max ROM (°)']
-                        
+            
                         latest_er = p_er_hist.iloc[-1]
                         cur_l_rom = latest_er['L Max ROM (°)']
                         cur_r_rom = latest_er['R Max ROM (°)']
                         cur_asym_rom = latest_er['ROM Asymmetry (%)']
-                        
+            
                         rom_pct_l = ((cur_l_rom - base_l_rom) / base_l_rom * 100) if base_l_rom > 0 else 0
                         rom_pct_r = ((cur_r_rom - base_r_rom) / base_r_rom * 100) if base_r_rom > 0 else 0
                         er_avg_diff = (rom_pct_l + rom_pct_r) / 2
-                        
-                        label_er, color_er = (" ", "#28a745") if er_avg_diff >= 0 and abs(cur_asym_rom) <= 10 else (" ", "#dc3545") if er_avg_diff < -6 else (" ", "#ffc107")
-                        
+            
+                        # Use the lowest current ROM between L and R to determine the color status
+                        min_current_rom = min(cur_l_rom, cur_r_rom)
+            
+                        # New color assignment logic based on ROM thresholds
+                        label_er, color_er = (" ", "#28a745") if min_current_rom >= 110 else (" ", "#ffc107") if 90 <= min_current_rom <= 109 else (" ", "#dc3545")
+            
                         st.markdown(f"""
                             <div style="text-align:center;">
                                 <div class="score-box" style="background-color:{color_er}; line-height:1.2; padding-top:15px; height:80px; width:100%;">
