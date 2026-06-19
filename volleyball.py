@@ -458,9 +458,9 @@ if check_password():
                         color_er_l = "#28a745" if cur_l_rom >= 110 else "#ffc107" if 90 <= cur_l_rom <= 109 else "#dc3545"
                         color_er_r = "#28a745" if cur_r_rom >= 110 else "#ffc107" if 90 <= cur_r_rom <= 109 else "#dc3545"
             
-                            # Side-by-side Left/Right boxes containing raw ROM degrees (°)
-                            sc1, sc2 = st.columns(2)
-                                            with sc1:
+                        # Side-by-side Left/Right boxes containing raw ROM degrees (°)
+                        sc1, sc2 = st.columns(2)
+                        with sc1:
                             st.markdown(f"""
                                 <div style="text-align:center;">
                                     <div class="score-box" style="background-color:{color_er_l}; line-height:1.2; padding-top:15px; height:80px; width:100%;">
