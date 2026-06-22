@@ -313,7 +313,7 @@ if check_password():
             st.markdown('<div class="section-header">Weekly Readiness Profile</div>', unsafe_allow_html=True)
             
             # --- BLOCK 1: LOWER BODY JUMP PROFILE (CMJ) ---
-            st.markdown('<h4 style="color:#4895DB; font-weight:800; margin-bottom:5px;">LOWER BODY: COUNTERMOVEMENT JUMP</h4>', unsafe_allow_html=True)
+            st.markdown('<h4 style="color:#4895DB; font-weight:800; margin-bottom:5px;">COUNTERMOVEMENT JUMP</h4>', unsafe_allow_html=True)
             jc1, jc2 = st.columns([1.5, 3.5])
             p_cmj_hist = cmj_df[(cmj_df['Name'] == selected_athlete_prof) & (cmj_df['Test Date'] <= curr_date_prof)].sort_values('Test Date')
             cmj_col = 'Jump Height (Imp-Mom) [cm]'
