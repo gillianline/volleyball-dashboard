@@ -1343,7 +1343,7 @@ if check_password():
         # NEW TAB 8: SPRING V. SUMMER PRACTICES
         # =========================================================================
         with tabs[8]:
-            st.markdown('<div class="section-header">Spring Benchmarks vs. Summer Development</div>', unsafe_allow_html=True)
+            st.markdown('<div class="section-header">Spring Max vs. Summer Open Gym</div>', unsafe_allow_html=True)
             
             # 1. Filter raw data out into precise Season datasets
             spring_gps = full_df_unfiltered[(full_df_unfiltered['Season'] == 'Spring') & (full_df_unfiltered['Session_Type'] == 'Practice')].copy()
@@ -1368,7 +1368,7 @@ if check_password():
                 spring_peaks.columns = ['Name', 'Spring Peak Load', 'Spring Peak Jumps', 'Spring Peak Efforts', 'Spring Peak Distance', 'Spring Peak Jump Load']
                 
                 # 4. Metric Selectors
-                comp_metric_label = st.selectbox("Select Core Vector to Compare", ["Player Load", "Total Jumps", "Explosive Efforts", "Estimated Distance (y)", "Jump Load"], key="ss_metric_select")
+                comp_metric_label = st.selectbox("Select Metric to Compare", ["Player Load", "Total Jumps", "Explosive Efforts", "Estimated Distance (y)", "Jump Load"], key="ss_metric_select")
                 
                 spring_col_map = {
                     "Player Load": "Spring Peak Load",
@@ -1418,7 +1418,7 @@ if check_password():
                 
                 # 6. Summer Practice Cards Graded against Spring Benchmarks
                 st.markdown("### Summer Session Scores")
-                target_ath_comp = st.selectbox("Select Target Athlete for Session Breakdown", sorted(merged_comp['Name'].unique()), key="ss_ath_select")
+                target_ath_comp = st.selectbox("Select Athlete", sorted(merged_comp['Name'].unique()), key="ss_ath_select")
                 
                 # Flat reference check to extract metadata metrics
                 meta_rows = full_df_unfiltered[full_df_unfiltered['Name'] == target_ath_comp]
