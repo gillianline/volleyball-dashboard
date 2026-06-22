@@ -381,7 +381,7 @@ if check_password():
 
             # --- BLOCK 2: UPPER BODY ISOMETRIC PROFILE (ASH TEST) ---
             st.markdown('<hr style="display:block !important; margin:15px 0; border:0; border-top:1px solid #E5E5E7;" />', unsafe_allow_html=True)
-            st.markdown('<h4 style="color:#4895DB; font-weight:800; margin-bottom:5px;">UPPER BODY: ASH SHOULDER ISOMETRIC</h4>', unsafe_allow_html=True)
+            st.markdown('<h4 style="color:#4895DB; font-weight:800; margin-bottom:5px;">ASH SHOULDER: ISO I</h4>', unsafe_allow_html=True)
                 
             p_ash_all = ash_df[(ash_df['Name'] == selected_athlete_prof) & (ash_df['Test Date'] <= curr_date_prof)].sort_values('Test Date')
             
