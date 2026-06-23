@@ -746,12 +746,14 @@ if check_password():
             if not clean_date_list_sm:
                 st.warning("No recorded dates found for the currently active season.")
             else:
+                # --- UPDATED FILTER ROW LAYOUT WITH SESSION TYPE TOGGLE ---
                 c_sm1, c_sm2, c_sm3 = st.columns([1.5, 1.5, 1.2])
                 with c_sm1: 
                     selected_date_sm = st.selectbox("Date Selection", clean_date_list_sm, index=0, key="nav_sel_sm")
                 with c_sm2: 
                     pos_f_sm = st.selectbox("Position Filter", ["All Positions"] + sorted([p for p in df['Position'].unique() if p != "N/A"]), key="nav_pos_sm")
                 with c_sm3:
+                    # New interactive type selector toggle
                     spring_benchmark_type = st.radio("Spring Baseline Type", ["Practice", "Game"], horizontal=True, key="sm_benchmark_type_toggle")
                 
                 # --- 2. MULTI-SESSION DATA SUMMATION LOGIC ---
@@ -759,94 +761,15 @@ if check_password():
                 display_df_sm = df[df['Date'] == target_date_obj_sm].groupby(['Name', 'Position', 'PhotoURL'])[all_metrics].sum().reset_index()
 
                 # --- 3. FETCH HISTORICAL SPRING BENCHMARKS ---
+                # Dynamically switches selection assignment criteria based on radio option selection state
                 spring_gps_raw = full_df_unfiltered[
                     (full_df_unfiltered['Season'] == 'Spring') & 
                     (full_df_unfiltered['Session_Type'] == spring_benchmark_type)
                 ].copy()
                 
-                if spring_gps_raw.empty:
-                    st.warning(f"No historical Spring baseline performance records matching **{spring_benchmark_type}** context discovered inside the tracking databases.")
-                elif not display_df_sm.empty:
-                    # Filter down columns dynamically to only look at columns that actually exist in spring_gps_raw
-                    available_metrics = [m for m in all_metrics if m in spring_gps_raw.columns]
-                    
-                    # Aggregate Spring values safely using available columns
-                    spring_daily_totals = spring_gps_raw.groupby(['Name', 'Date'])[available_metrics].sum().reset_index()
-                    spring_daily_maxes = spring_daily_totals.groupby('Name')[available_metrics].max().reset_index()
-                    
-                    if pos_f_sm != "All Positions": 
-                        display_df_sm = display_df_sm[display_df_sm['Position'] == pos_f_sm]
-                    
-                    athlete_names_sm = sorted(display_df_sm['Name'].unique())
-                    metrics_to_exclude = ['High Jumps', 'Moderate Jumps', 'High Intensity Movement']
-                    filtered_metrics_sm = [m for m in all_metrics if m not in metrics_to_exclude]
+          if spring_gps_raw.empty:
+                    st.warning(f"No historical Spring baseline performance records matching **{spring_benchmark_type}** context discovered inside the tracking databases.")      
 
-                    # Track if we actually show any cards to handle display fallbacks cleanly
-                    visible_cards_count = 0
-
-                    for i in range(0, len(athlete_names_sm), 2):
-                        cols = st.columns(2)
-                        for j in range(2):
-                            if i + j < len(athlete_names_sm):
-                                name = athlete_names_sm[i + j]
-                                
-                                ath_spring_peaks = spring_daily_maxes[spring_daily_maxes['Name'] == name]
-                                if ath_spring_peaks.empty:
-                                    continue
-                                    
-                                visible_cards_count += 1
-                                p_session_row = display_df_sm[display_df_sm['Name'] == name].iloc[0]
-                                r_html = ""; t_grade = 0; c_metrics = 0
-                                
-                                for k in filtered_metrics_sm:
-                                    val = p_session_row[k]
-                                    
-                                    # Safe fallback check if specific key isn't recorded inside source sheet types
-                                    if k in ath_spring_peaks.columns:
-                                        mx = ath_spring_peaks[k].iloc[0]
-                                    else:
-                                        mx = 0.0
-                                        
-                                    if pd.isna(mx) or mx <= 0: mx = 1.0
-                                    
-                                    g = math.ceil((val / mx) * 100)
-                                    t_grade += g
-                                    c_metrics += 1
-                                    
-                                    r_html += f"<tr><td>{k}</td><td>{val:.1f}</td><td>{mx:.1f}</td><td>{g}</td></tr>"
-                                
-                                sc_g = math.ceil(t_grade / c_metrics) if c_metrics > 0 else 0
-                                
-                                with cols[j]: 
-                                    st.markdown(f"""
-                                        <div style="border:1px solid #E5E5E7; border-radius:15px; padding:15px; margin-bottom:20px; background-color:white;">
-                                            <div style="display:flex; align-items:center; gap:10px;">
-                                                <div style="flex:1.2; text-align:center;">
-                                                    <img src="{p_session_row["PhotoURL"]}" class="gallery-photo">
-                                                    <p style="font-weight:bold; font-size:15px; margin-top:8px; color:#333;">{name}</p>
-                                                </div>
-                                                <div style="flex:3;">
-                                                    <table class="scout-table">
-                                                        <thead>
-                                                            <tr><th>Metric</th><th>Combined Total</th><th>Spring Max Day</th><th>Grade</th></tr>
-                                                        </thead>
-                                                        <tbody>{r_html}</tbody>
-                                                    </table>
-                                                </div>
-                                                <div style="flex:1; text-align:center;">
-                                                    <div style="background-color:{get_flipped_gradient(sc_g)}; color:white; padding:10px; border-radius:12px; font-size:32px; font-weight:900;">
-                                                        {sc_g}
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    """, unsafe_allow_html=True)
-                    
-                    if visible_cards_count == 0:
-                        st.info(f"No roster athletes logged baseline tracking milestones matching **Spring {spring_benchmark_type}** data parameters.")
-                else:
-                    st.warning("No performance footprint logged for selected parameters on this date.")
-                    
 
         with tabs[4]: # Tab 4: Game v Practice
             st.markdown('<div class="section-header">Season Preparation vs. Match Demands</div>', unsafe_allow_html=True)
