@@ -766,10 +766,6 @@ if check_password():
                     (full_df_unfiltered['Season'] == 'Spring') & 
                     (full_df_unfiltered['Session_Type'] == spring_benchmark_type)
                 ].copy()
-                
-          if spring_gps_raw.empty:
-                    st.warning(f"No historical Spring baseline performance records matching **{spring_benchmark_type}** context discovered inside the tracking databases.")      
-
 
         with tabs[4]: # Tab 4: Game v Practice
             st.markdown('<div class="section-header">Season Preparation vs. Match Demands</div>', unsafe_allow_html=True)
