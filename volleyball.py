@@ -55,7 +55,7 @@ if check_password():
     if "is_printing" not in st.session_state:
         st.session_state.is_printing = False
 
-    # --- CSS: FORMATTING & PAGE BREAK CONTROLS ---
+    #CSS: FORMATTING & PAGE BREAK CONTROLS
     st.markdown("""
         <style>
         .stApp { background-color: #FFFFFF; color: #1D1D1F; }
@@ -132,7 +132,7 @@ if check_password():
             elif m > 5: return 'Summer'
             else: return 'Spring'
 
-        # Load GPS Data
+        #Load GPS Data
         df = pd.read_csv(st.secrets["GOOGLE_SHEET_URL"])
         match_df = pd.read_csv(st.secrets["MATCHES_SHEET_URL"])
         
@@ -148,14 +148,14 @@ if check_password():
             frame['Session_Type'] = frame['Activity'].apply(lambda x: 'Game' if any(w in str(x).lower() for w in ['game', 'match', 'v.']) else 'Practice')
             frame['Season'] = frame['Date'].apply(assign_season)
 
-        # 1. Process CMJ Lower Body Sheet
+        #Process CMJ Lower Body Sheet
         cmj_df = pd.read_csv(st.secrets["CMJ_SHEET_URL"])
         cmj_df.columns = cmj_df.columns.str.strip()
         cmj_df.rename(columns={'Athlete': 'Name'}, inplace=True)
         cmj_df['Test Date'] = pd.to_datetime(cmj_df['Test Date'], errors='coerce')
         cmj_df['Season'] = cmj_df['Test Date'].apply(assign_season)
 
-        # 2. Process ASH Upper Body Sheet
+        #Process ASH Upper Body Sheet
         try:
             ash_df = pd.read_csv(st.secrets["ASH_SHEET_URL"])
             ash_df.columns = ash_df.columns.str.strip()
@@ -169,7 +169,7 @@ if check_password():
         except:
             ash_df = pd.DataFrame(columns=['Name', 'Test Date', 'Isometric Type', 'Peak Vertical Force [N] (L)', 'Peak Vertical Force [N] (R)', 'Peak Vertical Force [N] (Asym)(%)', 'Season'])
 
-        # 3. Process External Rotation Range of Motion Sheet
+        #Process External Rotation Range of Motion Sheet
         try:
             er_df = pd.read_csv(st.secrets["ER_SHEET_URL"])
             er_df.columns = er_df.columns.str.strip()
@@ -183,7 +183,7 @@ if check_password():
         except:
             er_df = pd.DataFrame(columns=['Name', 'Test Date', 'Movement', 'L Max ROM (°)', 'R Max ROM (°)', 'ROM Asymmetry (%)', 'Season'])
 
-        # Process Drill Phases
+        #Process Drill Phases
         phase_df = pd.read_csv(st.secrets["PHASES_SHEET_URL"])
         phase_df = heavy_sanitize(phase_df)
         if 'Phases' in phase_df.columns: phase_df = phase_df.rename(columns={'Phases': 'Phase'})
@@ -207,7 +207,7 @@ if check_password():
     try:
         raw_df, raw_match_df, cmj_df, phase_df, thresh_df, ash_df, er_df = load_all_data()
 
-        # Save copies containing all records for cross-season calculations
+        #Save copies containing all records for cross-season calculations
         full_df_unfiltered = raw_df.copy()
 
         # --- GLOBAL SEASON FILTER SIDEBAR CONFIG ---
