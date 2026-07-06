@@ -1554,9 +1554,10 @@ if check_password():
                 }).reset_index()
                 
                 # 3. Pull the Absolute Highest Day across each metric during Spring (The Benchmarks)
-                #  Fixed line with single brackets wrapping the column list
-                spring_peaks = spring_daily.groupby('Name')['Player Load', 'Total Jumps', 'Explosive Efforts', 'Estimated Distance (y)', 'Jump Load'].max().reset_index()
-                spring_peaks.columns = ['Name', 'Spring Peak Load', 'Spring Peak Jumps', 'Spring Peak Efforts', 'Spring Peak Distance', 'Spring Peak Jump Load']
+                # Fixed: Passing a clean, explicit list of columns
+                metric_cols = ['Player Load', 'Total Jumps', 'Explosive Efforts', 'Estimated Distance (y)', 'Jump Load']
+                spring_peaks = spring_daily.groupby('Name')[metric_cols].max().reset_index()
+                # spring_peaks.columns = ['Name', 'Spring Peak Load', 'Spring Peak Jumps', 'Spring Peak Efforts', 'Spring Peak Distance', 'Spring Peak Jump Load']
                 
                 # 4. Metric Selectors
                 comp_metric_label = st.selectbox("Select Metric to Compare", ["Player Load", "Total Jumps", "Explosive Efforts", "Estimated Distance (y)", "Jump Load"], key="ss_metric_select")
