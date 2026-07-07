@@ -31,10 +31,6 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- PAGE CONFIG ---
-st.set_page_config(page_title="Lady Vols VB Performance", layout="wide")
-
-
 # --- PASSWORD PROTECTION ---
 def check_password():
     def password_entered():
