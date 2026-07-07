@@ -6,6 +6,11 @@ from plotly.subplots import make_subplots
 import math 
 from datetime import timedelta
 
+# --- CRITICAL LAYOUT INITIALIZATION FIX ---
+# This MUST be the first Streamlit call to prevent the grid framework from breaking and bleeding
+st.set_page_config(page_title="Lady Vols VB Performance", layout="wide")
+
+# --- CUSTOM GLOBAL APP CSS DECK ---
 st.markdown("""
     <style>
     /* Center table text and style metrics */
@@ -14,11 +19,7 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- PAGE CONFIG ---
-st.set_page_config(page_title="Lady Vols VB Performance", layout="wide")
-
-
-# --- PASSWORD PROTECTION ---
+# --- PASSWORD PROTECTION FRAMEWORK ---
 def check_password():
     def password_entered():
         if st.session_state["password"] == st.secrets["PASSWORD"]:
@@ -37,7 +38,7 @@ def check_password():
         return True
 
 if check_password():
-    #CSS: FORMATTING & PAGE BREAK CONTROLS
+    # CUSTOM INTERFACE LAYOUT SPECIFICATIONS
     st.markdown("""
         <style>
         .stApp { background-color: #FFFFFF; color: #1D1D1F; }
@@ -64,7 +65,6 @@ if check_password():
         .player-divider { border: 0; height: 1px; background: #E5E5E7; margin-bottom: 15px; width: 100%; }
         .gallery-photo { border-radius: 50%; width: 110px; height: 110px; object-fit: cover; border: 4px solid #FF8200; }
         .section-header { font-size: 20px; font-weight: 800; color: #4895DB; border-bottom: 2px solid #FF8200; margin-top: 15px; margin-bottom: 10px; padding-bottom: 5px; text-transform: uppercase; }
-
         </style>
         """, unsafe_allow_html=True)
     
@@ -76,6 +76,7 @@ if check_password():
             return "#808080" 
         return "#2D5A27" if score <= 40 else "#D4A017" if score <= 70 else "#A52A2A"
 
+    # DATA SECURITY HANDLE: Universal numeric converter logic gatekeeper
     def clean_val(val, default=0.0):
         try:
             if pd.isna(val) or str(val).strip() in ["", "-", "N/A", "nan", "None"]: return default
@@ -114,6 +115,7 @@ if check_password():
             elif m > 5: return 'Summer'
             else: return 'Spring'
 
+        # Load Google Sheets URLs Safely
         df = pd.read_csv(st.secrets["GOOGLE_SHEET_URL"])
         match_df = pd.read_csv(st.secrets["MATCHES_SHEET_URL"])
         
@@ -140,7 +142,6 @@ if check_password():
             ash_df.columns = ash_df.columns.str.strip()
             ash_df.rename(columns={'Athlete': 'Name', 'Date': 'Test Date'}, inplace=True)
             ash_df['Test Date'] = pd.to_datetime(ash_df['Test Date'], errors='coerce')
-            
             for col in ['Peak Vertical Force [N] (L)', 'Peak Vertical Force [N] (R)', 'Peak Vertical Force [N] (Asym)(%)']:
                 if col in ash_df.columns:
                     ash_df[col] = pd.to_numeric(ash_df[col].astype(str).str.replace(r'[^0-9.-]', '', regex=True), errors='coerce').fillna(0.0)
@@ -153,7 +154,6 @@ if check_password():
             er_df.columns = er_df.columns.str.strip()
             er_df.rename(columns={'Athlete': 'Name', 'Date': 'Test Date'}, inplace=True)
             er_df['Test Date'] = pd.to_datetime(er_df['Test Date'], errors='coerce')
-            
             for col in ['L Max ROM (°)', 'R Max ROM (°)', 'ROM Asymmetry (%)']:
                 if col in er_df.columns:
                     er_df[col] = pd.to_numeric(er_df[col].astype(str).str.replace(r'[^0-9.-]', '', regex=True), errors='coerce').fillna(0.0)
@@ -183,7 +183,7 @@ if check_password():
 
     raw_df, raw_match_df, cmj_df, phase_df, thresh_df, ash_df, er_df = load_all_data()
 
-    st.sidebar.markdown("### Season")
+    st.sidebar.markdown("### Season Panel")
     selected_season = st.sidebar.radio("Select Season", ["Spring", "Summer"], index=1, key="global_season_toggle")
     
     df = raw_df[raw_df['Season'] == selected_season].copy()
@@ -205,8 +205,8 @@ if check_password():
     # --- TAB 0: INDIVIDUAL PROFILE ------------
     # ==========================================
     with tabs[0]:
-        # FIXED WALL: Hard border isolation box applied here
-        with st.container(border=True):
+        tab0 = st.container()
+        with tab0:
             target_date_str = "2026-04-04"
             tournament_label = "GT Spring Tournament 4-4-26"
             
@@ -224,14 +224,15 @@ if check_password():
                         clean_session_list_prof.append(s)
                 else:
                     clean_session_list_prof.append(s)
+            
             if not clean_session_list_prof:
                 clean_session_list_prof = [tournament_label]
 
-            c_prof1, c_prof2 = st.columns(2)
+            c_prof1, c_prof2 = tab0.columns(2)
             with c_prof1:
-                selected_session_prof = st.selectbox("Session Selection", clean_session_list_prof, index=0, key="nav_sel_prof")
+                selected_session_prof = c_prof1.selectbox("Session Selection", clean_session_list_prof, index=0, key="nav_sel_prof")
             with c_prof2:
-                selected_athlete_prof = st.selectbox("Athlete Selection", master_athlete_list, key="nav_ath_prof")
+                selected_athlete_prof = c_prof2.selectbox("Athlete Selection", master_athlete_list, key="nav_ath_prof")
 
             if selected_session_prof == tournament_label:
                 curr_date_prof = pd.to_datetime(target_date_str)
@@ -273,7 +274,7 @@ if check_password():
 
             sc_prof = math.ceil(t_grade_prof / c_metrics_prof) if c_metrics_prof > 0 else 0
 
-            c1, c2, c3 = st.columns([1.2, 2.5, 1.2])
+            c1, c2, c3 = tab0.columns([1.2, 2.5, 1.2])
             with c1:
                 st.markdown(f'<div style="text-align:center;"><img src="{p_meta.get("PhotoURL", "https://www.w3schools.com/howto/img_avatar.png")}" class="player-photo-large"></div><h3 style="text-align:center;">{p_meta.get("Name", selected_athlete_prof)}</h3>', unsafe_allow_html=True)
             with c2:
@@ -281,11 +282,11 @@ if check_password():
             with c3:
                 st.markdown(f'<div style="display:flex; justify-content:center;"><div class="score-box" style="background-color:{get_flipped_gradient(sc_prof)};">{sc_prof}</div></div><p style="text-align:center; font-weight:bold; color:grey; margin-top:10px;">SESSION SCORE</p>', unsafe_allow_html=True)
             
-            st.markdown('<div class="section-header">Weekly Readiness Profile</div>', unsafe_allow_html=True)
+            tab0.markdown('<div class="section-header">Weekly Readiness Profile</div>', unsafe_allow_html=True)
             
             # --- BLOCK 1: LOWER BODY JUMP PROFILE (CMJ) ---
-            st.markdown('<h4 style="color:#4895DB; font-weight:800; margin-bottom:5px;">COUNTERMOVEMENT JUMP</h4>', unsafe_allow_html=True)
-            jc1, jc2 = st.columns([1.5, 3.5])
+            tab0.markdown('<h4 style="color:#4895DB; font-weight:800; margin-bottom:5px;">COUNTERMOVEMENT JUMP</h4>', unsafe_allow_html=True)
+            jc1, jc2 = tab0.columns([1.5, 3.5])
             p_cmj_hist = cmj_df[(cmj_df['Name'] == selected_athlete_prof) & (cmj_df['Test Date'] <= curr_date_prof)].sort_values('Test Date')
             cmj_col = 'Jump Height (Imp-Mom) [cm]'
             rsi_col = 'RSI-modified [m/s]'
@@ -305,15 +306,15 @@ if check_password():
                     color_h = "#28a745" if cur_h >= base_h else "#dc3545"
                     color_rsi = "#28a745" if cur_rsi >= base_rsi else "#dc3545"
 
-                    sc1, sc2 = st.columns(2)
+                    sc1, sc2 = jc1.columns(2)
                     with sc1:
-                        st.markdown(f'<div class="score-box" style="background-color:{color_h}; line-height:1.2; padding-top:15px; height:80px; width:100%;"><span style="font-size:18px;">{cur_h:.1f} cm</span><span style="font-size:10px; display:block; font-weight:bold; margin-top:2px;">CMJ HEIGHT</span></div>', unsafe_allow_html=True)
+                        sc1.markdown(f'<div class="score-box" style="background-color:{color_h}; line-height:1.2; padding-top:15px; height:80px; width:100%;"><span style="font-size:18px;">{cur_h:.1f} cm</span><span style="font-size:10px; display:block; font-weight:bold; margin-top:2px;">CMJ HEIGHT</span></div>', unsafe_allow_html=True)
                     with sc2:
-                        st.markdown(f'<div class="score-box" style="background-color:{color_rsi}; line-height:1.2; padding-top:15px; height:80px; width:100%;"><span style="font-size:18px;">{cur_rsi:.2f}</span><span style="font-size:10px; display:block; font-weight:bold; margin-top:2px;">RSI MOD</span></div>', unsafe_allow_html=True)
+                        sc2.markdown(f'<div class="score-box" style="background-color:{color_rsi}; line-height:1.2; padding-top:15px; height:80px; width:100%;"><span style="font-size:18px;">{cur_rsi:.2f}</span><span style="font-size:10px; display:block; font-weight:bold; margin-top:2px;">RSI MOD</span></div>', unsafe_allow_html=True)
 
-                    st.markdown(f'<div class="info-box" style="text-align:center; margin-top:10px;"><p style="margin:0; font-size:11px; color:grey;"><b>% Change from Base:</b> CMJ: {p_diff_h:+.1f}% | RSI: {p_diff_rsi:+.1f}%</p><p style="margin:0; font-size:11px; color:grey;"><b>Base Values:</b> CMJ: {base_h:.1f} cm | RSI: {base_rsi:.2f}</p></div>', unsafe_allow_html=True)
+                    jc1.markdown(f'<div class="info-box" style="text-align:center; margin-top:10px;"><p style="margin:0; font-size:11px; color:grey;"><b>% Change from Base:</b> CMJ: {p_diff_h:+.1f}% | RSI: {p_diff_rsi:+.1f}%</p><p style="margin:0; font-size:11px; color:grey;"><b>Base Values:</b> CMJ: {base_h:.1f} cm | RSI: {base_rsi:.2f}</p></div>', unsafe_allow_html=True)
                 else:
-                    st.warning("No data recorded.")
+                    jc1.warning("No data recorded.")
 
             with jc2:
                 if not p_cmj_hist.empty:
@@ -321,16 +322,18 @@ if check_password():
                     fig.add_trace(go.Scatter(x=p_cmj_hist['Test Date'], y=p_cmj_hist[cmj_col], name="Jump Height", mode='lines+markers', line=dict(color='#FF8200', width=3)), secondary_y=False)
                     fig.add_trace(go.Scatter(x=p_cmj_hist['Test Date'], y=p_cmj_hist[rsi_col], name="RSI Modified", mode='lines+markers', line=dict(color='#4895DB', dash='dot', width=2)), secondary_y=True)
                     fig.update_layout(height=160, margin=dict(l=0, r=0, t=10, b=0), showlegend=True, legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0), template="simple_white")
-                    st.plotly_chart(fig, use_container_width=True, config=LOCKED_CONFIG, key="cmj_top_chart")
+                    jc2.plotly_chart(fig, use_container_width=True, config=LOCKED_CONFIG, key="cmj_top_chart")
+                else:
+                    jc2.info("No Countermovement Jump metrics recorded.")
 
             # --- BLOCK 2: UPPER BODY ISOMETRIC PROFILE (ASH TEST) ---
-            st.markdown('<hr style="display:block !important; margin:15px 0; border:0; border-top:1px solid #E5E5E7;" />', unsafe_allow_html=True)
-            st.markdown('<h4 style="color:#4895DB; font-weight:800; margin-bottom:5px;">ASH SHOULDER: ISO I</h4>', unsafe_allow_html=True)
+            tab0.markdown('<hr style="display:block !important; margin:15px 0; border:0; border-top:1px solid #E5E5E7;" />', unsafe_allow_html=True)
+            tab0.markdown('<h4 style="color:#4895DB; font-weight:800; margin-bottom:5px;">ASH SHOULDER: ISO I</h4>', unsafe_allow_html=True)
                 
             p_ash_all = ash_df[(ash_df['Name'] == selected_athlete_prof) & (ash_df['Test Date'] <= curr_date_prof)].sort_values('Test Date')
             
             if not p_ash_all.empty:
-                ac1, ac2 = st.columns([1.5, 3.5])
+                ac1, ac2 = tab0.columns([1.5, 3.5])
                 with ac1:
                     latest_date_ash = p_ash_all['Test Date'].iloc[-1]
                     today_ash_rows = p_ash_all[p_ash_all['Test Date'] == latest_date_ash]
@@ -350,13 +353,13 @@ if check_password():
                     color_ash_l = "#28a745" if li >= 100 else "#dc3545"
                     color_ash_r = "#28a745" if ri >= 100 else "#dc3545"
 
-                    asc1, asc2 = st.columns(2)
-                    with asc1:
-                        st.markdown(f'<div class="score-box" style="background-color:{color_ash_l}; line-height:1.2; padding-top:15px; height:80px; width:100%;"><span style="font-size:18px;">{li:.0f} N</span><span style="font-size:10px; display:block; font-weight:bold; margin-top:2px;">LEFT</span></div>', unsafe_allow_html=True)
-                    with asc2:
-                        st.markdown(f'<div class="score-box" style="background-color:{color_ash_r}; line-height:1.2; padding-top:15px; height:80px; width:100%;"><span style="font-size:18px;">{ri:.0f} N</span><span style="font-size:10px; display:block; font-weight:bold; margin-top:2px;">RIGHT</span></div>', unsafe_allow_html=True)
+                    sc1, sc2 = ac1.columns(2)
+                    with sc1:
+                        sc1.markdown(f'<div class="score-box" style="background-color:{color_ash_l}; line-height:1.2; padding-top:15px; height:80px; width:100%;"><span style="font-size:18px;">{li:.0f} N</span><span style="font-size:10px; display:block; font-weight:bold; margin-top:2px;">LEFT</span></div>', unsafe_allow_html=True)
+                    with sc2:
+                        sc2.markdown(f'<div class="score-box" style="background-color:{color_ash_r}; line-height:1.2; padding-top:15px; height:80px; width:100%;"><span style="font-size:18px;">{ri:.0f} N</span><span style="font-size:10px; display:block; font-weight:bold; margin-top:2px;">RIGHT</span></div>', unsafe_allow_html=True)
 
-                    st.markdown(f'<div class="info-box" style="text-align:center; margin-top:10px;"><p style="margin:0; font-size:11px; color:grey;"><b>Asymmetry:</b> {asym_i:+.1f}%</p><p style="margin:0; font-size:11px; color:grey;"><b>% Change from Base:</b> L: {pct_l:+.1f}% | R: {pct_r:+.1f}%</p><p style="margin:0; font-size:11px; color:grey;"><b>Base Force:</b> L: {base_li:.0f} N | R: {base_ri:.0f} N</p></div>', unsafe_allow_html=True)
+                    ac1.markdown(f'<div class="info-box" style="text-align:center; margin-top:10px;"><p style="margin:0; font-size:11px; color:grey;"><b>Asymmetry:</b> {asym_i:+.1f}%</p><p style="margin:0; font-size:11px; color:grey;"><b>% Change from Base:</b> L: {pct_l:+.1f}% | R: {pct_r:+.1f}%</p><p style="margin:0; font-size:11px; color:grey;"><b>Base Force:</b> L: {base_li:.0f} N | R: {base_ri:.0f} N</p></div>', unsafe_allow_html=True)
                 with ac2:
                     p_ash_i_only = p_ash_all[p_ash_all['Isometric Type'].str.contains('I', case=False, na=False)]
                     if not p_ash_i_only.empty:
@@ -364,9 +367,9 @@ if check_password():
                         fig_ash.add_trace(go.Scatter(x=p_ash_i_only['Test Date'], y=p_ash_i_only['Peak Vertical Force [N] (L)'], name="Left Peak Force", mode='lines+markers', line=dict(color='#4895DB', width=2.5)))
                         fig_ash.add_trace(go.Scatter(x=p_ash_i_only['Test Date'], y=p_ash_i_only['Peak Vertical Force [N] (R)'], name="Right Peak Force", mode='lines+markers', line=dict(color='#FF8200', width=2.5, dash='dash')))
                         fig_ash.update_layout(height=160, margin=dict(l=0, r=0, t=10, b=0), showlegend=True, legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0), template="simple_white")
-                        st.plotly_chart(fig_ash, use_container_width=True, config=LOCKED_CONFIG, key="ash_profile_chart")
+                        ac2.plotly_chart(fig_ash, use_container_width=True, config=LOCKED_CONFIG, key="ash_profile_chart")
             else:
-                st.info("No ASH shoulder test dataset recorded.")
+                tab0.info("No ASH shoulder test dataset recorded.")
 
             # --- BLOCK 3: ROTATOR CUFF EXTERNAL ROTATION ROM ---
             st.markdown('<hr style="display:block !important; margin:15px 0; border:0; border-top:1px solid #E5E5E7;" />', unsafe_allow_html=True)
@@ -375,11 +378,14 @@ if check_password():
             p_er_hist = er_df[(er_df['Name'] == selected_athlete_prof) & (er_df['Test Date'] <= curr_date_prof)].sort_values('Test Date')
             
             if not p_er_hist.empty:
-                ec1, ec2 = st.columns([1.8, 3.2])
+                ec1, ec2 = tab0.columns([1.5, 3.5])
                 with ec1:
                     baseline_er = p_er_hist[p_er_hist['Season'] == 'Summer'].head(1) if selected_season == 'Summer' else p_er_hist.head(1)
             
                     if not baseline_er.empty:
+                        base_l_rom = clean_val(baseline_er.iloc[-1].get('L Max ROM (°)', 0.0))
+                        base_r_rom = clean_val(baseline_er.iloc[-1].get('R Max ROM (°)', 0.0))
+            
                         latest_er = p_er_hist.iloc[-1]
                         cur_l_rom = clean_val(latest_er.get('L Max ROM (°)', 0.0))
                         cur_r_rom = clean_val(latest_er.get('R Max ROM (°)', 0.0))
@@ -388,34 +394,34 @@ if check_password():
                         color_er_l = "#28a745" if cur_l_rom >= 110 else "#ffc107" if 90 <= cur_l_rom <= 109 else "#dc3545"
                         color_er_r = "#28a745" if cur_r_rom >= 110 else "#ffc107" if 90 <= cur_r_rom <= 109 else "#dc3545"
             
-                        romsc1, romsc2 = st.columns(2)
-                        with romsc1:
-                            st.markdown(f'<div class="score-box" style="background-color:{color_er_l}; width:100%; font-size:16px; padding:10px;">{cur_l_rom:.1f}°<br><span style="font-size:9px; display:block; font-weight:bold;">LEFT ROM</span></div>', unsafe_allow_html=True)
-                        with romsc2:
-                            st.markdown(f'<div class="score-box" style="background-color:{color_er_r}; width:100%; font-size:16px; padding:10px;">{cur_r_rom:.1f}°<br><span style="font-size:9px; display:block; font-weight:bold;">RIGHT ROM</span></div>', unsafe_allow_html=True)
-                        st.markdown(f'<div class="info-box" style="text-align:center;"><p style="margin:0;"><b>ROM Asymmetry:</b> {cur_asym_rom:+.1f}%</p></div>', unsafe_allow_html=True)
+                        sc1, sc2 = ec1.columns(2)
+                        with sc1:
+                            st.markdown(f'<div class="score-box" style="background-color:{color_er_l}; line-height:1.2; padding-top:15px; height:80px; width:100%;"><span style="font-size:18px;">{cur_l_rom:.1f}°</span><span style="font-size:10px; display:block; font-weight:bold; margin-top:2px;">LEFT</span></div>', unsafe_allow_html=True)
+                        with sc2:
+                            st.markdown(f'<div class="score-box" style="background-color:{color_er_r}; line-height:1.2; padding-top:15px; height:80px; width:100%;"><span style="font-size:18px;">{cur_r_rom:.1f}°</span><span style="font-size:10px; display:block; font-weight:bold; margin-top:2px;">RIGHT</span></div>', unsafe_allow_html=True)
+                        ec1.markdown(f'<div class="info-box" style="text-align:center; margin-top:10px;"><p style="margin:0; font-size:11px; color:grey;"><b>ROM Asymmetry:</b> {cur_asym_rom:+.1f}%</p></div>', unsafe_allow_html=True)
                 with ec2:
                     fig_er = go.Figure()
                     fig_er.add_trace(go.Scatter(x=p_er_hist['Test Date'], y=p_er_hist['L Max ROM (°)'], name="Left Max ROM", mode='lines+markers', line=dict(color='#4895DB', width=2.5)))
                     fig_er.add_trace(go.Scatter(x=p_er_hist['Test Date'], y=p_er_hist['R Max ROM (°)'], name="Right Max ROM", mode='lines+markers', line=dict(color='#FF8200', width=2.5, dash='dash')))
                     fig_er.update_layout(height=160, margin=dict(l=0, r=0, t=10, b=0), showlegend=True, legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0), template="simple_white")
-                    st.plotly_chart(fig_er, use_container_width=True, config=LOCKED_CONFIG, key="er_profile_chart")
+                    ec2.plotly_chart(fig_er, use_container_width=True, config=LOCKED_CONFIG, key="er_profile_chart")
             else:
-                st.info("No Range of Motion metrics found for selected player timeline.")
+                tab0.info("No Range of Motion metrics found for selected player timeline.")
 
     # ==========================================
-    # --- HARD WALLED WORKSPACE SECTIONS -------
+    # --- OTHER WORKSPACE SECTIONS AUTOMATION --
     # ==========================================
     remaining_tabs = ["Practice Scores", "Daily Combined Scores", "Spring Max vs Daily Combined", "Practice History", "Match v. Practice", "Match Summary", "Position Analysis", "Phase Analysis", "Practice Planner", "Spring v. Summer"]
 
     for idx, tab_name in enumerate(remaining_tabs, start=1):
         with tabs[idx]:
-            # FIXED WALL: Hard box borders enforce visual boundaries on every secondary view layer
-            with st.container(border=True):
-                st.subheader(f"{tab_name} Workspace Engine")
+            loop_container = st.container()
+            with loop_container:
+                st.subheader(f"{tab_name} Analysis Layer")
                 if not df.empty:
-                    # Enforce standard visualization rule explicitly to Maximum benchmarks
+                    # Enforce the positional visualization rules to use Maximum metrics, not averages
                     summary_view = df.groupby('Position')[['Player Load', 'Total Jumps']].max().reset_index()
-                    st.dataframe(summary_view, use_container_width=True, hide_index=True, key=f"fixed_border_view_{idx}")
+                    st.dataframe(summary_view, use_container_width=True, hide_index=True, key=f"tab_view_auto_{idx}")
                 else:
-                    st.info("Tracking metrics sheets currently initializing parameter values.")
+                    st.info("Metrics tracking logs initializing.")
