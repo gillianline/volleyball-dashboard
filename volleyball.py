@@ -87,6 +87,13 @@ def check_password():
     else:
         return True
 
+def get_flipped_gradient(score):
+    try:
+        score = float(score)
+        if pd.isna(score): return "#808080" 
+    except (ValueError, TypeError):
+        return "#808080" 
+    return "#2D5A27" if score <= 40 else "#D4A017" if score <= 70 else "#A52A2A"
 
 # --- 3. HARD DECOUPLED DATA FETCHING ENGINE ---
 @st.cache_data(ttl=10)
