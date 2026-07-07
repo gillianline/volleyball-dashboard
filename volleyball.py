@@ -1124,16 +1124,17 @@ if check_password():
 
 
         # --- TAB 6: Match Summary (scoped, fixed HTML scoping) ---
+                # --- TAB 6: Match Summary (scoped, fixed session_state usage) ---
         with tabs[6]:
             tab6 = st.container()
             with tab6:
                 custom_colors = ['#4895DB', '#FF8200', '#515154', '#A52A2A', '#008080', '#6A1B9A', '#2E7D32']
-        
-                # Use the container to fully contain the filter UI so tags are not split across conditional branches
+
+                # Put the filter UI fully inside this container
                 filter_container = tab6.container()
                 with filter_container:
-                    if tab6.session_state.get("is_printing", st.session_state.is_printing):
-                        # printing mode controls
+                    # Use st.session_state (containers don't have session_state)
+                    if st.session_state.get("is_printing", st.session_state.is_printing):
                         if filter_container.button("Back to Editor (Show Filters)", key="back_to_editor"):
                             st.session_state.is_printing = False
                             st.experimental_rerun()
@@ -1144,19 +1145,22 @@ if check_password():
 
                         filter_container.markdown('<div class="section-header">Match Comparison Selection</div>', unsafe_allow_html=True)
                         c_ts1, c_ts2 = filter_container.columns([2, 1])
-                        
+
                         with c_ts1:
                             match_list_t = match_df.sort_values(['Date', 'Sheet_Order'])['Session_Name'].unique().tolist()
-                            if "matches_state" not in st.session_state or not all(m in match_list_t for m in st.session_state.matches_state):
+                            # initialize matches_state safely
+                            if "matches_state" not in st.session_state or not all(m in match_list_t for m in st.session_state.get("matches_state", [])):
                                 st.session_state.matches_state = match_list_t[-3:] if len(match_list_t) >= 3 else match_list_t
+                            # store selected matches into session_state via the widget key
                             st.session_state.matches_state = c_ts1.multiselect("Select Matches", match_list_t, default=st.session_state.matches_state, key="matches_multiselect")
-                        
+
                         with c_ts2:
-                            if "pos_state" not in st.session_state: st.session_state.pos_state = "All Positions"
+                            if "pos_state" not in st.session_state:
+                                st.session_state.pos_state = "All Positions"
                             st.session_state.pos_state = c_ts2.selectbox("Filter by Position", ["All Positions"] + sorted(list(match_df['Position'].unique())), index=0, key="match_pos_select")
 
-                # printing trigger
-                if st.session_state.is_printing:
+                # If printing mode, trigger print (keeps JS inside this tab)
+                if st.session_state.get("is_printing", False):
                     tab6.markdown('<script>window.print();</script>', unsafe_allow_html=True)
 
                 selected_matches = st.session_state.get("matches_state", [])
@@ -1165,22 +1169,22 @@ if check_password():
                 if selected_matches:
                     m_map = {m: custom_colors[idx % len(custom_colors)] for idx, m in enumerate(selected_matches)}
                     tab6.markdown('<div class="section-header">Athlete Match Performance Breakdown</div>', unsafe_allow_html=True)
-            
+
                     tourney_df = match_df[match_df['Session_Name'].isin(selected_matches)].sort_values(['Date', 'Sheet_Order'])
-                    if pos_filter_t != "All Positions": 
+                    if pos_filter_t != "All Positions":
                         tourney_df = tourney_df[tourney_df['Position'] == pos_filter_t]
 
                     for name in sorted(tourney_df['Name'].unique()):
                         ad = tourney_df[tourney_df['Name'] == name]
-                
+
                         try:
                             correct_photo = df[df['Name'] == name]['PhotoURL'].iloc[0]
                         except:
                             correct_photo = "https://www.w3schools.com/howto/img_avatar.png"
-                
+
                         tab6.markdown(f'<div class="player-row-container"><div class="player-divider"></div>', unsafe_allow_html=True)
                         side_cols = tab6.columns([1.5, 2])
-                        
+
                         with side_cols[0]:
                             card_start = f"""
                                 <div style="display:flex; align-items:center; gap:12px; padding:10px; background:#f8f9fa; border-bottom:2px solid #FF8200;">
@@ -1197,36 +1201,36 @@ if check_password():
                             """
                             for _, r in ad.iterrows():
                                 card_start += f"<tr><td style='font-weight:700; font-size:11px;'>{r['Session_Name']}</td><td>{int(r['Total Jumps'])}</td><td>{r['Player Load']:.0f}</td><td>{r['Explosive Efforts']:.0f}</td></tr>"
-                    
+
                             total_j = int(ad['Total Jumps'].sum())
                             total_pl = ad['Player Load'].sum()
                             total_ee = ad['Explosive Efforts'].sum()
-                    
+
                             card_start += f"<tr style='background:#4895DB; color:white; font-weight:900;'><td>TOTAL</td><td>{total_j}</td><td>{total_pl:.0f}</td><td>{total_ee:.0f}</td></tr></tbody></table></div>"
                             side_cols[0].markdown(card_start, unsafe_allow_html=True)
-                
+
                         with side_cols[1]:
                             fig_ath = make_subplots(specs=[[{"secondary_y": True}]])
                             for _, r in ad.iterrows():
                                 fig_ath.add_trace(go.Bar(
-                                    name=r['Session_Name'], 
-                                    x=['Total Jumps', 'Explosive Efforts'], 
-                                    y=[r['Total Jumps'], r['Explosive Efforts']], 
+                                    name=r['Session_Name'],
+                                    x=['Total Jumps', 'Explosive Efforts'],
+                                    y=[r['Total Jumps'], r['Explosive Efforts']],
                                     marker_color=m_map[r['Session_Name']],
                                     offsetgroup=r['Session_Name']
                                 ), secondary_y=False)
-                        
+
                                 fig_ath.add_trace(go.Bar(
-                                    name=f"Load ({r['Session_Name']})", 
-                                    x=['Player Load'], 
-                                    y=[r['Player Load']], 
-                                    marker=dict(color=m_map[r['Session_Name']], opacity=0.3), 
+                                    name=f"Load ({r['Session_Name']})",
+                                    x=['Player Load'],
+                                    y=[r['Player Load']],
+                                    marker=dict(color=m_map[r['Session_Name']], opacity=0.3),
                                     showlegend=False,
                                     offsetgroup=r['Session_Name']
                                 ), secondary_y=True)
-                    
+
                             fig_ath.update_layout(
-                                barmode='group', height=260, margin=dict(l=10, r=10, t=10, b=80), 
+                                barmode='group', height=260, margin=dict(l=10, r=10, t=10, b=80),
                                 template="simple_white", font=dict(color="#333333", size=10),
                                 legend=dict(orientation="h", yanchor="top", y=-0.3, xanchor="center", x=0.5),
                                 yaxis=dict(showgrid=False, title="Jumps / Efforts"),
