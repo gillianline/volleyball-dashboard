@@ -6,9 +6,10 @@ from plotly.subplots import make_subplots
 import math 
 from datetime import timedelta
 
-# --- 1. GLOBAL INITIALIZATION (MUST BE FIRST) ---
+# --- 1. GLOBAL INITIALIZATION (MUST BE AT THE VERY TOP) ---
 st.set_page_config(page_title="Lady Vols VB Performance", layout="wide")
 
+# Base Global CSS Stylesheet
 st.markdown("""
     <style>
     th, td {text-align: center !important;}
@@ -32,7 +33,7 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 
-# --- 2. SECURITY CHECK ---
+# --- 2. PASSWORD SECURITY GATEWAY ---
 def check_password():
     def password_entered():
         if st.session_state["password"] == st.secrets["PASSWORD"]:
@@ -56,7 +57,7 @@ if check_password():
     if "is_printing" not in st.session_state:
         st.session_state.is_printing = False
 
-    # Dynamic CSS Injector
+    # Dashboard Performance Styling Injection
     st.markdown("""
         <style>
         .stApp { background-color: #FFFFFF; color: #1D1D1F; }
@@ -117,18 +118,6 @@ if check_password():
             elif m > 5: return 'Summer'
             else: return 'Spring'
 
-        # --- ADVANCED ACTIVITY CLASSIFIER PATTERN ---
-        def classify_activity(x):
-            val = str(x).lower().strip()
-            if any(w in val for w in ['game', 'match', 'v.']):
-                return 'Game'
-            elif any(w in val for w in ['open gym', 'opengym']):
-                return 'Open Gym'
-            elif any(w in val for w in ['extra work', 'extra', 'individual']):
-                return 'Extra Work'
-            else:
-                return 'Practice'
-
         df = pd.read_csv(st.secrets["GOOGLE_SHEET_URL"])
         match_df = pd.read_csv(st.secrets["MATCHES_SHEET_URL"])
         
@@ -141,7 +130,7 @@ if check_password():
             frame['Session_Name'] = frame['Activity'].fillna(frame['Date'].dt.strftime('%m/%d/%Y'))
             frame['Position'] = frame.groupby('Name')['Position'].ffill().bfill().fillna("N/A")
             frame['PhotoURL'] = frame.groupby('Name')['PhotoURL'].ffill().bfill().fillna("https://www.w3schools.com/howto/img_avatar.png")
-            frame['Session_Type'] = frame['Activity'].apply(classify_activity)
+            frame['Session_Type'] = frame['Activity'].apply(lambda x: 'Game' if any(w in str(x).lower() for w in ['game', 'match', 'v.']) else 'Practice')
             frame['Season'] = frame['Date'].apply(assign_season)
 
         cmj_df = pd.read_csv(st.secrets["CMJ_SHEET_URL"])
@@ -200,7 +189,7 @@ if check_password():
         raw_df, raw_match_df, cmj_df, phase_df, thresh_df, ash_df, er_df = load_all_data()
         full_df_unfiltered = raw_df.copy()
 
-        # --- GLOBAL SIDEBAR CONFIG ---
+        # --- GLOBAL SEASON FILTER SIDEBAR CONFIG ---
         st.sidebar.markdown("### Season")
         selected_season = st.sidebar.radio("Select Season", ["Spring", "Summer"], index=1, key="global_season_toggle")
         
@@ -223,7 +212,7 @@ if check_password():
         all_metrics = ['Total Jumps', 'Moderate Jumps', 'High Jumps', 'Jump Load', 'Player Load', 'Estimated Distance (y)', 'Explosive Efforts', 'High Intensity Movement']
         st.markdown('<div class="main-logo-container" style="text-align: center; margin-top: 10px; margin-bottom: 15px;"><img src="https://upload.wikimedia.org/wikipedia/commons/thumb/f/fc/Tennessee_Lady_Volunteers_logo.svg/1280px-Tennessee_Lady_Volunteers_logo.svg.png" width="120"><div style="color: #FF8200; font-size: 2rem; font-weight: 900; margin-top: 10px;">LADY VOLS VOLLEYBALL PERFORMANCE</div></div>', unsafe_allow_html=True)
 
-        # --- SYSTEM LYNCHPIN: ATTACH KEY TO TABS TO LOCK RERUNS ---
+        # --- LOCKED LAYER: FIXED SYSTEM TAB STATE KEY TO PREVENT COLLAPSE ---
         tabs = st.tabs(
             ["Individual Profile", "Practice Scores", "Daily Combined Scores", "Spring Max vs Daily Combined", "Practice History", "Match v. Practice", "Match Summary", "Position Analysis", "Phase Analysis", "Practice Planner", "Spring v. Summer"],
             key="active_performance_tab"
@@ -306,6 +295,7 @@ if check_password():
             
             st.markdown('<div class="section-header">Weekly Readiness Profile</div>', unsafe_allow_html=True)
             
+            # --- BLOCK 1: LOWER BODY JUMP PROFILE (CMJ) ---
             st.markdown('<h4 style="color:#4895DB; font-weight:800; margin-bottom:5px;">COUNTERMOVEMENT JUMP</h4>', unsafe_allow_html=True)
             jc1, jc2 = st.columns([1.5, 3.5])
             p_cmj_hist = cmj_df[(cmj_df['Name'] == selected_athlete_prof) & (cmj_df['Test Date'] <= curr_date_prof)].sort_values('Test Date')
@@ -369,6 +359,7 @@ if check_password():
                 else:
                     st.info("No Countermovement Jump metrics recorded.")
 
+            # --- BLOCK 2: UPPER BODY ISOMETRIC PROFILE (ASH TEST) ---
             st.markdown('<hr style="display:block !important; margin:15px 0; border:0; border-top:1px solid #E5E5E7;" />', unsafe_allow_html=True)
             st.markdown('<h4 style="color:#4895DB; font-weight:800; margin-bottom:5px;">ASH SHOULDER: ISO I</h4>', unsafe_allow_html=True)
                 
@@ -437,6 +428,7 @@ if check_password():
             else:
                 st.info("No ASH shoulder test dataset recorded.")
 
+            # --- BLOCK 3: ROTATOR CUFF EXTERNAL ROTATION ROM ---
             st.markdown('<hr style="display:block !important; margin:15px 0; border:0; border-top:1px solid #E5E5E7;" />', unsafe_allow_html=True)
             st.markdown('<h4 style="color:#4895DB; font-weight:800; margin-bottom:5px;">EXTERNAL ROTATION: ROM</h4>', unsafe_allow_html=True)
             
@@ -514,7 +506,7 @@ if check_password():
                 fig_ph.update_yaxes(title_text="Total Jumps", secondary_y=True)
                 st.plotly_chart(fig_ph, use_container_width=True, config=LOCKED_CONFIG, key="prof_phase_chart")
        
-        with tabs[1]: # Tab 1: Practice Scores
+        with tabs[1]: # Tab 1: Practice Scores Gallery
             target_date_str = "2026-04-04"
             tournament_label = "GT Spring Tournament 4-4-26"
             
@@ -1116,7 +1108,6 @@ if check_password():
                     except:
                         correct_photo = "https://www.w3schools.com/howto/img_avatar.png"
             
-                    # --- CORE STABILITY: ALL RAW LAYOUT BLOCKS ENTIRELY COMPILING INSIDE SECURE CONTAINERS ---
                     with st.container():
                         card_start = f"""
                             <div class="player-row-container">
@@ -1242,7 +1233,7 @@ if check_password():
                                             xaxis=dict(dtick=1, showgrid=False, title="Week"), 
                                             yaxis=dict(showgrid=True, gridcolor='#F5F5F7', rangemode='tozero'),
                                             height=220, margin=dict(l=10, r=10, t=30, b=40),
-                                            showlegend=True, legend=dict(orientation="h", y=-0.6, x=0.5, xanchor="center"),
+                                            showlegend=True, legend=dict(orientation="h", yanchor="-0.6", x=0.5, xanchor="center"),
                                             template="simple_white"
                                         )
                                         st.plotly_chart(fig_t, use_container_width=True, config=LOCKED_CONFIG, key=f"trend_{name}_{m}")
@@ -1584,7 +1575,7 @@ if check_password():
                 ath_summer_days = summer_daily[summer_daily['Name'] == target_ath_comp].sort_values('Date', ascending=False)
                 
                 if ath_benchmarks.empty or ath_summer_days.empty:
-                    st.info(f"Insufficient data found to evaluate benchmarks for {target_ath_comp}.")
+                    st.info(f"Insufficient historical data pairings found to build benchmarks for {target_ath_comp}.")
                 else:
                     b_load = ath_benchmarks.iloc[0]['Spring Peak Load']
                     b_jumps = ath_benchmarks.iloc[0]['Spring Peak Jumps']
