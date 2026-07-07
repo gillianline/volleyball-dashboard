@@ -1,5 +1,3 @@
-streamlit
-pandas
-plotly
-openpyxl
-matplotlib
+streamlit>=1.38.0
+pandas>=2.0.0
+plotly>=5.15.0
