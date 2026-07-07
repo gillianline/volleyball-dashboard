@@ -293,7 +293,7 @@ if check_password():
             for k in filtered_metrics_prof:
                 val = p_row.get(k, 0.0)
                 mx = lb_prof[k].max() if (not lb_prof.empty and k in lb_prof.columns and lb_prof[k].max() > 0) else 1.0
-                avg = lb_prof[k].mean() if (not lb_prof.empty sheeting and k in lb_prof.columns and lb_prof[k].mean() > 0) else 1.0
+                avg = lb_prof[k].mean() if (not lb_prof.empty and k in lb_prof.columns and lb_prof[k].mean() > 0) else 1.0
                 g = math.ceil((val / mx) * 100) if mx > 0 else 0
                 t_grade_prof += g; c_metrics_prof += 1
                 diff = (val - avg) / avg if avg != 0 else 0
