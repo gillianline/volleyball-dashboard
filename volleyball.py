@@ -52,8 +52,16 @@ def check_password():
         return True
 
 if check_password():
-    if "is_printing" not in st.session_state:
-        st.session_state.is_printing = False
+    # --- HARD RESET SYSTEM ---
+    # This checks if the user just changed a filter and forces a clean state
+    if "last_selection" not in st.session_state:
+        st.session_state.last_selection = None
+    
+    # Track the current state of the main nav widgets
+    current_selection = f"{st.session_state.get('nav_sel_prof', '')}_{st.session_state.get('nav_ath_prof', '')}"
+    if st.session_state.last_selection != current_selection:
+        st.session_state.last_selection = current_selection
+        st.rerun() # Forces the DOM to clear out the orphaned layout elements
 
     # --- CSS: FORMATTING & PAGE BREAK CONTROLS ---
     st.markdown("""
