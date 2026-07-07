@@ -13,20 +13,6 @@ st.markdown("""
     th, td {text-align: center !important;}
     [data-testid="stMetricValue"] {font-size: 24px;}
     
-    @media print {
-        [data-testid="stSidebar"], [data-testid="stHeader"] {
-            display: none !important;
-        }
-        .main .block-container {
-            padding: 1rem !important;
-            margin: 0 !important;
-            max-width: 100% !important;
-        }
-        body {
-            -webkit-print-color-adjust: exact !important;
-            print-color-adjust: exact !important;
-        }
-    }
     </style>
     """, unsafe_allow_html=True)
 
@@ -52,9 +38,6 @@ def check_password():
     else:
         return True
 
-if check_password():
-    if "is_printing" not in st.session_state:
-        st.session_state.is_printing = False
 
     #CSS: FORMATTING & PAGE BREAK CONTROLS
     st.markdown("""
@@ -84,12 +67,6 @@ if check_password():
         .gallery-photo { border-radius: 50%; width: 110px; height: 110px; object-fit: cover; border: 4px solid #FF8200; }
         .section-header { font-size: 20px; font-weight: 800; color: #4895DB; border-bottom: 2px solid #FF8200; margin-top: 15px; margin-bottom: 10px; padding-bottom: 5px; text-transform: uppercase; }
 
-        @media print {
-            .main-logo-container { display: block !important; margin-bottom: 0 !important; }
-            .stTabs [role="tablist"], [data-testid="stSidebar"], header, footer, button, .stButton { display: none !important; }
-            .main .block-container { padding: 0 !important; max-width: 100% !important; }
-            .scout-table td, p, span, div { color: #000000 !important; }
-        }
         </style>
         """, unsafe_allow_html=True)
     
@@ -1133,15 +1110,6 @@ if check_password():
                 # Put the filter UI fully inside this container
                 filter_container = tab6.container()
                 with filter_container:
-                    # Use st.session_state (containers don't have session_state)
-                    if st.session_state.get("is_printing", st.session_state.is_printing):
-                        if filter_container.button("Back to Editor (Show Filters)", key="back_to_editor"):
-                            st.session_state.is_printing = False
-                            st.experimental_rerun()
-                    else:
-                        if filter_container.button("Prepare PDF for Printing", key="prepare_pdf"):
-                            st.session_state.is_printing = True
-                            st.experimental_rerun()
 
                         filter_container.markdown('<div class="section-header">Match Comparison Selection</div>', unsafe_allow_html=True)
                         c_ts1, c_ts2 = filter_container.columns([2, 1])
@@ -1159,10 +1127,7 @@ if check_password():
                                 st.session_state.pos_state = "All Positions"
                             st.session_state.pos_state = c_ts2.selectbox("Filter by Position", ["All Positions"] + sorted(list(match_df['Position'].unique())), index=0, key="match_pos_select")
 
-                # If printing mode, trigger print (keeps JS inside this tab)
-                if st.session_state.get("is_printing", False):
-                    tab6.markdown('<script>window.print();</script>', unsafe_allow_html=True)
-
+            
                 selected_matches = st.session_state.get("matches_state", [])
                 pos_filter_t = st.session_state.get("pos_state", "All Positions")
 
