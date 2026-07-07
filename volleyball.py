@@ -1093,10 +1093,9 @@ if check_password():
         # =========================================================================
         # TAB 6: MATCH SUMMARY
         # =========================================================================
-        with tabs[6]: 
+        with tabs[6]: # Tab 6: Match Summary
             custom_colors = ['#4895DB', '#FF8200', '#515154', '#A52A2A', '#008080', '#6A1B9A', '#2E7D32']
     
-            st.markdown('<div class="print-hide">', unsafe_allow_html=True)
             st.markdown('<div class="section-header">Match Comparison Selection</div>', unsafe_allow_html=True)
             c_ts1, c_ts2 = st.columns([2, 1])
             
@@ -1109,7 +1108,6 @@ if check_password():
             with c_ts2:
                 if "pos_state" not in st.session_state: st.session_state.pos_state = "All Positions"
                 st.session_state.pos_state = st.selectbox("Filter by Position Group", ["All Positions"] + sorted(list(match_df['Position'].unique())) if not match_df.empty else ["All Positions"], index=0, key="ms_pos_filt_final")
-            st.markdown('</div>', unsafe_allow_html=True)
 
             selected_matches = st.session_state.get("matches_state", [])
             pos_filter_t = st.session_state.get("pos_state", "All Positions")
@@ -1130,62 +1128,27 @@ if check_password():
                     except:
                         correct_photo = "https://www.w3schools.com/howto/img_avatar.png"
             
+                    # NATIVE CONTAINER REPLACEMENT
                     with st.container():
-                        card_start = f"""
-                            <div class="player-row-container">
-                            <div class="player-divider"></div>
-                            <div style="display:flex; align-items:center; gap:12px; padding:10px; background:#f8f9fa; border-bottom:2px solid #FF8200;">
-                                <img src="{correct_photo}" class="gallery-photo" style="width:65px; height:65px;">
-                                <div>
-                                    <p style="margin:0; font-weight:900; color:#1D1D1F; font-size:18px;">{name}</p>
-                                    <p style="margin:0; color:#4895DB; font-weight:700; font-size:16px;">{ad['Position'].iloc[0]}</p>
-                                </div>
-                            </div>
-                            <div style="padding:5px;">
-                                <table class="scout-table" style="margin-bottom:0;">
-                                    <thead><tr><th>Match</th><th>Jumps</th><th>Load</th><th>Efforts</th></tr></thead>
-                                    <tbody>
-                        """
-                        for _, r in ad.iterrows():
-                            card_start += f"<tr><td style='font-weight:700; font-size:11px;'>{r['Session_Name']}</td><td>{int(r['Total Jumps'])}</td><td>{r['Player Load']:.0f}</td><td>{r['Explosive Efforts']:.0f}</td></tr>"
-                
-                        total_j = int(ad['Total Jumps'].sum())
-                        total_pl = ad['Player Load'].sum()
-                        total_ee = ad['Explosive Efforts'].sum()
-                
-                        card_start += f"<tr style='background:#4895DB; color:white; font-weight:900;'><td>TOTAL</td><td>{total_j}</td><td>{total_pl:.0f}</td><td>{total_ee:.0f}</td></tr></tbody></table></div></div>"
+                        st.divider()
+                        col_a, col_b = st.columns([1.5, 2])
                         
-                        side_cols = st.columns([1.5, 2])
-                        with side_cols[0]:
-                            st.markdown(card_start, unsafe_allow_html=True)
+                        with col_a:
+                            st.image(correct_photo, width=65) # Using native image helper
+                            st.write(f"**{name}**")
+                            st.write(f"{ad['Position'].iloc[0]}")
+                            
+                            # Simple clean table for totals
+                            summary_data = ad[['Session_Name', 'Total Jumps', 'Player Load', 'Explosive Efforts']]
+                            st.table(summary_data)
                 
-                        with side_cols[1]:
+                        with col_b:
                             fig_ath = make_subplots(specs=[[{"secondary_y": True}]])
                             for _, r in ad.iterrows():
-                                fig_ath.add_trace(go.Bar(
-                                    name=r['Session_Name'], 
-                                    x=['Total Jumps', 'Explosive Efforts'], 
-                                    y=[r['Total Jumps'], r['Explosive Efforts']], 
-                                    marker_color=m_map[r['Session_Name']],
-                                    offsetgroup=r['Session_Name']
-                                ), secondary_y=False)
-                        
-                                fig_ath.add_trace(go.Bar(
-                                    name=f"Load ({r['Session_Name']})", 
-                                    x=['Player Load'], 
-                                    y=[r['Player Load']], 
-                                    marker=dict(color=m_map[r['Session_Name']], opacity=0.3), 
-                                    showlegend=False,
-                                    offsetgroup=r['Session_Name']
-                                ), secondary_y=True)
-                    
-                            fig_ath.update_layout(
-                                barmode='group', height=260, margin=dict(l=10, r=10, t=10, b=80), 
-                                template="simple_white", font=dict(color="#333333", size=10),
-                                legend=dict(orientation="h", yanchor="top", y=-0.3, xanchor="center", x=0.5),
-                                yaxis=dict(showgrid=False, title="Jumps / Efforts"),
-                                yaxis2=dict(showgrid=False, title="Player Load", overlaying='y', side='right')
-                            )
+                                fig_ath.add_trace(go.Bar(name=r['Session_Name'], x=['Total Jumps', 'Explosive Efforts'], y=[r['Total Jumps'], r['Explosive Efforts']], marker_color=m_map[r['Session_Name']]), secondary_y=False)
+                                fig_ath.add_trace(go.Bar(name=f"Load ({r['Session_Name']})", x=['Player Load'], y=[r['Player Load']], marker=dict(color=m_map[r['Session_Name']], opacity=0.3), showlegend=False), secondary_y=True)
+                
+                            fig_ath.update_layout(barmode='group', height=260, template="simple_white")
                             st.plotly_chart(fig_ath, use_container_width=True, config=LOCKED_CONFIG, key=f"match_sum_chart_{name}")
 
         # =========================================================================
