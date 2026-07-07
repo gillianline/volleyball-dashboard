@@ -9,22 +9,31 @@ from datetime import timedelta
 # --- PAGE CONFIG ---
 st.set_page_config(page_title="Lady Vols VB Performance", layout="wide")
 
-# --- SAFE, CONTANCE-ONLY CSS (No App Background Overrides) ---
+# --- SCOPED BROADCAST CSS (Cache-Busted Structure) ---
 st.markdown("""
     <style>
-    th, td { text-align: center !important; }
+    /* Scope everything to a single wrapper to prevent global cross-tab leaking */
+    .vols-layer-wrap th, .vols-layer-wrap td { text-align: center !important; }
     [data-testid="stMetricValue"] { font-size: 24px; }
     
-    /* Clean, non-breaking custom table styling */
-    .scout-table { width: 100%; border-collapse: collapse; text-align: center; }
-    .scout-table th { background-color: #4895DB; color: white; padding: 6px; border-bottom: 2px solid #FF8200; font-weight: 700; font-size: 11px; text-transform: uppercase; }
-    .scout-table td { padding: 6px; border-bottom: 1px solid #F5F5F7; font-size: 11px; }
-    .bg-highlight-red { background-color: #ffcccc !important; font-weight: 900; }
-    .arrow-red { color: #b30000 !important; font-weight: 900; margin-left: 4px; }
+    .vols-layer-wrap .scout-table { 
+        width: 100% !important; 
+        border-collapse: collapse !important; 
+        text-align: center !important; 
+        table-layout: auto !important;
+        margin: 10px 0 !important;
+    }
+    .vols-layer-wrap .scout-table th { background-color: #4895DB; color: white; padding: 6px; border-bottom: 2px solid #FF8200; font-weight: 700; font-size: 11px; text-transform: uppercase; }
+    .vols-layer-wrap .scout-table td { padding: 6px; border-bottom: 1px solid #F5F5F7; font-size: 11px; }
+    .vols-layer-wrap .bg-highlight-red { background-color: #ffcccc !important; font-weight: 900; }
+    .vols-layer-wrap .arrow-red { color: #b30000 !important; font-weight: 900; margin-left: 4px; }
+    .vols-layer-wrap .player-photo-large { border-radius: 50%; width: 180px; height: 180px; object-fit: contain; border: 6px solid #FF8200; display: block; margin: 0 auto; }
+    .vols-layer-wrap .score-box { padding: 12px 20px; border-radius: 12px; font-size: 28px; font-weight: 800; min-width: 100px; color: #FFFFFF; line-height: 1.2; text-align: center; display: inline-block;}
+    .vols-layer-wrap .info-box { background-color: #f8f9fa; border-left: 5px solid #FF8200; padding: 12px; margin-top: 10px; font-size: 12px; color: #1D1D1F; font-weight: 600; line-height: 1.4; border-radius: 0 4px 4px 0; }
+    .vols-layer-wrap .section-header { font-size: 20px; font-weight: 800; color: #4895DB; border-bottom: 2px solid #FF8200; margin-top: 20px; margin-bottom: 15px; padding-bottom: 5px; text-transform: uppercase; }
     
-    /* Percent-scaled components to ensure zero layout bleeding */
-    .score-box-native { padding: 12px; border-radius: 8px; font-size: 24px; font-weight: 800; color: #FFFFFF; text-align: center; width: 100%; max-width: 120px; margin: 0 auto; }
-    .info-box-native { background-color: #f8f9fa; border-left: 5px solid #FF8200; padding: 10px; margin-top: 5px; font-size: 11px; font-weight: 600; }
+    /* Clean grid isolation override */
+    div[data-testid="stBlock"] { clear: both !important; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -147,8 +156,8 @@ if check_password():
 
     raw_df, raw_match_df, cmj_df, phase_df, ash_df, er_df = load_all_data()
 
-    st.sidebar.markdown("### Season Panel")
-    selected_season = st.sidebar.radio("Select Season", ["Spring", "Summer"], index=1, key="global_season_toggle")
+    st.sidebar.markdown("### Active Season Dashboard View")
+    selected_season = st.sidebar.radio("Select Season Context", ["Spring", "Summer"], index=1, key="global_season_toggle")
     
     df = raw_df[raw_df['Season'] == selected_season].copy()
     match_df = raw_match_df[raw_match_df['Season'] == selected_season].copy()
@@ -159,6 +168,8 @@ if check_password():
     
     all_metrics = ['Total Jumps', 'Moderate Jumps', 'High Jumps', 'Jump Load', 'Player Load', 'Estimated Distance (y)', 'Explosive Efforts', 'High Intensity Movement']
     
+    # Render under custom wrapper to apply strict isolated CSS properties
+    st.markdown('<div class="vols-layer-wrap">', unsafe_allow_html=True)
     st.title("LADY VOLS VOLLEYBALL PERFORMANCE")
 
     tabs = st.tabs(["Individual Profile", "Practice Scores", "Daily Combined Scores", "Spring Max vs Daily Combined", "Practice History", "Match v. Practice", "Match Summary", "Position Analysis", "Phase Analysis", "Practice Planner", "Spring v. Summer"])
@@ -192,9 +203,9 @@ if check_password():
 
         c_prof1, c_prof2 = st.columns(2)
         with c_prof1:
-            selected_session_prof = st.selectbox("Session Selection", clean_session_list_prof, index=0, key="nav_sel_prof")
+            selected_session_prof = st.selectbox("Session Selector Block", clean_session_list_prof, index=0, key="nav_sel_prof")
         with c_prof2:
-            selected_athlete_prof = st.selectbox("Athlete Selection", master_athlete_list, key="nav_ath_prof")
+            selected_athlete_prof = st.selectbox("Athlete Selection Profile Target", master_athlete_list, key="nav_ath_prof")
 
         if selected_session_prof == tournament_label:
             curr_date_prof = pd.to_datetime(target_date_str)
@@ -236,24 +247,21 @@ if check_password():
 
         sc_prof = math.ceil(t_grade_prof / c_metrics_prof) if c_metrics_prof > 0 else 0
 
-        # Primary Block (Responsive Percentages Used)
         c1, c2, c3 = st.columns([1.5, 2.5, 1.0])
         with c1:
-            st.image(p_meta.get("PhotoURL", "https://www.w3schools.com/howto/img_avatar.png"), use_container_width=True)
-            st.markdown(f"<h3 style='text-align:center; margin:0;'>{p_meta.get('Name', selected_athlete_prof)}</h3>", unsafe_allow_html=True)
+            st.markdown(f'<img src="{p_meta.get("PhotoURL", "https://www.w3schools.com/howto/img_avatar.png")}" class="player-photo-large"><h3 style="text-align:center;">{p_meta.get("Name", selected_athlete_prof)}</h3>', unsafe_allow_html=True)
         with c2:
             st.markdown(f'<table class="scout-table"><thead><tr><th>Metric</th><th>Today Total</th><th>30d Max Day</th><th>Grade</th></tr></thead><tbody>{r_html_prof}</tbody></table>', unsafe_allow_html=True)
         with c3:
-            st.markdown(f'<div class="score-box-native" style="background-color:{get_flipped_gradient(sc_prof)};">{sc_prof}</div><p style="text-align:center; font-weight:bold; color:grey; margin-top:5px; font-size:12px;">SESSION SCORE</p>', unsafe_allow_html=True)
+            st.markdown(f'<div style="text-align:center; padding-top:20px;"><div class="score-box" style="background-color:{get_flipped_gradient(sc_prof)};">{sc_prof}</div><p style="font-weight:bold; color:grey; margin-top:5px;">SESSION SCORE</p></div>', unsafe_allow_html=True)
         
         st.markdown('<div class="section-header">Weekly Readiness Profile</div>', unsafe_allow_html=True)
         
         # --- BLOCK 1: LOWER BODY JUMP PROFILE (CMJ) ---
-        st.markdown('<h4 style="color:#4895DB; font-weight:800; margin: 10px 0 5px 0;">COUNTERMOVEMENT JUMP</h4>', unsafe_allow_html=True)
+        st.markdown('<div class="section-header" style="color:#4895DB; border:none; font-size:16px;">COUNTERMOVEMENT JUMP</div>', unsafe_allow_html=True)
         jc1, jc2 = st.columns([1.8, 3.2])
         p_cmj_hist = cmj_df[(cmj_df['Name'] == selected_athlete_prof) & (cmj_df['Test Date'] <= curr_date_prof)].sort_values('Test Date')
-        cmj_col = 'Jump Height (Imp-Mom) [cm]'
-        rsi_col = 'RSI-modified [m/s]'
+        cmj_col, rsi_col = 'Jump Height (Imp-Mom) [cm]', 'RSI-modified [m/s]'
 
         with jc1:
             baseline_cmj = p_cmj_hist[p_cmj_hist['Season'] == 'Summer'].head(1) if selected_season == 'Summer' else cmj_df[(cmj_df['Name'] == selected_athlete_prof) & (cmj_df['Week'] == 4)]
@@ -272,11 +280,11 @@ if check_password():
 
                 sc1, sc2 = st.columns(2)
                 with sc1:
-                    st.markdown(f'<div class="score-box-native" style="background-color:{color_h}; font-size:16px;">{cur_h:.1f} cm<br><span style="font-size:9px; font-weight:bold;">CMJ HEIGHT</span></div>', unsafe_allow_html=True)
+                    st.markdown(f'<div class="score-box" style="background-color:{color_h}; width:100%; font-size:16px; padding:10px;">{cur_h:.1f} cm<br><span style="font-size:9px; display:block; font-weight:bold;">CMJ HEIGHT</span></div>', unsafe_allow_html=True)
                 with sc2:
-                    st.markdown(f'<div class="score-box-native" style="background-color:{color_rsi}; font-size:16px;">{cur_rsi:.2f}<br><span style="font-size:9px; font-weight:bold;">RSI MOD</span></div>', unsafe_allow_html=True)
+                    st.markdown(f'<div class="score-box" style="background-color:{color_rsi}; width:100%; font-size:16px; padding:10px;">{cur_rsi:.2f}<br><span style="font-size:9px; display:block; font-weight:bold;">RSI MOD</span></div>', unsafe_allow_html=True)
 
-                st.markdown(f'<div class="info-box-native" style="text-align:center;"><p style="margin:0;"><b>% Change from Base:</b> CMJ: {p_diff_h:+.1f}% | RSI: {p_diff_rsi:+.1f}%</p><p style="margin:0; color:grey;">Base: CMJ: {base_h:.1f} cm | RSI: {base_rsi:.2f}</p></div>', unsafe_allow_html=True)
+                st.markdown(f'<div class="info-box" style="text-align:center;"><p style="margin:0;"><b>% Delta from Baseline:</b> CMJ Height: {p_diff_h:+.1f}% | RSI Mod: {p_diff_rsi:+.1f}%</p><p style="margin:0; color:grey; font-size:10px;">Baseline Metric: CMJ {base_h:.1f}cm | RSI {base_rsi:.2f}</p></div>', unsafe_allow_html=True)
             else:
                 st.warning("No data recorded.")
 
@@ -285,11 +293,11 @@ if check_password():
                 fig = make_subplots(specs=[[{"secondary_y": True}]])
                 fig.add_trace(go.Scatter(x=p_cmj_hist['Test Date'], y=p_cmj_hist[cmj_col], name="Jump Height", mode='lines+markers', line=dict(color='#FF8200', width=3)), secondary_y=False)
                 fig.add_trace(go.Scatter(x=p_cmj_hist['Test Date'], y=p_cmj_hist[rsi_col], name="RSI Modified", mode='lines+markers', line=dict(color='#4895DB', dash='dot', width=2)), secondary_y=True)
-                fig.update_layout(height=150, margin=dict(l=0, r=0, t=10, b=0), showlegend=True, legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0), template="simple_white")
+                fig.update_layout(height=140, margin=dict(l=0, r=0, t=10, b=0), showlegend=True, legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0), template="simple_white")
                 st.plotly_chart(fig, use_container_width=True, config=LOCKED_CONFIG, key="cmj_top_chart")
 
         # --- BLOCK 2: UPPER BODY ISOMETRIC PROFILE (ASH TEST) ---
-        st.markdown('<h4 style="color:#4895DB; font-weight:800; margin: 15px 0 5px 0;">ASH SHOULDER: ISO I</h4>', unsafe_allow_html=True)
+        st.markdown('<div class="section-header" style="color:#4895DB; border:none; font-size:16px; margin-top:15px;">ASH SHOULDER CAPACITY (ISO I)</div>', unsafe_allow_html=True)
         p_ash_all = ash_df[(ash_df['Name'] == selected_athlete_prof) & (ash_df['Test Date'] <= curr_date_prof)].sort_values('Test Date')
         
         if not p_ash_all.empty:
@@ -303,77 +311,75 @@ if check_password():
                 asym_i = clean_val(row_i.iloc[-1]['Peak Vertical Force [N] (Asym)(%)']) if not row_i.empty else 0.0
     
                 baseline_ash = p_ash_all[(p_ash_all['Season'] == 'Summer') & (p_ash_all['Isometric Type'].str.contains('I', case=False, na=False))].head(1) if selected_season == 'Summer' else p_ash_all[p_ash_all['Isometric Type'].str.contains('I', case=False, na=False)].head(1)
-                base_li = clean_val(baseline_ash.iloc[-1]['Peak Vertical Force [N] (L)']) if not baseline_ash.empty else 0.0
-                base_ri = clean_val(baseline_ash.iloc[-1]['Peak Vertical Force [N] (R)']) if not baseline_ash.empty else 0.0
+                base_li = clean_val(baseline_ash.iloc[-1]['Peak Vertical Force [N] (L)']) if not baseline_ash.empty else 1.0
+                base_ri = clean_val(baseline_ash.iloc[-1]['Peak Vertical Force [N] (R)']) if not baseline_ash.empty else 1.0
     
-                pct_l = ((li - base_li) / base_li * 100) if base_li > 0 else 0
-                pct_r = ((ri - base_ri) / base_ri * 100) if base_ri > 0 else 0
-    
+                pct_l = ((li - base_li) / base_li * 100)
+                pct_r = ((ri - base_ri) / base_ri * 100)
                 color_ash_l = "#28a745" if li >= 100 else "#dc3545"
                 color_ash_r = "#28a745" if ri >= 100 else "#dc3545"
 
                 asc1, asc2 = st.columns(2)
                 with asc1:
-                    st.markdown(f'<div class="score-box-native" style="background-color:{color_ash_l}; font-size:16px;">{li:.0f} N<br><span style="font-size:9px; font-weight:bold;">LEFT</span></div>', unsafe_allow_html=True)
+                    st.markdown(f'<div class="score-box" style="background-color:{color_ash_l}; width:100%; font-size:16px; padding:10px;">{li:.0f} N<br><span style="font-size:9px; display:block; font-weight:bold;">LEFT SIDE</span></div>', unsafe_allow_html=True)
                 with asc2:
-                    st.markdown(f'<div class="score-box-native" style="background-color:{color_ash_r}; font-size:16px;">{ri:.0f} N<br><span style="font-size:9px; font-weight:bold;">RIGHT</span></div>', unsafe_allow_html=True)
+                    st.markdown(f'<div class="score-box" style="background-color:{color_ash_r}; width:100%; font-size:16px; padding:10px;">{ri:.0f} N<br><span style="font-size:9px; display:block; font-weight:bold;">RIGHT SIDE</span></div>', unsafe_allow_html=True)
 
-                st.markdown(f'<div class="info-box-native" style="text-align:center;"><p style="margin:0;"><b>Asymmetry:</b> {asym_i:+.1f}% | <b>Base Shift:</b> L: {pct_l:+.1f}% / R: {pct_r:+.1f}%</p></div>', unsafe_allow_html=True)
+                st.markdown(f'<div class="info-box" style="text-align:center;"><p style="margin:0;"><b>Asymmetry Percent Index:</b> {asym_i:+.1f}% | <b>Base Force Variance:</b> L: {pct_l:+.1f}% / R: {pct_r:+.1f}%</p></div>', unsafe_allow_html=True)
             with ac2:
                 p_ash_i_only = p_ash_all[p_ash_all['Isometric Type'].str.contains('I', case=False, na=False)]
                 if not p_ash_i_only.empty:
                     fig_ash = go.Figure()
-                    fig_ash.add_trace(go.Scatter(x=p_ash_i_only['Test Date'], y=p_ash_i_only['Peak Vertical Force [N] (L)'], name="Left Peak Force", mode='lines+markers', line=dict(color='#4895DB', width=2.5)))
-                    fig_ash.add_trace(go.Scatter(x=p_ash_i_only['Test Date'], y=p_ash_i_only['Peak Vertical Force [N] (R)'], name="Right Peak Force", mode='lines+markers', line=dict(color='#FF8200', width=2.5, dash='dash')))
-                    fig_ash.update_layout(height=150, margin=dict(l=0, r=0, t=10, b=0), showlegend=True, legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0), template="simple_white")
+                    fig_ash.add_trace(go.Scatter(x=p_ash_i_only['Test Date'], y=p_ash_i_only['Peak Vertical Force [N] (L)'], name="Left ISO Force", mode='lines+markers', line=dict(color='#4895DB', width=2.5)))
+                    fig_ash.add_trace(go.Scatter(x=p_ash_i_only['Test Date'], y=p_ash_i_only['Peak Vertical Force [N] (R)'], name="Right ISO Force", mode='lines+markers', line=dict(color='#FF8200', width=2.5, dash='dash')))
+                    fig_ash.update_layout(height=140, margin=dict(l=0, r=0, t=10, b=0), showlegend=True, legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0), template="simple_white")
                     st.plotly_chart(fig_ash, use_container_width=True, config=LOCKED_CONFIG, key="ash_profile_chart")
         else:
-            st.info("No ASH shoulder test dataset recorded.")
+            st.info("No Upper Body Shoulder Force records logged.")
 
-        # --- BLOCK 3: ROTATOR CUFF EXTERNAL ROTATION ROM ---
-        st.markdown('<h4 style="color:#4895DB; font-weight:800; margin: 15px 0 5px 0;">EXTERNAL ROTATION: ROM</h4>', unsafe_allow_html=True)
+        # --- BLOCK 3: ROTATOR CUFF RANGE OF MOTION ---
+        st.markdown('<div class="section-header" style="color:#4895DB; border:none; font-size:16px; margin-top:15px;">ROTATOR CUFF RECOVERY (EXTERNAL ROTATION ROM)</div>', unsafe_allow_html=True)
         p_er_hist = er_df[(er_df['Name'] == selected_athlete_prof) & (er_df['Test Date'] <= curr_date_prof)].sort_values('Test Date')
         
         if not p_er_hist.empty:
             ec1, ec2 = st.columns([1.8, 3.2])
             with ec1:
-                baseline_er = p_er_hist[p_er_hist['Season'] == 'Summer'].head(1) if selected_season == 'Summer' else p_er_hist.head(1)
-        
-                if not baseline_er.empty:
-                    latest_er = p_er_hist.iloc[-1]
-                    cur_l_rom = clean_val(latest_er.get('L Max ROM (°)', 0.0))
-                    cur_r_rom = clean_val(latest_er.get('R Max ROM (°)', 0.0))
-                    cur_asym_rom = clean_val(latest_er.get('ROM Asymmetry (%)', 0.0))
-        
-                    color_er_l = "#28a745" if cur_l_rom >= 110 else "#ffc107" if 90 <= cur_l_rom <= 109 else "#dc3545"
-                    color_er_r = "#28a745" if cur_r_rom >= 110 else "#ffc107" if 90 <= cur_r_rom <= 109 else "#dc3545"
-        
-                    romsc1, romsc2 = st.columns(2)
-                    with romsc1:
-                        st.markdown(f'<div class="score-box-native" style="background-color:{color_er_l}; font-size:16px;">{cur_l_rom:.1f}°<br><span style="font-size:9px; font-weight:bold;">LEFT</span></div>', unsafe_allow_html=True)
-                    with romsc2:
-                        st.markdown(f'<div class="score-box-native" style="background-color:{color_er_r}; font-size:16px;">{cur_r_rom:.1f}°<br><span style="font-size:9px; font-weight:bold;">RIGHT</span></div>', unsafe_allow_html=True)
-                    st.markdown(f'<div class="info-box-native" style="text-align:center;"><p style="margin:0;"><b>ROM Asymmetry:</b> {cur_asym_rom:+.1f}%</p></div>', unsafe_allow_html=True)
+                latest_er = p_er_hist.iloc[-1]
+                cur_l_rom = clean_val(latest_er.get('L Max ROM (°)', 0.0))
+                cur_r_rom = clean_val(latest_er.get('R Max ROM (°)', 0.0))
+                cur_asym_rom = clean_val(latest_er.get('ROM Asymmetry (%)', 0.0))
+    
+                color_er_l = "#28a745" if cur_l_rom >= 110 else "#ffc107" if 90 <= cur_l_rom <= 109 else "#dc3545"
+                color_er_r = "#28a745" if cur_r_rom >= 110 else "#ffc107" if 90 <= cur_r_rom <= 109 else "#dc3545"
+    
+                romsc1, romsc2 = st.columns(2)
+                with romsc1:
+                    st.markdown(f'<div class="score-box" style="background-color:{color_er_l}; width:100%; font-size:16px; padding:10px;">{cur_l_rom:.1f}°<br><span style="font-size:9px; display:block; font-weight:bold;">LEFT ROM</span></div>', unsafe_allow_html=True)
+                with romsc2:
+                    st.markdown(f'<div class="score-box" style="background-color:{color_er_r}; width:100%; font-size:16px; padding:10px;">{cur_r_rom:.1f}°<br><span style="font-size:9px; display:block; font-weight:bold;">RIGHT ROM</span></div>', unsafe_allow_html=True)
+                st.markdown(f'<div class="info-box" style="text-align:center;"><p style="margin:0;"><b>Mobility Asymmetry Index:</b> {cur_asym_rom:+.1f}%</p></div>', unsafe_allow_html=True)
             with ec2:
                 fig_er = go.Figure()
-                fig_er.add_trace(go.Scatter(x=p_er_hist['Test Date'], y=p_er_hist['L Max ROM (°)'], name="Left Max ROM", mode='lines+markers', line=dict(color='#4895DB', width=2.5)))
-                fig_er.add_trace(go.Scatter(x=p_er_hist['Test Date'], y=p_er_hist['R Max ROM (°)'], name="Right Max ROM", mode='lines+markers', line=dict(color='#FF8200', width=2.5, dash='dash')))
-                fig_er.update_layout(height=150, margin=dict(l=0, r=0, t=10, b=0), showlegend=True, legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0), template="simple_white")
+                fig_er.add_trace(go.Scatter(x=p_er_hist['Test Date'], y=p_er_hist['L Max ROM (°)'], name="Left Mobility Max", mode='lines+markers', line=dict(color='#4895DB', width=2.5)))
+                fig_er.add_trace(go.Scatter(x=p_er_hist['Test Date'], y=p_er_hist['R Max ROM (°)'], name="Right Mobility Max", mode='lines+markers', line=dict(color='#FF8200', width=2.5, dash='dash')))
+                fig_er.update_layout(height=140, margin=dict(l=0, r=0, t=10, b=0), showlegend=True, legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0), template="simple_white")
                 st.plotly_chart(fig_er, use_container_width=True, config=LOCKED_CONFIG, key="er_profile_chart")
         else:
-            st.info("No Range of Motion metrics found for selected player timeline.")
+            st.info("No range of motion datasets mapped for profile.")
 
     # ==========================================
-    # --- WORKSPACE TAB AUTOMATION (1-10) ------
+    # --- AUTOMATED WORKSPACE SECTION LAYERS ---
     # ==========================================
     remaining_tabs = ["Practice Scores", "Daily Combined Scores", "Spring Max vs Daily Combined", "Practice History", "Match v. Practice", "Match Summary", "Position Analysis", "Phase Analysis", "Practice Planner", "Spring v. Summer"]
 
     for idx, tab_name in enumerate(remaining_tabs, start=1):
         with tabs[idx]:
-            st.subheader(f"{tab_name} Analysis Layer")
+            st.subheader(f"{tab_name} Analysis Terminal")
             if not df.empty:
-                # Utilizing position Maximum values over averages for high-performance visual target logic
+                # Setting visualization rule explicitly to Maximum values per positional requirements overrides
                 summary_view = df.groupby('Position')[['Player Load', 'Total Jumps']].max().reset_index()
-                st.dataframe(summary_view, use_container_width=True, hide_index=True, key=f"tab_view_auto_{idx}")
+                st.dataframe(summary_view, use_container_width=True, hide_index=True, key=f"isolated_tab_view_{idx}")
             else:
-                st.info("Upstream metric sheets initializing.")
+                st.info("Upstream training spreadsheet data logs initializing parameters.")
+                
+    st.markdown('</div>', unsafe_allow_html=True)
