@@ -572,8 +572,9 @@ if check_password():
                 metrics_to_exclude = ['High Jumps', 'Moderate Jumps', 'High Intensity Movement']
                 filtered_metrics_gal = [m for m in all_metrics if m not in metrics_to_exclude]
 
+                # --- REPLACE WITH THIS BULLETPROOF BLOCK ---
                 for i in range(0, len(athlete_names), 2):
-                    cols = st.columns(2)
+                    cols = st.columns(2, key=f"t1_stable_grid_row_{i}")
                     for j in range(2):
                         if i + j < len(athlete_names):
                             name = athlete_names[i + j]
