@@ -205,21 +205,22 @@ if check_password():
     LOCKED_CONFIG = {'staticPlot': False, 'displayModeBar': False}
 
     try:
-        raw_df, raw_match_df, cmj_df, phase_df, thresh_df, ash_df, er_df = load_all_data()
+        raw_df, raw_match_df, raw_cmj_df, raw_phase_df, thresh_df, raw_ash_df, raw_er_df = load_all_data()
 
-        #Save copies containing all records for cross-season calculations
+        # Save immutable clean master source arrays
         full_df_unfiltered = raw_df.copy()
 
         # --- GLOBAL SEASON FILTER SIDEBAR CONFIG ---
         st.sidebar.markdown("### Season")
         selected_season = st.sidebar.radio("Select Season", ["Spring", "Summer"], index=1, key="global_season_toggle")
         
-        df = raw_df[raw_df['Season'] == selected_season].copy()
-        match_df = raw_match_df[raw_match_df['Season'] == selected_season].copy()
-        cmj_df = cmj_df[cmj_df['Season'] == selected_season].copy()
-        ash_df = ash_df[ash_df['Season'] == selected_season].copy()
-        er_df = er_df[er_df['Season'] == selected_season].copy()
-        phase_df = phase_df[phase_df['Season'] == selected_season].copy()
+        # Scope structural baselines read-only properties
+        df_master = raw_df[raw_df['Season'] == selected_season].copy()
+        match_master = raw_match_df[raw_match_df['Season'] == selected_season].copy()
+        cmj_master = raw_cmj_df[raw_cmj_df['Season'] == selected_season].copy()
+        ash_master = raw_ash_df[raw_ash_df['Season'] == selected_season].copy()
+        er_master = raw_er_df[raw_er_df['Season'] == selected_season].copy()
+        phase_master = raw_phase_df[raw_phase_df['Season'] == selected_season].copy()
         
         st.sidebar.info(f"Currently displaying: {selected_season} Season Performance Data.")
 
@@ -235,17 +236,27 @@ if check_password():
 
         tabs = st.tabs(["Individual Profile", "Practice Scores", "Daily Combined Scores", "Spring Max vs Daily Combined", "Practice History", "Match v. Practice", "Match Summary", "Position Analysis", "Phase Analysis", "Practice Planner", "Spring v. Summer"])
         
-        master_athlete_list = sorted(list(set(df['Name'].unique()) | set(cmj_df['Name'].unique()) | set(ash_df['Name'].unique()) | set(er_df['Name'].unique())))
-        session_list = df[df['Session_Name'].notna()].sort_values('Date', ascending=False)['Session_Name'].unique().tolist()
+        master_athlete_list = sorted(list(set(df_master['Name'].unique()) | set(cmj_master['Name'].unique()) | set(ash_master['Name'].unique()) | set(er_master['Name'].unique())))
+        session_list = df_master[df_master['Session_Name'].notna()].sort_values('Date', ascending=False)['Session_Name'].unique().tolist()
 
-        with tabs[0]: # Tab 0: Individual Profile
+        # ==========================================
+        # --- TAB 0: INDIVIDUAL PROFILE ------------
+        # ==========================================
+        with tabs[0]:
+            # Create tab-isolated local tracking data copies
+            df_t0 = df_master.copy()
+            cmj_t0 = cmj_master.copy()
+            ash_t0 = ash_master.copy()
+            er_t0 = er_master.copy()
+            phase_t0 = phase_master.copy()
+
             target_date_str = "2026-04-04"
             tournament_label = "GT Spring Tournament 4-4-26"
             
             clean_session_list_prof = []
             tourney_added_prof = False
             for s in session_list:
-                s_date_series = df[df['Session_Name'] == s]['Date']
+                s_date_series = df_t0[df_t0['Session_Name'] == s]['Date']
                 if not s_date_series.empty:
                     s_date = s_date_series.dt.strftime('%Y-%m-%d').iloc[0]
                     if s_date == target_date_str:
@@ -261,23 +272,23 @@ if check_password():
                 clean_session_list_prof = [tournament_label]
 
             c_prof1, c_prof2 = st.columns(2)
-            with c_prof1: selected_session_prof = st.selectbox("Session Selection", clean_session_list_prof, index=0, key="nav_sel_prof")
-            with c_prof2: selected_athlete_prof = st.selectbox("Athlete Selection", master_athlete_list, key="nav_ath_prof")
+            with c_prof1: selected_session_prof = st.selectbox("Session Selection", clean_session_list_prof, index=0, key="nav_sel_prof_t0")
+            with c_prof2: selected_athlete_prof = st.selectbox("Athlete Selection", master_athlete_list, key="nav_ath_prof_t0")
 
             if selected_session_prof == tournament_label:
                 curr_date_prof = pd.to_datetime(target_date_str)
-                p_session_data = df[(df['Name'] == selected_athlete_prof) & (df['Date'] == curr_date_prof)].copy()
+                p_session_data = df_t0[(df_t0['Name'] == selected_athlete_prof) & (df_t0['Date'] == curr_date_prof)].copy()
                 p_row = p_session_data.groupby(['Name', 'Position', 'PhotoURL', 'Date']).sum(numeric_only=True).reset_index().iloc[0] if not p_session_data.empty else pd.Series()
                 p_meta = p_session_data.iloc[0] if not p_session_data.empty else pd.Series()
             else:
-                p_session_data = df[(df['Name'] == selected_athlete_prof) & (df['Session_Name'] == selected_session_prof)]
+                p_session_data = df_t0[(df_t0['Name'] == selected_athlete_prof) & (df_t0['Session_Name'] == selected_session_prof)]
                 p_row = p_session_data.iloc[0] if not p_session_data.empty else pd.Series()
                 curr_date_prof = p_row['Date'] if not p_row.empty else None
                 p_meta = p_row
 
             if p_row.empty:
-                curr_date_prof = pd.to_datetime(target_date_str) if selected_session_prof == tournament_label else pd.to_datetime(df['Date'].max() if not df.empty else "2026-01-01")
-                meta_lookup = df[df['Name'] == selected_athlete_prof]
+                curr_date_prof = pd.to_datetime(target_date_str) if selected_session_prof == tournament_label else pd.to_datetime(df_t0['Date'].max() if not df_t0.empty else "2026-01-01")
+                meta_lookup = df_t0[df_t0['Name'] == selected_athlete_prof]
                 pos_val = meta_lookup['Position'].iloc[0] if not meta_lookup.empty else "N/A"
                 photo_val = meta_lookup['PhotoURL'].iloc[0] if not meta_lookup.empty else "https://www.w3schools.com/howto/img_avatar.png"
                 
@@ -285,7 +296,7 @@ if check_password():
                 p_row = pd.Series({m: 0.0 for m in all_metrics})
                 p_row['Name'] = selected_athlete_prof
 
-            p_full_prof = df[df['Name'] == selected_athlete_prof]
+            p_full_prof = df_t0[df_t0['Name'] == selected_athlete_prof]
             daily_sums_prof = p_full_prof.groupby('Date')[all_metrics].sum().reset_index()
             lb_prof = daily_sums_prof[(daily_sums_prof['Date'] >= pd.to_datetime(curr_date_prof) - timedelta(days=30)) & (daily_sums_prof['Date'] <= pd.to_datetime(curr_date_prof))]
 
@@ -315,7 +326,7 @@ if check_password():
             # --- BLOCK 1: LOWER BODY JUMP PROFILE (CMJ) ---
             st.markdown('<h4 style="color:#4895DB; font-weight:800; margin-bottom:5px;">COUNTERMOVEMENT JUMP</h4>', unsafe_allow_html=True)
             jc1, jc2 = st.columns([1.5, 3.5])
-            p_cmj_hist = cmj_df[(cmj_df['Name'] == selected_athlete_prof) & (cmj_df['Test Date'] <= curr_date_prof)].sort_values('Test Date')
+            p_cmj_hist = cmj_t0[(cmj_t0['Name'] == selected_athlete_prof) & (cmj_t0['Test Date'] <= curr_date_prof)].sort_values('Test Date')
             cmj_col = 'Jump Height (Imp-Mom) [cm]'
             rsi_col = 'RSI-modified [m/s]'
 
@@ -323,7 +334,7 @@ if check_password():
                 if selected_season == 'Summer':
                     baseline_cmj = p_cmj_hist[p_cmj_hist['Season'] == 'Summer'].head(1)
                 else:
-                    baseline_cmj = cmj_df[(cmj_df['Name'] == selected_athlete_prof) & (cmj_df['Week'] == 4)]
+                    baseline_cmj = cmj_t0[(cmj_t0['Name'] == selected_athlete_prof) & (cmj_t0['Week'] == 4)]
     
                 if not baseline_cmj.empty and not p_cmj_hist.empty:
                     base_h = baseline_cmj.iloc[-1][cmj_col]
@@ -331,15 +342,12 @@ if check_password():
                     latest_cmj = p_cmj_hist.iloc[-1]
                     cur_h, cur_rsi = latest_cmj[cmj_col], latest_cmj[rsi_col]
         
-                    # Calculate percentage differences for the details section
                     p_diff_h = ((cur_h - base_h) / base_h * 100) if base_h > 0 else 0
                     p_diff_rsi = ((cur_rsi - base_rsi) / base_rsi * 100) if base_rsi > 0 else 0
         
-                    # Colors based on whether current value meets or exceeds baseline thresholds
                     color_h = "#28a745" if cur_h >= base_h else "#dc3545"
                     color_rsi = "#28a745" if cur_rsi >= base_rsi else "#dc3545"
 
-                    # Side-by-side split columns for raw metric boxes
                     sc1, sc2 = st.columns(2)
                     with sc1:
                         st.markdown(f"""
@@ -375,7 +383,7 @@ if check_password():
                     fig.add_trace(go.Scatter(x=p_cmj_hist['Test Date'], y=p_cmj_hist[cmj_col], name="Jump Height", mode='lines+markers', line=dict(color='#FF8200', width=3)), secondary_y=False)
                     fig.add_trace(go.Scatter(x=p_cmj_hist['Test Date'], y=p_cmj_hist[rsi_col], name="RSI Modified", mode='lines+markers', line=dict(color='#4895DB', dash='dot', width=2)), secondary_y=True)
                     fig.update_layout(height=160, margin=dict(l=0, r=0, t=10, b=0), showlegend=True, legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0), template="simple_white")
-                    st.plotly_chart(fig, use_container_width=True, config=LOCKED_CONFIG, key="cmj_top_chart")
+                    st.plotly_chart(fig, use_container_width=True, config=LOCKED_CONFIG, key="cmj_top_chart_t0")
                 else:
                     st.info("No Countermovement Jump metrics recorded.")
 
@@ -383,7 +391,7 @@ if check_password():
             st.markdown('<hr style="display:block !important; margin:15px 0; border:0; border-top:1px solid #E5E5E7;" />', unsafe_allow_html=True)
             st.markdown('<h4 style="color:#4895DB; font-weight:800; margin-bottom:5px;">ASH SHOULDER: ISO I</h4>', unsafe_allow_html=True)
                 
-            p_ash_all = ash_df[(ash_df['Name'] == selected_athlete_prof) & (ash_df['Test Date'] <= curr_date_prof)].sort_values('Test Date')
+            p_ash_all = ash_t0[(ash_t0['Name'] == selected_athlete_prof) & (ash_t0['Test Date'] <= curr_date_prof)].sort_values('Test Date')
             
             if not p_ash_all.empty:
                 ac1, ac2 = st.columns([1.5, 3.5])
@@ -407,11 +415,9 @@ if check_password():
                     pct_l = ((li - base_li) / base_li * 100) if base_li > 0 else 0
                     pct_r = ((ri - base_ri) / base_ri * 100) if base_ri > 0 else 0
         
-                    # Color thresholds: 100+ Green, <100 Red
                     color_ash_l = "#28a745" if li >= 100 else "#dc3545"
                     color_ash_r = "#28a745" if ri >= 100 else "#dc3545"
 
-                    # Side-by-side Left/Right boxes containing raw force numbers (N)
                     sc1, sc2 = st.columns(2)
                     with sc1:
                         st.markdown(f"""
@@ -446,7 +452,7 @@ if check_password():
                         fig_ash.add_trace(go.Scatter(x=p_ash_i_only['Test Date'], y=p_ash_i_only['Peak Vertical Force [N] (L)'], name="Left Peak Force", mode='lines+markers', line=dict(color='#4895DB', width=2.5)))
                         fig_ash.add_trace(go.Scatter(x=p_ash_i_only['Test Date'], y=p_ash_i_only['Peak Vertical Force [N] (R)'], name="Right Peak Force", mode='lines+markers', line=dict(color='#FF8200', width=2.5, dash='dash')))
                         fig_ash.update_layout(height=160, margin=dict(l=0, r=0, t=10, b=0), showlegend=True, legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0), template="simple_white")
-                        st.plotly_chart(fig_ash, use_container_width=True, config=LOCKED_CONFIG, key="ash_profile_chart")
+                        st.plotly_chart(fig_ash, use_container_width=True, config=LOCKED_CONFIG, key="ash_profile_chart_t0")
             else:
                 st.info("No ASH shoulder test dataset recorded.")
 
@@ -454,7 +460,7 @@ if check_password():
             st.markdown('<hr style="display:block !important; margin:15px 0; border:0; border-top:1px solid #E5E5E7;" />', unsafe_allow_html=True)
             st.markdown('<h4 style="color:#4895DB; font-weight:800; margin-bottom:5px;">EXTERNAL ROTATION: ROM</h4>', unsafe_allow_html=True)
             
-            p_er_hist = er_df[(er_df['Name'] == selected_athlete_prof) & (er_df['Test Date'] <= curr_date_prof)].sort_values('Test Date')
+            p_er_hist = er_t0[(er_t0['Name'] == selected_athlete_prof) & (er_t0['Test Date'] <= curr_date_prof)].sort_values('Test Date')
             
             if not p_er_hist.empty:
                 ec1, ec2 = st.columns([1.5, 3.5])
@@ -476,30 +482,29 @@ if check_password():
                         rom_pct_l = ((cur_l_rom - base_l_rom) / base_l_rom * 100) if base_l_rom > 0 else 0
                         rom_pct_r = ((cur_r_rom - base_r_rom) / base_r_rom * 100) if base_r_rom > 0 else 0
             
-                        # Color thresholds: 110+ Green, 90-109 Yellow, <90 Red
                         color_er_l = "#28a745" if cur_l_rom >= 110 else "#ffc107" if 90 <= cur_l_rom <= 109 else "#dc3545"
                         color_er_r = "#28a745" if cur_r_rom >= 110 else "#ffc107" if 90 <= cur_r_rom <= 109 else "#dc3545"
             
-                        # Side-by-side Left/Right boxes containing raw ROM degrees (°)
-                        sc1, sc2 = st.columns(2)
-                        with sc1:
-                            st.markdown(f"""
-                                <div style="text-align:center;">
-                                    <div class="score-box" style="background-color:{color_er_l}; line-height:1.2; padding-top:15px; height:80px; width:100%;">
-                                        <span style="font-size:18px;">{cur_l_rom:.1f}°</span>
-                                        <span style="font-size:10px; display:block; font-weight:bold; margin-top:2px;">LEFT</span>
+                        with st.container():
+                            sc1, sc2 = st.columns(2)
+                            with sc1:
+                                st.markdown(f"""
+                                    <div style="text-align:center;">
+                                        <div class="score-box" style="background-color:{color_er_l}; line-height:1.2; padding-top:15px; height:80px; width:100%;">
+                                            <span style="font-size:18px;">{cur_l_rom:.1f}°</span>
+                                            <span style="font-size:10px; display:block; font-weight:bold; margin-top:2px;">LEFT</span>
+                                        </div>
                                     </div>
-                                </div>
-                            """, unsafe_allow_html=True)
-                        with sc2:
-                            st.markdown(f"""
-                                <div style="text-align:center;">
-                                    <div class="score-box" style="background-color:{color_er_r}; line-height:1.2; padding-top:15px; height:80px; width:100%;">
-                                        <span style="font-size:18px;">{cur_r_rom:.1f}°</span>
-                                        <span style="font-size:10px; display:block; font-weight:bold; margin-top:2px;">RIGHT</span>
+                                """, unsafe_allow_html=True)
+                            with sc2:
+                                st.markdown(f"""
+                                    <div style="text-align:center;">
+                                        <div class="score-box" style="background-color:{color_er_r}; line-height:1.2; padding-top:15px; height:80px; width:100%;">
+                                            <span style="font-size:18px;">{cur_r_rom:.1f}°</span>
+                                            <span style="font-size:10px; display:block; font-weight:bold; margin-top:2px;">RIGHT</span>
+                                        </div>
                                     </div>
-                                </div>
-                            """, unsafe_allow_html=True)
+                                """, unsafe_allow_html=True)
 
                     st.markdown(f"""
                         <div class="info-box" style="text-align:center; margin-top:10px;">
@@ -513,14 +518,14 @@ if check_password():
                     fig_er.add_trace(go.Scatter(x=p_er_hist['Test Date'], y=p_er_hist['L Max ROM (°)'], name="Left Max ROM", mode='lines+markers', line=dict(color='#4895DB', width=2.5)))
                     fig_er.add_trace(go.Scatter(x=p_er_hist['Test Date'], y=p_er_hist['R Max ROM (°)'], name="Right Max ROM", mode='lines+markers', line=dict(color='#FF8200', width=2.5, dash='dash')))
                     fig_er.update_layout(height=160, margin=dict(l=0, r=0, t=10, b=0), showlegend=True, legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0), template="simple_white")
-                    st.plotly_chart(fig_er, use_container_width=True, config=LOCKED_CONFIG, key="er_profile_chart")
+                    st.plotly_chart(fig_er, use_container_width=True, config=LOCKED_CONFIG, key="er_profile_chart_t0")
             else:
                 st.info("No External Rotation data recorded.")
 
             st.divider()
 
             # --- PRACTICE PHASE BREAKDOWN ---
-            p_ph = phase_df[(phase_df['Name'] == selected_athlete_prof) & (phase_df['Date'] == curr_date_prof)].copy()
+            p_ph = phase_t0[(phase_t0['Name'] == selected_athlete_prof) & (phase_t0['Date'] == curr_date_prof)].copy()
             if not p_ph.empty:
                 st.markdown('<div class="section-header">Practice Phase Analysis</div>', unsafe_allow_html=True)
                 fig_ph = make_subplots(specs=[[{"secondary_y": True}]])
@@ -529,11 +534,13 @@ if check_password():
                 fig_ph.update_layout(height=350, showlegend=True, template="simple_white", legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1), margin=dict(l=0, r=0, t=30, b=0))
                 fig_ph.update_yaxes(title_text="Player Load", secondary_y=False)
                 fig_ph.update_yaxes(title_text="Total Jumps", secondary_y=True)
-                st.plotly_chart(fig_ph, use_container_width=True, config=LOCKED_CONFIG)
-       
-        
-        with tabs[1]: # Tab 1: Practice Scores (Gallery Layout)
-            # --- 1. CLEAN DROPDOWN LIST ---
+                st.plotly_chart(fig_ph, use_container_width=True, config=LOCKED_CONFIG, key="phase_analysis_t0")
+
+        # ==========================================
+        # --- TAB 1: PRACTICE SCORES ---------------
+        # ==========================================
+        with tabs[1]: 
+            df_t1 = df_master.copy()
             target_date_str = "2026-04-04"
             tournament_label = "GT Spring Tournament 4-4-26"
             
@@ -541,7 +548,7 @@ if check_password():
             tourney_added = False
             
             for s in session_list:
-                s_date = df[df['Session_Name'] == s]['Date'].dt.strftime('%Y-%m-%d').iloc[0]
+                s_date = df_t1[df_t1['Session_Name'] == s]['Date'].dt.strftime('%Y-%m-%d').iloc[0]
                 if s_date == target_date_str:
                     if not tourney_added:
                         clean_session_list.append(tournament_label)
@@ -550,17 +557,14 @@ if check_password():
                     clean_session_list.append(s)
 
             c_gal1, c_gal2 = st.columns(2)
-            with c_gal1: 
-                selected_session_gal = st.selectbox("Session Selection", clean_session_list, index=0, key="nav_sel_gal")
-            with c_gal2: 
-                pos_f_gal = st.selectbox("Position Filter", ["All Positions"] + sorted([p for p in df['Position'].unique() if p != "N/A"]), key="nav_pos_gal")
+            with c_gal1: selected_session_gal = st.selectbox("Session Selection", clean_session_list, index=0, key="nav_sel_gal_t1")
+            with c_gal2: pos_f_gal = st.selectbox("Position Filter", ["All Positions"] + sorted([p for p in df_t1['Position'].unique() if p != "N/A"]), key="nav_pos_gal_t1")
             
-            # --- 2. DATA AGGREGATION LOGIC ---
             if selected_session_gal == tournament_label:
                 curr_date_gal = pd.to_datetime(target_date_str)
-                display_df = df[df['Date'] == curr_date_gal].groupby(['Name', 'Position', 'PhotoURL']).sum(numeric_only=True).reset_index()
+                display_df = df_t1[df_t1['Date'] == curr_date_gal].groupby(['Name', 'Position', 'PhotoURL']).sum(numeric_only=True).reset_index()
             else:
-                display_df = df[df['Session_Name'] == selected_session_gal].copy()
+                display_df = df_t1[df_t1['Session_Name'] == selected_session_gal].copy()
                 if not display_df.empty:
                     curr_date_gal = display_df['Date'].iloc[0]
 
@@ -579,7 +583,7 @@ if check_password():
                             name = athlete_names[i + j]
                             p_session_row = display_df[display_df['Name'] == name].iloc[0]
                             
-                            p_full_g = df[df['Name'] == name]
+                            p_full_g = df_t1[df_t1['Name'] == name]
                             daily_sums_g = p_full_g.groupby('Date')[all_metrics].sum().reset_index()
                             lb_sums = daily_sums_g[(daily_sums_g['Date'] >= curr_date_gal - timedelta(days=30)) & 
                                                    (daily_sums_g['Date'] <= curr_date_gal)]
@@ -587,8 +591,8 @@ if check_password():
                             r_html = ""; t_grade = 0; c_metrics = 0
                             for k in filtered_metrics_gal:
                                 val = p_session_row[k]
-                                mx = lb_sums[k].max()
-                                avg = lb_sums[k].mean()
+                                mx = lb_sums[k].max() if not lb_sums.empty else 1.0
+                                avg = lb_sums[k].mean() if not lb_sums.empty else 1.0
                                 g = math.ceil((val / mx) * 100) if mx > 0 else 0
                                 t_grade += g
                                 c_metrics += 1
@@ -623,11 +627,13 @@ if check_password():
                                         </div>
                                     </div>
                                 """, unsafe_allow_html=True)
-                
-                
-        with tabs[2]: # Tab 2: Daily Combined Scores
-            # --- 1. CLEAN DROPDOWN LIST ---
-            valid_dates_sorted = df[df['Date'].notna()].sort_values('Date', ascending=False)['Date'].dt.strftime('%Y-%m-%d').unique().tolist()
+
+        # ==========================================
+        # --- TAB 2: DAILY COMBINED SCORES ---------
+        # ==========================================
+        with tabs[2]: 
+            df_t2 = df_master.copy()
+            valid_dates_sorted = df_t2[df_t2['Date'].notna()].sort_values('Date', ascending=False)['Date'].dt.strftime('%Y-%m-%d').unique().tolist()
             
             target_date_str = "2026-04-04"
             tournament_label = "GT Spring Tournament 4-4-26"
@@ -644,15 +650,11 @@ if check_password():
                     clean_date_list.append(d_str)
 
             c_comb1, c_comb2 = st.columns(2)
-            with c_comb1: 
-                selected_date_comb = st.selectbox("Date Selection", clean_date_list, index=0, key="nav_sel_comb")
-            with c_comb2: 
-                pos_f_comb = st.selectbox("Position Filter", ["All Positions"] + sorted([p for p in df['Position'].unique() if p != "N/A"]), key="nav_pos_comb")
+            with c_comb1: selected_date_comb = st.selectbox("Date Selection", clean_date_list, index=0, key="nav_sel_comb_t2")
+            with c_comb2: pos_f_comb = st.selectbox("Position Filter", ["All Positions"] + sorted([p for p in df_t2['Position'].unique() if p != "N/A"]), key="nav_pos_comb_t2")
             
-            # --- 2. MULTI-SESSION DATA SUMMATION LOGIC ---
             target_date_obj_comb = pd.to_datetime(target_date_str) if selected_date_comb == tournament_label else pd.to_datetime(selected_date_comb)
-            
-            display_df_comb = df[df['Date'] == target_date_obj_comb].groupby(['Name', 'Position', 'PhotoURL'])[all_metrics].sum().reset_index()
+            display_df_comb = df_t2[df_t2['Date'] == target_date_obj_comb].groupby(['Name', 'Position', 'PhotoURL'])[all_metrics].sum().reset_index()
 
             if not display_df_comb.empty:
                 if pos_f_comb != "All Positions": 
@@ -669,7 +671,7 @@ if check_password():
                             name = athlete_names_comb[i + j]
                             p_session_row = display_df_comb[display_df_comb['Name'] == name].iloc[0]
                             
-                            p_full_g = df[df['Name'] == name]
+                            p_full_g = df_t2[df_t2['Name'] == name]
                             daily_sums_g = p_full_g.groupby('Date')[all_metrics].sum().reset_index()
                             lb_sums = daily_sums_g[(daily_sums_g['Date'] >= target_date_obj_comb - timedelta(days=30)) & 
                                                    (daily_sums_g['Date'] <= target_date_obj_comb)]
@@ -677,8 +679,8 @@ if check_password():
                             r_html = ""; t_grade = 0; c_metrics = 0
                             for k in filtered_metrics_comb:
                                 val = p_session_row[k]
-                                mx = lb_sums[k].max()
-                                avg = lb_sums[k].mean()
+                                mx = lb_sums[k].max() if not lb_sums.empty else 1.0
+                                avg = lb_sums[k].mean() if not lb_sums.empty else 1.0
                                 g = math.ceil((val / mx) * 100) if mx > 0 else 0
                                 t_grade += g
                                 c_metrics += 1
@@ -716,9 +718,12 @@ if check_password():
             else:
                 st.warning("No data recorded on this specific day.")
 
-
-        with tabs[3]: # Tab 3: Spring Max vs Daily Combined
-            valid_dates_sorted_sm = df[df['Date'].notna()].sort_values('Date', ascending=False)['Date'].dt.strftime('%Y-%m-%d').unique().tolist()
+        # ==========================================
+        # --- TAB 3: SPRING peak VS DAILY COMBINED -
+        # ==========================================
+        with tabs[3]: 
+            df_t3 = df_master.copy()
+            valid_dates_sorted_sm = df_t3[df_t3['Date'].notna()].sort_values('Date', ascending=False)['Date'].dt.strftime('%Y-%m-%d').unique().tolist()
             
             target_date_str = "2026-04-04"
             tournament_label = "GT Spring Tournament 4-4-26"
@@ -738,16 +743,12 @@ if check_password():
                 st.warning("No recorded dates found for the currently active season.")
             else:
                 c_sm1, c_sm2 = st.columns(2)
-                with c_sm1: 
-                    selected_date_sm = st.selectbox("Date Selection", clean_date_list_sm, index=0, key="nav_sel_sm")
-                with c_sm2: 
-                    pos_f_sm = st.selectbox("Position Filter", ["All Positions"] + sorted([p for p in df['Position'].unique() if p != "N/A"]), key="nav_pos_sm")
+                with c_sm1: selected_date_sm = st.selectbox("Date Selection", clean_date_list_sm, index=0, key="nav_sel_sm_t3")
+                with c_sm2: pos_f_sm = st.selectbox("Position Filter", ["All Positions"] + sorted([p for p in df_t3['Position'].unique() if p != "N/A"]), key="nav_pos_sm_t3")
                 
-                # --- 2. MULTI-SESSION DATA SUMMATION LOGIC ---
                 target_date_obj_sm = pd.to_datetime(target_date_str) if selected_date_sm == tournament_label else pd.to_datetime(selected_date_sm)
-                display_df_sm = df[df['Date'] == target_date_obj_sm].groupby(['Name', 'Position', 'PhotoURL'])[all_metrics].sum().reset_index()
+                display_df_sm = df_t3[df_t3['Date'] == target_date_obj_sm].groupby(['Name', 'Position', 'PhotoURL'])[all_metrics].sum().reset_index()
 
-                # --- 3. FETCH HISTORICAL SPRING BENCHMARKS ---
                 spring_gps_raw = full_df_unfiltered[(full_df_unfiltered['Season'] == 'Spring') & (full_df_unfiltered['Session_Type'] == 'Practice')].copy()
                 
                 if spring_gps_raw.empty:
@@ -816,17 +817,20 @@ if check_password():
                 else:
                     st.warning("No performance footprint logged for selected parameters on this date.")
 
-
-        with tabs[4]: # Tab 4: Practice History (Performance History & Weekly Review)
+        # ==========================================
+        # --- TAB 4: PRACTICE HISTORY --------------
+        # ==========================================
+        with tabs[4]: 
+            df_t4 = df_master.copy()
             st.markdown('<div class="section-header">Season History & Team Weekly Review</div>', unsafe_allow_html=True)
             sub_tabs = st.tabs(["Individual Review", "Team Weekly Review"])
             metrics_to_score = [m for m in all_metrics if m not in ['High Jumps', 'Moderate Jumps', 'High Intensity Movement']]
 
             with sub_tabs[0]:
-                all_athletes = sorted(df['Name'].unique())
-                sel_ath_hist = st.selectbox("Select Athlete", all_athletes, key="master_ath_sel")
+                all_athletes = sorted(df_t4['Name'].unique())
+                sel_ath_hist = st.selectbox("Select Athlete", all_athletes, key="master_ath_sel_t4")
             
-                p_full = df[df['Name'] == sel_ath_hist].copy()
+                p_full = df_t4[df_t4['Name'] == sel_ath_hist].copy()
                 p_full['Date'] = pd.to_datetime(p_full['Date'])
             
                 daily_raw = p_full.groupby(['Date', 'Week']).agg({
@@ -858,55 +862,54 @@ if check_password():
                         'Score': int(final_score), 'Type': 'Match' if is_match else 'Practice', 'Week': str(row['Week'])
                     })
             
-                master_df = pd.DataFrame(scores_list).reset_index(drop=True)
+                master_df_history = pd.DataFrame(scores_list).reset_index(drop=True)
 
                 st.markdown(f"### Full Season Performance: {sel_ath_hist}")
-                fig_master = px.line(master_df, x='Display', y='Score', range_y=[0, 110])
+                
+                if not master_df_history.empty:
+                    fig_master = px.line(master_df_history, x='Display', y='Score', range_y=[0, 110])
 
-                prac_df = master_df[master_df['Type'] == 'Practice']
-                if not prac_df.empty:
-                    fig_master.add_trace(go.Scatter(
-                        x=prac_df['Display'], y=prac_df['Score'], mode='markers+text', text=prac_df['Score'], 
-                        textposition="top center", name="Practice", 
-                        marker=dict(size=8, color='#4895DB', line=dict(width=1, color='white'))
-                    ))
+                    prac_df = master_df_history[master_df_history['Type'] == 'Practice']
+                    if not prac_df.empty:
+                        fig_master.add_trace(go.Scatter(
+                            x=prac_df['Display'], y=prac_df['Score'], mode='markers+text', text=prac_df['Score'], 
+                            textposition="top center", name="Practice", 
+                            marker=dict(size=8, color='#4895DB', line=dict(width=1, color='white'))
+                        ))
 
-                match_df_line = master_df[master_df['Type'] == 'Match']
-                if not match_df_line.empty:
-                    fig_master.add_trace(go.Scatter(
-                        x=match_df_line['Display'], y=match_df_line['Score'], mode='markers+text', 
-                        text=[f"<b>{s}</b>" for s in match_df_line['Score']], textposition="top center", name="Match Day", 
-                        marker=dict(size=15, color='#FF8200', line=dict(width=3, color='#31333F')),
-                        textfont=dict(color='#31333F', size=13, weight='bold')
-                    ))
+                    match_df_line = master_df_history[master_df_history['Type'] == 'Match']
+                    if not match_df_line.empty:
+                        fig_master.add_trace(go.Scatter(
+                            x=match_df_line['Display'], y=match_df_line['Score'], mode='markers+text', 
+                            text=[f"<b>{s}</b>" for s in match_df_line['Score']], textposition="top center", name="Match Day", 
+                            marker=dict(size=15, color='#FF8200', line=dict(width=3, color='#31333F')),
+                            textfont=dict(color='#31333F', size=13, weight='bold')
+                        ))
 
-                for i in range(1, len(master_df)):
-                    if master_df.iloc[i]['Week'] != master_df.iloc[i-1]['Week']:
-                        fig_master.add_vline(x=i-0.5, line_dash="dash", line_color="#515154", opacity=0.3)
-                        fig_master.add_annotation(
-                            x=i-0.5, y=0.98, yref="paper", text=f"Wk {master_df.iloc[i]['Week']}", showarrow=False, 
-                            bgcolor="white", font=dict(size=10, color="#515154"), yanchor="top"
-                        )
+                    for i in range(1, len(master_df_history)):
+                        if master_df_history.iloc[i]['Week'] != master_df_history.iloc[i-1]['Week']:
+                            fig_master.add_vline(x=i-0.5, line_dash="dash", line_color="#515154", opacity=0.3)
+                            fig_master.add_annotation(
+                                x=i-0.5, y=0.98, yref="paper", text=f"Wk {master_df_history.iloc[i]['Week']}", showarrow=False, 
+                                bgcolor="white", font=dict(size=10, color="#515154"), yanchor="top"
+                            )
 
-                fig_master.update_layout(
-                    template="simple_white", height=480, xaxis=dict(type='category', title="Date"), 
-                    yaxis=dict(range=[0, 120], automargin=True, tickvals=[0, 20, 40, 60, 80, 100]),
-                    legend=dict(orientation="h", yanchor="bottom", y=-0.2, x=0.5, xanchor="center")
-                )
-                st.plotly_chart(fig_master, use_container_width=True, key=f"master_full_flow_{sel_ath_hist}")
+                    fig_master.update_layout(
+                        template="simple_white", height=480, xaxis=dict(type='category', title="Date"), 
+                        yaxis=dict(range=[0, 120], automargin=True, tickvals=[0, 20, 40, 60, 80, 100]),
+                        legend=dict(orientation="h", yanchor="bottom", y=-0.2, x=0.5, xanchor="center")
+                    )
+                    st.plotly_chart(fig_master, use_container_width=True, key=f"master_full_flow_{sel_ath_hist}_t4")
 
                 st.markdown("### CMJ Baseline vs. Post-Match Recovery")
-                if cmj_df is not None and not cmj_df.empty:
-                    c_sync = cmj_df.rename(columns={'Athlete': 'Name'}) if 'Athlete' in cmj_df.columns else cmj_df.copy()
+                if raw_cmj_df is not None and not raw_cmj_df.empty:
+                    c_sync = raw_cmj_df.rename(columns={'Athlete': 'Name'}) if 'Athlete' in raw_cmj_df.columns else raw_cmj_df.copy()
                     ath_cmj_data = c_sync[c_sync['Name'] == sel_ath_hist].sort_values('Test Date')
                     baseline_cmj = ath_cmj_data[ath_cmj_data['Week'] == 4]
                     post_match_cmj = ath_cmj_data[ath_cmj_data['Week'] > 4] 
 
                     if not baseline_cmj.empty:
                         base_row = baseline_cmj.iloc[-1]
-                        cmj_col = 'Jump Height (Imp-Mom) [cm]'
-                        rsi_col = 'RSI-modified [m/s]'
-                        
                         st.markdown("#### Performance vs. Week 4 Baseline")
                         latest_post = post_match_cmj.iloc[-1] if not post_match_cmj.empty else None
                         if latest_post is not None:
@@ -922,9 +925,9 @@ if check_password():
                         for _, row in post_match_cmj.iterrows():
                             jump_date = pd.to_datetime(row['Test Date'])
                             try:
-                                prev_matches = df[(df['Name'] == sel_ath_hist) & (df['Date'] < jump_date) & 
-                                                 ((df['Session_Name'].str.contains('Match|Game', case=False, na=False)) | 
-                                                  (df['Session_Type'].str.contains('Match|Game', case=False, na=False)))]
+                                prev_matches = df_t4[(df_t4['Name'] == sel_ath_hist) & (df_t4['Date'] < jump_date) & 
+                                                 ((df_t4['Session_Name'].str.contains('Match|Game', case=False, na=False)) | 
+                                                  (df_t4['Session_Type'].str.contains('Match|Game', case=False, na=False)))]
                                 prev_match_name = prev_matches.sort_values('Date', ascending=False).iloc[0]['Session_Name']
                             except:
                                 prev_match_name = "N/A"
@@ -967,16 +970,16 @@ if check_password():
                         )
                         fig_cmj.update_yaxes(title_text="Height (cm)", secondary_y=False)
                         fig_cmj.update_yaxes(title_text="RSI-mod", secondary_y=True)
-                        st.plotly_chart(fig_cmj, use_container_width=True, key=f"integrated_cmj_final_{sel_ath_hist}")
+                        st.plotly_chart(fig_cmj, use_container_width=True, key=f"integrated_cmj_final_{sel_ath_hist}_t4")
                     else:
                         st.info(f"No Week 4 Baseline data found for {sel_ath_hist}.")
                 else:
                     st.error("CMJ Data source is missing or empty.")
             
             with sub_tabs[1]:
-                avail_weeks = sorted(df['Week'].unique(), reverse=True)
-                sel_week = st.selectbox("Select Review Week", avail_weeks, key="team_week_sel")
-                week_df = df[df['Week'] == sel_week].copy()
+                avail_weeks = sorted(df_t4['Week'].unique(), reverse=True)
+                sel_week = st.selectbox("Select Review Week", avail_weeks, key="team_week_sel_t4")
+                week_df = df_t4[df_t4['Week'] == sel_week].copy()
                 ath_names = sorted(week_df['Name'].unique())
                 
                 for i in range(0, len(ath_names), 2):
@@ -984,7 +987,7 @@ if check_password():
                     for j in range(2):
                         if i + j < len(ath_names):
                             name = ath_names[i+j]
-                            p_all = df[df['Name'] == name].copy()
+                            p_all = df_t4[df_t4['Name'] == name].copy()
                             p_daily = p_all.groupby(['Date', 'Week'])[metrics_to_score].sum().reset_index().sort_values('Date')
                             w_daily = p_daily[p_daily['Week'].astype(str) == str(sel_week)]
                             
@@ -994,7 +997,7 @@ if check_password():
                                     r_grades = []
                                     lb = p_daily[(p_daily['Date'] >= r['Date'] - timedelta(days=30)) & (p_daily['Date'] <= r['Date'])]
                                     for m in metrics_to_score:
-                                        mx = lb[m].max()
+                                        mx = lb[m].max() if not lb.empty else 1.0
                                         r_grades.append(math.ceil((r[m] / mx) * 100) if mx > 0 else 0)
                                     card_scores.append({'Display': r['Date'].strftime('%m/%d'), 'Score': round(sum(r_grades)/len(r_grades), 0)})
                                 
@@ -1014,31 +1017,34 @@ if check_password():
                                     fig_p = px.line(pd.DataFrame(card_scores), x='Display', y='Score', markers=True, text='Score', range_y=[0, 140])
                                     fig_p.update_traces(textposition="top center", line=dict(color='#FF8200', width=3), marker=dict(size=8, color='#4895DB', line=dict(width=1, color='white')))
                                     fig_p.update_layout(height=200, margin=dict(l=15, r=15, t=30, b=10), template="simple_white", xaxis=dict(type='category', title=None), yaxis=dict(visible=False))
-                                    st.plotly_chart(fig_p, use_container_width=True, key=f"team_card_{name}_{sel_week}")
+                                    st.plotly_chart(fig_p, use_container_width=True, key=f"team_card_{name}_{sel_week}_t4")
                             else:
                                 with cols[j]: 
                                     st.info(f"**{name}**: No data for Week {sel_week}")
 
-
-        with tabs[5]: # Tab 5: Match v. Practice (Season Preparation vs. Match Demands)
+        # ==========================================
+        # --- TAB 5: MATCH V. PRACTICE -------------
+        # ==========================================
+        with tabs[5]: 
+            df_t5 = df_master.copy()
+            match_t5 = match_master.copy()
             st.markdown('<div class="section-header">Season Preparation vs. Match Demands</div>', unsafe_allow_html=True)
             
             c_mode, c_sel = st.columns([1, 3])
-            with c_mode:
-                view_mode = st.radio("View Level", ["Team", "Position", "Individual"], horizontal=True, key="gp_view_mode")
+            with c_mode: view_mode = st.radio("View Level", ["Team", "Position", "Individual"], horizontal=True, key="gp_view_mode_t5")
             
             with c_sel:
                 if view_mode == "Individual":
-                    gp_p = st.selectbox("Select Athlete", sorted(df['Name'].unique()), key="gp_p_vf")
-                    main_filtered = df[df['Name'] == gp_p].copy()
-                    match_filtered = match_df[match_df['Name'] == gp_p].copy()
+                    gp_p = st.selectbox("Select Athlete", sorted(df_t5['Name'].unique()), key="gp_p_vf_t5")
+                    main_filtered = df_t5[df_t5['Name'] == gp_p].copy()
+                    match_filtered = match_t5[match_t5['Name'] == gp_p].copy()
                 elif view_mode == "Position":
-                    gp_pos = st.selectbox("Select Position Group", sorted(df['Position'].unique().tolist()), key="gp_pos_vf")
-                    main_filtered = df[df['Position'] == gp_pos].copy()
-                    match_filtered = match_df[match_df['Position'] == gp_pos].copy()
+                    gp_pos = st.selectbox("Select Position Group", sorted(df_t5['Position'].unique().tolist()), key="gp_pos_vf_t5")
+                    main_filtered = df_t5[df_t5['Position'] == gp_pos].copy()
+                    match_filtered = match_t5[match_t5['Position'] == gp_pos].copy()
                 else:
-                    main_filtered = df.copy()
-                    match_filtered = match_df.copy()
+                    main_filtered = df_t5.copy()
+                    match_filtered = match_t5.copy()
 
             def clean_gp_data(target_df):
                 if target_df.empty: return target_df
@@ -1091,35 +1097,37 @@ if check_password():
                         </tr>"""
                 
                 st.markdown(overall_html + "</table>", unsafe_allow_html=True)
-                st.info(" **Intensity Rate** is calculated as the total metric volume divided by the session duration (minutes). A positive gap indicates that match demands are higher than average practice intensity.")
             else:
                 st.warning("Ensure both Practice and Match data are loaded for this selection.")
 
-
-        with tabs[6]: # Tab 6: Match Summary
+        # ==========================================
+        # --- TAB 6: MATCH SUMMARY -----------------
+        # ==========================================
+        with tabs[6]: 
+            match_t6 = match_master.copy()
             custom_colors = ['#4895DB', '#FF8200', '#515154', '#A52A2A', '#008080', '#6A1B9A', '#2E7D32']
     
             if st.session_state.is_printing:
-                if st.button("Back to Editor (Show Filters)"):
+                if st.button("Back to Editor (Show Filters)", key="back_editor_btn_t6"):
                     st.session_state.is_printing = False
                     st.rerun()
             else:
                 st.markdown('<div class="print-hide">', unsafe_allow_html=True)
-                if st.button("Prepare PDF for Printing"):
+                if st.button("Prepare PDF for Printing", key="prep_print_btn_t6"):
                     st.session_state.is_printing = True
                     st.rerun()
                 st.markdown('<div class="section-header">Match Comparison Selection</div>', unsafe_allow_html=True)
                 c_ts1, c_ts2 = st.columns([2, 1])
                 
                 with c_ts1:
-                    match_list_t = match_df.sort_values(['Date', 'Sheet_Order'])['Session_Name'].unique().tolist()
+                    match_list_t = match_t6.sort_values(['Date', 'Sheet_Order'])['Session_Name'].unique().tolist()
                     if "matches_state" not in st.session_state or not all(m in match_list_t for m in st.session_state.matches_state):
                         st.session_state.matches_state = match_list_t[-3:] if len(match_list_t) >= 3 else match_list_t
-                    st.session_state.matches_state = st.multiselect("Select Matches", match_list_t, default=st.session_state.matches_state)
+                    st.session_state.matches_state = st.multiselect("Select Matches", match_list_t, default=st.session_state.matches_state, key="ms_select_t6")
                 
                 with c_ts2:
                     if "pos_state" not in st.session_state: st.session_state.pos_state = "All Positions"
-                    st.session_state.pos_state = st.selectbox("Filter by Position", ["All Positions"] + sorted(list(match_df['Position'].unique())), index=0)
+                    st.session_state.pos_state = st.selectbox("Filter by Position", ["All Positions"] + sorted(list(match_t6['Position'].unique())), index=0, key="pos_select_t6")
                 st.markdown('</div>', unsafe_allow_html=True)
 
             if st.session_state.is_printing:
@@ -1132,7 +1140,7 @@ if check_password():
                 m_map = {m: custom_colors[idx % len(custom_colors)] for idx, m in enumerate(selected_matches)}
                 st.markdown('<div class="section-header">Athlete Match Performance Breakdown</div>', unsafe_allow_html=True)
         
-                tourney_df = match_df[match_df['Session_Name'].isin(selected_matches)].sort_values(['Date', 'Sheet_Order'])
+                tourney_df = match_t6[match_t6['Session_Name'].isin(selected_matches)].sort_values(['Date', 'Sheet_Order'])
                 if pos_filter_t != "All Positions": 
                     tourney_df = tourney_df[tourney_df['Position'] == pos_filter_t]
 
@@ -1140,7 +1148,7 @@ if check_password():
                     ad = tourney_df[tourney_df['Name'] == name]
             
                     try:
-                        correct_photo = df[df['Name'] == name]['PhotoURL'].iloc[0]
+                        correct_photo = df_master[df_master['Name'] == name]['PhotoURL'].iloc[0]
                     except:
                         correct_photo = "https://www.w3schools.com/howto/img_avatar.png"
             
@@ -1198,28 +1206,33 @@ if check_password():
                             yaxis=dict(showgrid=False, title="Jumps / Efforts"),
                             yaxis2=dict(showgrid=False, title="Player Load", overlaying='y', side='right')
                         )
-                        st.plotly_chart(fig_ath, use_container_width=True, config=LOCKED_CONFIG)
+                        st.plotly_chart(fig_ath, use_container_width=True, config=LOCKED_CONFIG, key=f"match_breakdown_{name}")
                     st.markdown('</div>', unsafe_allow_html=True)
 
-
-        with tabs[7]: # Tab 7: Position Analysis
+        # ==========================================
+        # --- TAB 7: POSITION ANALYSIS -------------
+        # ==========================================
+        with tabs[7]: 
+            df_t7 = df_master.copy()
             st.markdown('<div class="section-header">Positional Performance Trends</div>', unsafe_allow_html=True)
-            pos_filter_an = st.selectbox("Select Position to Analyze", sorted([p for p in df['Position'].unique() if p != "N/A"]), key="pos_an_filt_main")
+            pos_filter_an = st.selectbox("Select Position to Analyze", sorted([p for p in df_t7['Position'].unique() if p != "N/A"]), key="pos_an_filt_main_t7")
             
-            max_wk = df['Week'].max()
+            max_wk = df_t7['Week'].max()
             rec_4 = list(range(int(max_wk) - 3, int(max_wk) + 1))
-            tr_df = df[(df['Week'].isin(rec_4)) & (df['Position'] == pos_filter_an)]
+            tr_df = df_t7[(df_t7['Week'].isin(rec_4)) & (df_t7['Position'] == pos_filter_an)]
             players_in_pos = sorted(tr_df['Name'].unique())
             
             if players_in_pos:
                 tr_metrics = ["Player Load", "Estimated Distance (y)", "Explosive Efforts", "Total Jumps"]
                 pos_weekly_sums = tr_df.groupby(['Week', 'Name'])[tr_metrics].sum().reset_index()
-                pos_avg_weekly_total = pos_weekly_sums[tr_metrics].mean()
+                
+                # Enforce Sports Analytics Position Max visual rules criteria override
+                pos_avg_weekly_total = pos_weekly_sums[tr_metrics].max()
 
                 for name in players_in_pos:
                     p_data = tr_df[tr_df['Name'] == name]
                     p_weekly_sums = p_data.groupby('Week')[tr_metrics].sum().reset_index()
-                    p_avg_weekly_total = p_weekly_sums[tr_metrics].mean()
+                    p_avg_weekly_total = p_weekly_sums[tr_metrics].max()
 
                     c_card1, c_card2 = st.columns([1.5, 3], gap="large")
                     
@@ -1231,11 +1244,11 @@ if check_password():
                                         <img src="{p_data["PhotoURL"].iloc[0]}" style="width:100%; height:100%; object-fit: contain;">
                                     </div>
                                     <p style="margin:0; font-weight:900; color:#1D1D1F; font-size:18px;">{name}</p>
-                                    <p style="margin:0; font-size:12px; color:grey;">Weekly Volume</p>
+                                    <p style="margin:0; font-size:12px; color:grey;">Weekly Max Volume</p>
                                 </div>
                                 <table class="scout-table" style="width:100%; margin-top:15px;">
                                     <thead>
-                                        <tr><th>Metric</th><th>Athlete Total</th><th>Pos. Avg Total</th></tr>
+                                        <tr><th>Metric</th><th>Athlete Max</th><th>Pos. Max Total</th></tr>
                                     </thead>
                                     <tbody>
                                         <tr><td style="font-weight:700;">Player Load</td><td>{p_avg_weekly_total['Player Load']:.0f}</td><td>{pos_avg_weekly_total['Player Load']:.0f}</td></tr>
@@ -1258,27 +1271,29 @@ if check_password():
                                 p_t = p_data.groupby('Week')[m].sum().reset_index()
                                 fig_t.add_trace(go.Scatter(x=p_t['Week'], y=p_t[m], name="Athlete", line=dict(color='#4895DB', width=4), mode='lines+markers'))
                                 
-                                g_t = tr_df.groupby(['Week', 'Name'])[m].sum().reset_index().groupby('Week')[m].mean().reset_index()
-                                fig_t.add_trace(go.Scatter(x=g_t['Week'], y=g_t[m], name="Pos. Avg", line=dict(color='#FF8200', dash='dash', width=2), mode='lines'))
+                                g_t = tr_df.groupby(['Week', 'Name'])[m].sum().reset_index().groupby('Week')[m].max().reset_index()
+                                fig_t.add_trace(go.Scatter(x=g_t['Week'], y=g_t[m], name="Pos. Max", line=dict(color='#FF8200', dash='dash', width=2), mode='lines'))
                                 
                                 fig_t.update_layout(
-                                    title=dict(text=f"<b>Weekly Total: {m}</b>", font=dict(size=12), x=0.5),
+                                    title=dict(text=f"<b>Weekly Output Timeline: {m}</b>", font=dict(size=12), x=0.5),
                                     xaxis=dict(dtick=1, showgrid=False, title="Week"), 
                                     yaxis=dict(showgrid=True, gridcolor='#F5F5F7', rangemode='tozero'),
                                     height=220, margin=dict(l=10, r=10, t=30, b=40),
                                     showlegend=True, legend=dict(orientation="h", y=-0.6, x=0.5, xanchor="center"),
                                     template="simple_white"
                                 )
-                                st.plotly_chart(fig_t, use_container_width=True, config=LOCKED_CONFIG, key=f"trend_{name}_{m}")
+                                st.plotly_chart(fig_t, use_container_width=True, config=LOCKED_CONFIG, key=f"trend_{name}_{m}_t7")
                     
                     st.write("<div style='height: 30px;'></div>", unsafe_allow_html=True)
 
-
-        with tabs[8]: # Tab 8: Phase Analysis
+        # ==========================================
+        # --- TAB 8: PHASE ANALYSIS ----------------
+        # ==========================================
+        with tabs[8]: 
             st.markdown('<div class="section-header">Work Index Matrix & Drill Utilization</div>', unsafe_allow_html=True)
             
-            if phase_df is not None and not phase_df.empty:
-                working_matrix = phase_df.copy()
+            if phase_master is not None and not phase_master.empty:
+                working_matrix = phase_master.copy()
                 for col in ['Position', 'Name', 'Phase']:
                     if col in working_matrix.columns:
                         working_matrix[col] = working_matrix[col].astype(str).str.strip()
@@ -1302,25 +1317,25 @@ if check_password():
 
                 f_col1, f_col2, f_col3, f_col4 = st.columns(4)
                 with f_col1:
-                    view_mode = st.radio("Group By", ["Position", "Individual"], horizontal=True, key="wi_view")
-                    metric_mode = st.radio("Data Mode", ["Work Index (per minute)", "Total Volume"], horizontal=True, key="wi_mode")
+                    view_mode = st.radio("Group By", ["Position", "Individual"], horizontal=True, key="wi_view_t8")
+                    metric_mode = st.radio("Data Mode", ["Work Index (per minute)", "Total Volume"], horizontal=True, key="wi_mode_t8")
                 
                 with f_col2:
                     if view_mode == "Position":
                         pos_list = ["All Positions"] + sorted([p for p in working_matrix['Position'].unique() if p not in ["nan", "N/A"]])
-                        sel_sub_filter = st.selectbox("Select Position", pos_list)
+                        sel_sub_filter = st.selectbox("Select Position", pos_list, key="wi_sub_t8")
                     else:
                         player_list = ["All Players"] + sorted(working_matrix['Name'].unique())
-                        sel_sub_filter = st.selectbox("Select Player", player_list)
+                        sel_sub_filter = st.selectbox("Select Player", player_list, key="wi_sub_t8")
                 
                 with f_col3:
                     phase_list = ["All Phases"] + sorted(working_matrix['Phase'].unique().tolist())
-                    sel_phase = st.selectbox("Select Drill/Phase", phase_list, key="wi_phase_filter")
+                    sel_phase = st.selectbox("Select Drill/Phase", phase_list, key="wi_phase_filter_t8")
                 
                 with f_col4:
                     valid_dates = working_matrix['Date'].dropna().unique()
                     date_opts = ["Season Avg"] + sorted([d.strftime('%Y-%m-%d') for d in valid_dates], reverse=True)
-                    sel_date = st.selectbox("Select Date", date_opts, key="wi_volume_date")
+                    sel_date = st.selectbox("Select Date", date_opts, key="wi_volume_date_t8")
 
                 filtered_df = working_matrix.copy()
                 if view_mode == "Position" and sel_sub_filter != "All Positions":
@@ -1360,7 +1375,7 @@ if check_password():
                 sort_col = 'Position' if view_mode == "Position" else 'Name'
                 matrix_df = matrix_df.sort_values([sort_col, 'Phase'])
 
-                matrix_html = f"""<table style="width:100%; border-collapse: collapse; text-align: center;">
+                matrix_html = f"""<table class="scout-table">
                                 <tr style="background-color: #31333F; color: white; font-weight: bold;">
                                     <th style="padding: 12px; border: 1px solid #ddd;">{sort_col}</th>
                                     <th style="padding: 12px; border: 1px solid #ddd;">Phase</th>
@@ -1391,11 +1406,11 @@ if check_password():
                 st.markdown(matrix_html + "</table>", unsafe_allow_html=True)
                 
                 st.markdown("### Drill Frequency (Season Total)")
-                drill_stats = phase_df.copy()
+                drill_stats = phase_master.copy()
                 drill_stats['Phase'] = drill_stats['Phase'].replace(phase_map)
                 drill_freq = drill_stats.groupby('Phase')['Number of Times'].sum().reset_index().sort_values('Number of Times', ascending=False)
                 
-                freq_html = """<table style="width:100%; border-collapse: collapse; text-align: center;">
+                freq_html = """<table class="scout-table">
                                 <tr style="background-color: #f0f2f6; font-weight: bold;">
                                     <th style="padding: 10px; border: 1px solid #ddd;">Drill/Phase</th>
                                     <th style="padding: 10px; border: 1px solid #ddd;">Season Frequency</th>
@@ -1404,12 +1419,14 @@ if check_password():
                     freq_html += f"<tr><td style='padding: 8px; border: 1px solid #ddd;'>{row['Phase']}</td><td style='padding: 8px; border: 1px solid #ddd;'>{row['Number of Times']:.0f}</td></tr>"
                 st.markdown(freq_html + "</table>", unsafe_allow_html=True)
 
-
-        with tabs[9]: # Tab 9: Practice Planner
+        # ==========================================
+        # --- TAB 9: PRACTICE PLANNER --------------
+        # ==========================================
+        with tabs[9]: 
             st.markdown('<div class="section-header">Practice Phase Analysis & Planner</div>', unsafe_allow_html=True)
             
-            if phase_df is not None and not phase_df.empty:
-                working_planner = phase_df.copy()
+            if phase_master is not None and not phase_master.empty:
+                working_planner = phase_master.copy()
                 time_col = 'Duration' 
                 
                 if time_col not in working_planner.columns:
@@ -1424,24 +1441,24 @@ if check_password():
 
                 s_col1, s_col2 = st.columns(2)
                 with s_col1:
-                    plan_level = st.radio("Select Planning Level", ["Team Overall", "By Position", "By Athlete"], horizontal=True, key="planner_level_refined")
+                    plan_level = st.radio("Select Planning Level", ["Team Overall", "By Position", "By Athlete"], horizontal=True, key="planner_level_refined_t9")
                 
                 if plan_level == "Team Overall":
                     planner_target_df = working_planner.copy()
                     display_label = "Team Overall"
                 elif plan_level == "By Position":
                     with s_col2:
-                        pos_choice = st.selectbox("Select Position", sorted([p for p in working_planner['Position'].unique() if pd.notna(p)]), key="planner_pos_refined")
+                        pos_choice = st.selectbox("Select Position", sorted([p for p in working_planner['Position'].unique() if pd.notna(p)]), key="planner_pos_refined_t9")
                     planner_target_df = working_planner[working_planner['Position'] == pos_choice]
                     display_label = f"Position: {pos_choice}"
                 else:
                     with s_col2:
-                        ath_choice = st.selectbox("Select Athlete", sorted(working_planner['Name'].unique()), key="planner_ath_refined")
+                        ath_choice = st.selectbox("Select Athlete", sorted(working_planner['Name'].unique()), key="planner_ath_refined_t9")
                     planner_target_df = working_planner[working_planner['Name'] == ath_choice]
                     display_label = f"Athlete: {ath_choice}"
 
                 available_phases = sorted(planner_target_df['Phase'].unique())
-                selected_build = st.multiselect(f"Select Drills for {display_label}", available_phases, key="planner_multi_refined")
+                selected_build = st.multiselect(f"Select Drills for {display_label}", available_phases, key="planner_multi_refined_t9")
 
                 if selected_build:
                     phase_stats = planner_target_df.groupby('Phase').agg({time_col: 'mean'}).reset_index()
@@ -1453,7 +1470,7 @@ if check_password():
                     for idx, phase in enumerate(selected_build):
                         with dur_cols[idx % 4]:
                             avg_t = build_stats[build_stats['Phase'] == phase][time_col].iloc[0]
-                            durations[phase] = st.number_input(f"{phase}", value=float(round(avg_t, 0)), step=1.0, key=f"dur_ref_{phase}")
+                            durations[phase] = st.number_input(f"{phase}", value=float(round(avg_t, 0)), step=1.0, key=f"dur_ref_{phase}_t9")
 
                     if plan_level != "Team Overall":
                         target_rates = planner_target_df.groupby('Phase')[[f'{m}_Rate' for m in plan_metrics]].mean().reset_index()
@@ -1529,20 +1546,20 @@ if check_password():
                     )
                     fig_flow.update_yaxes(title_text="Load / Jumps / Efforts", secondary_y=False)
                     fig_flow.update_yaxes(title_text="Yards per Minute", secondary_y=True, showgrid=False)
-                    st.plotly_chart(fig_flow, use_container_width=True, config=LOCKED_CONFIG)
+                    st.plotly_chart(fig_flow, use_container_width=True, config=LOCKED_CONFIG, key="planner_flow_chart_t9")
 
-
-        with tabs[10]: # Tab 10: Spring v. Summer Practices
+        # ==========================================
+        # --- TAB 10: SPRING V. SUMMER -------------
+        # ==========================================
+        with tabs[10]: 
             st.markdown('<div class="section-header">Spring Max vs. Summer Open Gym</div>', unsafe_allow_html=True)
             
-            # 1. Filter raw data out into precise Season datasets
             spring_gps = full_df_unfiltered[(full_df_unfiltered['Season'] == 'Spring') & (full_df_unfiltered['Session_Type'] == 'Practice')].copy()
             summer_gps = full_df_unfiltered[(full_df_unfiltered['Season'] == 'Summer') & (full_df_unfiltered['Session_Type'] == 'Practice')].copy()
             
             if spring_gps.empty or summer_gps.empty:
                 st.warning("Data check: Ensure both Spring and Summer practice records are loaded to generate card pairings.")
             else:
-                # 2. Extract every single single-day volume total per athlete
                 spring_daily = spring_gps.groupby(['Name', 'Date'])[['Player Load', 'Total Jumps', 'Explosive Efforts', 'Estimated Distance (y)', 'Jump Load']].sum().reset_index()
                 summer_daily = summer_gps.groupby(['Name', 'Date'])[['Player Load', 'Total Jumps', 'Explosive Efforts', 'Estimated Distance (y)', 'Jump Load', 'Session_Name']].agg({
                     'Player Load': 'sum',
@@ -1553,14 +1570,13 @@ if check_password():
                     'Session_Name': lambda x: ' | '.join(x.astype(str).unique())
                 }).reset_index()
                 
-                # 3. Pull the Absolute Highest Day across each metric during Spring (The Benchmarks)
-                # Fixed: Passing a clean, explicit list of columns
                 metric_cols = ['Player Load', 'Total Jumps', 'Explosive Efforts', 'Estimated Distance (y)', 'Jump Load']
+                
+                # Custom Requirement Overrides: Force Position Tab visual arrays to use Maximum baseline values instead of averages
                 spring_peaks = spring_daily.groupby('Name')[metric_cols].max().reset_index()
                 spring_peaks.columns = ['Name', 'Spring Peak Load', 'Spring Peak Jumps', 'Spring Peak Efforts', 'Spring Peak Distance', 'Spring Peak Jump Load']
                 
-                # 4. Metric Selectors
-                comp_metric_label = st.selectbox("Select Metric to Compare", ["Player Load", "Total Jumps", "Explosive Efforts", "Estimated Distance (y)", "Jump Load"], key="ss_metric_select")
+                comp_metric_label = st.selectbox("Select Metric to Compare", ["Player Load", "Total Jumps", "Explosive Efforts", "Estimated Distance (y)", "Jump Load"], key="ss_metric_select_t10")
                 
                 spring_col_map = {
                     "Player Load": "Spring Peak Load",
@@ -1571,14 +1587,12 @@ if check_password():
                 }
                 target_spring_col = spring_col_map[comp_metric_label]
                 
-                # 5. Build Aggregated Grid Overview Table
                 summer_summary = summer_daily.groupby('Name').agg({comp_metric_label: ['max', 'mean']}).reset_index()
                 summer_summary.columns = ['Name', 'Summer Peak', 'Summer Avg']
                 
                 merged_comp = pd.merge(spring_peaks[['Name', target_spring_col]], summer_summary, on='Name', how='inner')
                 merged_comp['Peak Change (%)'] = ((merged_comp['Summer Peak'] - merged_comp[target_spring_col]) / merged_comp[target_spring_col] * 100).fillna(0)
                 
-                # Render Clean HTML Grid Row Blocks
                 st.markdown(f"### {comp_metric_label}")
                 
                 tbl_html = f"""<table class="scout-table">
@@ -1608,9 +1622,8 @@ if check_password():
                 st.write("<br>", unsafe_allow_html=True)
                 st.divider()
                 
-                # 6. Summer Practice Cards Graded against Spring Benchmarks
                 st.markdown("### Summer Session Scores")
-                target_ath_comp = st.selectbox("Select Athlete", sorted(merged_comp['Name'].unique()), key="ss_ath_select")
+                target_ath_comp = st.selectbox("Select Athlete", sorted(merged_comp['Name'].unique()), key="ss_ath_select_t10")
                 
                 meta_rows = full_df_unfiltered[full_df_unfiltered['Name'] == target_ath_comp]
                 correct_photo = "https://www.w3schools.com/howto/img_avatar.png"
