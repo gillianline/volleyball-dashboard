@@ -87,7 +87,7 @@ if check_password():
 
         @media print {
             .main-logo-container { display: block !important; margin-bottom: 0 !important; }
-            .stTabs [role="tablist"], [data-testid="stSidebar"], header, footer, button, .stButton { display: none !important; }
+            [data-testid="stSidebar"], header, footer, button, .stButton { display: none !important; }
             .main .block-container { padding: 0 !important; max-width: 100% !important; }
             .scout-table td, p, span, div { color: #000000 !important; }
         }
@@ -1080,11 +1080,22 @@ if check_password():
                 st.warning("Ensure both Practice and Match data are loaded for this selection.")
 
 
-        with tabs[6]: # Match Summary
+        with tabs[6]: # Tab 6: Match Summary
             custom_colors = ['#4895DB', '#FF8200', '#515154', '#A52A2A', '#008080', '#6A1B9A', '#2E7D32']
     
+            # --- CONDITIONAL PRINT STYLING INJECTION ---
             if st.session_state.is_printing:
-                if st.button("Back to Editor (Show Filters)"):
+                # Force browser layout compilation adjustments only when actively compiling print view
+                st.markdown("""
+                    <style>
+                    .stTabs [role="tablist"], [data-testid="stSidebar"], header, footer, button, .stButton { 
+                        display: none !important; 
+                    }
+                    </style>
+                    <script>window.print();</script>
+                    """, unsafe_allow_html=True)
+                
+                if st.button("Back to Dashboard View"):
                     st.session_state.is_printing = False
                     st.rerun()
             else:
@@ -1092,6 +1103,7 @@ if check_password():
                 if st.button("Prepare PDF for Printing"):
                     st.session_state.is_printing = True
                     st.rerun()
+                
                 st.markdown('<div class="section-header">Match Comparison Selection</div>', unsafe_allow_html=True)
                 c_ts1, c_ts2 = st.columns([2, 1])
                 
@@ -1103,12 +1115,10 @@ if check_password():
                 
                 with c_ts2:
                     if "pos_state" not in st.session_state: st.session_state.pos_state = "All Positions"
-                    st.session_state.pos_state = st.selectbox("Filter by Position", ["All Positions"] + sorted(list(match_df['Position'].unique())) if not match_df.empty else ["All Positions"], index=0)
+                    st.session_state.pos_state = st.selectbox("Filter by Position Group", ["All Positions"] + sorted(list(match_df['Position'].unique())) if not match_df.empty else ["All Positions"], index=0)
                 st.markdown('</div>', unsafe_allow_html=True)
 
-            if st.session_state.is_printing:
-                st.markdown('<script>window.print();</script>', unsafe_allow_html=True)
-
+            # --- RENDER MATCH SUMMARY CONTENT BELOW ---
             selected_matches = st.session_state.get("matches_state", [])
             pos_filter_t = st.session_state.get("pos_state", "All Positions")
 
