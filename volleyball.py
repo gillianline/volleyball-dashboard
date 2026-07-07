@@ -6,6 +6,8 @@ from plotly.subplots import make_subplots
 import math 
 from datetime import timedelta
 
+st.set_page_config(page_title="Lady Vols VB Performance", layout="wide")
+
 st.markdown("""
     <style>
     /* Center table text and style metrics */
