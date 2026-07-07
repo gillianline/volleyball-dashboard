@@ -15,7 +15,7 @@ st.markdown("""
     [data-testid="stMetricValue"] {font-size: 24px;}
     
     @media print {
-        [data-testid="stSidebar"], [data-testid="stHeader"], header, footer, button, .stButton {
+        [data-testid="stSidebar"], [data-testid="stHeader"] {
             display: none !important;
         }
         .main .block-container {
@@ -32,7 +32,7 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 
-# --- 2. PASSWORD PROTECTION GATEWAY ---
+# --- 2. PASSWORD SECURITY GATEWAY ---
 def check_password():
     def password_entered():
         if st.session_state["password"] == st.secrets["PASSWORD"]:
@@ -56,7 +56,7 @@ if check_password():
     if "is_printing" not in st.session_state:
         st.session_state.is_printing = False
 
-    # Standard Theme Injection
+    # Dashboard Performance Layout Sheet
     st.markdown("""
         <style>
         .stApp { background-color: #FFFFFF; color: #1D1D1F; }
@@ -72,17 +72,13 @@ if check_password():
         .player-photo-large { border-radius: 50%; width: 220px; height: 220px; object-fit: contain; border: 6px solid #FF8200; }
         .score-box { padding: 12px 20px; border-radius: 12px; font-size: 28px; font-weight: 800; min-width: 100px; color: #FFFFFF; line-height: 1.2; text-align: center;}
         .info-box { background-color: #f8f9fa; border-left: 5px solid #FF8200; padding: 12px; margin-top: 10px; font-size: 12px; color: #1D1D1F; font-weight: 600; line-height: 1.4; }
-        
-        .player-row-container { 
-            break-inside: avoid !important; 
-            page-break-inside: avoid !important; 
-            display: block !important; 
-            margin-bottom: 30px; 
-        }
-        
-        .player-divider { border: 0; height: 1px; background: #E5E5E7; margin-bottom: 15px; width: 100%; }
         .gallery-photo { border-radius: 50%; width: 110px; height: 110px; object-fit: cover; border: 4px solid #FF8200; }
         .section-header { font-size: 20px; font-weight: 800; color: #4895DB; border-bottom: 2px solid #FF8200; margin-top: 15px; margin-bottom: 10px; padding-bottom: 5px; text-transform: uppercase; }
+
+        /* Stable Grid Rules Layout Blocks */
+        .stable-grid { display: flex; flex-wrap: wrap; gap: 20px; width: 100%; }
+        .stable-card { flex: 1 1 calc(50% - 20px); min-width: 340px; border: 1px solid #E5E5E7; border-radius: 15px; padding: 15px; background-color: white; box-sizing: border-box; }
+        @media(max-width: 768px) { .stable-card { flex: 1 1 100%; } }
 
         @media print {
             .main-logo-container { display: block !important; margin-bottom: 0 !important; }
@@ -204,7 +200,7 @@ if check_password():
         raw_df, raw_match_df, cmj_df, phase_df, thresh_df, ash_df, er_df = load_all_data()
         full_df_unfiltered = raw_df.copy()
 
-        # --- GLOBAL SEASON FILTER CONFIG ---
+        # --- GLOBAL SEASON FILTER SIDEBAR ---
         st.sidebar.markdown("### Season")
         selected_season = st.sidebar.radio("Select Season", ["Spring", "Summer"], index=1, key="global_season_toggle")
         
@@ -227,8 +223,11 @@ if check_password():
         all_metrics = ['Total Jumps', 'Moderate Jumps', 'High Jumps', 'Jump Load', 'Player Load', 'Estimated Distance (y)', 'Explosive Efforts', 'High Intensity Movement']
         st.markdown('<div class="main-logo-container" style="text-align: center; margin-top: 10px; margin-bottom: 15px;"><img src="https://upload.wikimedia.org/wikipedia/commons/thumb/f/fc/Tennessee_Lady_Volunteers_logo.svg/1280px-Tennessee_Lady_Volunteers_logo.svg.png" width="120"><div style="color: #FF8200; font-size: 2rem; font-weight: 900; margin-top: 10px;">LADY VOLS VOLLEYBALL PERFORMANCE</div></div>', unsafe_allow_html=True)
 
-        # Secure Tab Key Registration
-        tabs = st.tabs(["Individual Profile", "Practice Scores", "Daily Combined Scores", "Spring Max vs Daily Combined", "Practice History", "Match v. Practice", "Match Summary", "Position Analysis", "Phase Analysis", "Practice Planner", "Spring v. Summer"], key="vball_dashboard_tabs_system")
+        # --- LOCKED LAYER: PREVENTS RERUNS FROM DESTROYING LAYOUT TAB CONTEXT ---
+        tabs = st.tabs(
+            ["Individual Profile", "Practice Scores", "Daily Combined Scores", "Spring Max vs Daily Combined", "Practice History", "Match v. Practice", "Match Summary", "Position Analysis", "Phase Analysis", "Practice Planner", "Spring v. Summer"],
+            key="vball_dashboard_tabs_system"
+        )
         
         master_athlete_list = sorted(list(set(df['Name'].unique()) | set(cmj_df['Name'].unique()) | set(ash_df['Name'].unique()) | set(er_df['Name'].unique())))
         session_list = df[df['Session_Name'].notna()].sort_values('Date', ascending=False)['Session_Name'].unique().tolist()
@@ -515,7 +514,8 @@ if check_password():
                 fig_ph.update_yaxes(title_text="Total Jumps", secondary_y=True)
                 st.plotly_chart(fig_ph, use_container_width=True, config=LOCKED_CONFIG, key="prof_phase_chart")
        
-        with tabs[1]: # Tab 1: Practice Scores Gallery Layout
+        # --- FIXED LAYER: EMBEDDING GRID ROW BLOCKS INTO PURE SAFE CONTEXT ---
+        with tabs[1]: # Tab 1: Practice Scores Gallery
             target_date_str = "2026-04-04"
             tournament_label = "GT Spring Tournament 4-4-26"
             
@@ -551,58 +551,56 @@ if check_password():
                 metrics_to_exclude = ['High Jumps', 'Moderate Jumps', 'High Intensity Movement']
                 filtered_metrics_gal = [m for m in all_metrics if m not in metrics_to_exclude]
 
-                for i in range(0, len(t1_athlete_names), 2):
-                    cols = st.columns(2)
-                    for j in range(2):
-                        if i + j < len(t1_athlete_names):
-                            t1_name = t1_athlete_names[i + j]
-                            t1_p_session_row = t1_display_df[t1_display_df['Name'] == t1_name].iloc[0]
-                            
-                            t1_p_full_g = df[df['Name'] == t1_name]
-                            t1_daily_sums_g = t1_p_full_g.groupby('Date')[all_metrics].sum().reset_index()
-                            t1_lb_sums = t1_daily_sums_g[(t1_daily_sums_g['Date'] >= curr_date_gal - timedelta(days=30)) & 
-                                                   (t1_daily_sums_g['Date'] <= curr_date_gal)] if curr_date_gal else t1_daily_sums_g
-                            
-                            t1_r_html = ""; t1_t_grade = 0; t1_c_metrics = 0
-                            for k in filtered_metrics_gal:
-                                val = t1_p_session_row[k]
-                                mx = t1_lb_sums[k].max() if (not t1_lb_sums.empty and t1_lb_sums[k].max() > 0) else 1.0
-                                avg = t1_lb_sums[k].mean() if (not t1_lb_sums.empty and t1_lb_sums[k].mean() > 0) else 1.0
-                                g = math.ceil((val / mx) * 100) if mx > 0 else 0
-                                t1_t_grade += g
-                                t1_c_metrics += 1
-                                diff = (val - avg) / avg if avg != 0 else 0
-                                h_class = "class='bg-highlight-red'" if abs(diff) > 0.15 else ""
-                                arr_val = f"<span class='arrow-red'>{'↑' if diff > 0.15 else '↓'}</span>" if abs(diff) > 0.15 else ""
-                                t1_r_html += f"<tr><td>{k}</td><td {h_class}>{val:.1f} {arr_val}</td><td>{mx:.1f}</td><td>{g}</td></tr>"
-                            
-                            sc_g = math.ceil(t1_t_grade / t1_c_metrics) if t1_c_metrics > 0 else 0
-                            
-                            with cols[j]: 
-                                # FIXED: Removed standalone dangling layout elements that break DOM layout hierarchies
-                                st.markdown(f"""
-                                    <div style="border:1px solid #E5E5E7; border-radius:15px; padding:15px; margin-bottom:20px; background-color:white;">
-                                        <div style="display:flex; align-items:center; gap:10px;">
-                                            <div style="flex:1.2; text-align:center;">
-                                                <img src="{t1_p_session_row["PhotoURL"]}" class="gallery-photo">
-                                                <p style="font-weight:bold; font-size:15px; margin-top:8px; color:#333;">{t1_name}</p>
-                                            </div>
-                                            <div style="flex:3;">
-                                                <table class="scout-table">
-                                                    <thead>
-                                                        <tr><th>Metric</th><th>Total</th><th>30d Max</th><th>Grade</th></tr>
-                                                    </thead>
-                                                    <tbody>{t1_r_html}</tbody>
-                                                </table>
-                                            </div>
-                                            <div style="flex:1; text-align:center;">
-                                                <div style="background-color:{get_flipped_gradient(sc_g)}; color:white; padding:10px; border-radius:12px; font-size:32px; font-weight:900;">
-                                                    {sc_g}
-                                                </div>
-                                            </div>
-                                        </div>
+                # Core Fix: Injecting profiles directly via a stable CSS layout grid to preserve context on rerun
+                grid_html = '<div class="stable-grid">'
+                for t1_name in t1_athlete_names:
+                    t1_p_session_row = t1_display_df[t1_display_df['Name'] == t1_name].iloc[0]
+                    t1_p_full_g = df[df['Name'] == t1_name]
+                    t1_daily_sums_g = t1_p_full_g.groupby('Date')[all_metrics].sum().reset_index()
+                    t1_lb_sums = t1_daily_sums_g[(t1_daily_sums_g['Date'] >= curr_date_gal - timedelta(days=30)) & (t1_daily_sums_g['Date'] <= curr_date_gal)] if curr_date_gal else t1_daily_sums_g
+                    
+                    t1_r_html = ""
+                    t1_t_grade = 0
+                    t1_c_metrics = 0
+                    for k in filtered_metrics_gal:
+                        val = t1_p_session_row[k]
+                        mx = t1_lb_sums[k].max() if (not t1_lb_sums.empty and t1_lb_sums[k].max() > 0) else 1.0
+                        avg = t1_lb_sums[k].mean() if (not t1_lb_sums.empty and t1_lb_sums[k].mean() > 0) else 1.0
+                        g = math.ceil((val / mx) * 100) if mx > 0 else 0
+                        t1_t_grade += g
+                        t1_c_metrics += 1
+                        diff = (val - avg) / avg if avg != 0 else 0
+                        h_class = "class='bg-highlight-red'" if abs(diff) > 0.15 else ""
+                        arr_val = f"<span class='arrow-red'>{'↑' if diff > 0.15 else '↓'}</span>" if abs(diff) > 0.15 else ""
+                        t1_r_html += f"<tr><td>{k}</td><td {h_class}>{val:.1f} {arr_val}</td><td>{mx:.1f}</td><td>{g}</td></tr>"
+                    
+                    sc_g = math.ceil(t1_t_grade / t1_c_metrics) if t1_c_metrics > 0 else 0
+                    
+                    grid_html += f"""
+                        <div class="stable-card">
+                            <div style="display:flex; align-items:center; gap:10px;">
+                                <div style="flex:1.2; text-align:center;">
+                                    <img src="{t1_p_session_row["PhotoURL"]}" class="gallery-photo">
+                                    <p style="font-weight:bold; font-size:15px; margin-top:8px; color:#333;">{t1_name}</p>
+                                </div>
+                                <div style="flex:3;">
+                                    <table class="scout-table">
+                                        <thead>
+                                            <tr><th>Metric</th><th>Total</th><th>30d Max</th><th>Grade</th></tr>
+                                        </thead>
+                                        <tbody>{t1_r_html}</tbody>
+                                    </table>
+                                </div>
+                                <div style="flex:1; text-align:center;">
+                                    <div style="background-color:{get_flipped_gradient(sc_g)}; color:white; padding:10px; border-radius:12px; font-size:32px; font-weight:900;">
+                                        {sc_g}
                                     </div>
-                                """, unsafe_allow_html=True)
+                                </div>
+                            </div>
+                        </div>
+                    """
+                grid_html += '</div>'
+                st.markdown(grid_html, unsafe_allow_html=True)
                 
         with tabs[2]: # Tab 2: Daily Combined Scores
             valid_dates_sorted = df[df['Date'].notna()].sort_values('Date', ascending=False)['Date'].dt.strftime('%Y-%m-%d').unique().tolist()
@@ -638,57 +636,55 @@ if check_password():
                     metrics_to_exclude = ['High Jumps', 'Moderate Jumps', 'High Intensity Movement']
                     filtered_metrics_comb = [m for m in all_metrics if m not in metrics_to_exclude]
 
-                    for i in range(0, len(t2_athlete_names_comb), 2):
-                        cols = st.columns(2)
-                        for j in range(2):
-                            if i + j < len(t2_athlete_names_comb):
-                                t2_name = t2_athlete_names_comb[i + j]
-                                t2_p_session_row = t2_display_df_comb[t2_display_df_comb['Name'] == t2_name].iloc[0]
-                                
-                                t2_p_full_g = df[df['Name'] == t2_name]
-                                t2_daily_sums_g = t2_p_full_g.groupby('Date')[all_metrics].sum().reset_index()
-                                t2_lb_sums = t2_daily_sums_g[(t2_daily_sums_g['Date'] >= target_date_obj_comb - timedelta(days=30)) & 
-                                                       (t2_daily_sums_g['Date'] <= target_date_obj_comb)]
-                                
-                                t2_r_html = ""; t2_t_grade = 0; t2_c_metrics = 0
-                                for k in filtered_metrics_comb:
-                                    val = t2_p_session_row[k]
-                                    mx = t2_lb_sums[k].max() if (not t2_lb_sums.empty and t2_lb_sums[k].max() > 0) else 1.0
-                                    avg = t2_lb_sums[k].mean() if (not t2_lb_sums.empty and t2_lb_sums[k].mean() > 0) else 1.0
-                                    g = math.ceil((val / mx) * 100) if mx > 0 else 0
-                                    t2_t_grade += g
-                                    t2_c_metrics += 1
-                                    diff = (val - avg) / avg if avg != 0 else 0
-                                    h_class = "class='bg-highlight-red'" if abs(diff) > 0.15 else ""
-                                    arr_val = f"<span class='arrow-red'>{'↑' if diff > 0.15 else '↓'}</span>" if abs(diff) > 0.15 else ""
-                                    t2_r_html += f"<tr><td>{k}</td><td {h_class}>{val:.1f} {arr_val}</td><td>{mx:.1f}</td><td>{g}</td></tr>"
-                                
-                                sc_g = math.ceil(t2_t_grade / t2_c_metrics) if t2_c_metrics > 0 else 0
-                                
-                                with cols[j]: 
-                                    st.markdown(f"""
-                                        <div style="border:1px solid #E5E5E7; border-radius:15px; padding:15px; margin-bottom:20px; background-color:white;">
-                                            <div style="display:flex; align-items:center; gap:10px;">
-                                                <div style="flex:1.2; text-align:center;">
-                                                    <img src="{t2_p_session_row["PhotoURL"]}" class="gallery-photo">
-                                                    <p style="font-weight:bold; font-size:15px; margin-top:8px; color:#333;">{t2_name}</p>
-                                                </div>
-                                                <div style="flex:3;">
-                                                    <table class="scout-table">
-                                                        <thead>
-                                                            <tr><th>Metric</th><th>Combined Total</th><th>30d Max Day</th><th>Grade</th></tr>
-                                                        </thead>
-                                                        <tbody>{t2_r_html}</tbody>
-                                                    </table>
-                                                </div>
-                                                <div style="flex:1; text-align:center;">
-                                                    <div style="background-color:{get_flipped_gradient(sc_g)}; color:white; padding:10px; border-radius:12px; font-size:32px; font-weight:900;">
-                                                        {sc_g}
-                                                    </div>
-                                                </div>
-                                            </div>
+                    grid_html_comb = '<div class="stable-grid">'
+                    for t2_name in t2_athlete_names_comb:
+                        t2_p_session_row = t2_display_df_comb[t2_display_df_comb['Name'] == t2_name].iloc[0]
+                        t2_p_full_g = df[df['Name'] == t2_name]
+                        t2_daily_sums_g = t2_p_full_g.groupby('Date')[all_metrics].sum().reset_index()
+                        t2_lb_sums = t2_daily_sums_g[(t2_daily_sums_g['Date'] >= target_date_obj_comb - timedelta(days=30)) & (t2_daily_sums_g['Date'] <= target_date_obj_comb)]
+                        
+                        t2_r_html = ""
+                        t2_t_grade = 0
+                        t2_c_metrics = 0
+                        for k in filtered_metrics_comb:
+                            val = t2_p_session_row[k]
+                            mx = t2_lb_sums[k].max() if (not t2_lb_sums.empty and t2_lb_sums[k].max() > 0) else 1.0
+                            avg = t2_lb_sums[k].mean() if (not t2_lb_sums.empty and t2_lb_sums[k].mean() > 0) else 1.0
+                            g = math.ceil((val / mx) * 100) if mx > 0 else 0
+                            t2_t_grade += g
+                            t2_c_metrics += 1
+                            diff = (val - avg) / avg if avg != 0 else 0
+                            h_class = "class='bg-highlight-red'" if abs(diff) > 0.15 else ""
+                            arr_val = f"<span class='arrow-red'>{'↑' if diff > 0.15 else '↓'}</span>" if abs(diff) > 0.15 else ""
+                            t2_r_html += f"<tr><td>{k}</td><td {h_class}>{val:.1f} {arr_val}</td><td>{mx:.1f}</td><td>{g}</td></tr>"
+                        
+                        sc_g = math.ceil(t2_t_grade / t2_c_metrics) if t2_c_metrics > 0 else 0
+                        
+                        grid_html_comb += f"""
+                            <div class="stable-card">
+                                <div style="display:flex; align-items:center; gap:10px;">
+                                    <div style="flex:1.2; text-align:center;">
+                                        <img src="{t2_p_session_row["PhotoURL"]}" class="gallery-photo">
+                                        <p style="font-weight:bold; font-size:15px; margin-top:8px; color:#333;">{t2_name}</p>
+                                    </div>
+                                    <div style="flex:3;">
+                                        <table class="scout-table">
+                                            <thead>
+                                                <tr><th>Metric</th><th>Combined Total</th><th>30d Max Day</th><th>Grade</th></tr>
+                                            </thead>
+                                            <tbody>{t2_r_html}</tbody>
+                                        </table>
+                                    </div>
+                                    <div style="flex:1; text-align:center;">
+                                        <div style="background-color:{get_flipped_gradient(sc_g)}; color:white; padding:10px; border-radius:12px; font-size:32px; font-weight:900;">
+                                            {sc_g}
                                         </div>
-                                    """, unsafe_allow_html=True)
+                                    </div>
+                                </div>
+                            </div>
+                        """
+                    grid_html_comb += '</div>'
+                    st.markdown(grid_html_comb, unsafe_allow_html=True)
                 else:
                     st.warning("No data recorded on this specific day.")
 
@@ -733,55 +729,54 @@ if check_password():
                     metrics_to_exclude = ['High Jumps', 'Moderate Jumps', 'High Intensity Movement']
                     filtered_metrics_sm = [m for m in all_metrics if m not in metrics_to_exclude]
 
-                    for i in range(0, len(t3_athlete_names_sm), 2):
-                        cols = st.columns(2)
-                        for j in range(2):
-                            if i + j < len(t3_athlete_names_sm):
-                                t3_name = t3_athlete_names_sm[i + j]
-                                
-                                ath_spring_peaks = spring_daily_maxes[spring_daily_maxes['Name'] == t3_name]
-                                if ath_spring_peaks.empty:
-                                    continue
-                                    
-                                t3_p_session_row = t3_display_df_sm[t3_display_df_sm['Name'] == t3_name].iloc[0]
-                                t3_r_html = ""; t3_t_grade = 0; t3_c_metrics = 0
-                                
-                                for k in filtered_metrics_sm:
-                                    val = t3_p_session_row[k]
-                                    mx = ath_spring_peaks[k].iloc[0]
-                                    if pd.isna(mx) or mx <= 0: mx = 1.0
-                                    
-                                    g = math.ceil((val / mx) * 100)
-                                    t3_t_grade += g
-                                    t3_c_metrics += 1
-                                    t3_r_html += f"<tr><td>{k}</td><td>{val:.1f}</td><td>{mx:.1f}</td><td>{g}</td></tr>"
-                                
-                                sc_g = math.ceil(t3_t_grade / t3_c_metrics) if t3_c_metrics > 0 else 0
-                                
-                                with cols[j]: 
-                                    st.markdown(f"""
-                                        <div style="border:1px solid #E5E5E7; border-radius:15px; padding:15px; margin-bottom:20px; background-color:white;">
-                                            <div style="display:flex; align-items:center; gap:10px;">
-                                                <div style="flex:1.2; text-align:center;">
-                                                    <img src="{t3_p_session_row["PhotoURL"]}" class="gallery-photo">
-                                                    <p style="font-weight:bold; font-size:15px; margin-top:8px; color:#333;">{t3_name}</p>
-                                                </div>
-                                                <div style="flex:3;">
-                                                    <table class="scout-table">
-                                                        <thead>
-                                                            <tr><th>Metric</th><th>Combined Total</th><th>Spring Max Day</th><th>Grade</th></tr>
-                                                        </thead>
-                                                        <tbody>{t3_r_html}</tbody>
-                                                    </table>
-                                                </div>
-                                                <div style="flex:1; text-align:center;">
-                                                    <div style="background-color:{get_flipped_gradient(sc_g)}; color:white; padding:10px; border-radius:12px; font-size:32px; font-weight:900;">
-                                                        {sc_g}
-                                                    </div>
-                                                </div>
-                                            </div>
+                    grid_html_sm = '<div class="stable-grid">'
+                    for t3_name in t3_athlete_names_sm:
+                        ath_spring_peaks = spring_daily_maxes[spring_daily_maxes['Name'] == t3_name]
+                        if ath_spring_peaks.empty:
+                            continue
+                            
+                        t3_p_session_row = t3_display_df_sm[t3_display_df_sm['Name'] == t3_name].iloc[0]
+                        t3_r_html = ""
+                        t3_t_grade = 0
+                        t3_c_metrics = 0
+                        
+                        for k in filtered_metrics_sm:
+                            val = t3_p_session_row[k]
+                            mx = ath_spring_peaks[k].iloc[0]
+                            if pd.isna(mx) or mx <= 0: mx = 1.0
+                            
+                            g = math.ceil((val / mx) * 100)
+                            t3_t_grade += g
+                            t3_c_metrics += 1
+                            t3_r_html += f"<tr><td>{k}</td><td>{val:.1f}</td><td>{mx:.1f}</td><td>{g}</td></tr>"
+                        
+                        sc_g = math.ceil(t3_t_grade / t3_c_metrics) if t3_c_metrics > 0 else 0
+                        
+                        grid_html_sm += f"""
+                            <div class="stable-card">
+                                <div style="display:flex; align-items:center; gap:10px;">
+                                    <div style="flex:1.2; text-align:center;">
+                                        <img src="{t3_p_session_row["PhotoURL"]}" class="gallery-photo">
+                                        <p style="font-weight:bold; font-size:15px; margin-top:8px; color:#333;">{t3_name}</p>
+                                    </div>
+                                    <div style="flex:3;">
+                                        <table class="scout-table">
+                                            <thead>
+                                                <tr><th>Metric</th><th>Combined Total</th><th>Spring Max Day</th><th>Grade</th></tr>
+                                            </thead>
+                                            <tbody>{t3_r_html}</tbody>
+                                        </table>
+                                    </div>
+                                    <div style="flex:1; text-align:center;">
+                                        <div style="background-color:{get_flipped_gradient(sc_g)}; color:white; padding:10px; border-radius:12px; font-size:32px; font-weight:900;">
+                                            {sc_g}
                                         </div>
-                                    """, unsafe_allow_html=True)
+                                    </div>
+                                </div>
+                            </div>
+                        """
+                    grid_html_sm += '</div>'
+                    st.markdown(grid_html_sm, unsafe_allow_html=True)
 
         with tabs[4]: # Tab 4: Practice History
             st.markdown('<div class="section-header">Season History & Team Weekly Review</div>', unsafe_allow_html=True)
@@ -1074,11 +1069,11 @@ if check_password():
                 match_list_t = match_df.sort_values(['Date', 'Sheet_Order'])['Session_Name'].unique().tolist() if not match_df.empty else []
                 if "matches_state" not in st.session_state or not all(m in match_list_t for m in st.session_state.matches_state):
                     st.session_state.matches_state = match_list_t[-3:] if len(match_list_t) >= 3 else match_list_t
-                st.session_state.matches_state = st.multiselect("Select Matches", match_list_t, default=st.session_state.matches_state)
+                st.session_state.matches_state = st.multiselect("Select Matches", match_list_t, default=st.session_state.matches_state, key="ms_match_sel_final")
             
             with c_ts2:
                 if "pos_state" not in st.session_state: st.session_state.pos_state = "All Positions"
-                st.session_state.pos_state = st.selectbox("Filter by Position Group", ["All Positions"] + sorted(list(match_df['Position'].unique())) if not match_df.empty else ["All Positions"], index=0)
+                st.session_state.pos_state = st.selectbox("Filter by Position Group", ["All Positions"] + sorted(list(match_df['Position'].unique())) if not match_df.empty else ["All Positions"], index=0, key="ms_pos_filt_final")
             st.markdown('</div>', unsafe_allow_html=True)
 
             selected_matches = st.session_state.get("matches_state", [])
