@@ -6,10 +6,9 @@ from plotly.subplots import make_subplots
 import math 
 from datetime import timedelta
 
-# --- 1. SINGLE PAGE CONFIGURATION (MUST BE FIRST) ---
+# --- 1. GLOBAL INITIALIZATION (MUST BE FIRST) ---
 st.set_page_config(page_title="Lady Vols VB Performance", layout="wide")
 
-# --- 2. GLOBAL STYLING Injection ---
 st.markdown("""
     <style>
     th, td {text-align: center !important;}
@@ -33,7 +32,7 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 
-# --- 3. PASSWORD PROTECTION ---
+# --- 2. SECURITY CHECK ---
 def check_password():
     def password_entered():
         if st.session_state["password"] == st.secrets["PASSWORD"]:
@@ -57,7 +56,7 @@ if check_password():
     if "is_printing" not in st.session_state:
         st.session_state.is_printing = False
 
-    # CSS Configuration Styling Injection
+    # Dynamic CSS Injector
     st.markdown("""
         <style>
         .stApp { background-color: #FFFFFF; color: #1D1D1F; }
@@ -84,13 +83,6 @@ if check_password():
         .player-divider { border: 0; height: 1px; background: #E5E5E7; margin-bottom: 15px; width: 100%; }
         .gallery-photo { border-radius: 50%; width: 110px; height: 110px; object-fit: cover; border: 4px solid #FF8200; }
         .section-header { font-size: 20px; font-weight: 800; color: #4895DB; border-bottom: 2px solid #FF8200; margin-top: 15px; margin-bottom: 10px; padding-bottom: 5px; text-transform: uppercase; }
-
-        @media print {
-            .main-logo-container { display: block !important; margin-bottom: 0 !important; }
-            .stTabs [role="tablist"], [data-testid="stSidebar"], header, footer, button, .stButton { display: none !important; }
-            .main .block-container { padding: 0 !important; max-width: 100% !important; }
-            .scout-table td, p, span, div { color: #000000 !important; }
-        }
         </style>
         """, unsafe_allow_html=True)
     
@@ -205,7 +197,7 @@ if check_password():
         raw_df, raw_match_df, cmj_df, phase_df, thresh_df, ash_df, er_df = load_all_data()
         full_df_unfiltered = raw_df.copy()
 
-        # --- GLOBAL SIDEBAR ---
+        # --- GLOBAL SIDEBAR CONFIG ---
         st.sidebar.markdown("### Season")
         selected_season = st.sidebar.radio("Select Season", ["Spring", "Summer"], index=1, key="global_season_toggle")
         
@@ -228,12 +220,16 @@ if check_password():
         all_metrics = ['Total Jumps', 'Moderate Jumps', 'High Jumps', 'Jump Load', 'Player Load', 'Estimated Distance (y)', 'Explosive Efforts', 'High Intensity Movement']
         st.markdown('<div class="main-logo-container" style="text-align: center; margin-top: 10px; margin-bottom: 15px;"><img src="https://upload.wikimedia.org/wikipedia/commons/thumb/f/fc/Tennessee_Lady_Volunteers_logo.svg/1280px-Tennessee_Lady_Volunteers_logo.svg.png" width="120"><div style="color: #FF8200; font-size: 2rem; font-weight: 900; margin-top: 10px;">LADY VOLS VOLLEYBALL PERFORMANCE</div></div>', unsafe_allow_html=True)
 
-        tabs = st.tabs(["Individual Profile", "Practice Scores", "Daily Combined Scores", "Spring Max vs Daily Combined", "Practice History", "Match v. Practice", "Match Summary", "Position Analysis", "Phase Analysis", "Practice Planner", "Spring v. Summer"])
+        # --- SYSTEM FIX: LOCKED STRUCTURAL TABS VIA EXPLICIT STATE KEY ---
+        tabs = st.tabs(
+            ["Individual Profile", "Practice Scores", "Daily Combined Scores", "Spring Max vs Daily Combined", "Practice History", "Match v. Practice", "Match Summary", "Position Analysis", "Phase Analysis", "Practice Planner", "Spring v. Summer"],
+            key="active_performance_tab"
+        )
         
         master_athlete_list = sorted(list(set(df['Name'].unique()) | set(cmj_df['Name'].unique()) | set(ash_df['Name'].unique()) | set(er_df['Name'].unique())))
         session_list = df[df['Session_Name'].notna()].sort_values('Date', ascending=False)['Session_Name'].unique().tolist()
 
-        with tabs[0]: # Individual Profile
+        with tabs[0]: # Tab 0: Individual Profile
             target_date_str = "2026-04-04"
             tournament_label = "GT Spring Tournament 4-4-26"
             
@@ -307,7 +303,6 @@ if check_password():
             
             st.markdown('<div class="section-header">Weekly Readiness Profile</div>', unsafe_allow_html=True)
             
-            # --- BLOCK 1: CMJ ---
             st.markdown('<h4 style="color:#4895DB; font-weight:800; margin-bottom:5px;">COUNTERMOVEMENT JUMP</h4>', unsafe_allow_html=True)
             jc1, jc2 = st.columns([1.5, 3.5])
             p_cmj_hist = cmj_df[(cmj_df['Name'] == selected_athlete_prof) & (cmj_df['Test Date'] <= curr_date_prof)].sort_values('Test Date')
@@ -371,7 +366,6 @@ if check_password():
                 else:
                     st.info("No Countermovement Jump metrics recorded.")
 
-            # --- BLOCK 2: ASH TEST ---
             st.markdown('<hr style="display:block !important; margin:15px 0; border:0; border-top:1px solid #E5E5E7;" />', unsafe_allow_html=True)
             st.markdown('<h4 style="color:#4895DB; font-weight:800; margin-bottom:5px;">ASH SHOULDER: ISO I</h4>', unsafe_allow_html=True)
                 
@@ -440,7 +434,6 @@ if check_password():
             else:
                 st.info("No ASH shoulder test dataset recorded.")
 
-            # --- BLOCK 3: ER ROM ---
             st.markdown('<hr style="display:block !important; margin:15px 0; border:0; border-top:1px solid #E5E5E7;" />', unsafe_allow_html=True)
             st.markdown('<h4 style="color:#4895DB; font-weight:800; margin-bottom:5px;">EXTERNAL ROTATION: ROM</h4>', unsafe_allow_html=True)
             
@@ -507,7 +500,6 @@ if check_password():
 
             st.divider()
 
-            # --- PHASE BREAKDOWN ---
             p_ph = phase_df[(phase_df['Name'] == selected_athlete_prof) & (phase_df['Date'] == curr_date_prof)].copy()
             if not p_ph.empty:
                 st.markdown('<div class="section-header">Practice Phase Analysis</div>', unsafe_allow_html=True)
@@ -519,14 +511,12 @@ if check_password():
                 fig_ph.update_yaxes(title_text="Total Jumps", secondary_y=True)
                 st.plotly_chart(fig_ph, use_container_width=True, config=LOCKED_CONFIG, key="prof_phase_chart")
        
-        
-        with tabs[1]: # Practice Scores Gallery
+        with tabs[1]: # Tab 1: Practice Scores Gallery
             target_date_str = "2026-04-04"
             tournament_label = "GT Spring Tournament 4-4-26"
             
             clean_session_list = []
             tourney_added = False
-            
             for s in session_list:
                 s_dates = df[df['Session_Name'] == s]['Date']
                 if not s_dates.empty:
@@ -609,8 +599,7 @@ if check_password():
                                     </div>
                                 """, unsafe_allow_html=True)
                 
-                
-        with tabs[2]: # Daily Combined Scores
+        with tabs[2]: # Tab 2: Daily Combined Scores
             valid_dates_sorted = df[df['Date'].notna()].sort_values('Date', ascending=False)['Date'].dt.strftime('%Y-%m-%d').unique().tolist()
             
             target_date_str = "2026-04-04"
@@ -618,7 +607,6 @@ if check_password():
             
             clean_date_list = []
             tourney_added_comb = False
-            
             for d_str in valid_dates_sorted:
                 if d_str == target_date_str:
                     if not tourney_added_comb:
@@ -699,8 +687,7 @@ if check_password():
                 else:
                     st.warning("No data recorded on this specific day.")
 
-
-        with tabs[3]: # Spring Max vs Daily Combined
+        with tabs[3]: # Tab 3: Spring Max vs Daily Combined
             valid_dates_sorted_sm = df[df['Date'].notna()].sort_values('Date', ascending=False)['Date'].dt.strftime('%Y-%m-%d').unique().tolist()
             
             target_date_str = "2026-04-04"
@@ -708,7 +695,6 @@ if check_password():
             
             clean_date_list_sm = []
             tourney_added_sm = False
-            
             for d_str in valid_dates_sorted_sm:
                 if d_str == target_date_str:
                     if not tourney_added_sm:
@@ -763,7 +749,6 @@ if check_password():
                                     g = math.ceil((val / mx) * 100)
                                     t_grade += g
                                     c_metrics += 1
-                                    
                                     r_html += f"<tr><td>{k}</td><td>{val:.1f}</td><td>{mx:.1f}</td><td>{g}</td></tr>"
                                 
                                 sc_g = math.ceil(t_grade / c_metrics) if c_metrics > 0 else 0
@@ -793,8 +778,7 @@ if check_password():
                                         </div>
                                     """, unsafe_allow_html=True)
 
-
-        with tabs[4]: # Practice History
+        with tabs[4]: # Tab 4: Practice History
             st.markdown('<div class="section-header">Season History & Team Weekly Review</div>', unsafe_allow_html=True)
             sub_tabs = st.tabs(["Individual Review", "Team Weekly Review"])
             metrics_to_score = [m for m in all_metrics if m not in ['High Jumps', 'Moderate Jumps', 'High Intensity Movement']]
@@ -1003,8 +987,7 @@ if check_password():
                                     with cols[j]: 
                                         st.info(f"**{name}**: No data for Week {sel_week}")
 
-
-        with tabs[5]: # Match v. Practice
+        with tabs[5]: # Tab 5: Match v. Practice
             st.markdown('<div class="section-header">Season Preparation vs. Match Demands</div>', unsafe_allow_html=True)
             
             c_mode, c_sel = st.columns([1, 3])
@@ -1039,10 +1022,7 @@ if check_password():
             match_filtered = clean_gp_data(match_filtered)
             
             metrics_dict = {
-                'Player Load': 'Player Load', 
-                'Jump Load': 'Jump Load', 
-                'Total Jumps': 'Total Jumps', 
-                'Explosive Efforts': 'Explosive Efforts'
+                'Player Load': 'Player Load', 'Jump Load': 'Jump Load', 'Total Jumps': 'Total Jumps', 'Explosive Efforts': 'Explosive Efforts'
             }
             calc_cols = list(metrics_dict.keys())
 
@@ -1075,16 +1055,23 @@ if check_password():
                         </tr>"""
                 
                 st.markdown(overall_html + "</table>", unsafe_allow_html=True)
-                st.info(" **Intensity Rate** is calculated as the total metric volume divided by session minutes.")
             else:
                 st.warning("Ensure both Practice and Match data are loaded for this selection.")
 
-
-        with tabs[6]: # Match Summary
+        with tabs[6]: # Tab 6: Match Summary
             custom_colors = ['#4895DB', '#FF8200', '#515154', '#A52A2A', '#008080', '#6A1B9A', '#2E7D32']
     
             if st.session_state.is_printing:
-                if st.button("Back to Editor (Show Filters)"):
+                st.markdown("""
+                    <style>
+                    .stTabs [role="tablist"], [data-testid="stSidebar"], header, footer, button, .stButton { 
+                        display: none !important; 
+                    }
+                    </style>
+                    <script>window.print();</script>
+                    """, unsafe_allow_html=True)
+                
+                if st.button("Back to Dashboard View"):
                     st.session_state.is_printing = False
                     st.rerun()
             else:
@@ -1092,6 +1079,7 @@ if check_password():
                 if st.button("Prepare PDF for Printing"):
                     st.session_state.is_printing = True
                     st.rerun()
+                
                 st.markdown('<div class="section-header">Match Comparison Selection</div>', unsafe_allow_html=True)
                 c_ts1, c_ts2 = st.columns([2, 1])
                 
@@ -1103,11 +1091,8 @@ if check_password():
                 
                 with c_ts2:
                     if "pos_state" not in st.session_state: st.session_state.pos_state = "All Positions"
-                    st.session_state.pos_state = st.selectbox("Filter by Position", ["All Positions"] + sorted(list(match_df['Position'].unique())) if not match_df.empty else ["All Positions"], index=0)
+                    st.session_state.pos_state = st.selectbox("Filter by Position Group", ["All Positions"] + sorted(list(match_df['Position'].unique())) if not match_df.empty else ["All Positions"], index=0)
                 st.markdown('</div>', unsafe_allow_html=True)
-
-            if st.session_state.is_printing:
-                st.markdown('<script>window.print();</script>', unsafe_allow_html=True)
 
             selected_matches = st.session_state.get("matches_state", [])
             pos_filter_t = st.session_state.get("pos_state", "All Positions")
@@ -1185,8 +1170,7 @@ if check_password():
                         st.plotly_chart(fig_ath, use_container_width=True, config=LOCKED_CONFIG, key=f"match_sum_chart_{name}")
                     st.markdown('</div>', unsafe_allow_html=True)
 
-
-        with tabs[7]: # Position Analysis
+        with tabs[7]: # Tab 7: Position Analysis
             st.markdown('<div class="section-header">Positional Performance Trends</div>', unsafe_allow_html=True)
             if df.empty:
                 st.info("No position dataset loaded.")
@@ -1260,8 +1244,7 @@ if check_password():
                         
                         st.write("<div style='height: 30px;'></div>", unsafe_allow_html=True)
 
-
-        with tabs[8]: # Phase Analysis
+        with tabs[8]: # Tab 8: Phase Analysis
             st.markdown('<div class="section-header">Work Index Matrix & Drill Utilization</div>', unsafe_allow_html=True)
             
             if phase_df is not None and not phase_df.empty:
@@ -1394,8 +1377,7 @@ if check_password():
                         freq_html += f"<tr><td style='padding: 8px; border: 1px solid #ddd;'>{row['Phase']}</td><td style='padding: 8px; border: 1px solid #ddd;'>{row['Number of Times']:.0f}</td></tr>"
                     st.markdown(freq_html + "</table>", unsafe_allow_html=True)
 
-
-        with tabs[9]: # Practice Planner
+        with tabs[9]: # Tab 9: Practice Planner
             st.markdown('<div class="section-header">Practice Phase Analysis & Planner</div>', unsafe_allow_html=True)
             
             if phase_df is not None and not phase_df.empty:
@@ -1465,7 +1447,7 @@ if check_password():
                         m5.metric("Proj. Dist (y)", f"{int(total_dist)}")
                         st.markdown('</div>', unsafe_allow_html=True)
 
-                    if plan_level != "By Athlete":
+                    if plan_level != "Team Overall":
                         st.markdown(f"#### Individual Athlete Projections")
                         ath_rates = planner_target_df.groupby(['Name', 'Phase'])[[f'{m}_Rate' for m in plan_metrics]].mean().reset_index()
                         
@@ -1521,8 +1503,7 @@ if check_password():
                     fig_flow.update_yaxes(title_text="Yards per Minute", secondary_y=True, showgrid=False)
                     st.plotly_chart(fig_flow, use_container_width=True, config=LOCKED_CONFIG, key="planner_flow_chart")
 
-
-        with tabs[10]: # Spring v. Summer Practices
+        with tabs[10]: # Tab 10: Spring v. Summer Practices
             st.markdown('<div class="section-header">Spring Max vs. Summer Open Gym</div>', unsafe_allow_html=True)
             
             spring_gps = full_df_unfiltered[(full_df_unfiltered['Season'] == 'Spring') & (full_df_unfiltered['Session_Type'] == 'Practice')].copy()
@@ -1598,7 +1579,7 @@ if check_password():
                 ath_summer_days = summer_daily[summer_daily['Name'] == target_ath_comp].sort_values('Date', ascending=False)
                 
                 if ath_benchmarks.empty or ath_summer_days.empty:
-                    st.info(f"Insufficient historical data pairings found for {target_ath_comp}.")
+                    st.info(f"Insufficient data found to evaluate benchmarks for {target_ath_comp}.")
                 else:
                     b_load = ath_benchmarks.iloc[0]['Spring Peak Load']
                     b_jumps = ath_benchmarks.iloc[0]['Spring Peak Jumps']
