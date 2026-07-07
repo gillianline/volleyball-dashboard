@@ -6,10 +6,6 @@ from plotly.subplots import make_subplots
 import math 
 from datetime import timedelta
 
-# --- 1. PAGE CONFIGURATION (MUST BE THE VERY FIRST STREAMLIT CALL) ---
-st.set_page_config(page_title="Lady Vols VB Performance", layout="wide")
-
-# Global CSS Injection
 st.markdown("""
     <style>
     /* Center table text and style metrics */
@@ -33,13 +29,16 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
+# --- PAGE CONFIG ---
+st.set_page_config(page_title="Lady Vols VB Performance", layout="wide")
 
-# --- 2. PASSWORD PROTECTION ---
+
+# --- PASSWORD PROTECTION ---
 def check_password():
     def password_entered():
         if st.session_state["password"] == st.secrets["PASSWORD"]:
             st.session_state["password_correct"] = True
-            st.session_state["password"] = ""  # Safely clear text value without breaking key state
+            st.session_state["password"] = "" # Reset value instead of deleting key to prevent ror
         else:
             st.session_state["password_correct"] = False
     if "password_correct" not in st.session_state:
@@ -56,7 +55,7 @@ if check_password():
     if "is_printing" not in st.session_state:
         st.session_state.is_printing = False
 
-    # CSS Stylesheet
+    # --- CSS: FORMATTING & PAGE BREAK CONTROLS ---
     st.markdown("""
         <style>
         .stApp { background-color: #FFFFFF; color: #1D1D1F; }
@@ -133,6 +132,7 @@ if check_password():
             elif m > 5: return 'Summer'
             else: return 'Spring'
 
+        # Load GPS Data
         df = pd.read_csv(st.secrets["GOOGLE_SHEET_URL"])
         match_df = pd.read_csv(st.secrets["MATCHES_SHEET_URL"])
         
@@ -148,12 +148,14 @@ if check_password():
             frame['Session_Type'] = frame['Activity'].apply(lambda x: 'Game' if any(w in str(x).lower() for w in ['game', 'match', 'v.']) else 'Practice')
             frame['Season'] = frame['Date'].apply(assign_season)
 
+        # Process CMJ Lower Body Sheet
         cmj_df = pd.read_csv(st.secrets["CMJ_SHEET_URL"])
         cmj_df.columns = cmj_df.columns.str.strip()
         cmj_df.rename(columns={'Athlete': 'Name'}, inplace=True)
         cmj_df['Test Date'] = pd.to_datetime(cmj_df['Test Date'], errors='coerce')
         cmj_df['Season'] = cmj_df['Test Date'].apply(assign_season)
 
+        # Process ASH Upper Body Sheet
         try:
             ash_df = pd.read_csv(st.secrets["ASH_SHEET_URL"])
             ash_df.columns = ash_df.columns.str.strip()
@@ -167,6 +169,7 @@ if check_password():
         except:
             ash_df = pd.DataFrame(columns=['Name', 'Test Date', 'Isometric Type', 'Peak Vertical Force [N] (L)', 'Peak Vertical Force [N] (R)', 'Peak Vertical Force [N] (Asym)(%)', 'Season'])
 
+        # Process External Rotation Range of Motion Sheet
         try:
             er_df = pd.read_csv(st.secrets["ER_SHEET_URL"])
             er_df.columns = er_df.columns.str.strip()
@@ -180,6 +183,7 @@ if check_password():
         except:
             er_df = pd.DataFrame(columns=['Name', 'Test Date', 'Movement', 'L Max ROM (°)', 'R Max ROM (°)', 'ROM Asymmetry (%)', 'Season'])
 
+        # Process Drill Phases
         phase_df = pd.read_csv(st.secrets["PHASES_SHEET_URL"])
         phase_df = heavy_sanitize(phase_df)
         if 'Phases' in phase_df.columns: phase_df = phase_df.rename(columns={'Phases': 'Phase'})
@@ -202,6 +206,12 @@ if check_password():
 
     try:
         raw_df, raw_match_df, cmj_df, phase_df, thresh_df, ash_df, er_df = load_all_data()
+
+        # --- CRITICAL STABILITY WALL: DROP CORRUPTED BLANK SHEET DATA IMMEDIATELY ---
+        raw_df = raw_df.dropna(subset=['Date', 'Name'])
+        raw_match_df = raw_match_df.dropna(subset=['Date', 'Name'])
+
+        # Save copies containing all records for cross-season calculations
         full_df_unfiltered = raw_df.copy()
 
         # --- GLOBAL SEASON FILTER SIDEBAR CONFIG ---
@@ -227,19 +237,16 @@ if check_password():
         all_metrics = ['Total Jumps', 'Moderate Jumps', 'High Jumps', 'Jump Load', 'Player Load', 'Estimated Distance (y)', 'Explosive Efforts', 'High Intensity Movement']
         st.markdown('<div class="main-logo-container" style="text-align: center; margin-top: 10px; margin-bottom: 15px;"><img src="https://upload.wikimedia.org/wikipedia/commons/thumb/f/fc/Tennessee_Lady_Volunteers_logo.svg/1280px-Tennessee_Lady_Volunteers_logo.svg.png" width="120"><div style="color: #FF8200; font-size: 2rem; font-weight: 900; margin-top: 10px;">LADY VOLS VOLLEYBALL PERFORMANCE</div></div>', unsafe_allow_html=True)
 
-        # --- RE-MAPPED TAB ENGINE WITH SEPARATION STATE tracker KEY ---
+        # --- TRACKER KEY ASSIGNED TO ENFORCE CONTAINER BOUNDARIES ---
         tabs = st.tabs(
             ["Individual Profile", "Practice Scores", "Daily Combined Scores", "Spring Max vs Daily Combined", "Practice History", "Match v. Practice", "Match Summary", "Position Analysis", "Phase Analysis", "Practice Planner", "Spring v. Summer"],
-            key="vball_dashboard_system_tabs_tracker"
+            key="vball_dashboard_tabs_system_tracker"
         )
         
         master_athlete_list = sorted(list(set(df['Name'].unique()) | set(cmj_df['Name'].unique()) | set(ash_df['Name'].unique()) | set(er_df['Name'].unique())))
         session_list = df[df['Session_Name'].notna()].sort_values('Date', ascending=False)['Session_Name'].unique().tolist()
 
-        # =========================================================================
-        # TAB 0: INDIVIDUAL PROFILE
-        # =========================================================================
-        with tabs[0]: 
+        with tabs[0]: # Tab 0: Individual Profile
             target_date_str = "2026-04-04"
             tournament_label = "GT Spring Tournament 4-4-26"
             
@@ -522,7 +529,7 @@ if check_password():
                 st.plotly_chart(fig_ph, use_container_width=True, config=LOCKED_CONFIG, key="prof_phase_chart")
 
         # =========================================================================
-        # TAB 1: PRACTICE SCORES (GALLERY LAYOUT)
+        # TAB 1: PRACTICE SCORES
         # =========================================================================
         with tabs[1]: 
             target_date_str = "2026-04-04"
@@ -611,7 +618,7 @@ if check_password():
                                         </div>
                                     </div>
                                 """, unsafe_allow_html=True)
-
+                
         # =========================================================================
         # TAB 2: DAILY COMBINED SCORES
         # =========================================================================
@@ -632,7 +639,7 @@ if check_password():
                     clean_date_list.append(d_str)
 
             if not clean_date_list:
-                st.warning("No performance footprint matches found.")
+                st.warning("No data found for selected season dates.")
             else:
                 c_comb1, c_comb2 = st.columns(2)
                 with c_comb1: selected_date_comb = st.selectbox("Date Selection", clean_date_list, index=0, key="nav_sel_comb")
