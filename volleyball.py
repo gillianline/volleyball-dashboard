@@ -6,9 +6,10 @@ from plotly.subplots import make_subplots
 import math 
 from datetime import timedelta
 
-# --- 1. GLOBAL INITIALIZATION (MUST BE FIRST) ---
+# --- 1. SINGLE GLOBAL INITIALIZATION (MUST BE AT THE VERY TOP) ---
 st.set_page_config(page_title="Lady Vols VB Performance", layout="wide")
 
+# Base CSS Injection (Excludes tab-collapsing print overrides)
 st.markdown("""
     <style>
     th, td {text-align: center !important;}
@@ -32,7 +33,7 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 
-# --- 2. SECURITY CHECK ---
+# --- 2. PASSWORD GATEWAY ---
 def check_password():
     def password_entered():
         if st.session_state["password"] == st.secrets["PASSWORD"]:
@@ -56,7 +57,7 @@ if check_password():
     if "is_printing" not in st.session_state:
         st.session_state.is_printing = False
 
-    # Dynamic CSS Injector
+    # Layout Engine Stylesheet
     st.markdown("""
         <style>
         .stApp { background-color: #FFFFFF; color: #1D1D1F; }
@@ -197,7 +198,7 @@ if check_password():
         raw_df, raw_match_df, cmj_df, phase_df, thresh_df, ash_df, er_df = load_all_data()
         full_df_unfiltered = raw_df.copy()
 
-        # --- GLOBAL SIDEBAR CONFIG ---
+        # --- GLOBAL SEASON SIDEBAR CONTROL ---
         st.sidebar.markdown("### Season")
         selected_season = st.sidebar.radio("Select Season", ["Spring", "Summer"], index=1, key="global_season_toggle")
         
@@ -220,7 +221,7 @@ if check_password():
         all_metrics = ['Total Jumps', 'Moderate Jumps', 'High Jumps', 'Jump Load', 'Player Load', 'Estimated Distance (y)', 'Explosive Efforts', 'High Intensity Movement']
         st.markdown('<div class="main-logo-container" style="text-align: center; margin-top: 10px; margin-bottom: 15px;"><img src="https://upload.wikimedia.org/wikipedia/commons/thumb/f/fc/Tennessee_Lady_Volunteers_logo.svg/1280px-Tennessee_Lady_Volunteers_logo.svg.png" width="120"><div style="color: #FF8200; font-size: 2rem; font-weight: 900; margin-top: 10px;">LADY VOLS VOLLEYBALL PERFORMANCE</div></div>', unsafe_allow_html=True)
 
-        # --- SYSTEM FIX: LOCKED STRUCTURAL TABS VIA EXPLICIT STATE KEY ---
+        # --- SECURE CONTAINER: TAB NAVIGATION PERSISTENCE KEY ---
         tabs = st.tabs(
             ["Individual Profile", "Practice Scores", "Daily Combined Scores", "Spring Max vs Daily Combined", "Practice History", "Match v. Practice", "Match Summary", "Position Analysis", "Phase Analysis", "Practice Planner", "Spring v. Summer"],
             key="active_performance_tab"
@@ -303,6 +304,7 @@ if check_password():
             
             st.markdown('<div class="section-header">Weekly Readiness Profile</div>', unsafe_allow_html=True)
             
+            # --- BLOCK 1: LOWER BODY JUMP PROFILE (CMJ) ---
             st.markdown('<h4 style="color:#4895DB; font-weight:800; margin-bottom:5px;">COUNTERMOVEMENT JUMP</h4>', unsafe_allow_html=True)
             jc1, jc2 = st.columns([1.5, 3.5])
             p_cmj_hist = cmj_df[(cmj_df['Name'] == selected_athlete_prof) & (cmj_df['Test Date'] <= curr_date_prof)].sort_values('Test Date')
@@ -366,6 +368,7 @@ if check_password():
                 else:
                     st.info("No Countermovement Jump metrics recorded.")
 
+            # --- BLOCK 2: UPPER BODY ISOMETRIC PROFILE (ASH TEST) ---
             st.markdown('<hr style="display:block !important; margin:15px 0; border:0; border-top:1px solid #E5E5E7;" />', unsafe_allow_html=True)
             st.markdown('<h4 style="color:#4895DB; font-weight:800; margin-bottom:5px;">ASH SHOULDER: ISO I</h4>', unsafe_allow_html=True)
                 
@@ -434,6 +437,7 @@ if check_password():
             else:
                 st.info("No ASH shoulder test dataset recorded.")
 
+            # --- BLOCK 3: ROTATOR CUFF EXTERNAL ROTATION ROM ---
             st.markdown('<hr style="display:block !important; margin:15px 0; border:0; border-top:1px solid #E5E5E7;" />', unsafe_allow_html=True)
             st.markdown('<h4 style="color:#4895DB; font-weight:800; margin-bottom:5px;">EXTERNAL ROTATION: ROM</h4>', unsafe_allow_html=True)
             
@@ -511,7 +515,7 @@ if check_password():
                 fig_ph.update_yaxes(title_text="Total Jumps", secondary_y=True)
                 st.plotly_chart(fig_ph, use_container_width=True, config=LOCKED_CONFIG, key="prof_phase_chart")
        
-        with tabs[1]: # Tab 1: Practice Scores Gallery
+        with tabs[1]: # Tab 1: Practice Scores (Gallery Layout)
             target_date_str = "2026-04-04"
             tournament_label = "GT Spring Tournament 4-4-26"
             
@@ -534,60 +538,60 @@ if check_password():
             
             if selected_session_gal == tournament_label:
                 curr_date_gal = pd.to_datetime(target_date_str)
-                display_df = df[df['Date'] == curr_date_gal].groupby(['Name', 'Position', 'PhotoURL']).sum(numeric_only=True).reset_index()
+                t1_display_df = df[df['Date'] == curr_date_gal].groupby(['Name', 'Position', 'PhotoURL']).sum(numeric_only=True).reset_index()
             else:
-                display_df = df[df['Session_Name'] == selected_session_gal].copy()
-                curr_date_gal = display_df['Date'].iloc[0] if not display_df.empty else None
+                t1_display_df = df[df['Session_Name'] == selected_session_gal].copy()
+                curr_date_gal = t1_display_df['Date'].iloc[0] if not t1_display_df.empty else None
 
-            if not display_df.empty:
+            if not t1_display_df.empty:
                 if pos_f_gal != "All Positions": 
-                    display_df = display_df[display_df['Position'] == pos_f_gal]
+                    t1_display_df = t1_display_df[t1_display_df['Position'] == pos_f_gal]
                 
-                athlete_names = sorted(display_df['Name'].unique())
+                t1_athlete_names = sorted(t1_display_df['Name'].unique())
                 metrics_to_exclude = ['High Jumps', 'Moderate Jumps', 'High Intensity Movement']
                 filtered_metrics_gal = [m for m in all_metrics if m not in metrics_to_exclude]
 
-                for i in range(0, len(athlete_names), 2):
+                for i in range(0, len(t1_athlete_names), 2):
                     cols = st.columns(2)
                     for j in range(2):
-                        if i + j < len(athlete_names):
-                            name = athlete_names[i + j]
-                            p_session_row = display_df[display_df['Name'] == name].iloc[0]
+                        if i + j < len(t1_athlete_names):
+                            t1_name = t1_athlete_names[i + j]
+                            t1_p_session_row = t1_display_df[t1_display_df['Name'] == t1_name].iloc[0]
                             
-                            p_full_g = df[df['Name'] == name]
-                            daily_sums_g = p_full_g.groupby('Date')[all_metrics].sum().reset_index()
-                            lb_sums = daily_sums_g[(daily_sums_g['Date'] >= curr_date_gal - timedelta(days=30)) & 
-                                                   (daily_sums_g['Date'] <= curr_date_gal)] if curr_date_gal else daily_sums_g
+                            t1_p_full_g = df[df['Name'] == t1_name]
+                            t1_daily_sums_g = t1_p_full_g.groupby('Date')[all_metrics].sum().reset_index()
+                            t1_lb_sums = t1_daily_sums_g[(t1_daily_sums_g['Date'] >= curr_date_gal - timedelta(days=30)) & 
+                                                   (t1_daily_sums_g['Date'] <= curr_date_gal)] if curr_date_gal else t1_daily_sums_g
                             
-                            r_html = ""; t_grade = 0; c_metrics = 0
+                            t1_r_html = ""; t1_t_grade = 0; t1_c_metrics = 0
                             for k in filtered_metrics_gal:
-                                val = p_session_row[k]
-                                mx = lb_sums[k].max() if (not lb_sums.empty and lb_sums[k].max() > 0) else 1.0
-                                avg = lb_sums[k].mean() if (not lb_sums.empty and lb_sums[k].mean() > 0) else 1.0
+                                val = t1_p_session_row[k]
+                                mx = t1_lb_sums[k].max() if (not t1_lb_sums.empty and t1_lb_sums[k].max() > 0) else 1.0
+                                avg = t1_lb_sums[k].mean() if (not t1_lb_sums.empty and t1_lb_sums[k].mean() > 0) else 1.0
                                 g = math.ceil((val / mx) * 100) if mx > 0 else 0
-                                t_grade += g
-                                c_metrics += 1
+                                t1_t_grade += g
+                                t1_c_metrics += 1
                                 diff = (val - avg) / avg if avg != 0 else 0
                                 h_class = "class='bg-highlight-red'" if abs(diff) > 0.15 else ""
                                 arr_val = f"<span class='arrow-red'>{'↑' if diff > 0.15 else '↓'}</span>" if abs(diff) > 0.15 else ""
-                                r_html += f"<tr><td>{k}</td><td {h_class}>{val:.1f} {arr_val}</td><td>{mx:.1f}</td><td>{g}</td></tr>"
+                                t1_r_html += f"<tr><td>{k}</td><td {h_class}>{val:.1f} {arr_val}</td><td>{mx:.1f}</td><td>{g}</td></tr>"
                             
-                            sc_g = math.ceil(t_grade / c_metrics) if c_metrics > 0 else 0
+                            sc_g = math.ceil(t1_t_grade / t1_c_metrics) if t1_c_metrics > 0 else 0
                             
                             with cols[j]: 
                                 st.markdown(f"""
                                     <div style="border:1px solid #E5E5E7; border-radius:15px; padding:15px; margin-bottom:20px; background-color:white;">
                                         <div style="display:flex; align-items:center; gap:10px;">
                                             <div style="flex:1.2; text-align:center;">
-                                                <img src="{p_session_row["PhotoURL"]}" class="gallery-photo">
-                                                <p style="font-weight:bold; font-size:15px; margin-top:8px; color:#333;">{name}</p>
+                                                <img src="{t1_p_session_row["PhotoURL"]}" class="gallery-photo">
+                                                <p style="font-weight:bold; font-size:15px; margin-top:8px; color:#333;">{t1_name}</p>
                                             </div>
                                             <div style="flex:3;">
                                                 <table class="scout-table">
                                                     <thead>
                                                         <tr><th>Metric</th><th>Total</th><th>30d Max</th><th>Grade</th></tr>
                                                     </thead>
-                                                    <tbody>{r_html}</tbody>
+                                                    <tbody>{t1_r_html}</tbody>
                                                 </table>
                                             </div>
                                             <div style="flex:1; text-align:center;">
@@ -616,64 +620,64 @@ if check_password():
                     clean_date_list.append(d_str)
 
             if not clean_date_list:
-                st.warning("No dynamic performance dates found.")
+                st.warning("No performance footprint data blocks recorded.")
             else:
                 c_comb1, c_comb2 = st.columns(2)
                 with c_comb1: selected_date_comb = st.selectbox("Date Selection", clean_date_list, index=0, key="nav_sel_comb")
                 with c_comb2: pos_f_comb = st.selectbox("Position Filter", ["All Positions"] + sorted([p for p in df['Position'].unique() if p != "N/A"]), key="nav_pos_comb")
                 
                 target_date_obj_comb = pd.to_datetime(target_date_str) if selected_date_comb == tournament_label else pd.to_datetime(selected_date_comb)
-                display_df_comb = df[df['Date'] == target_date_obj_comb].groupby(['Name', 'Position', 'PhotoURL'])[all_metrics].sum().reset_index()
+                t2_display_df_comb = df[df['Date'] == target_date_obj_comb].groupby(['Name', 'Position', 'PhotoURL'])[all_metrics].sum().reset_index()
 
-                if not display_df_comb.empty:
+                if not t2_display_df_comb.empty:
                     if pos_f_comb != "All Positions": 
-                        display_df_comb = display_df_comb[display_df_comb['Position'] == pos_f_comb]
+                        t2_display_df_comb = t2_display_df_comb[t2_display_df_comb['Position'] == pos_f_comb]
                     
-                    athlete_names_comb = sorted(display_df_comb['Name'].unique())
+                    t2_athlete_names_comb = sorted(t2_display_df_comb['Name'].unique())
                     metrics_to_exclude = ['High Jumps', 'Moderate Jumps', 'High Intensity Movement']
                     filtered_metrics_comb = [m for m in all_metrics if m not in metrics_to_exclude]
 
-                    for i in range(0, len(athlete_names_comb), 2):
+                    for i in range(0, len(t2_athlete_names_comb), 2):
                         cols = st.columns(2)
                         for j in range(2):
-                            if i + j < len(athlete_names_comb):
-                                name = athlete_names_comb[i + j]
-                                p_session_row = display_df_comb[display_df_comb['Name'] == name].iloc[0]
+                            if i + j < len(t2_athlete_names_comb):
+                                t2_name = t2_athlete_names_comb[i + j]
+                                t2_p_session_row = t2_display_df_comb[t2_display_df_comb['Name'] == t2_name].iloc[0]
                                 
-                                p_full_g = df[df['Name'] == name]
-                                daily_sums_g = p_full_g.groupby('Date')[all_metrics].sum().reset_index()
-                                lb_sums = daily_sums_g[(daily_sums_g['Date'] >= target_date_obj_comb - timedelta(days=30)) & 
-                                                       (daily_sums_g['Date'] <= target_date_obj_comb)]
+                                t2_p_full_g = df[df['Name'] == t2_name]
+                                t2_daily_sums_g = t2_p_full_g.groupby('Date')[all_metrics].sum().reset_index()
+                                t2_lb_sums = t2_daily_sums_g[(t2_daily_sums_g['Date'] >= target_date_obj_comb - timedelta(days=30)) & 
+                                                       (t2_daily_sums_g['Date'] <= target_date_obj_comb)]
                                 
-                                r_html = ""; t_grade = 0; c_metrics = 0
+                                t2_r_html = ""; t2_t_grade = 0; t2_c_metrics = 0
                                 for k in filtered_metrics_comb:
-                                    val = p_session_row[k]
-                                    mx = lb_sums[k].max() if (not lb_sums.empty and lb_sums[k].max() > 0) else 1.0
-                                    avg = lb_sums[k].mean() if (not lb_sums.empty and lb_sums[k].mean() > 0) else 1.0
+                                    val = t2_p_session_row[k]
+                                    mx = t2_lb_sums[k].max() if (not t2_lb_sums.empty and t2_lb_sums[k].max() > 0) else 1.0
+                                    avg = t2_lb_sums[k].mean() if (not t2_lb_sums.empty and t2_lb_sums[k].mean() > 0) else 1.0
                                     g = math.ceil((val / mx) * 100) if mx > 0 else 0
-                                    t_grade += g
-                                    c_metrics += 1
+                                    t2_t_grade += g
+                                    t2_c_metrics += 1
                                     diff = (val - avg) / avg if avg != 0 else 0
                                     h_class = "class='bg-highlight-red'" if abs(diff) > 0.15 else ""
                                     arr_val = f"<span class='arrow-red'>{'↑' if diff > 0.15 else '↓'}</span>" if abs(diff) > 0.15 else ""
-                                    r_html += f"<tr><td>{k}</td><td {h_class}>{val:.1f} {arr_val}</td><td>{mx:.1f}</td><td>{g}</td></tr>"
+                                    t2_r_html += f"<tr><td>{k}</td><td {h_class}>{val:.1f} {arr_val}</td><td>{mx:.1f}</td><td>{g}</td></tr>"
                                 
-                                sc_g = math.ceil(t_grade / c_metrics) if c_metrics > 0 else 0
+                                sc_g = math.ceil(t2_t_grade / t2_c_metrics) if t2_c_metrics > 0 else 0
                                 
                                 with cols[j]: 
                                     st.markdown(f"""
                                         <div style="border:1px solid #E5E5E7; border-radius:15px; padding:15px; margin-bottom:20px; background-color:white;">
                                             <div style="display:flex; align-items:center; gap:10px;">
                                                 <div style="flex:1.2; text-align:center;">
-                                                    <img src="{p_session_row["PhotoURL"]}" class="gallery-photo">
-                                                    <p style="font-weight:bold; font-size:15px; margin-top:8px; color:#333;">{name}</p>
+                                                    <img src="{t2_p_session_row["PhotoURL"]}" class="gallery-photo">
+                                                    <p style="font-weight:bold; font-size:15px; margin-top:8px; color:#333;">{t2_name}</p>
                                                 </div>
                                                 <div style="flex:3;">
                                                     <table class="scout-table">
                                                         <thead>
                                                             <tr><th>Metric</th><th>Combined Total</th><th>30d Max Day</th><th>Grade</th></tr>
                                                         </thead>
-                                                        <tbody>{r_html}</tbody>
+                                                        <tbody>{t2_r_html}</tbody>
                                                     </table>
                                                 </div>
                                                 <div style="flex:1; text-align:center;">
@@ -711,62 +715,62 @@ if check_password():
                 with c_sm2: pos_f_sm = st.selectbox("Position Filter", ["All Positions"] + sorted([p for p in df['Position'].unique() if p != "N/A"]), key="nav_pos_sm")
                 
                 target_date_obj_sm = pd.to_datetime(target_date_str) if selected_date_sm == tournament_label else pd.to_datetime(selected_date_sm)
-                display_df_sm = df[df['Date'] == target_date_obj_sm].groupby(['Name', 'Position', 'PhotoURL'])[all_metrics].sum().reset_index()
+                t3_display_df_sm = df[df['Date'] == target_date_obj_sm].groupby(['Name', 'Position', 'PhotoURL'])[all_metrics].sum().reset_index()
 
                 spring_gps_raw = full_df_unfiltered[(full_df_unfiltered['Season'] == 'Spring') & (full_df_unfiltered['Session_Type'] == 'Practice')].copy()
                 
                 if spring_gps_raw.empty:
                     st.warning("No historical Spring dataset found to generate maximum baseline metrics.")
-                elif not display_df_sm.empty:
+                elif not t3_display_df_sm.empty:
                     spring_daily_totals = spring_gps_raw.groupby(['Name', 'Date'])[all_metrics].sum().reset_index()
                     spring_daily_maxes = spring_daily_totals.groupby('Name')[all_metrics].max().reset_index()
                     
                     if pos_f_sm != "All Positions": 
-                        display_df_sm = display_df_sm[display_df_sm['Position'] == pos_f_sm]
+                        t3_display_df_sm = t3_display_df_sm[t3_display_df_sm['Position'] == pos_f_sm]
                     
-                    athlete_names_sm = sorted(display_df_sm['Name'].unique())
+                    t3_athlete_names_sm = sorted(t3_display_df_sm['Name'].unique())
                     metrics_to_exclude = ['High Jumps', 'Moderate Jumps', 'High Intensity Movement']
                     filtered_metrics_sm = [m for m in all_metrics if m not in metrics_to_exclude]
 
-                    for i in range(0, len(athlete_names_sm), 2):
+                    for i in range(0, len(t3_athlete_names_sm), 2):
                         cols = st.columns(2)
                         for j in range(2):
-                            if i + j < len(athlete_names_sm):
-                                name = athlete_names_sm[i + j]
+                            if i + j < len(t3_athlete_names_sm):
+                                t3_name = t3_athlete_names_sm[i + j]
                                 
-                                ath_spring_peaks = spring_daily_maxes[spring_daily_maxes['Name'] == name]
+                                ath_spring_peaks = spring_daily_maxes[spring_daily_maxes['Name'] == t3_name]
                                 if ath_spring_peaks.empty:
                                     continue
                                     
-                                p_session_row = display_df_sm[display_df_sm['Name'] == name].iloc[0]
-                                r_html = ""; t_grade = 0; c_metrics = 0
+                                t3_p_session_row = t3_display_df_sm[t3_display_df_sm['Name'] == t3_name].iloc[0]
+                                t3_r_html = ""; t3_t_grade = 0; t3_c_metrics = 0
                                 
                                 for k in filtered_metrics_sm:
-                                    val = p_session_row[k]
+                                    val = t3_p_session_row[k]
                                     mx = ath_spring_peaks[k].iloc[0]
                                     if pd.isna(mx) or mx <= 0: mx = 1.0
                                     
                                     g = math.ceil((val / mx) * 100)
-                                    t_grade += g
-                                    c_metrics += 1
-                                    r_html += f"<tr><td>{k}</td><td>{val:.1f}</td><td>{mx:.1f}</td><td>{g}</td></tr>"
+                                    t3_t_grade += g
+                                    t3_c_metrics += 1
+                                    t3_r_html += f"<tr><td>{k}</td><td>{val:.1f}</td><td>{mx:.1f}</td><td>{g}</td></tr>"
                                 
-                                sc_g = math.ceil(t_grade / c_metrics) if c_metrics > 0 else 0
+                                sc_g = math.ceil(t3_t_grade / t3_c_metrics) if t3_c_metrics > 0 else 0
                                 
                                 with cols[j]: 
                                     st.markdown(f"""
                                         <div style="border:1px solid #E5E5E7; border-radius:15px; padding:15px; margin-bottom:20px; background-color:white;">
                                             <div style="display:flex; align-items:center; gap:10px;">
                                                 <div style="flex:1.2; text-align:center;">
-                                                    <img src="{p_session_row["PhotoURL"]}" class="gallery-photo">
-                                                    <p style="font-weight:bold; font-size:15px; margin-top:8px; color:#333;">{name}</p>
+                                                    <img src="{t3_p_session_row["PhotoURL"]}" class="gallery-photo">
+                                                    <p style="font-weight:bold; font-size:15px; margin-top:8px; color:#333;">{t3_name}</p>
                                                 </div>
                                                 <div style="flex:3;">
                                                     <table class="scout-table">
                                                         <thead>
                                                             <tr><th>Metric</th><th>Combined Total</th><th>Spring Max Day</th><th>Grade</th></tr>
                                                         </thead>
-                                                        <tbody>{r_html}</tbody>
+                                                        <tbody>{t3_r_html}</tbody>
                                                     </table>
                                                 </div>
                                                 <div style="flex:1; text-align:center;">
@@ -1514,7 +1518,7 @@ if check_password():
             else:
                 spring_daily = spring_gps.groupby(['Name', 'Date'])[['Player Load', 'Total Jumps', 'Explosive Efforts', 'Estimated Distance (y)', 'Jump Load']].sum().reset_index()
                 summer_daily = summer_gps.groupby(['Name', 'Date'])[['Player Load', 'Total Jumps', 'Explosive Efforts', 'Estimated Distance (y)', 'Jump Load', 'Session_Name']].agg({
-                    'Player Load': 'sum', 'Total Jumps': 'sum', 'Explosive Efforts': 'sum', 'Estimated Distance (y)': 'sum', 'Jump Load': 'sum',
+                    'Player Load': 'sum', 'Total Jumps': 'sum', 'Explosive Efforts': 'sum', 'Estimated Distance (y)' : 'sum', 'Jump Load': 'sum',
                     'Session_Name': lambda x: ' | '.join(x.astype(str).unique())
                 }).reset_index()
                 
@@ -1579,7 +1583,7 @@ if check_password():
                 ath_summer_days = summer_daily[summer_daily['Name'] == target_ath_comp].sort_values('Date', ascending=False)
                 
                 if ath_benchmarks.empty or ath_summer_days.empty:
-                    st.info(f"Insufficient data found to evaluate benchmarks for {target_ath_comp}.")
+                    st.info(f"Insufficient historical data pairings found to build benchmarks for {target_ath_comp}.")
                 else:
                     b_load = ath_benchmarks.iloc[0]['Spring Peak Load']
                     b_jumps = ath_benchmarks.iloc[0]['Spring Peak Jumps']
