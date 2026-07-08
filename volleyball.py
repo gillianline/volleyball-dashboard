@@ -455,11 +455,15 @@ if check_password():
             clean_session_list = []
             tourney_added = False
             for s in session_list:
-                s_date = df_t1[df_t1['Session_Name'] == s]['Date'].dt.strftime('%Y-%m-%d').iloc[0]
-                if s_date == target_date_str:
-                    if not tourney_added:
-                        clean_session_list.append(tournament_label)
-                        tourney_added = True
+                s_date_series = df_t1[df_t1['Session_Name'] == s]['Date']
+                if not s_date_series.empty:
+                    s_date = s_date_series.dt.strftime('%Y-%m-%d').iloc[0]
+                    if s_date == target_date_str:
+                        if not tourney_added:
+                            clean_session_list.append(tournament_label)
+                            tourney_added = True
+                    else:
+                        clean_session_list.append(s)
                 else:
                     clean_session_list.append(s)
 
@@ -469,10 +473,12 @@ if check_password():
             
             if selected_session_gal == tournament_label:
                 curr_date_gal = pd.to_datetime(target_date_str)
+                # FIX: Group by and sum all entries for that specific tournament date
                 display_df = df_t1[df_t1['Date'] == curr_date_gal].groupby(['Name', 'Position', 'PhotoURL']).sum(numeric_only=True).reset_index()
             else:
                 display_df = df_t1[df_t1['Session_Name'] == selected_session_gal].copy()
-                if not display_df.empty: curr_date_gal = display_df['Date'].iloc[0]
+                if not display_df.empty: 
+                    curr_date_gal = display_df['Date'].iloc[0]
 
             if display_df is not None and not display_df.empty:
                 if pos_f_gal != "All Positions": display_df = display_df[display_df['Position'] == pos_f_gal]
@@ -486,24 +492,25 @@ if check_password():
                             name = athlete_names[i + j]
                             p_session_row = display_df[display_df['Name'] == name].iloc[0]
                             p_full_g = df_t1[df_t1['Name'] == name]
+                            
+                            # FIX: Match lookback generation logic identically to individual profiles
                             daily_sums_g = p_full_g.groupby('Date')[all_metrics].sum().reset_index()
-                            lb_sums = daily_sums_g[(daily_sums_g['Date'] >= curr_date_gal - timedelta(days=30)) & (daily_sums_g['Date'] <= curr_date_gal)]
+                            lb_sums = daily_sums_g[(daily_sums_g['Date'] >= pd.to_datetime(curr_date_gal) - timedelta(days=30)) & (daily_sums_g['Date'] <= pd.to_datetime(curr_date_gal))]
                             
                             r_html = ""; t_grade = 0; c_metrics = 0
                             for k in filtered_metrics_gal:
                                 val = p_session_row[k]
-                                mx = lb_sums[k].max() if not lb_sums.empty else 1.0
-                                avg = lb_sums[k].mean() if not lb_sums.empty else 1.0
+                                mx = lb_sums[k].max() if (not lb_sums.empty and k in lb_sums.columns and lb_sums[k].max() > 0) else 1.0
+                                avg = lb_sums[k].mean() if (not lb_sums.empty and k in lb_sums.columns and lb_sums[k].mean() > 0) else 1.0
                                 g = math.ceil((val / mx) * 100) if mx > 0 else 0
                                 t_grade += g; c_metrics += 1
                                 diff = (val - avg) / avg if avg != 0 else 0
-                                h_class = "class='bg-highlight-red'" if abs(diff) > 0.15 else ""
-                                arr_val = f"<span class='arrow-red'>{'↑' if diff > 0.15 else '↓'}</span>" if abs(diff) > 0.15 else ""
+                                h_class = "class='bg-highlight-red'" if abs(diff) > 0.10 else ""
+                                arr_val = f"<span class='arrow-red'>{'↑' if diff > 0.10 else '↓'}</span>" if abs(diff) > 0.10 else ""
                                 r_html += f"<tr><td>{k}</td><td {h_class}>{val:.1f} {arr_val}</td><td>{mx:.1f}</td><td>{g}</td></tr>"
                             
                             sc_g = math.ceil(t_grade / c_metrics) if c_metrics > 0 else 0
                             with cols[j]: st.markdown(f'<div style="border:1px solid #E5E5E7; border-radius:15px; padding:15px; margin-bottom:20px; background-color:white;"><div style="display:flex; align-items:center; gap:10px;"><div style="flex:1.2; text-align:center;"><img src="{p_session_row["PhotoURL"]}" class="gallery-photo"><p style="font-weight:bold; font-size:15px; margin-top:8px; color:#333;">{name}</p></div><div style="flex:3;"><table class="scout-table"><thead><tr><th>Metric</th><th>Total</th><th>30d Max</th><th>Grade</th></tr></thead><tbody>{r_html}</tbody></table></div><div style="flex:1; text-align:center;"><div style="background-color:{get_flipped_gradient(sc_g)}; color:white; padding:10px; border-radius:12px; font-size:32px; font-weight:900;">{sc_g}</div></div></div></div>', unsafe_allow_html=True)
-
         # ==========================================
         # --- TAB CLAUSE 2: DAILY COMBINED SCORES ---
         # ==========================================
