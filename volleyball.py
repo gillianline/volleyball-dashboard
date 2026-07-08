@@ -267,7 +267,7 @@ if check_password():
             for s in session_list:
                 s_date_series = df_t0[df_t0['Session_Name'] == s]['Date']
                 if not s_date_series.empty:
-                    s_date = s_date_series.dt.strftime('%Y-%m-%d').iloc[0]
+                    s_date = pd.to_datetime(s_date_series.iloc[0]).strftime('%Y-%m-%d')
                     if s_date == target_date_str:
                         if not tourney_added_prof:
                             clean_session_list_prof.append(tournament_label)
@@ -285,13 +285,13 @@ if check_password():
 
             if selected_session_prof == tournament_label:
                 curr_date_prof = pd.to_datetime(target_date_str)
-                p_session_data = df_t0[(df_t0['Name'] == selected_athlete_prof) & (df_t0['Date'] == curr_date_prof)].copy()
-                p_row = p_session_data.groupby(['Name', 'Position', 'PhotoURL', 'Date']).sum(numeric_only=True).reset_index().iloc[0] if not p_session_data.empty else pd.Series()
+                p_session_data = df_t0[(df_t0['Name'] == selected_athlete_prof) & (df_t0['Date'].dt.date == curr_date_prof.date())].copy()
+                p_row = p_session_data.groupby(['Name', 'Position', 'PhotoURL']).sum(numeric_only=True).reset_index().iloc[0] if not p_session_data.empty else pd.Series()
                 p_meta = p_session_data.iloc[0] if not p_session_data.empty else pd.Series()
             else:
                 p_session_data = df_t0[(df_t0['Name'] == selected_athlete_prof) & (df_t0['Session_Name'] == selected_session_prof)]
                 p_row = p_session_data.iloc[0] if not p_session_data.empty else pd.Series()
-                curr_date_prof = p_row['Date'] if not p_row.empty else None
+                curr_date_prof = pd.to_datetime(p_row['Date']) if not p_row.empty else None
                 p_meta = p_row
 
             if p_row.empty:
@@ -305,10 +305,10 @@ if check_password():
 
             p_full_prof = df_t0[df_t0['Name'] == selected_athlete_prof]
             daily_sums_prof = p_full_prof.groupby('Date')[all_metrics].sum().reset_index()
-            lb_prof = daily_sums_prof[(daily_sums_prof['Date'] >= pd.to_datetime(curr_date_prof) - timedelta(days=30)) & (daily_sums_prof['Date'] <= pd.to_datetime(curr_date_prof))]
+            lb_prof = daily_sums_prof[(daily_sums_prof['Date'].dt.date >= curr_date_prof.date() - timedelta(days=30)) & (daily_sums_prof['Date'].dt.date <= curr_date_prof.date())]
 
             filtered_metrics_prof = [m for m in all_metrics if m not in ['High Jumps', 'Moderate Jumps', 'High Intensity Movement']]
-            r_html_prof = ""; t_grade_prof = 0; c_metrics_prof = 1
+            r_html_prof = ""; t_grade_prof = 0; c_metrics_prof = 0
 
             for k in filtered_metrics_prof:
                 val = p_row.get(k, 0.0)
@@ -335,7 +335,7 @@ if check_password():
             p_cmj_hist = cmj_t0[(cmj_t0['Name'] == selected_athlete_prof) & (cmj_t0['Test Date'] <= curr_date_prof)].sort_values('Test Date')
 
             with jc1:
-                baseline_cmj = p_cmj_hist[p_cmj_hist['Season'] == 'Summer'].head(1) if selected_season == 'Summer' else cmj_t0[(cmj_t0['Name'] == selected_athlete_prof) & (cmj_t0['Week'] == 4)]
+                baseline_cmj = cmj_t0[(cmj_t0['Name'] == selected_athlete_prof) & (cmj_t0['Season'] == 'Summer')].head(1) if selected_season == 'Summer' else cmj_t0[(cmj_t0['Name'] == selected_athlete_prof) & (cmj_t0['Week'] == 4)]
                 if not baseline_cmj.empty and not p_cmj_hist.empty:
                     base_h = baseline_cmj.iloc[-1][cmj_col]
                     base_rsi = baseline_cmj.iloc[-1][rsi_col]
@@ -433,7 +433,7 @@ if check_password():
                 st.info("No External Rotation data recorded.")
 
             st.divider()
-            p_ph = phase_t0[(phase_t0['Name'] == selected_athlete_prof) & (phase_t0['Date'] == curr_date_prof)].copy()
+            p_ph = phase_t0[(phase_t0['Name'] == selected_athlete_prof) & (phase_t0['Date'].dt.date == curr_date_prof.date())].copy()
             if not p_ph.empty:
                 st.markdown('<div class="section-header">Practice Phase Analysis</div>', unsafe_allow_html=True)
                 fig_ph = make_subplots(specs=[[{"secondary_y": True}]])
@@ -457,7 +457,7 @@ if check_password():
             for s in session_list:
                 s_date_series = df_t1[df_t1['Session_Name'] == s]['Date']
                 if not s_date_series.empty:
-                    s_date = s_date_series.dt.strftime('%Y-%m-%d').iloc[0]
+                    s_date = pd.to_datetime(s_date_series.iloc[0]).strftime('%Y-%m-%d')
                     if s_date == target_date_str:
                         if not tourney_added:
                             clean_session_list.append(tournament_label)
@@ -473,12 +473,11 @@ if check_password():
             
             if selected_session_gal == tournament_label:
                 curr_date_gal = pd.to_datetime(target_date_str)
-                # FIX: Group by and sum all entries for that specific tournament date
-                display_df = df_t1[df_t1['Date'] == curr_date_gal].groupby(['Name', 'Position', 'PhotoURL']).sum(numeric_only=True).reset_index()
+                display_df = df_t1[df_t1['Date'].dt.date == curr_date_gal.date()].groupby(['Name', 'Position', 'PhotoURL']).sum(numeric_only=True).reset_index()
             else:
                 display_df = df_t1[df_t1['Session_Name'] == selected_session_gal].copy()
                 if not display_df.empty: 
-                    curr_date_gal = display_df['Date'].iloc[0]
+                    curr_date_gal = pd.to_datetime(display_df['Date'].iloc[0])
 
             if display_df is not None and not display_df.empty:
                 if pos_f_gal != "All Positions": display_df = display_df[display_df['Position'] == pos_f_gal]
@@ -493,9 +492,8 @@ if check_password():
                             p_session_row = display_df[display_df['Name'] == name].iloc[0]
                             p_full_g = df_t1[df_t1['Name'] == name]
                             
-                            # FIX: Match lookback generation logic identically to individual profiles
                             daily_sums_g = p_full_g.groupby('Date')[all_metrics].sum().reset_index()
-                            lb_sums = daily_sums_g[(daily_sums_g['Date'] >= pd.to_datetime(curr_date_gal) - timedelta(days=30)) & (daily_sums_g['Date'] <= pd.to_datetime(curr_date_gal))]
+                            lb_sums = daily_sums_g[(daily_sums_g['Date'].dt.date >= curr_date_gal.date() - timedelta(days=30)) & (daily_sums_g['Date'].dt.date <= curr_date_gal.date())]
                             
                             r_html = ""; t_grade = 0; c_metrics = 0
                             for k in filtered_metrics_gal:
@@ -511,7 +509,7 @@ if check_password():
                             
                             sc_g = math.ceil(t_grade / c_metrics) if c_metrics > 0 else 0
                             with cols[j]: st.markdown(f'<div style="border:1px solid #E5E5E7; border-radius:15px; padding:15px; margin-bottom:20px; background-color:white;"><div style="display:flex; align-items:center; gap:10px;"><div style="flex:1.2; text-align:center;"><img src="{p_session_row["PhotoURL"]}" class="gallery-photo"><p style="font-weight:bold; font-size:15px; margin-top:8px; color:#333;">{name}</p></div><div style="flex:3;"><table class="scout-table"><thead><tr><th>Metric</th><th>Total</th><th>30d Max</th><th>Grade</th></tr></thead><tbody>{r_html}</tbody></table></div><div style="flex:1; text-align:center;"><div style="background-color:{get_flipped_gradient(sc_g)}; color:white; padding:10px; border-radius:12px; font-size:32px; font-weight:900;">{sc_g}</div></div></div></div>', unsafe_allow_html=True)
-        # ==========================================
+                                
         # --- TAB CLAUSE 2: DAILY COMBINED SCORES ---
         # ==========================================
         elif st.session_state.active_tab_state == "Daily Combined Scores":
