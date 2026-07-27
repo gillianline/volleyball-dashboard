@@ -390,21 +390,55 @@ if check_password():
                     if not cmj_comp.empty:
                         cmj_avg_season = cmj_comp.groupby('Season')[[cmj_col, rsi_col]].mean().reset_index()
                         
+                        max_h = cmj_avg_season[cmj_col].max() if not cmj_avg_season.empty else 50.0
+                        max_r = cmj_avg_season[rsi_col].max() if not cmj_avg_season.empty else 1.0
+
                         fig_comp_cmj = make_subplots(specs=[[{"secondary_y": True}]])
+                        
+                        # Bar trace with cliponaxis=False & inside positioning option to avoid visual collision
                         fig_comp_cmj.add_trace(
-                            go.Bar(x=cmj_avg_season['Season'], y=cmj_avg_season[cmj_col], name="Avg CMJ Height (cm)", marker_color='#FF8200', text=cmj_avg_season[cmj_col].round(1), textposition="auto"),
+                            go.Bar(
+                                x=cmj_avg_season['Season'], 
+                                y=cmj_avg_season[cmj_col], 
+                                name="Avg CMJ Height (cm)", 
+                                marker_color='#FF8200', 
+                                text=cmj_avg_season[cmj_col].round(1), 
+                                textposition="inside",
+                                cliponaxis=False
+                            ),
                             secondary_y=False
                         )
+                        
+                        # Scatter trace with cliponaxis=False
                         fig_comp_cmj.add_trace(
-                            go.Scatter(x=cmj_avg_season['Season'], y=cmj_avg_season[rsi_col], name="Avg RSI-mod", mode='lines+markers+text', text=cmj_avg_season[rsi_col].round(2), textposition="top center", line=dict(color='#4895DB', width=3), marker=dict(size=10)),
+                            go.Scatter(
+                                x=cmj_avg_season['Season'], 
+                                y=cmj_avg_season[rsi_col], 
+                                name="Avg RSI-mod", 
+                                mode='lines+markers+text', 
+                                text=cmj_avg_season[rsi_col].round(2), 
+                                textposition="top center", 
+                                line=dict(color='#4895DB', width=3), 
+                                marker=dict(size=10),
+                                cliponaxis=False
+                            ),
                             secondary_y=True
                         )
-                        fig_comp_cmj.update_layout(template="simple_white", height=380, showlegend=True, legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
-                        fig_comp_cmj.update_yaxes(title_text="CMJ Height (cm)", secondary_y=False)
-                        fig_comp_cmj.update_yaxes(title_text="RSI Modified", secondary_y=True, showgrid=False)
+                        
+                        # Added top padding to y-axes ranges to guarantee zero text clipping
+                        fig_comp_cmj.update_layout(
+                            template="simple_white", 
+                            height=400, 
+                            margin=dict(l=20, r=20, t=60, b=20),
+                            showlegend=True, 
+                            legend=dict(orientation="h", yanchor="bottom", y=1.05, xanchor="right", x=1)
+                        )
+                        fig_comp_cmj.update_yaxes(title_text="CMJ Height (cm)", range=[0, max_h * 1.25], secondary_y=False)
+                        fig_comp_cmj.update_yaxes(title_text="RSI Modified", range=[0, max_r * 1.35], secondary_y=True, showgrid=False)
+                        
                         st.plotly_chart(fig_comp_cmj, use_container_width=True, config=LOCKED_CONFIG, key="cmj_cross_season_bar")
                     
-                    st.markdown("#### Season-by-Season Peak Testing Benchmarks")
+                    st.markdown("#### Season-by-Season Best")
                     summary_rows = []
                     for season_period in ['Spring', 'Summer', 'Pre-Season']:
                         s_cmj = cmj_comp[cmj_comp['Season'] == season_period]
