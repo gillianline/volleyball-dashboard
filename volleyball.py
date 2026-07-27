@@ -233,6 +233,7 @@ if check_password():
             "5v5 (2)": "5v5", "Serve & Pass": "Serve and Pass"
         }
         all_metrics = ['Total Jumps', 'Moderate Jumps', 'High Jumps', 'Jump Load', 'Player Load', 'Estimated Distance (y)', 'Explosive Efforts', 'High Intensity Movement']
+        metrics_to_score = [m for m in all_metrics if m not in ['High Jumps', 'Moderate Jumps', 'High Intensity Movement']]
         cmj_col = 'Jump Height (Imp-Mom) [cm]'
         rsi_col = 'RSI-modified [m/s]'
 
@@ -241,10 +242,32 @@ if check_password():
 
         st.markdown('<div class="main-logo-container" style="text-align: center; margin-top: 10px; margin-bottom: 15px;"><img src="https://upload.wikimedia.org/wikipedia/commons/thumb/f/fc/Tennessee_Lady_Volunteers_logo.svg/1280px-Tennessee_Lady_Volunteers_logo.svg.png" width="120"><div style="color: #FF8200; font-size: 2rem; font-weight: 900; margin-top: 10px;">LADY VOLS VOLLEYBALL PERFORMANCE</div></div>', unsafe_allow_html=True)
 
-        # --- CONDITIONAL CONDITIONAL CONDITIONAL SELECTION MENU GATING ---
-        tab_titles = ["Individual Profile", "Practice Scores", "Daily Combined Scores", "Spring Max vs Daily Combined", "Practice History", "Match v. Practice", "Match Summary", "Position Analysis", "Phase Analysis", "Practice Planner", "Spring v. Summer"]
-        if "active_tab_state" not in st.session_state:
-            st.session_state.active_tab_state = "Individual Profile"
+        # --- DYNAMIC SEASONAL TAB NAVIGATION SETUP ---
+        if selected_season == "Summer":
+            tab_titles = [
+                "Individual Profile", 
+                "Practice Scores", 
+                "Daily Combined Scores", 
+                "Spring Max vs Daily Combined", 
+                "Practice History", 
+                "Position Analysis", 
+                "Spring v. Summer"
+            ]
+        else: # Spring
+            tab_titles = [
+                "Individual Profile", 
+                "Practice Scores", 
+                "Daily Combined Scores", 
+                "Practice History", 
+                "Match v. Practice", 
+                "Match Summary", 
+                "Position Analysis", 
+                "Phase Analysis", 
+                "Practice Planner"
+            ]
+
+        if "active_tab_state" not in st.session_state or st.session_state.active_tab_state not in tab_titles:
+            st.session_state.active_tab_state = tab_titles[0]
 
         selected_tab_label = st.radio("Navigation View Menu Selection Control", tab_titles, label_visibility="collapsed", horizontal=True, key="master_app_structural_gate_radio")
         st.session_state.active_tab_state = selected_tab_label
@@ -510,6 +533,7 @@ if check_password():
                             sc_g = math.ceil(t_grade / c_metrics) if c_metrics > 0 else 0
                             with cols[j]: st.markdown(f'<div style="border:1px solid #E5E5E7; border-radius:15px; padding:15px; margin-bottom:20px; background-color:white;"><div style="display:flex; align-items:center; gap:10px;"><div style="flex:1.2; text-align:center;"><img src="{p_session_row["PhotoURL"]}" class="gallery-photo"><p style="font-weight:bold; font-size:15px; margin-top:8px; color:#333;">{name}</p></div><div style="flex:3;"><table class="scout-table"><thead><tr><th>Metric</th><th>Total</th><th>30d Max</th><th>Grade</th></tr></thead><tbody>{r_html}</tbody></table></div><div style="flex:1; text-align:center;"><div style="background-color:{get_flipped_gradient(sc_g)}; color:white; padding:10px; border-radius:12px; font-size:32px; font-weight:900;">{sc_g}</div></div></div></div>', unsafe_allow_html=True)
                                 
+        # ==========================================
         # --- TAB CLAUSE 2: DAILY COMBINED SCORES ---
         # ==========================================
         elif st.session_state.active_tab_state == "Daily Combined Scores":
@@ -571,7 +595,7 @@ if check_password():
         # ==========================================
         # --- TAB CLAUSE 3: SPRING PEAK VS COMBINED -
         # ==========================================
-        elif st.session_state.active_tab_state == "Spring Max vs Daily Combined":
+        elif st.session_state.active_tab_state in ["Spring Max vs Daily Combined", "Spring Max v. Daily Combined"]:
             df_t3 = df_master.copy()
             valid_dates_sorted_sm = df_t3[df_t3['Date'].notna()].sort_values('Date', ascending=False)['Date'].dt.strftime('%Y-%m-%d').unique().tolist()
             
@@ -640,7 +664,6 @@ if check_password():
             df_t4 = df_master.copy()
             st.markdown('<div class="section-header">Season History & Team Weekly Review</div>', unsafe_allow_html=True)
             sub_tabs = st.tabs(["Individual Review", "Team Weekly Review"])
-            metrics_to_score = [m for m in all_metrics if m not in ['High Jumps', 'Moderate Jumps', 'High Intensity Movement']]
 
             with sub_tabs[0]:
                 sel_ath_hist = st.selectbox("Select Athlete", sorted(df_t4['Name'].unique()), key="master_ath_sel_t4")
