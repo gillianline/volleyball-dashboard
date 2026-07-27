@@ -4,7 +4,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import math 
-from datetime import timedelta
+from datetime import timedelta, datetime
 
 # --- 1. PAGE CONFIG & SYSTEM GLOBAL CSS ---
 st.set_page_config(page_title="Lady Vols VB Performance", layout="wide")
@@ -122,9 +122,13 @@ def load_all_data():
         if pd.isna(date_val): return 'Spring'
         m = date_val.month
         d = date_val.day
-        if 1 <= m <= 4: return 'Spring'
+        y = date_val.year
+        # Pre-Season starting Thursday Aug 6, 2026 onwards
+        if y == 2026 and m == 8 and d >= 6: return 'Pre-Season'
+        elif y == 2026 and m > 8: return 'Pre-Season'
+        elif 1 <= m <= 4: return 'Spring'
         elif m == 5 and d >= 26: return 'Summer'
-        elif m > 5: return 'Summer'
+        elif m >= 5 and m <= 8: return 'Summer'
         else: return 'Spring'
 
     df = pd.read_csv(st.secrets["GOOGLE_SHEET_URL"])
@@ -215,7 +219,7 @@ if check_password():
 
         # --- GLOBAL SIDEBAR ---
         st.sidebar.markdown("### Season")
-        selected_season = st.sidebar.radio("Select Season", ["Spring", "Summer", "Testing"], index=1, key="global_season_toggle")
+        selected_season = st.sidebar.radio("Select Season", ["Spring", "Summer", "Pre-Season", "Testing"], index=2, key="global_season_toggle")
         
         if selected_season != "Testing":
             st.sidebar.info(f"Currently displaying: {selected_season} Season Performance Data.")
@@ -249,9 +253,10 @@ if check_password():
 
         if selected_season == "Testing":
             st.markdown('<div class="section-header">Physical & Neuromuscular Testing Profile</div>', unsafe_allow_html=True)
-            testing_season_tabs = st.tabs(["Spring Testing", "Summer Testing"])
+            testing_season_tabs = st.tabs(["Spring Testing", "Summer Testing", "Pre-Season Testing", "Cross-Season Comparison"])
             
-            for tab_idx, s_label in enumerate(["Spring", "Summer"]):
+            # --- TAB 1, 2, 3: INDIVIDUAL SEASONAL TESTING ---
+            for tab_idx, s_label in enumerate(["Spring", "Summer", "Pre-Season"]):
                 with testing_season_tabs[tab_idx]:
                     c_t_ath, _ = st.columns([2, 2])
                     with c_t_ath:
@@ -370,6 +375,54 @@ if check_password():
                     else:
                         st.info(f"No External Rotation ROM testing records logged for {selected_athlete_test} in {s_label}.")
 
+            # --- TAB 4: CROSS-SEASON TESTING COMPARISON ---
+            with testing_season_tabs[3]:
+                st.markdown("### Multi-Season Testing Performance Comparison")
+                c_comp_ath, _ = st.columns([2, 2])
+                with c_comp_ath:
+                    comp_athlete = st.selectbox("Select Athlete for Cross-Seasonal Comparison", master_athlete_list, key="comp_ath_testing_t4")
+
+                cmj_comp = raw_cmj_df[raw_cmj_df['Name'] == comp_athlete].sort_values('Test Date')
+                ash_comp = raw_ash_df[raw_ash_df['Name'] == comp_athlete].sort_values('Test Date')
+                er_comp = raw_er_df[raw_er_df['Name'] == comp_athlete].sort_values('Test Date')
+
+                if not cmj_comp.empty or not ash_comp.empty or not er_comp.empty:
+                    st.markdown("#### Countermovement Jump Shift Across Seasons")
+                    if not cmj_comp.empty:
+                        fig_comp_cmj = px.box(cmj_comp, x='Season', y=cmj_col, color='Season', points="all", title="CMJ Height Distribution by Season", color_discrete_map={'Spring': '#4895DB', 'Summer': '#FF8200', 'Pre-Season': '#2D5A27'})
+                        fig_comp_cmj.update_layout(template="simple_white", height=350, showlegend=False)
+                        st.plotly_chart(fig_comp_cmj, use_container_width=True, config=LOCKED_CONFIG, key="cmj_cross_season_box")
+                    
+                    st.markdown("#### Season-by-Season Peak Testing Benchmarks")
+                    summary_rows = []
+                    for season_period in ['Spring', 'Summer', 'Pre-Season']:
+                        s_cmj = cmj_comp[cmj_comp['Season'] == season_period]
+                        s_ash = ash_comp[ash_comp['Season'] == season_period]
+                        s_er = er_comp[er_comp['Season'] == season_period]
+                        
+                        max_cmj = s_cmj[cmj_col].max() if not s_cmj.empty else 0.0
+                        max_rsi = s_cmj[rsi_col].max() if not s_cmj.empty else 0.0
+                        
+                        max_ash_l = s_ash['Peak Vertical Force [N] (L)'].max() if not s_ash.empty and 'Peak Vertical Force [N] (L)' in s_ash.columns else 0.0
+                        max_ash_r = s_ash['Peak Vertical Force [N] (R)'].max() if not s_ash.empty and 'Peak Vertical Force [N] (R)' in s_ash.columns else 0.0
+                        
+                        max_er_l = s_er['L Max ROM (°)'].max() if not s_er.empty and 'L Max ROM (°)' in s_er.columns else 0.0
+                        max_er_r = s_er['R Max ROM (°)'].max() if not s_er.empty and 'R Max ROM (°)' in s_er.columns else 0.0
+                        
+                        summary_rows.append({
+                            'Season': season_period,
+                            'Max CMJ (cm)': round(max_cmj, 1),
+                            'Max RSI': round(max_rsi, 2),
+                            'Max ASH L (N)': round(max_ash_l, 0),
+                            'Max ASH R (N)': round(max_ash_r, 0),
+                            'Max ER ROM L (°)': round(max_er_l, 1),
+                            'Max ER ROM R (°)': round(max_er_r, 1)
+                        })
+                    
+                    st.dataframe(pd.DataFrame(summary_rows), use_container_width=True, hide_index=True)
+                else:
+                    st.info(f"No multi-season testing records logged for {comp_athlete}.")
+
         else:
             # --- DYNAMIC SEASONAL TAB NAVIGATION SETUP ---
             if selected_season == "Summer":
@@ -381,6 +434,16 @@ if check_password():
                     "Practice History", 
                     "Position Analysis", 
                     "Spring v. Summer"
+                ]
+            elif selected_season == "Pre-Season":
+                tab_titles = [
+                    "Individual Profile", 
+                    "Practice Scores", 
+                    "Daily Combined Scores", 
+                    "Practice History", 
+                    "Position Analysis", 
+                    "Phase Analysis", 
+                    "Practice Planner"
                 ]
             else: # Spring
                 tab_titles = [
@@ -447,7 +510,7 @@ if check_password():
                     p_meta = p_row
 
                 if p_row.empty:
-                    curr_date_prof = pd.to_datetime(target_date_str) if selected_session_prof == tournament_label else pd.to_datetime(df_t0['Date'].max() if not df_t0.empty else "2026-01-01")
+                    curr_date_prof = pd.to_datetime(target_date_str) if selected_session_prof == tournament_label else pd.to_datetime(df_t0['Date'].max() if not df_t0.empty else "2026-08-06")
                     meta_lookup = df_t0[df_t0['Name'] == selected_athlete_prof]
                     pos_val = meta_lookup['Position'].iloc[0] if not meta_lookup.empty else "N/A"
                     photo_val = meta_lookup['PhotoURL'].iloc[0] if not meta_lookup.empty else "https://www.w3schools.com/howto/img_avatar.png"
@@ -487,7 +550,7 @@ if check_password():
                 p_cmj_hist = cmj_t0[(cmj_t0['Name'] == selected_athlete_prof) & (cmj_t0['Test Date'] <= curr_date_prof)].sort_values('Test Date')
 
                 with jc1:
-                    baseline_cmj = cmj_t0[(cmj_t0['Name'] == selected_athlete_prof) & (cmj_t0['Season'] == 'Summer')].head(1) if selected_season == 'Summer' else cmj_t0[(cmj_t0['Name'] == selected_athlete_prof) & (cmj_t0['Week'] == 4)]
+                    baseline_cmj = cmj_t0[(cmj_t0['Name'] == selected_athlete_prof) & (cmj_t0['Season'] == selected_season)].head(1)
                     if not baseline_cmj.empty and not p_cmj_hist.empty:
                         base_h = baseline_cmj.iloc[-1][cmj_col]
                         base_rsi = baseline_cmj.iloc[-1][rsi_col]
@@ -528,7 +591,7 @@ if check_password():
                         li = row_i.iloc[-1]['Peak Vertical Force [N] (L)'] if not row_i.empty else 0.0
                         ri = row_i.iloc[-1]['Peak Vertical Force [N] (R)'] if not row_i.empty else 0.0
                         asym_i = row_i.iloc[-1]['Peak Vertical Force [N] (Asym)(%)'] if not row_i.empty else 0.0
-                        baseline_ash = p_ash_all[(p_ash_all['Season'] == 'Summer') & (p_ash_all['Isometric Type'].str.contains('I', case=False, na=False))].head(1) if selected_season == 'Summer' else p_ash_all[p_ash_all['Isometric Type'].str.contains('I', case=False, na=False)].head(1)
+                        baseline_ash = p_ash_all[(p_ash_all['Season'] == selected_season) & (p_ash_all['Isometric Type'].str.contains('I', case=False, na=False))].head(1)
                         base_li = baseline_ash.iloc[-1]['Peak Vertical Force [N] (L)'] if not baseline_ash.empty else 0.0
                         base_ri = baseline_ash.iloc[-1]['Peak Vertical Force [N] (R)'] if not baseline_ash.empty else 0.0
                         pct_l = ((li - base_li) / base_li * 100) if base_li > 0 else 0
@@ -558,7 +621,7 @@ if check_password():
                 if not p_er_hist.empty:
                     ec1, ec2 = st.columns([1.5, 3.5])
                     with ec1:
-                        baseline_er = p_er_hist[p_er_hist['Season'] == 'Summer'].head(1) if selected_season == 'Summer' else p_er_hist.head(1)
+                        baseline_er = p_er_hist[p_er_hist['Season'] == selected_season].head(1)
                         if not baseline_er.empty:
                             base_l_rom = baseline_er.iloc[-1]['L Max ROM (°)']
                             base_r_rom = baseline_er.iloc[-1]['R Max ROM (°)']
