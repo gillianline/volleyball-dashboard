@@ -229,7 +229,7 @@ if check_password():
             er_master = raw_er_df[raw_er_df['Season'] == selected_season].copy()
             phase_master = raw_phase_df[raw_phase_df['Season'] == selected_season].copy()
         else:
-            st.sidebar.info("Currently displaying: Physical & Biomechanical Testing Engine.")
+            st.sidebar.info("Currently displaying: Testing")
             df_master, match_master, cmj_master, ash_master, er_master, phase_master = raw_df, raw_match_df, raw_cmj_df, raw_ash_df, raw_er_df, raw_phase_df
             
         full_df_unfiltered = raw_df.copy()
@@ -251,8 +251,8 @@ if check_password():
         st.markdown('<div class="main-logo-container" style="text-align: center; margin-top: 10px; margin-bottom: 15px;"><img src="https://upload.wikimedia.org/wikipedia/commons/thumb/f/fc/Tennessee_Lady_Volunteers_logo.svg/1280px-Tennessee_Lady_Volunteers_logo.svg.png" width="120"><div style="color: #FF8200; font-size: 2rem; font-weight: 900; margin-top: 10px;">LADY VOLS VOLLEYBALL PERFORMANCE</div></div>', unsafe_allow_html=True)
 
         if selected_season == "Testing":
-            st.markdown('<div class="section-header">Physical & Neuromuscular Testing Profile</div>', unsafe_allow_html=True)
-            testing_season_tabs = st.tabs(["Spring Testing", "Summer Testing", "Pre-Season Testing", "Cross-Season Comparison"])
+            st.markdown('<div class="section-header">Testing Profile</div>', unsafe_allow_html=True)
+            testing_season_tabs = st.tabs(["Spring Testing", "Summer Testing", "Pre-Season Testing", "Season Comparison"])
             
             # --- TAB 1, 2, 3: INDIVIDUAL SEASONAL TESTING ---
             for tab_idx, s_label in enumerate(["Spring", "Summer", "Pre-Season"]):
@@ -386,11 +386,23 @@ if check_password():
                 er_comp = raw_er_df[raw_er_df['Name'] == comp_athlete].sort_values('Test Date')
 
                 if not cmj_comp.empty or not ash_comp.empty or not er_comp.empty:
-                    st.markdown("#### Countermovement Jump Shift Across Seasons")
+                    st.markdown("#### Countermovement Jump Trend Across Seasons")
                     if not cmj_comp.empty:
-                        fig_comp_cmj = px.box(cmj_comp, x='Season', y=cmj_col, color='Season', points="all", title="CMJ Height Distribution by Season", color_discrete_map={'Spring': '#4895DB', 'Summer': '#FF8200', 'Pre-Season': '#2D5A27'})
-                        fig_comp_cmj.update_layout(template="simple_white", height=350, showlegend=False)
-                        st.plotly_chart(fig_comp_cmj, use_container_width=True, config=LOCKED_CONFIG, key="cmj_cross_season_box")
+                        cmj_avg_season = cmj_comp.groupby('Season')[[cmj_col, rsi_col]].mean().reset_index()
+                        
+                        fig_comp_cmj = make_subplots(specs=[[{"secondary_y": True}]])
+                        fig_comp_cmj.add_trace(
+                            go.Bar(x=cmj_avg_season['Season'], y=cmj_avg_season[cmj_col], name="Avg CMJ Height (cm)", marker_color='#FF8200', text=cmj_avg_season[cmj_col].round(1), textposition="auto"),
+                            secondary_y=False
+                        )
+                        fig_comp_cmj.add_trace(
+                            go.Scatter(x=cmj_avg_season['Season'], y=cmj_avg_season[rsi_col], name="Avg RSI-mod", mode='lines+markers+text', text=cmj_avg_season[rsi_col].round(2), textposition="top center", line=dict(color='#4895DB', width=3), marker=dict(size=10)),
+                            secondary_y=True
+                        )
+                        fig_comp_cmj.update_layout(template="simple_white", height=380, showlegend=True, legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
+                        fig_comp_cmj.update_yaxes(title_text="CMJ Height (cm)", secondary_y=False)
+                        fig_comp_cmj.update_yaxes(title_text="RSI Modified", secondary_y=True, showgrid=False)
+                        st.plotly_chart(fig_comp_cmj, use_container_width=True, config=LOCKED_CONFIG, key="cmj_cross_season_bar")
                     
                     st.markdown("#### Season-by-Season Peak Testing Benchmarks")
                     summary_rows = []
