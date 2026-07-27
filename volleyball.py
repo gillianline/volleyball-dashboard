@@ -217,17 +217,6 @@ if check_password():
         st.sidebar.markdown("### Season")
         selected_season = st.sidebar.radio("Select Season", ["Spring", "Summer", "Testing"], index=1, key="global_season_toggle")
         
-        if selected_season != "Testing":
-            st.sidebar.info(f"Currently displaying: {selected_season} Season Performance Data.")
-            df_master = raw_df[raw_df['Season'] == selected_season].copy()
-            match_master = raw_match_df[raw_match_df['Season'] == selected_season].copy()
-            cmj_master = raw_cmj_df[raw_cmj_df['Season'] == selected_season].copy()
-            ash_master = raw_ash_df[raw_ash_df['Season'] == selected_season].copy()
-            er_master = raw_er_df[raw_er_df['Season'] == selected_season].copy()
-            phase_master = raw_phase_df[raw_phase_df['Season'] == selected_season].copy()
-        else:
-            st.sidebar.info("Currently displaying: Physical & Biomechanical Testing Engine.")
-            df_master, match_master, cmj_master, ash_master, er_master, phase_master = raw_df, raw_match_df, raw_cmj_df, raw_ash_df, raw_er_df, raw_phase_df
             
         full_df_unfiltered = raw_df.copy()
 
