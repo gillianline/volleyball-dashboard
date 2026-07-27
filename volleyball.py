@@ -395,50 +395,52 @@ if check_password():
 
                         fig_comp_cmj = make_subplots(specs=[[{"secondary_y": True}]])
                         
-                        # Bar trace with cliponaxis=False & inside positioning option to avoid visual collision
+                        # Bar trace: CMJ Height text inside middle of bars with white font to avoid collisions
                         fig_comp_cmj.add_trace(
                             go.Bar(
                                 x=cmj_avg_season['Season'], 
                                 y=cmj_avg_season[cmj_col], 
                                 name="Avg CMJ Height (cm)", 
                                 marker_color='#FF8200', 
-                                text=cmj_avg_season[cmj_col].round(1), 
+                                text=[f"<b>{val:.1f} cm</b>" for val in cmj_avg_season[cmj_col]], 
                                 textposition="inside",
+                                insidetextanchor="middle",
+                                textfont=dict(color='white', size=13),
                                 cliponaxis=False
                             ),
                             secondary_y=False
                         )
                         
-                        # Scatter trace with cliponaxis=False
+                        # Line trace: RSI-mod text sitting clearly above markers
                         fig_comp_cmj.add_trace(
                             go.Scatter(
                                 x=cmj_avg_season['Season'], 
                                 y=cmj_avg_season[rsi_col], 
                                 name="Avg RSI-mod", 
                                 mode='lines+markers+text', 
-                                text=cmj_avg_season[rsi_col].round(2), 
+                                text=[f"<b>RSI: {val:.2f}</b>" for val in cmj_avg_season[rsi_col]], 
                                 textposition="top center", 
+                                textfont=dict(color='#1D1D1F', size=12),
                                 line=dict(color='#4895DB', width=3), 
-                                marker=dict(size=10),
+                                marker=dict(size=10, color='#4895DB'),
                                 cliponaxis=False
                             ),
                             secondary_y=True
                         )
                         
-                        # Added top padding to y-axes ranges to guarantee zero text clipping
                         fig_comp_cmj.update_layout(
                             template="simple_white", 
-                            height=400, 
-                            margin=dict(l=20, r=20, t=60, b=20),
+                            height=420, 
+                            margin=dict(l=20, r=20, t=70, b=20),
                             showlegend=True, 
                             legend=dict(orientation="h", yanchor="bottom", y=1.05, xanchor="right", x=1)
                         )
-                        fig_comp_cmj.update_yaxes(title_text="CMJ Height (cm)", range=[0, max_h * 1.25], secondary_y=False)
-                        fig_comp_cmj.update_yaxes(title_text="RSI Modified", range=[0, max_r * 1.35], secondary_y=True, showgrid=False)
+                        fig_comp_cmj.update_yaxes(title_text="CMJ Height (cm)", range=[0, max_h * 1.30], secondary_y=False)
+                        fig_comp_cmj.update_yaxes(title_text="RSI Modified", range=[0, max_r * 1.45], secondary_y=True, showgrid=False)
                         
                         st.plotly_chart(fig_comp_cmj, use_container_width=True, config=LOCKED_CONFIG, key="cmj_cross_season_bar")
                     
-                    st.markdown("#### Season-by-Season Best")
+                    st.markdown("#### Season-by-Season Peak Testing Benchmarks")
                     summary_rows = []
                     for season_period in ['Spring', 'Summer', 'Pre-Season']:
                         s_cmj = cmj_comp[cmj_comp['Season'] == season_period]
@@ -467,7 +469,6 @@ if check_password():
                     st.dataframe(pd.DataFrame(summary_rows), use_container_width=True, hide_index=True)
                 else:
                     st.info(f"No multi-season testing records logged for {comp_athlete}.")
-
         else:
             # --- DYNAMIC SEASONAL TAB NAVIGATION SETUP ---
             if selected_season == "Summer":
