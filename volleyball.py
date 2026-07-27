@@ -440,7 +440,7 @@ if check_password():
                         
                         st.plotly_chart(fig_comp_cmj, use_container_width=True, config=LOCKED_CONFIG, key="cmj_cross_season_bar")
                     
-                    st.markdown("#### Season-by-Season Peak Testing Benchmarks")
+                    st.markdown("#### Season-by-Season Best")
                     summary_rows = []
                     for season_period in ['Spring', 'Summer', 'Pre-Season']:
                         s_cmj = cmj_comp[cmj_comp['Season'] == season_period]
