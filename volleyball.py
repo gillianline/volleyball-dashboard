@@ -169,7 +169,7 @@ def load_all_data():
             if col in ash_df.columns:
                 ash_df[col] = pd.to_numeric(ash_df[col].astype(str).str.replace(r'[^0-9.-]', '', regex=True), errors='coerce').fillna(0.0)
         ash_df['Season'] = ash_df['Test Date'].apply(assign_season)
-    except Exception:
+    except:
         ash_df = pd.DataFrame(columns=['Name', 'Test Date', 'Isometric Type', 'Peak Vertical Force [N] (L)', 'Peak Vertical Force [N] (R)', 'Peak Vertical Force [N] (Asym)(%)', 'Season'])
 
     try:
@@ -181,7 +181,7 @@ def load_all_data():
             if col in er_df.columns:
                 er_df[col] = pd.to_numeric(er_df[col].astype(str).str.replace(r'[^0-9.-]', '', regex=True), errors='coerce').fillna(0.0)
         er_df['Season'] = er_df['Test Date'].apply(assign_season)
-    except Exception:
+    except:
         er_df = pd.DataFrame(columns=['Name', 'Test Date', 'Movement', 'L Max ROM (°)', 'R Max ROM (°)', 'ROM Asymmetry (%)', 'Season'])
 
     phase_df = pd.read_csv(st.secrets["PHASES_SHEET_URL"])
@@ -197,7 +197,7 @@ def load_all_data():
         for col in ['Load_Limit', 'Jump_Limit']:
             if col in thresh_df.columns:
                 thresh_df[col] = pd.to_numeric(thresh_df[col].astype(str).str.replace(r'[^0-9.]', '', regex=True), errors='coerce').fillna(0).astype(float)
-    except Exception:
+    except:
         thresh_df = None
         
     return df.dropna(subset=['Date']), match_df.dropna(subset=['Date']), cmj_df, phase_df, thresh_df, ash_df, er_df
@@ -254,6 +254,12 @@ if check_password():
         phase_master = raw_phase_df[raw_phase_df['Season'] == selected_season].copy()
         full_df_unfiltered = raw_df.copy()
 
+        phase_map = {
+            "Mini Games (Set 1)": "Mini Games", "Mini Games (Set 2)": "Mini Games", "Brizo (2)": "Brizo",
+            "2 Ball (Set 1)": "2 Ball", "2 Ball (Set 2)": "2 Ball", "2 Ball (Set 3)": "2 Ball", "2 Ball (Set 4)": "2 Ball",
+            "serving (2)": "Serving", "serving": "Serving", "Serving (2)": "Serving", "2/3 Hitters (2)": "2/3 Hitters",
+            "5v5 (2)": "5v5", "Serve & Pass": "Serve and Pass"
+        }
         all_metrics = ['Total Jumps', 'Moderate Jumps', 'High Jumps', 'Jump Load', 'Player Load', 'Estimated Distance (y)', 'Explosive Efforts', 'High Intensity Movement']
         cmj_col = 'Jump Height (Imp-Mom) [cm]'
         rsi_col = 'RSI-modified [m/s]'
@@ -711,7 +717,7 @@ if check_password():
                             try:
                                 prev_matches = df_t4[(df_t4['Name'] == sel_ath_hist) & (df_t4['Date'] < jump_date) & ((df_t4['Session_Name'].str.contains('Match|Game', case=False, na=False)) | (df_t4['Session_Type'].str.contains('Match|Game', case=False, na=False)))]
                                 prev_match_name = prev_matches.sort_values('Date', ascending=False).iloc[0]['Session_Name']
-                            except Exception: prev_match_name = "N/A"
+                            except: prev_match_name = "N/A"
                             raw_diff = float(row[cmj_col]) - float(base_row[cmj_col])
                             comparison_list.append({"Date": jump_date.strftime('%m/%d/%Y'), "Prev Match": prev_match_name, "Jump Height": f"{row[cmj_col]:.1f} cm", "Raw Diff": raw_diff, "Display Diff": f"{raw_diff:+.1f} cm", "RSI": f"{row[rsi_col]:.2f}"})
                         
@@ -728,13 +734,30 @@ if check_password():
                         st.plotly_chart(fig_cmj, use_container_width=True, key=f"integrated_cmj_final_{sel_ath_hist}_t4")
 
             with sub_tabs[1]:
-                st.markdown("### Team Weekly Overview")
+                st.markdown("### Team Weekly Overview & Workload Trends")
                 if not df_t4.empty:
-                    weekly_team = df_t4.groupby(['Week', 'Position'])[all_metrics].mean().reset_index()
-                    selected_metric_team = st.selectbox("Select Metric for Weekly Team Trend", all_metrics, key="team_wk_metric")
-                    fig_team = px.line(weekly_team, x='Week', y=selected_metric_team, color='Position', markers=True, title=f"Weekly Average {selected_metric_team} by Position")
-                    fig_team.update_layout(template="simple_white", height=400)
-                    st.plotly_chart(fig_team, use_container_width=True, key="team_weekly_chart")
+                    weekly_pos_data = df_t4.groupby(['Week', 'Position'])[all_metrics].mean().reset_index()
+                    c_wk1, c_wk2 = st.columns(2)
+                    with c_wk1:
+                        sel_wk_metric = st.selectbox("Select Target Metric", all_metrics, key="team_wk_metric_select")
+                    with c_wk2:
+                        sel_wk_num = st.selectbox("Filter Week Number", ["All Weeks"] + sorted([str(w) for w in df_t4['Week'].unique() if w > 0]), key="team_wk_num_select")
+                    
+                    if sel_wk_num != "All Weeks":
+                        df_t4_wk = df_t4[df_t4['Week'] == int(sel_wk_num)]
+                        st.markdown(f"#### Week {sel_wk_num} Position Comparison")
+                        wk_summary = df_t4_wk.groupby(['Position', 'Name'])[all_metrics].sum().reset_index()
+                        fig_wk_bar = px.bar(wk_summary, x='Name', y=sel_wk_metric, color='Position', color_discrete_sequence=['#4895DB', '#FF8200', '#2D5A27', '#D4A017'], title=f"Week {sel_wk_num}: {sel_wk_metric} by Athlete")
+                        fig_wk_bar.update_layout(template="simple_white", height=420)
+                        st.plotly_chart(fig_wk_bar, use_container_width=True, key="team_weekly_bar")
+                    else:
+                        fig_team = px.line(weekly_pos_data, x='Week', y=sel_wk_metric, color='Position', markers=True, color_discrete_sequence=['#4895DB', '#FF8200', '#2D5A27', '#D4A017'], title=f"Weekly Average {sel_wk_metric} Trend by Position Group")
+                        fig_team.update_layout(template="simple_white", height=420)
+                        st.plotly_chart(fig_team, use_container_width=True, key="team_weekly_trend_chart")
+                        
+                    st.markdown("#### Positional Weekly Means Table")
+                    pos_pivot = df_t4.groupby(['Week', 'Position'])[metrics_to_score].mean().round(1).reset_index()
+                    st.dataframe(pos_pivot, use_container_width=True)
                 else:
                     st.info("No team weekly data available.")
 
@@ -742,138 +765,214 @@ if check_password():
         # --- TAB CLAUSE 5: POSITION ANALYSIS ------
         # ==========================================
         elif selected_tab_label == "Position Analysis":
-            st.markdown('<div class="section-header">Position Analysis</div>', unsafe_allow_html=True)
+            st.markdown('<div class="section-header">Position Group Analysis</div>', unsafe_allow_html=True)
             df_pos = df_master.copy()
             
-            c_p1, c_p2 = st.columns(2)
-            with c_p1:
-                sel_pos = st.selectbox("Select Position Group", sorted([p for p in df_pos['Position'].unique() if p != "N/A"]), key="pos_analysis_sel")
-            with c_p2:
-                sel_pos_metric = st.selectbox("Select Primary Metric", all_metrics, key="pos_analysis_metric")
-                
-            pos_df = df_pos[df_pos['Position'] == sel_pos]
-            if not pos_df.empty:
-                st.markdown(f"#### Positional Performance Breakdown: {sel_pos}")
-                pos_summary = pos_df.groupby('Name')[all_metrics].mean().reset_index()
-                
-                fig_pos = px.bar(pos_summary, x='Name', y=sel_pos_metric, color='Name', title=f"Average {sel_pos_metric} by Athlete ({sel_pos})", text_auto='.1f')
-                fig_pos.update_layout(template="simple_white", height=400, showlegend=False)
-                st.plotly_chart(fig_pos, use_container_width=True, key="pos_bar_chart")
-                
-                st.markdown("#### Position Historical Trend")
-                pos_trend = pos_df.groupby(['Date', 'Name'])[sel_pos_metric].sum().reset_index()
-                fig_pos_line = px.line(pos_trend, x='Date', y=sel_pos_metric, color='Name', markers=True)
-                fig_pos_line.update_layout(template="simple_white", height=400)
-                st.plotly_chart(fig_pos_line, use_container_width=True, key="pos_line_chart")
+            avail_positions = sorted([p for p in df_pos['Position'].unique() if p != "N/A"])
+            if not avail_positions:
+                st.warning("No position designations recorded in dataset.")
             else:
-                st.warning("No data found for the selected position group.")
+                c_p1, c_p2 = st.columns(2)
+                with c_p1:
+                    sel_pos = st.selectbox("Select Position Group", avail_positions, key="pos_analysis_sel_t5")
+                with c_p2:
+                    sel_pos_metric = st.selectbox("Select Focus Metric", all_metrics, index=4, key="pos_analysis_metric_t5")
+                    
+                pos_df = df_pos[df_pos['Position'] == sel_pos].copy()
+                if not pos_df.empty:
+                    pos_summary = pos_df.groupby(['Name', 'PhotoURL'])[all_metrics].agg(['mean', 'max', 'sum']).reset_index()
+                    
+                    st.markdown(f"#### Athlete Comparison: {sel_pos}")
+                    athlete_pos_names = sorted(pos_df['Name'].unique())
+                    
+                    # Position Group Cards using Scout Table style
+                    for i in range(0, len(athlete_pos_names), 2):
+                        cols = st.columns(2)
+                        for j in range(2):
+                            if i + j < len(athlete_pos_names):
+                                name = athlete_pos_names[i + j]
+                                p_data = pos_df[pos_df['Name'] == name]
+                                photo = p_data['PhotoURL'].iloc[0] if not p_data.empty else "https://www.w3schools.com/howto/img_avatar.png"
+                                
+                                daily_sums = p_data.groupby('Date')[all_metrics].sum().reset_index()
+                                r_html = ""
+                                for k in metrics_to_score:
+                                    avg_val = daily_sums[k].mean() if not daily_sums.empty else 0.0
+                                    max_val = daily_sums[k].max() if not daily_sums.empty else 0.0
+                                    tot_val = daily_sums[k].sum() if not daily_sums.empty else 0.0
+                                    r_html += f"<tr><td>{k}</td><td>{avg_val:.1f}</td><td>{max_val:.1f}</td><td>{tot_val:.1f}</td></tr>"
+                                
+                                with cols[j]:
+                                    st.markdown(f'<div style="border:1px solid #E5E5E7; border-radius:15px; padding:15px; margin-bottom:20px; background-color:white;"><div style="display:flex; align-items:center; gap:10px;"><div style="flex:1.2; text-align:center;"><img src="{photo}" class="gallery-photo"><p style="font-weight:bold; font-size:15px; margin-top:8px; color:#333;">{name}</p></div><div style="flex:3.8;"><table class="scout-table"><thead><tr><th>Metric</th><th>Daily Avg</th><th>Season Max</th><th>Total</th></tr></thead><tbody>{r_html}</tbody></table></div></div></div>', unsafe_allow_html=True)
+                    
+                    st.markdown("#### Positional Metric Trend Over Time")
+                    pos_trend = pos_df.groupby(['Date', 'Name'])[sel_pos_metric].sum().reset_index()
+                    fig_pos_line = px.line(pos_trend, x='Date', y=sel_pos_metric, color='Name', markers=True, color_discrete_sequence=['#4895DB', '#FF8200', '#2D5A27', '#D4A017'])
+                    fig_pos_line.update_layout(template="simple_white", height=400, legend=dict(orientation="h", yanchor="bottom", y=-0.25, x=0.5, xanchor="center"))
+                    st.plotly_chart(fig_pos_line, use_container_width=True, key="pos_line_chart_t5")
+                else:
+                    st.warning("No data found for the selected position group.")
 
         # ==========================================
         # --- TAB CLAUSE 6: SPRING V. SUMMER -------
         # ==========================================
         elif selected_tab_label == "Spring v. Summer":
-            st.markdown('<div class="section-header">Spring v. Summer Comparison Dashboard</div>', unsafe_allow_html=True)
+            st.markdown('<div class="section-header">Spring v. Summer Seasonal Comparison</div>', unsafe_allow_html=True)
             df_all = raw_df.copy()
             
-            ath_comp = st.selectbox("Select Athlete for Seasonal Comparison", sorted(df_all['Name'].unique()), key="svs_ath_sel")
-            metric_comp = st.selectbox("Select Metric", all_metrics, key="svs_metric_sel")
-            
-            ath_seasonal = df_all[df_all['Name'] == ath_comp].groupby(['Season', 'Date'])[metric_comp].sum().reset_index()
-            
-            if not ath_seasonal.empty:
-                comp_summary = ath_seasonal.groupby('Season')[metric_comp].agg(['mean', 'max', 'count']).reset_index()
-                comp_summary.columns = ['Season', 'Daily Average', 'Peak Day', 'Sessions Count']
+            c_svs1, c_svs2 = st.columns(2)
+            with c_svs1:
+                ath_comp = st.selectbox("Select Athlete for Seasonal Comparison", master_athlete_list, key="svs_ath_sel_t6")
+            with c_svs2:
+                metric_comp = st.selectbox("Select Target Metric", all_metrics, index=4, key="svs_metric_sel_t6")
                 
-                st.markdown("#### Seasonal Averages & Peaks")
-                st.dataframe(comp_summary, use_container_width=True)
+            ath_seasonal = df_all[df_all['Name'] == ath_comp].copy()
+            
+            if not ath_seasonal.empty and len(ath_seasonal['Season'].unique()) > 0:
+                ath_daily = ath_seasonal.groupby(['Season', 'Date'])[all_metrics].sum().reset_index()
                 
-                fig_svs = px.box(ath_seasonal, x='Season', y=metric_comp, color='Season', points="all", title=f"{metric_comp} Distribution: Spring vs. Summer")
-                fig_svs.update_layout(template="simple_white", height=400)
-                st.plotly_chart(fig_svs, use_container_width=True, key="svs_box_plot")
+                comp_summary = ath_daily.groupby('Season')[metric_comp].agg(['mean', 'max', 'sum', 'count']).reset_index()
+                comp_summary.columns = ['Season', 'Daily Average', 'Peak Day Max', 'Cumulative Total', 'Sessions Logged']
+                
+                st.markdown(f"#### Seasonal Averages & Peaks: {ath_comp}")
+                st.dataframe(comp_summary.style.format({'Daily Average': '{:.1f}', 'Peak Day Max': '{:.1f}', 'Cumulative Total': '{:.1f}'}), use_container_width=True)
+                
+                col_box, col_bar = st.columns(2)
+                with col_box:
+                    fig_svs_box = px.box(ath_daily, x='Season', y=metric_comp, color='Season', points="all", color_discrete_map={'Spring': '#4895DB', 'Summer': '#FF8200'}, title=f"{metric_comp} Workload Distribution")
+                    fig_svs_box.update_layout(template="simple_white", height=400, showlegend=False)
+                    st.plotly_chart(fig_svs_box, use_container_width=True, key="svs_box_plot_t6")
+                with col_bar:
+                    mean_df = ath_daily.groupby('Season')[all_metrics].mean().reset_index().melt(id_vars='Season', var_name='Metric', value_name='Average')
+                    filtered_mean_df = mean_df[mean_df['Metric'].isin(metrics_to_score)]
+                    fig_svs_bar = px.bar(filtered_mean_df, x='Metric', y='Average', color='Season', barmode='group', color_discrete_map={'Spring': '#4895DB', 'Summer': '#FF8200'}, title="Daily Metric Averages Across Seasons")
+                    fig_svs_bar.update_layout(template="simple_white", height=400, xaxis_tickangle=-30, legend=dict(orientation="h", yanchor="bottom", y=-0.35, x=0.5, xanchor="center"))
+                    st.plotly_chart(fig_svs_bar, use_container_width=True, key="svs_bar_plot_t6")
             else:
-                st.warning("Insufficient multi-season data for selected athlete.")
+                st.warning("Insufficient multi-season data recorded for the selected athlete.")
 
         # ==========================================
         # --- TAB CLAUSE 7: MATCH V. PRACTICE ------
         # ==========================================
         elif selected_tab_label == "Match v. Practice":
-            st.markdown('<div class="section-header">Match v. Practice Comparison</div>', unsafe_allow_html=True)
+            st.markdown('<div class="section-header">Match v. Practice Workload Comparison</div>', unsafe_allow_html=True)
             df_mp = df_master.copy()
             
             c_mp1, c_mp2 = st.columns(2)
             with c_mp1:
-                ath_mp = st.selectbox("Select Athlete", sorted(df_mp['Name'].unique()), key="mp_ath_sel")
+                ath_mp = st.selectbox("Select Athlete", master_athlete_list, key="mp_ath_sel_t7")
             with c_mp2:
-                metric_mp = st.selectbox("Select Metric", all_metrics, key="mp_metric_sel")
+                metric_mp = st.selectbox("Select Evaluation Metric", all_metrics, index=4, key="mp_metric_sel_t7")
                 
-            ath_mp_data = df_mp[df_mp['Name'] == ath_mp]
+            ath_mp_data = df_mp[df_mp['Name'] == ath_mp].copy()
             if not ath_mp_data.empty:
-                mp_summary = ath_mp_data.groupby('Session_Type')[metric_mp].agg(['mean', 'max', 'count']).reset_index()
-                mp_summary.columns = ['Session Type', 'Average', 'Max', 'Count']
+                daily_mp = ath_mp_data.groupby(['Session_Type', 'Date'])[all_metrics].sum().reset_index()
+                mp_summary = daily_mp.groupby('Session_Type')[metric_mp].agg(['mean', 'max', 'count']).reset_index()
+                mp_summary.columns = ['Session Type', 'Daily Mean', 'Single-Day Peak', 'Sessions Logged']
                 
-                col1, col2 = st.columns([1, 2])
-                with col1:
+                c_tbl, c_chart = st.columns([1.2, 2.8])
+                with c_tbl:
                     st.markdown("#### Summary Metrics")
-                    st.table(mp_summary)
-                with col2:
-                    fig_mp = px.histogram(ath_mp_data, x=metric_mp, color='Session_Type', barmode='overlay', title=f"{metric_mp}: Match vs. Practice Distribution")
-                    fig_mp.update_layout(template="simple_white", height=380)
-                    st.plotly_chart(fig_mp, use_container_width=True, key="mp_hist_chart")
+                    st.dataframe(mp_summary.style.format({'Daily Mean': '{:.1f}', 'Single-Day Peak': '{:.1f}'}), use_container_width=True)
+                    
+                    st.markdown("#### Key Takeaways")
+                    game_avg = mp_summary[mp_summary['Session Type'] == 'Game']['Daily Mean'].values
+                    prac_avg = mp_summary[mp_summary['Session Type'] == 'Practice']['Daily Mean'].values
+                    if len(game_avg) > 0 and len(prac_avg) > 0 and prac_avg[0] > 0:
+                        diff_pct = ((game_avg[0] - prac_avg[0]) / prac_avg[0]) * 100
+                        st.markdown(f'<div class="info-box">Match days average <b>{diff_pct:+.1f}%</b> relative to practice intensity for {metric_mp}.</div>', unsafe_allow_html=True)
+                        
+                with c_chart:
+                    fig_mp = px.box(daily_mp, x='Session_Type', y=metric_mp, color='Session_Type', points="all", color_discrete_map={'Game': '#FF8200', 'Practice': '#4895DB'}, title=f"{metric_mp}: Match vs. Practice Daily Distribution")
+                    fig_mp.update_layout(template="simple_white", height=380, showlegend=False)
+                    st.plotly_chart(fig_mp, use_container_width=True, key="mp_box_chart_t7")
             else:
-                st.warning("No session data logged for selected athlete.")
+                st.warning("No session data logged for the selected athlete.")
 
         # ==========================================
         # --- TAB CLAUSE 8: MATCH SUMMARY ----------
         # ==========================================
         elif selected_tab_label == "Match Summary":
-            st.markdown('<div class="section-header">Match Summary Dashboard</div>', unsafe_allow_html=True)
+            st.markdown('<div class="section-header">Match Performance Summary</div>', unsafe_allow_html=True)
             df_ms = match_master.copy()
             
-            if not df_ms.empty:
-                match_list = df_ms['Session_Name'].unique().tolist()
-                sel_match = st.selectbox("Select Match Event", match_list, key="match_summary_sel")
-                
-                m_data = df_ms[df_ms['Session_Name'] == sel_match]
-                
-                st.markdown(f"#### Match Totals: {sel_match}")
-                m_totals = m_data.groupby(['Name', 'Position'])[all_metrics].sum().reset_index()
-                
-                st.dataframe(m_totals, use_container_width=True)
-                
-                fig_ms = px.bar(m_totals, x='Name', y='Player Load', color='Position', title="Player Load Distribution during Match")
-                fig_ms.update_layout(template="simple_white", height=400)
-                st.plotly_chart(fig_ms, use_container_width=True, key="match_summary_bar")
+            if df_ms.empty:
+                st.info("No match dataset logged for the active season.")
             else:
-                st.info("No match dataset logged for this season.")
+                match_list = sorted(df_ms['Session_Name'].dropna().unique().tolist())
+                sel_match = st.selectbox("Select Match Event", match_list, key="match_summary_sel_t8")
+                
+                m_data = df_ms[df_ms['Session_Name'] == sel_match].copy()
+                m_totals = m_data.groupby(['Name', 'Position', 'PhotoURL'])[all_metrics].sum().reset_index()
+                
+                st.markdown(f"#### Match Totals & Box Score: {sel_match}")
+                
+                # Match Leaderboard Summary Cards
+                top_load = m_totals.sort_values('Player Load', ascending=False).iloc[0] if not m_totals.empty else None
+                top_jumps = m_totals.sort_values('Total Jumps', ascending=False).iloc[0] if not m_totals.empty else None
+                
+                m_kpi1, m_kpi2, m_kpi3 = st.columns(3)
+                with m_kpi1:
+                    st.metric("Total Team Player Load", f"{m_totals['Player Load'].sum():.1f}")
+                with m_kpi2:
+                    st.metric("Match Workload Leader", f"{top_load['Name'] if top_load is not None else 'N/A'}", f"{top_load['Player Load']:.1f} Load" if top_load is not None else "")
+                with m_kpi3:
+                    st.metric("Match Jump Leader", f"{top_jumps['Name'] if top_jumps is not None else 'N/A'}", f"{int(top_jumps['Total Jumps'])} Jumps" if top_jumps is not None else "")
+                
+                st.markdown("#### Athlete Match Box Score")
+                box_df = m_totals[['Name', 'Position'] + metrics_to_score].sort_values('Player Load', ascending=False)
+                st.dataframe(box_df.style.format({m: '{:.1f}' for m in metrics_to_score}), use_container_width=True)
+                
+                fig_ms = px.bar(m_totals, x='Name', y=['Player Load', 'Total Jumps'], barmode='group', color_discrete_sequence=['#4895DB', '#FF8200'], title="Player Load & Total Jumps Distribution Across Squad")
+                fig_ms.update_layout(template="simple_white", height=420, legend=dict(orientation="h", yanchor="bottom", y=-0.25, x=0.5, xanchor="center"))
+                st.plotly_chart(fig_ms, use_container_width=True, key="match_summary_bar_t8")
 
         # ==========================================
         # --- TAB CLAUSE 9: PRACTICE PLANNER -------
         # ==========================================
         elif selected_tab_label == "Practice Planner":
-            st.markdown('<div class="section-header">Practice Planner Tool</div>', unsafe_allow_html=True)
+            st.markdown('<div class="section-header">Practice Planning Matrix & Workload Budgeting</div>', unsafe_allow_html=True)
             
-            st.markdown("#### Phase Intensity Estimator")
+            st.markdown("#### Practice Intensity Target Calculator")
             col_plan1, col_plan2 = st.columns(2)
             
             with col_plan1:
-                target_load = st.number_input("Target Total Team Player Load", min_value=100.0, max_value=5000.0, value=1200.0, step=50.0)
-                target_jumps = st.number_input("Target Total Team Jumps", min_value=10, max_value=2000, value=350, step=10)
-                num_athletes = st.number_input("Active Athlete Count", min_value=1, max_value=30, value=14, step=1)
+                target_load = st.number_input("Target Team Total Player Load", min_value=100.0, max_value=10000.0, value=2500.0, step=100.0)
+                target_jumps = st.number_input("Target Team Total Jumps", min_value=10, max_value=5000, value=800, step=50)
+                num_athletes = st.number_input("Participating Athletes Count", min_value=1, max_value=30, value=14, step=1)
                 
             with col_plan2:
                 avg_load_per_ath = target_load / num_athletes if num_athletes > 0 else 0
                 avg_jumps_per_ath = target_jumps / num_athletes if num_athletes > 0 else 0
                 
-                st.metric("Estimated Load / Athlete", f"{avg_load_per_ath:.1f}")
-                st.metric("Estimated Jumps / Athlete", f"{avg_jumps_per_ath:.1f}")
+                st.markdown('<div style="display:flex; gap:15px; margin-top:10px;">', unsafe_allow_html=True)
+                st.metric("Target Load / Athlete", f"{avg_load_per_ath:.1f}")
+                st.metric("Target Jumps / Athlete", f"{avg_jumps_per_ath:.1f}")
+                st.markdown('</div>', unsafe_allow_html=True)
                 
-            st.markdown("#### Phase Load Budget Allocation")
+            st.markdown('<hr style="display:block !important; margin:15px 0; border:0; border-top:1px solid #E5E5E7;" />', unsafe_allow_html=True)
+            st.markdown("#### Historical Practice Phase Intensity Library")
+            
             if raw_phase_df is not None and not raw_phase_df.empty:
-                phase_avg = raw_phase_df.groupby('Phase')[['Player Load', 'Total Jumps']].mean().reset_index()
-                st.markdown("##### Historical Average Intensity per Phase")
+                phase_avg = raw_phase_df.groupby('Phase')[['Player Load', 'Total Jumps', 'Explosive Efforts', 'Duration']].mean().round(1).reset_index()
+                st.markdown("##### Historical Average Workload Generated per Phase")
                 st.dataframe(phase_avg, use_container_width=True)
+                
+                st.markdown("##### Proposed Phase Allocation")
+                selected_phases = st.multiselect("Select Drill / Phase Modules for Planned Practice", phase_avg['Phase'].unique().tolist(), default=phase_avg['Phase'].unique()[:3] if len(phase_avg) >= 3 else [])
+                
+                if selected_phases:
+                    planned_df = phase_avg[phase_avg['Phase'].isin(selected_phases)]
+                    planned_tot_load = planned_df['Player Load'].sum() * num_athletes
+                    planned_tot_jumps = planned_df['Total Jumps'].sum() * num_athletes
+                    
+                    st.markdown(f'<div class="info-box">Selected Modules Estimate: <b>{planned_tot_load:.0f}</b> Total Team Load and <b>{planned_tot_jumps:.0f}</b> Total Jumps.</div>', unsafe_allow_html=True)
+                    
+                    fig_plan = px.bar(planned_df, x='Phase', y=['Player Load', 'Total Jumps'], barmode='group', color_discrete_sequence=['#4895DB', '#FF8200'], title="Estimated Per-Athlete Workload Contribution by Selected Drill Module")
+                    fig_plan.update_layout(template="simple_white", height=380, legend=dict(orientation="h", yanchor="bottom", y=-0.25, x=0.5, xanchor="center"))
+                    st.plotly_chart(fig_plan, use_container_width=True, key="practice_planner_chart_t9")
             else:
-                st.info("Phase library empty.")
+                st.info("No practice phase tracking library data found in secrets configuration.")
 
     except Exception as e:
         st.error(f"Application Execution Error: {e}")
