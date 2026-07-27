@@ -300,7 +300,7 @@ if check_password():
 
                     # --- SECTION 2: ASH SHOULDER: ISO I ---
                     st.markdown('<h4 style="color:#4895DB; font-weight:800; margin-bottom:5px;">ASH SHOULDER: ISO I</h4>', unsafe_allow_html=True)
-                    ash_t_data = raw_ash_df[(raw_ash_df['Name'] == selected_athlete_prof) & (raw_ash_df['Season'] == s_label)].sort_values('Test Date')
+                    ash_t_data = raw_ash_df[(raw_ash_df['Name'] == selected_athlete_test) & (raw_ash_df['Season'] == s_label)].sort_values('Test Date')
                     
                     if not ash_t_data.empty:
                         ac1, ac2 = st.columns([1.5, 3.5])
