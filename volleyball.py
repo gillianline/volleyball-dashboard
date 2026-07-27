@@ -123,7 +123,6 @@ def load_all_data():
         m = date_val.month
         d = date_val.day
         y = date_val.year
-        # Pre-Season starting Thursday Aug 6, 2026 onwards
         if y == 2026 and m == 8 and d >= 6: return 'Pre-Season'
         elif y == 2026 and m > 8: return 'Pre-Season'
         elif 1 <= m <= 4: return 'Spring'
@@ -483,7 +482,7 @@ if check_password():
                     s_date_series = df_t0[df_t0['Session_Name'] == s]['Date']
                     if not s_date_series.empty:
                         s_date = pd.to_datetime(s_date_series.iloc[0]).strftime('%Y-%m-%d')
-                        if s_date == target_date_str:
+                        if selected_season == "Spring" and s_date == target_date_str:
                             if not tourney_added_prof:
                                 clean_session_list_prof.append(tournament_label)
                                 tourney_added_prof = True
@@ -492,13 +491,14 @@ if check_password():
                     else:
                         clean_session_list_prof.append(s)
                 
-                if not clean_session_list_prof: clean_session_list_prof = [tournament_label]
+                if not clean_session_list_prof:
+                    clean_session_list_prof = [tournament_label] if selected_season == "Spring" else session_list
 
                 c_prof1, c_prof2 = st.columns(2)
                 with c_prof1: selected_session_prof = st.selectbox("Session Selection", clean_session_list_prof, index=0, key="nav_sel_prof_t0")
                 with c_prof2: selected_athlete_prof = st.selectbox("Athlete Selection", master_athlete_list, key="nav_ath_prof_t0")
 
-                if selected_session_prof == tournament_label:
+                if selected_season == "Spring" and selected_session_prof == tournament_label:
                     curr_date_prof = pd.to_datetime(target_date_str)
                     p_session_data = df_t0[(df_t0['Name'] == selected_athlete_prof) & (df_t0['Date'].dt.date == curr_date_prof.date())].copy()
                     p_row = p_session_data.groupby(['Name', 'Position', 'PhotoURL']).sum(numeric_only=True).reset_index().iloc[0] if not p_session_data.empty else pd.Series()
@@ -510,7 +510,7 @@ if check_password():
                     p_meta = p_row
 
                 if p_row.empty:
-                    curr_date_prof = pd.to_datetime(target_date_str) if selected_session_prof == tournament_label else pd.to_datetime(df_t0['Date'].max() if not df_t0.empty else "2026-08-06")
+                    curr_date_prof = pd.to_datetime(target_date_str) if (selected_season == "Spring" and selected_session_prof == tournament_label) else pd.to_datetime(df_t0['Date'].max() if not df_t0.empty else "2026-08-06")
                     meta_lookup = df_t0[df_t0['Name'] == selected_athlete_prof]
                     pos_val = meta_lookup['Position'].iloc[0] if not meta_lookup.empty else "N/A"
                     photo_val = meta_lookup['PhotoURL'].iloc[0] if not meta_lookup.empty else "https://www.w3schools.com/howto/img_avatar.png"
@@ -673,7 +673,7 @@ if check_password():
                     s_date_series = df_t1[df_t1['Session_Name'] == s]['Date']
                     if not s_date_series.empty:
                         s_date = pd.to_datetime(s_date_series.iloc[0]).strftime('%Y-%m-%d')
-                        if s_date == target_date_str:
+                        if selected_season == "Spring" and s_date == target_date_str:
                             if not tourney_added:
                                 clean_session_list.append(tournament_label)
                                 tourney_added = True
@@ -682,11 +682,14 @@ if check_password():
                     else:
                         clean_session_list.append(s)
 
+                if not clean_session_list:
+                    clean_session_list = [tournament_label] if selected_season == "Spring" else session_list
+
                 c_gal1, c_gal2 = st.columns(2)
                 with c_gal1: selected_session_gal = st.selectbox("Session Selection", clean_session_list, index=0, key="nav_sel_gal_t1")
                 with c_gal2: pos_f_gal = st.selectbox("Position Filter", ["All Positions"] + sorted([p for p in df_t1['Position'].unique() if p != "N/A"]), key="nav_pos_gal_t1")
                 
-                if selected_session_gal == tournament_label:
+                if selected_season == "Spring" and selected_session_gal == tournament_label:
                     curr_date_gal = pd.to_datetime(target_date_str)
                     display_df = df_t1[df_t1['Date'].dt.date == curr_date_gal.date()].groupby(['Name', 'Position', 'PhotoURL']).sum(numeric_only=True).reset_index()
                 else:
@@ -738,18 +741,20 @@ if check_password():
                 clean_date_list = []
                 tourney_added_comb = False
                 for d_str in valid_dates_sorted:
-                    if d_str == target_date_str:
+                    if selected_season == "Spring" and d_str == target_date_str:
                         if not tourney_added_comb:
                             clean_date_list.append(tournament_label)
                             tourney_added_comb = True
                     else:
                         clean_date_list.append(d_str)
 
+                if not clean_date_list: clean_date_list = valid_dates_sorted
+
                 c_comb1, c_comb2 = st.columns(2)
                 with c_comb1: selected_date_comb = st.selectbox("Date Selection", clean_date_list, index=0, key="nav_sel_comb_t2")
                 with c_comb2: pos_f_comb = st.selectbox("Position Filter", ["All Positions"] + sorted([p for p in df_t2['Position'].unique() if p != "N/A"]), key="nav_pos_comb_t2")
                 
-                target_date_obj_comb = pd.to_datetime(target_date_str) if selected_date_comb == tournament_label else pd.to_datetime(selected_date_comb)
+                target_date_obj_comb = pd.to_datetime(target_date_str) if (selected_season == "Spring" and selected_date_comb == tournament_label) else pd.to_datetime(selected_date_comb)
                 display_df_comb = df_t2[df_t2['Date'] == target_date_obj_comb].groupby(['Name', 'Position', 'PhotoURL'])[all_metrics].sum().reset_index()
 
                 if not display_df_comb.empty:
@@ -797,12 +802,14 @@ if check_password():
                 clean_date_list_sm = []
                 tourney_added_sm = False
                 for d_str in valid_dates_sorted_sm:
-                    if d_str == target_date_str:
+                    if selected_season == "Spring" and d_str == target_date_str:
                         if not tourney_added_sm:
                             clean_date_list_sm.append(tournament_label)
                             tourney_added_sm = True
                     else:
                         clean_date_list_sm.append(d_str)
+
+                if not clean_date_list_sm: clean_date_list_sm = valid_dates_sorted_sm
 
                 if not clean_date_list_sm:
                     st.warning("No recorded dates found for the currently active season.")
@@ -811,7 +818,7 @@ if check_password():
                     with c_sm1: selected_date_sm = st.selectbox("Date Selection", clean_date_list_sm, index=0, key="nav_sel_sm_t3")
                     with c_sm2: pos_f_sm = st.selectbox("Position Filter", ["All Positions"] + sorted([p for p in df_t3['Position'].unique() if p != "N/A"]), key="nav_pos_sm_t3")
                     
-                    target_date_obj_sm = pd.to_datetime(target_date_str) if selected_date_sm == tournament_label else pd.to_datetime(selected_date_sm)
+                    target_date_obj_sm = pd.to_datetime(target_date_str) if (selected_season == "Spring" and selected_date_sm == tournament_label) else pd.to_datetime(selected_date_sm)
                     display_df_sm = df_t3[df_t3['Date'] == target_date_obj_sm].groupby(['Name', 'Position', 'PhotoURL'])[all_metrics].sum().reset_index()
                     spring_gps_raw = full_df_unfiltered[(full_df_unfiltered['Season'] == 'Spring') & (full_df_unfiltered['Session_Type'] == 'Practice')].copy()
                     
