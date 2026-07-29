@@ -59,89 +59,28 @@ st.markdown("""
     .gallery-photo { border-radius: 50%; width: 110px; height: 110px; object-fit: cover; border: 4px solid #FF8200; }
     .section-header { font-size: 20px; font-weight: 800; color: #4895DB; border-bottom: 2px solid #FF8200; margin-top: 15px; margin-bottom: 10px; padding-bottom: 5px; text-transform: uppercase; }
 
-    /* --- LADY VOLS BASKETBALL CARD COMPLIANCE STYLING --- */
-    .kpi-card-outer {
-        border: 1px solid #E2E8F0;
-        border-radius: 16px;
-        padding: 20px;
+    /* Intake Cards Container Styling */
+    .intake-card {
+        border: 1px solid #E5E5E7;
+        border-radius: 12px;
+        padding: 15px;
         background-color: #FFFFFF;
-        box-shadow: 0 2px 6px rgba(0,0,0,0.02);
-        margin-bottom: 25px;
-    }
-    .kpi-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
         margin-bottom: 15px;
     }
-    .kpi-header-left {
-        display: flex;
-        align-items: center;
-        gap: 15px;
-    }
-    .kpi-avatar {
-        width: 60px;
-        height: 60px;
-        border-radius: 50%;
-        object-fit: cover;
-        border: 3px solid #FF8200;
-    }
-    .kpi-name {
-        font-size: 20px;
+    .intake-card-header {
         font-weight: 800;
-        color: #0F172A;
-        margin: 0;
+        font-size: 15px;
+        color: #4895DB;
+        border-bottom: 2px solid #FF8200;
+        padding-bottom: 4px;
+        margin-bottom: 12px;
     }
-    .kpi-pos {
-        font-size: 14px;
-        font-weight: 700;
-        color: #64748B;
-        margin: 0;
-    }
-    .kpi-badge {
-        background-color: #FEE2E2;
-        color: #991B1B;
+    .intake-col-title {
         font-weight: 800;
         font-size: 13px;
-        padding: 6px 14px;
-        border-radius: 20px;
-    }
-    .kpi-box {
-        border: 1px solid #E2E8F0;
-        border-radius: 12px;
-        padding: 16px;
-        text-align: center;
-        background-color: #F8FAFC;
-        height: 100%;
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
-    }
-    .kpi-title {
-        font-size: 11px;
-        font-weight: 800;
-        color: #64748B;
+        color: #1D1D1F;
+        margin-bottom: 8px;
         text-transform: uppercase;
-        letter-spacing: 0.5px;
-        margin-bottom: 6px;
-    }
-    .kpi-value {
-        font-size: 24px;
-        font-weight: 900;
-        color: #0F172A;
-        margin-bottom: 4px;
-    }
-    .kpi-value-orange {
-        font-size: 24px;
-        font-weight: 900;
-        color: #FF8200;
-        margin-bottom: 4px;
-    }
-    .kpi-subtitle {
-        font-size: 11px;
-        font-weight: 600;
-        color: #94A3B8;
-        margin: 0;
     }
 
     @media print {
@@ -297,7 +236,7 @@ def load_all_data():
             hip_df['Direction'] = hip_df['Direction'].astype(str).str.strip()
         for col in ['L Max Force (N)', 'R Max Force (N)', 'Max Imbalance', 'L Max Ratio', 'R Max Ratio']:
             if col in hip_df.columns:
-                hip_df[col] = pd.to_numeric(hip_df[col].astype(str).str.replace(r'[^0-9.-]', '', regex=True), errors='coerce').fillna(0).astype(float)
+                hip_df[col] = pd.to_numeric(hip_df[col].astype(str).str.replace(r'[^0-9.-]', '', regex=True), errors='coerce').fillna(0.0)
         hip_df['Season'] = hip_df['Test Date'].apply(assign_season)
     except:
         hip_df = pd.DataFrame(columns=['Name', 'Test Date', 'Direction', 'Season'])
@@ -312,7 +251,7 @@ def load_all_data():
             shoulder_df['Direction'] = shoulder_df['Direction'].astype(str).str.strip()
         for col in ['L Max Force (N)', 'R Max Force (N)', 'Max Imbalance', 'L Max Ratio', 'R Max Ratio']:
             if col in shoulder_df.columns:
-                shoulder_df[col] = pd.to_numeric(shoulder_df[col].astype(str).str.replace(r'[^0-9.-]', '', regex=True), errors='coerce').fillna(0).astype(float)
+                shoulder_df[col] = pd.to_numeric(shoulder_df[col].astype(str).str.replace(r'[^0-9.-]', '', regex=True), errors='coerce').fillna(0.0)
         shoulder_df['Season'] = shoulder_df['Test Date'].apply(assign_season)
     except:
         shoulder_df = pd.DataFrame(columns=['Name', 'Test Date', 'Direction', 'Season'])
@@ -515,9 +454,9 @@ if check_password():
                     else:
                         st.info(f"No External Rotation ROM testing records logged for {selected_athlete_test} in {s_label}.")
 
-            # --- TAB 4: LADY VOLS BASKETBALL INTAKE COMPLIANCE DASHBOARD ---
+            # --- TAB 4: INTAKE TESTING TAB ---
             with testing_season_tabs[3]:
-                st.markdown("### Athlete Intake Assessment Compliance Cards")
+                st.markdown("### Athlete Intake Assessment Data")
                 c_int_ath, _ = st.columns([2, 2])
                 with c_int_ath:
                     selected_intake_athlete = st.selectbox("Select Athlete for Intake Assessment", master_athlete_list, key="intake_ath_select")
@@ -527,131 +466,158 @@ if check_password():
                 sh_ath = raw_shoulder_df[raw_shoulder_df['Name'] == selected_intake_athlete].sort_values('Test Date')
                 isoy_ath = raw_ash_df[(raw_ash_df['Name'] == selected_intake_athlete) & (raw_ash_df['Isometric Type'].str.contains('ISO-Y|Y', case=False, na=False))].sort_values('Test Date')
 
-                meta_lookup = full_df_unfiltered[full_df_unfiltered['Name'] == selected_intake_athlete]
-                photo_val = meta_lookup['PhotoURL'].iloc[0] if not meta_lookup.empty else "https://www.w3schools.com/howto/img_avatar.png"
-                pos_val = meta_lookup['Position'].iloc[0] if not meta_lookup.empty else "N/A"
+                has_data = not (calf_ath.empty and hip_ath.empty and sh_ath.empty and isoy_ath.empty)
 
-                def calculate_days_elapsed(last_date):
-                    if pd.isna(last_date): return "N/A"
-                    today_ref = pd.to_datetime("today")
-                    diff = (today_ref - pd.to_datetime(last_date)).days
-                    return f"{diff} Days"
+                if has_data:
+                    def render_val_with_arrow(current, initial, fmt="{:.1f}", unit=""):
+                        if initial == 0:
+                            return f"{fmt.format(current)}{unit}"
+                        diff = current - initial
+                        pct = (diff / initial) * 100
+                        arrow = "↑" if diff >= 0 else "↓"
+                        color = "#28a745" if diff >= 0 else "#dc3545"
+                        return f"{fmt.format(current)}{unit} <span style='color:{color}; font-size:13px; font-weight:bold;'>({arrow} {abs(pct):.1f}%)</span>"
 
-                def render_2x2_kpi_card(test_title, recent_val_str, recent_date_str, peak_val_str, peak_date_str, pct_val_str, pct_sub_str, elapsed_days_str):
-                    st.markdown(f"""
-                    <div class="kpi-card-outer">
-                        <div class="kpi-header">
-                            <div class="kpi-header-left">
-                                <img src="{photo_val}" class="kpi-avatar">
-                                <div>
-                                    <p class="kpi-name">{selected_intake_athlete} &nbsp;<span style="font-size:14px; color:#4895DB; font-weight:800;">({test_title})</span></p>
-                                    <p class="kpi-pos">{pos_val}</p>
-                                </div>
-                            </div>
-                            <div class="kpi-badge">{elapsed_days_str}</div>
-                        </div>
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
-                            <div class="kpi-box">
-                                <div class="kpi-title">RECENT TEST OUTPUT</div>
-                                <div class="kpi-value">{recent_val_str}</div>
-                                <div class="kpi-subtitle">{recent_date_str}</div>
-                            </div>
-                            <div class="kpi-box">
-                                <div class="kpi-title">ALL-TIME / BASELINE TEST</div>
-                                <div class="kpi-value">{peak_val_str}</div>
-                                <div class="kpi-subtitle">{peak_date_str}</div>
-                            </div>
-                        </div>
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
-                            <div class="kpi-box">
-                                <div class="kpi-title">% OF BASELINE OUTPUT</div>
-                                <div class="kpi-value-orange">{pct_val_str}</div>
-                                <div class="kpi-subtitle">{pct_sub_str}</div>
-                            </div>
-                            <div class="kpi-box">
-                                <div class="kpi-title">RECENCY STATUS</div>
-                                <div class="kpi-value">{elapsed_days_str}</div>
-                                <div class="kpi-subtitle">Elapsed Threshold</div>
-                            </div>
-                        </div>
-                    </div>
-                    """, unsafe_allow_html=True)
+                    # --- ROW 1: HIP AD/AB & SINGLE LEG CALF RAISE ---
+                    col1, col2 = st.columns(2)
+                    
+                    with col1:
+                        st.markdown('<div class="intake-card"><div class="intake-card-header">HIP AD/AB FORCE & RATIOS</div>', unsafe_allow_html=True)
+                        if not hip_ath.empty:
+                            hip_ad = hip_ath[hip_ath['Direction'].str.contains('AD', case=False, na=False)] if 'Direction' in hip_ath.columns else hip_ath
+                            hip_ab = hip_ath[hip_ath['Direction'].str.contains('AB', case=False, na=False)] if 'Direction' in hip_ath.columns else hip_ath
 
-                # --- 1. HIP AD/AB ---
-                if not hip_ath.empty:
-                    hip_ad = hip_ath[hip_ath['Direction'].str.contains('AD', case=False, na=False)] if 'Direction' in hip_ath.columns else hip_ath
-                    hip_ab = hip_ath[hip_ath['Direction'].str.contains('AB', case=False, na=False)] if 'Direction' in hip_ath.columns else hip_ath
+                            def render_hip_side_by_side(dir_df, dir_label):
+                                if not dir_df.empty:
+                                    base = dir_df.iloc[0]
+                                    latest = dir_df.iloc[-1]
 
-                    for h_df, h_title in [(hip_ad, "Hip Adduction (AD)"), (hip_ab, "Hip Abduction (AB)")]:
-                        if not h_df.empty:
-                            base = h_df.iloc[0]
-                            latest = h_df.iloc[-1]
-                            b_f = (base.get('L Max Force (N)', 0.0) + base.get('R Max Force (N)', 0.0)) / 2
-                            l_f = (latest.get('L Max Force (N)', 0.0) + latest.get('R Max Force (N)', 0.0)) / 2
-                            pct = (l_f / b_f * 100) if b_f > 0 else 0.0
-                            days = calculate_days_elapsed(latest['Test Date'])
-                            
-                            render_2x2_kpi_card(
-                                h_title,
-                                f"{l_f:.1f} N", latest['Test Date'].strftime('%Y-%m-%d'),
-                                f"{b_f:.1f} N", base['Test Date'].strftime('%Y-%m-%d'),
-                                f"{pct:.1f}%", "Recent vs. Baseline Output", days
-                            )
+                                    bL_f, bR_f = base.get('L Max Force (N)', 0.0), base.get('R Max Force (N)', 0.0)
+                                    b_imb = base.get('Max Imbalance', 0.0)
+                                    bL_rat, bR_rat = base.get('L Max Ratio', 0.0), base.get('R Max Ratio', 0.0)
 
-                # --- 2. SINGLE LEG CALF RAISE ---
-                if not calf_ath.empty:
-                    base_c = calf_ath.iloc[0]
-                    latest_c = calf_ath.iloc[-1]
-                    b_f = (base_c.get('Peak Vertical Force [N] (L)', 0.0) + base_c.get('Peak Vertical Force [N] (R)', 0.0)) / 2
-                    l_f = (latest_c.get('Peak Vertical Force [N] (L)', 0.0) + latest_c.get('Peak Vertical Force [N] (R)', 0.0)) / 2
-                    pct = (l_f / b_f * 100) if b_f > 0 else 0.0
-                    days = calculate_days_elapsed(latest_c['Test Date'])
+                                    lL_f, lR_f = latest.get('L Max Force (N)', 0.0), latest.get('R Max Force (N)', 0.0)
+                                    l_imb = latest.get('Max Imbalance', 0.0)
+                                    lL_rat, lR_rat = latest.get('L Max Ratio', 0.0), latest.get('R Max Ratio', 0.0)
 
-                    render_2x2_kpi_card(
-                        "Single Leg Calf Raise",
-                        f"{l_f:.0f} N", latest_c['Test Date'].strftime('%Y-%m-%d'),
-                        f"{b_f:.0f} N", base_c['Test Date'].strftime('%Y-%m-%d'),
-                        f"{pct:.1f}%", "Recent vs. Baseline Force", days
-                    )
+                                    st.markdown(f"**Direction: {dir_label}**")
+                                    hc1, hc2 = st.columns(2)
+                                    
+                                    with hc1:
+                                        st.markdown(f"<div class='intake-col-title'>Initial Test ({base['Test Date'].strftime('%m/%d/%Y')})</div>", unsafe_allow_html=True)
+                                        st.markdown(f"L Force: **{bL_f:.1f} N** &nbsp;|&nbsp; R Force: **{bR_f:.1f} N**<br>Imbalance: **{b_imb:.1f}%**<br>L Ratio: **{bL_rat:.2f}** &nbsp;|&nbsp; R Ratio: **{bR_rat:.2f}**", unsafe_allow_html=True)
 
-                # --- 3. SHOULDER IR/ER ---
-                if not sh_ath.empty:
-                    sh_ir = sh_ath[sh_ath['Direction'].str.contains('Internal|IR', case=False, na=False)] if 'Direction' in sh_ath.columns else sh_ath
-                    sh_er = sh_ath[sh_ath['Direction'].str.contains('External|ER', case=False, na=False)] if 'Direction' in sh_ath.columns else sh_ath
+                                    with hc2:
+                                        st.markdown(f"<div class='intake-col-title'>Latest Test ({latest['Test Date'].strftime('%m/%d/%Y')})</div>", unsafe_allow_html=True)
+                                        st.markdown(f"L Force: {render_val_with_arrow(lL_f, bL_f, '{:.1f}', ' N')} &nbsp;|&nbsp; R Force: {render_val_with_arrow(lR_f, bR_f, '{:.1f}', ' N')}<br>Imbalance: {l_imb:.1f}%<br>L Ratio: {render_val_with_arrow(lL_rat, bL_rat, '{:.2f}')} &nbsp;|&nbsp; R Ratio: {render_val_with_arrow(lR_rat, bR_rat, '{:.2f}')}", unsafe_allow_html=True)
 
-                    for s_df, s_title in [(sh_ir, "Shoulder IR"), (sh_er, "Shoulder ER")]:
-                        if not s_df.empty:
-                            base = s_df.iloc[0]
-                            latest = s_df.iloc[-1]
-                            b_f = (base.get('L Max Force (N)', 0.0) + base.get('R Max Force (N)', 0.0)) / 2
-                            l_f = (latest.get('L Max Force (N)', 0.0) + latest.get('R Max Force (N)', 0.0)) / 2
-                            pct = (l_f / b_f * 100) if b_f > 0 else 0.0
-                            days = calculate_days_elapsed(latest['Test Date'])
+                                    st.markdown("<hr style='margin:10px 0; border-top:1px solid #E5E5E7;'>", unsafe_allow_html=True)
 
-                            render_2x2_kpi_card(
-                                s_title,
-                                f"{l_f:.1f} N", latest['Test Date'].strftime('%Y-%m-%d'),
-                                f"{b_f:.1f} N", base['Test Date'].strftime('%Y-%m-%d'),
-                                f"{pct:.1f}%", "Recent vs. Baseline Force", days
-                            )
+                            render_hip_side_by_side(hip_ad, "Adduction (AD)")
+                            render_hip_side_by_side(hip_ab, "Abduction (AB)")
+                        else:
+                            st.info("No Hip AD/AB records logged.")
+                        st.markdown('</div>', unsafe_allow_html=True)
 
-                # --- 4. ISO-Y STRENGTH ---
-                if not isoy_ath.empty:
-                    base_y = isoy_ath.iloc[0]
-                    latest_y = isoy_ath.iloc[-1]
-                    b_f = (base_y.get('Peak Vertical Force [N] (L)', 0.0) + base_y.get('Peak Vertical Force [N] (R)', 0.0)) / 2
-                    l_f = (latest_y.get('Peak Vertical Force [N] (L)', 0.0) + latest_y.get('Peak Vertical Force [N] (R)', 0.0)) / 2
-                    pct = (l_f / b_f * 100) if b_f > 0 else 0.0
-                    days = calculate_days_elapsed(latest_y['Test Date'])
+                    with col2:
+                        st.markdown('<div class="intake-card"><div class="intake-card-header">SINGLE LEG CALF RAISE</div>', unsafe_allow_html=True)
+                        if not calf_ath.empty:
+                            base_calf = calf_ath.iloc[0]
+                            latest_calf = calf_ath.iloc[-1]
 
-                    render_2x2_kpi_card(
-                        "ISO-Y Strength",
-                        f"{l_f:.0f} N", latest_y['Test Date'].strftime('%Y-%m-%d'),
-                        f"{b_f:.0f} N", base_y['Test Date'].strftime('%Y-%m-%d'),
-                        f"{pct:.1f}%", "Recent vs. Baseline Force", days
-                    )
+                            bcL_f = base_calf.get('Peak Vertical Force [N] (L)', 0.0)
+                            bcR_f = base_calf.get('Peak Vertical Force [N] (R)', 0.0)
+                            bcL_bm = base_calf.get('Peak Vertical Force / BM [N/kg] (L)', 0.0)
+                            bcR_bm = base_calf.get('Peak Vertical Force / BM [N/kg] (R)', 0.0)
+                            b_asym = base_calf.get('Peak Vertical Force [N] (Asym)(%)', 'N/A')
 
-                if calf_ath.empty and hip_ath.empty and sh_ath.empty and isoy_ath.empty:
+                            lcL_f = latest_calf.get('Peak Vertical Force [N] (L)', 0.0)
+                            lcR_f = latest_calf.get('Peak Vertical Force [N] (R)', 0.0)
+                            lcL_bm = latest_calf.get('Peak Vertical Force / BM [N/kg] (L)', 0.0)
+                            lcR_bm = latest_calf.get('Peak Vertical Force / BM [N/kg] (R)', 0.0)
+                            l_asym = latest_calf.get('Peak Vertical Force [N] (Asym)(%)', 'N/A')
+
+                            cc1, cc2 = st.columns(2)
+                            with cc1:
+                                st.markdown(f"<div class='intake-col-title'>Initial Test ({base_calf['Test Date'].strftime('%m/%d/%Y')})</div>", unsafe_allow_html=True)
+                                st.markdown(f"Force L: **{bcL_f:.0f} N** &nbsp;|&nbsp; Force R: **{bcR_f:.0f} N**<br>N/kg (L): **{bcL_bm:.2f}** &nbsp;|&nbsp; N/kg (R): **{bcR_bm:.2f}**<br>Asymmetry: **{b_asym}**", unsafe_allow_html=True)
+
+                            with cc2:
+                                st.markdown(f"<div class='intake-col-title'>Latest Test ({latest_calf['Test Date'].strftime('%m/%d/%Y')})</div>", unsafe_allow_html=True)
+                                st.markdown(f"Force L: {render_val_with_arrow(lcL_f, bcL_f, '{:.0f}', ' N')} &nbsp;|&nbsp; Force R: {render_val_with_arrow(lcR_f, bcR_f, '{:.0f}', ' N')}<br>N/kg (L): {render_val_with_arrow(lcL_bm, bcL_bm, '{:.2f}')} &nbsp;|&nbsp; N/kg (R): {render_val_with_arrow(lcR_bm, bcR_bm, '{:.2f}')}<br>Asymmetry: {l_asym}", unsafe_allow_html=True)
+
+                        else:
+                            st.info("No Single Leg Calf Raise records logged.")
+                        st.markdown('</div>', unsafe_allow_html=True)
+
+                    # --- ROW 2: SHOULDER IR/ER & ISO-Y ---
+                    col3, col4 = st.columns(2)
+                    with col3:
+                        st.markdown('<div class="intake-card"><div class="intake-card-header">SHOULDER IR / ER FORCE</div>', unsafe_allow_html=True)
+                        if not sh_ath.empty:
+                            sh_ir = sh_ath[sh_ath['Direction'].str.contains('Internal|IR', case=False, na=False)] if 'Direction' in sh_ath.columns else sh_ath
+                            sh_er = sh_ath[sh_ath['Direction'].str.contains('External|ER', case=False, na=False)] if 'Direction' in sh_ath.columns else sh_ath
+
+                            def render_sh_side_by_side(dir_df, dir_label):
+                                if not dir_df.empty:
+                                    base = dir_df.iloc[0]
+                                    latest = dir_df.iloc[-1]
+
+                                    bL_f, bR_f = base.get('L Max Force (N)', 0.0), base.get('R Max Force (N)', 0.0)
+                                    b_imb = base.get('Max Imbalance', 0.0)
+                                    bL_rat, bR_rat = base.get('L Max Ratio', 0.0), base.get('R Max Ratio', 0.0)
+
+                                    lL_f, lR_f = latest.get('L Max Force (N)', 0.0), latest.get('R Max Force (N)', 0.0)
+                                    l_imb = latest.get('Max Imbalance', 0.0)
+                                    lL_rat, lR_rat = latest.get('L Max Ratio', 0.0), latest.get('R Max Ratio', 0.0)
+
+                                    st.markdown(f"**Direction: {dir_label}**")
+                                    sc1, sc2 = st.columns(2)
+
+                                    with sc1:
+                                        st.markdown(f"<div class='intake-col-title'>Initial Test ({base['Test Date'].strftime('%m/%d/%Y')})</div>", unsafe_allow_html=True)
+                                        st.markdown(f"L Force: **{bL_f:.1f} N** &nbsp;|&nbsp; R Force: **{bR_f:.1f} N**<br>Imbalance: **{b_imb:.1f}%**<br>L Ratio: **{bL_rat:.2f}** &nbsp;|&nbsp; R Ratio: **{bR_rat:.2f}**", unsafe_allow_html=True)
+
+                                    with sc2:
+                                        st.markdown(f"<div class='intake-col-title'>Latest Test ({latest['Test Date'].strftime('%m/%d/%Y')})</div>", unsafe_allow_html=True)
+                                        st.markdown(f"L Force: {render_val_with_arrow(lL_f, bL_f, '{:.1f}', ' N')} &nbsp;|&nbsp; R Force: {render_val_with_arrow(lR_f, bR_f, '{:.1f}', ' N')}<br>Imbalance: {l_imb:.1f}%<br>L Ratio: {render_val_with_arrow(lL_rat, bL_rat, '{:.2f}')} &nbsp;|&nbsp; R Ratio: {render_val_with_arrow(lR_rat, bR_rat, '{:.2f}')}", unsafe_allow_html=True)
+
+                                    st.markdown("<hr style='margin:10px 0; border-top:1px solid #E5E5E7;'>", unsafe_allow_html=True)
+
+                            render_sh_side_by_side(sh_ir, "Internal Rotation (IR)")
+                            render_sh_side_by_side(sh_er, "External Rotation (ER)")
+                        else:
+                            st.info("No Shoulder IR/ER records logged.")
+                        st.markdown('</div>', unsafe_allow_html=True)
+
+                    with col4:
+                        st.markdown('<div class="intake-card"><div class="intake-card-header">ISO-Y STRENGTH (ASH SHEET)</div>', unsafe_allow_html=True)
+                        if not isoy_ath.empty:
+                            base_isoy = isoy_ath.iloc[0]
+                            latest_isoy = isoy_ath.iloc[-1]
+
+                            byL = base_isoy.get('Peak Vertical Force [N] (L)', 0.0)
+                            byR = base_isoy.get('Peak Vertical Force [N] (R)', 0.0)
+                            by_asym = base_isoy.get('Peak Vertical Force [N] (Asym)(%)', 0.0)
+
+                            lyL = latest_isoy.get('Peak Vertical Force [N] (L)', 0.0)
+                            lyR = latest_isoy.get('Peak Vertical Force [N] (R)', 0.0)
+                            ly_asym = latest_isoy.get('Peak Vertical Force [N] (Asym)(%)', 0.0)
+
+                            yc1, yc2 = st.columns(2)
+                            with yc1:
+                                st.markdown(f"<div class='intake-col-title'>Initial Test ({base_isoy['Test Date'].strftime('%m/%d/%Y')})</div>", unsafe_allow_html=True)
+                                st.markdown(f"Force L: **{byL:.0f} N** &nbsp;|&nbsp; Force R: **{byR:.0f} N**<br>Asymmetry: **{by_asym:+.1f}%**", unsafe_allow_html=True)
+
+                            with yc2:
+                                st.markdown(f"<div class='intake-col-title'>Latest Test ({latest_isoy['Test Date'].strftime('%m/%d/%Y')})</div>", unsafe_allow_html=True)
+                                st.markdown(f"Force L: {render_val_with_arrow(lyL, byL, '{:.0f}', ' N')} &nbsp;|&nbsp; Force R: {render_val_with_arrow(lyR, byR, '{:.0f}', ' N')}<br>Asymmetry: {ly_asym:+.1f}%", unsafe_allow_html=True)
+
+                        else:
+                            st.info("No ISO-Y test records logged on ASH Sheet.")
+                        st.markdown('</div>', unsafe_allow_html=True)
+
+                else:
                     st.info(f"No Intake Assessment records found for {selected_intake_athlete}.")
 
             # --- TAB 5: CROSS-SEASON TESTING COMPARISON ---
