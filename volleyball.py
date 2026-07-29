@@ -208,12 +208,14 @@ def load_all_data():
         hip_df.columns = hip_df.columns.str.strip()
         hip_df.rename(columns={'Athlete': 'Name', 'Date': 'Test Date'}, inplace=True)
         hip_df['Test Date'] = pd.to_datetime(hip_df['Test Date'], errors='coerce')
+        if 'Direction' in hip_df.columns:
+            hip_df['Direction'] = hip_df['Direction'].astype(str).str.strip()
         for col in ['L Max Force (N)', 'R Max Force (N)', 'Max Imbalance', 'L Max Ratio', 'R Max Ratio']:
             if col in hip_df.columns:
                 hip_df[col] = pd.to_numeric(hip_df[col].astype(str).str.replace(r'[^0-9.-]', '', regex=True), errors='coerce').fillna(0.0)
         hip_df['Season'] = hip_df['Test Date'].apply(assign_season)
     except:
-        hip_df = pd.DataFrame(columns=['Name', 'Test Date', 'Season'])
+        hip_df = pd.DataFrame(columns=['Name', 'Test Date', 'Direction', 'Season'])
 
     # Dedicated Shoulder IR/ER Sheet
     try:
@@ -221,12 +223,14 @@ def load_all_data():
         shoulder_df.columns = shoulder_df.columns.str.strip()
         shoulder_df.rename(columns={'Athlete': 'Name', 'Date': 'Test Date'}, inplace=True)
         shoulder_df['Test Date'] = pd.to_datetime(shoulder_df['Test Date'], errors='coerce')
+        if 'Direction' in shoulder_df.columns:
+            shoulder_df['Direction'] = shoulder_df['Direction'].astype(str).str.strip()
         for col in ['L Max Force (N)', 'R Max Force (N)', 'Max Imbalance', 'L Max Ratio', 'R Max Ratio']:
             if col in shoulder_df.columns:
                 shoulder_df[col] = pd.to_numeric(shoulder_df[col].astype(str).str.replace(r'[^0-9.-]', '', regex=True), errors='coerce').fillna(0.0)
         shoulder_df['Season'] = shoulder_df['Test Date'].apply(assign_season)
     except:
-        shoulder_df = pd.DataFrame(columns=['Name', 'Test Date', 'Season'])
+        shoulder_df = pd.DataFrame(columns=['Name', 'Test Date', 'Direction', 'Season'])
 
     phase_df = pd.read_csv(st.secrets["PHASES_SHEET_URL"])
     phase_df = heavy_sanitize(phase_df)
@@ -441,7 +445,6 @@ if check_password():
                 has_data = not (calf_ath.empty and hip_ath.empty and sh_ath.empty and isoy_ath.empty)
 
                 if has_data:
-                    # Helper delta renderer
                     def render_delta(current, initial, fmt="{:.1f}", unit=""):
                         if initial == 0:
                             return f"{fmt.format(current)}{unit}"
@@ -449,7 +452,7 @@ if check_password():
                         pct = (diff / initial) * 100
                         arrow = "↑" if diff >= 0 else "↓"
                         color = "#28a745" if diff >= 0 else "#dc3545"
-                        return f"{fmt.format(current)}{unit} <span style='color:{color}; font-size:14px; font-weight:bold;'>({arrow} {abs(pct):.1f}%)</span>"
+                        return f"{fmt.format(current)}{unit} <span style='color:{color}; font-size:13px; font-weight:bold;'>({arrow} {abs(pct):.1f}%)</span>"
 
                     # --- ROW 1: HIP AD/AB & SINGLE LEG CALF RAISE ---
                     col1, col2 = st.columns(2)
@@ -457,27 +460,28 @@ if check_password():
                     with col1:
                         st.markdown('<h4 style="color:#4895DB; font-weight:800;">HIP AD/AB FORCE & RATIOS</h4>', unsafe_allow_html=True)
                         if not hip_ath.empty:
-                            base_hip = hip_ath.iloc[0]
-                            latest_hip = hip_ath.iloc[-1]
+                            hip_ad = hip_ath[hip_ath['Direction'].str.contains('AD', case=False, na=False)] if 'Direction' in hip_ath.columns else hip_ath
+                            hip_ab = hip_ath[hip_ath['Direction'].str.contains('AB', case=False, na=False)] if 'Direction' in hip_ath.columns else hip_ath
 
-                            hL_f = latest_hip.get('L Max Force (N)', 0.0)
-                            hR_f = latest_hip.get('R Max Force (N)', 0.0)
-                            h_imb = latest_hip.get('Max Imbalance', 0.0)
-                            hL_rat = latest_hip.get('L Max Ratio', 0.0)
-                            hR_rat = latest_hip.get('R Max Ratio', 0.0)
+                            def render_hip_dir_card(dir_df, dir_label):
+                                if not dir_df.empty:
+                                    base = dir_df.iloc[0]
+                                    latest = dir_df.iloc[-1]
+                                    L_f, R_f = latest.get('L Max Force (N)', 0.0), latest.get('R Max Force (N)', 0.0)
+                                    bL_f, bR_f = base.get('L Max Force (N)', 0.0), base.get('R Max Force (N)', 0.0)
+                                    imb = latest.get('Max Imbalance', 0.0)
+                                    L_rat, R_rat = latest.get('L Max Ratio', 0.0), latest.get('R Max Ratio', 0.0)
+                                    bL_rat, bR_rat = base.get('L Max Ratio', 0.0), base.get('R Max Ratio', 0.0)
 
-                            bL_f = base_hip.get('L Max Force (N)', 0.0)
-                            bR_f = base_hip.get('R Max Force (N)', 0.0)
-                            bL_rat = base_hip.get('L Max Ratio', 0.0)
-                            bR_rat = base_hip.get('R Max Ratio', 0.0)
+                                    st.markdown(f"**Direction: {dir_label}**")
+                                    h1, h2, h3 = st.columns(3)
+                                    h1.markdown(f"L Force: {render_delta(L_f, bL_f, '{:.1f}', ' N')}", unsafe_allow_html=True)
+                                    h2.markdown(f"R Force: {render_delta(R_f, bR_f, '{:.1f}', ' N')}", unsafe_allow_html=True)
+                                    h3.markdown(f"Imbalance: {imb:.1f}%", unsafe_allow_html=True)
+                                    st.markdown(f"<p style='margin:2px 0 8px 0; font-size:12px; color:#1D1D1F;'><b>L Ratio:</b> {render_delta(L_rat, bL_rat, '{:.2f}')} &nbsp;|&nbsp; <b>R Ratio:</b> {render_delta(R_rat, bR_rat, '{:.2f}')}</p>", unsafe_allow_html=True)
 
-                            h1, h2, h3 = st.columns(3)
-                            h1.markdown(f"**L Max Force**<br>{render_delta(hL_f, bL_f, '{:.1f}', ' N')}", unsafe_allow_html=True)
-                            h2.markdown(f"**R Max Force**<br>{render_delta(hR_f, bR_f, '{:.1f}', ' N')}", unsafe_allow_html=True)
-                            h3.markdown(f"**Max Imbalance**<br>{h_imb:.1f}%", unsafe_allow_html=True)
-
-                            st.markdown(f"<div style='margin-top:10px;'><p style='margin:0; font-size:13px; color:#1D1D1F;'><b>L Max Ratio:</b> {render_delta(hL_rat, bL_rat, '{:.2f}')} &nbsp;|&nbsp; <b>R Max Ratio:</b> {render_delta(hR_rat, bR_rat, '{:.2f}')}</p></div>", unsafe_allow_html=True)
-                            st.markdown(f"<p style='font-size:11px; color:grey; margin-top:4px;'>Baseline Date: {base_hip['Test Date'].strftime('%m/%d/%Y')} | Tests Logged: {len(hip_ath)}</p>", unsafe_allow_html=True)
+                            render_hip_dir_card(hip_ad, "Adduction (AD)")
+                            render_hip_dir_card(hip_ab, "Abduction (AB)")
                         else:
                             st.info("No Hip AD/AB records logged.")
 
@@ -501,7 +505,7 @@ if check_password():
                             c2.markdown(f"**Force R**<br>{render_delta(cR_f, bcR_f, '{:.0f}', ' N')}", unsafe_allow_html=True)
                             c3.markdown(f"**N/kg (L)**<br>{cL_bm:.2f}", unsafe_allow_html=True)
                             c4.markdown(f"**N/kg (R)**<br>{cR_bm:.2f}", unsafe_allow_html=True)
-                            st.markdown(f"<p style='font-size:11px; color:grey; margin-top:8px;'><b>Asymmetry:</b> {asym} &nbsp;|&nbsp; Baseline Date: {base_calf['Test Date'].strftime('%m/%d/%Y')} | Tests Logged: {len(calf_ath)}</p>", unsafe_allow_html=True)
+                            st.markdown(f"<p style='font-size:11px; color:grey; margin-top:8px;'><b>Asymmetry:</b> {asym} &nbsp;|&nbsp; Tests Logged: {len(calf_ath)}</p>", unsafe_allow_html=True)
                         else:
                             st.info("No Single Leg Calf Raise records logged.")
 
@@ -512,26 +516,28 @@ if check_password():
                     with col3:
                         st.markdown('<h4 style="color:#4895DB; font-weight:800;">SHOULDER IR / ER FORCE</h4>', unsafe_allow_html=True)
                         if not sh_ath.empty:
-                            base_sh = sh_ath.iloc[0]
-                            latest_sh = sh_ath.iloc[-1]
+                            sh_ir = sh_ath[sh_ath['Direction'].str.contains('Internal|IR', case=False, na=False)] if 'Direction' in sh_ath.columns else sh_ath
+                            sh_er = sh_ath[sh_ath['Direction'].str.contains('External|ER', case=False, na=False)] if 'Direction' in sh_ath.columns else sh_ath
 
-                            sL_f = latest_sh.get('L Max Force (N)', 0.0)
-                            sR_f = latest_sh.get('R Max Force (N)', 0.0)
-                            s_imb = latest_sh.get('Max Imbalance', 0.0)
-                            sL_rat = latest_sh.get('L Max Ratio', 0.0)
-                            sR_rat = latest_sh.get('R Max Ratio', 0.0)
+                            def render_sh_dir_card(dir_df, dir_label):
+                                if not dir_df.empty:
+                                    base = dir_df.iloc[0]
+                                    latest = dir_df.iloc[-1]
+                                    L_f, R_f = latest.get('L Max Force (N)', 0.0), latest.get('R Max Force (N)', 0.0)
+                                    bL_f, bR_f = base.get('L Max Force (N)', 0.0), base.get('R Max Force (N)', 0.0)
+                                    imb = latest.get('Max Imbalance', 0.0)
+                                    L_rat, R_rat = latest.get('L Max Ratio', 0.0), latest.get('R Max Ratio', 0.0)
+                                    bL_rat, bR_rat = base.get('L Max Ratio', 0.0), base.get('R Max Ratio', 0.0)
 
-                            bsL_f = base_sh.get('L Max Force (N)', 0.0)
-                            bsR_f = base_sh.get('R Max Force (N)', 0.0)
-                            bsL_rat = base_sh.get('L Max Ratio', 0.0)
-                            bsR_rat = base_sh.get('R Max Ratio', 0.0)
+                                    st.markdown(f"**Direction: {dir_label}**")
+                                    s1, s2, s3 = st.columns(3)
+                                    s1.markdown(f"L Force: {render_delta(L_f, bL_f, '{:.1f}', ' N')}", unsafe_allow_html=True)
+                                    s2.markdown(f"R Force: {render_delta(R_f, bR_f, '{:.1f}', ' N')}", unsafe_allow_html=True)
+                                    s3.markdown(f"Imbalance: {imb:.1f}%", unsafe_allow_html=True)
+                                    st.markdown(f"<p style='margin:2px 0 8px 0; font-size:12px; color:#1D1D1F;'><b>L Ratio:</b> {render_delta(L_rat, bL_rat, '{:.2f}')} &nbsp;|&nbsp; <b>R Ratio:</b> {render_delta(R_rat, bR_rat, '{:.2f}')}</p>", unsafe_allow_html=True)
 
-                            s1, s2, s3 = st.columns(3)
-                            s1.markdown(f"**L Max Force**<br>{render_delta(sL_f, bsL_f, '{:.1f}', ' N')}", unsafe_allow_html=True)
-                            s2.markdown(f"**R Max Force**<br>{render_delta(sR_f, bsR_f, '{:.1f}', ' N')}", unsafe_allow_html=True)
-                            s3.markdown(f"**Max Imbalance**<br>{s_imb:.1f}%", unsafe_allow_html=True)
-                            st.markdown(f"<div style='margin-top:10px;'><p style='margin:0; font-size:13px; color:#1D1D1F;'><b>L Max Ratio:</b> {render_delta(sL_rat, bsL_rat, '{:.2f}')} &nbsp;|&nbsp; <b>R Max Ratio:</b> {render_delta(sR_rat, bsR_rat, '{:.2f}')}</p></div>", unsafe_allow_html=True)
-                            st.markdown(f"<p style='font-size:11px; color:grey; margin-top:4px;'>Baseline Date: {base_sh['Test Date'].strftime('%m/%d/%Y')} | Tests Logged: {len(sh_ath)}</p>", unsafe_allow_html=True)
+                            render_sh_dir_card(sh_ir, "Internal Rotation (IR)")
+                            render_sh_dir_card(sh_er, "External Rotation (ER)")
                         else:
                             st.info("No Shoulder IR/ER records logged.")
 
@@ -565,7 +571,9 @@ if check_password():
                     if test_type_choice == "Hip AD/AB" and not hip_ath.empty:
                         df_display = hip_ath.copy()
                         df_display['Date'] = df_display['Test Date'].dt.strftime('%m/%d/%Y')
-                        st.dataframe(df_display[['Date', 'L Max Force (N)', 'R Max Force (N)', 'Max Imbalance', 'L Max Ratio', 'R Max Ratio']], use_container_width=True, hide_index=True)
+                        cols_show = ['Date', 'Direction', 'L Max Force (N)', 'R Max Force (N)', 'Max Imbalance', 'L Max Ratio', 'R Max Ratio']
+                        cols_show = [c for c in cols_show if c in df_display.columns]
+                        st.dataframe(df_display[cols_show], use_container_width=True, hide_index=True)
                     elif test_type_choice == "Single Leg Calf Raise" and not calf_ath.empty:
                         df_display = calf_ath.copy()
                         df_display['Date'] = df_display['Test Date'].dt.strftime('%m/%d/%Y')
@@ -573,7 +581,9 @@ if check_password():
                     elif test_type_choice == "Shoulder IR/ER" and not sh_ath.empty:
                         df_display = sh_ath.copy()
                         df_display['Date'] = df_display['Test Date'].dt.strftime('%m/%d/%Y')
-                        st.dataframe(df_display[['Date', 'L Max Force (N)', 'R Max Force (N)', 'Max Imbalance', 'L Max Ratio', 'R Max Ratio']], use_container_width=True, hide_index=True)
+                        cols_show = ['Date', 'Direction', 'L Max Force (N)', 'R Max Force (N)', 'Max Imbalance', 'L Max Ratio', 'R Max Ratio']
+                        cols_show = [c for c in cols_show if c in df_display.columns]
+                        st.dataframe(df_display[cols_show], use_container_width=True, hide_index=True)
                     elif test_type_choice == "ISO-Y (ASH)" and not isoy_ath.empty:
                         df_display = isoy_ath.copy()
                         df_display['Date'] = df_display['Test Date'].dt.strftime('%m/%d/%Y')
@@ -1187,7 +1197,7 @@ if check_password():
                             fig_cmj.add_trace(go.Scatter(x=ath_cmj_data['Test Date'], y=ath_cmj_data[rsi_col], name="RSI-mod", mode='lines+markers', line=dict(color='#FF8200', width=2, dash='dot')), secondary_y=True)
                             fig_cmj.add_hline(y=base_row[cmj_col], line_dash="dash", line_color="red")
                             fig_cmj.update_layout(height=400, template="simple_white", margin=dict(l=10, r=10, t=30, b=10), legend=dict(orientation="h", yanchor="bottom", y=-0.3, x=0.5, xanchor="center"), xaxis=dict(title="Date", tickformat="%m/%d"))
-                            st.plotly_chart(fig_cmj, use_container_width=True, key=f"integrated_cmj_final_{sel_ath_hist}_t4")
+                            st.plotly_chart(fig_cmj, use_container_width=True, config=LOCKED_CONFIG, key=f"integrated_cmj_final_{sel_ath_hist}_t4")
 
                 with sub_tabs[1]:
                     sel_week = st.selectbox("Select Review Week", sorted(df_t4['Week'].unique(), reverse=True), key="team_week_sel_t4")
