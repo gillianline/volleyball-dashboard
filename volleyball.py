@@ -187,6 +187,27 @@ def load_all_data():
     except:
         er_df = pd.DataFrame(columns=['Name', 'Test Date', 'Movement', 'L Max ROM (°)', 'R Max ROM (°)', 'ROM Asymmetry (%)', 'Season'])
 
+    # --- INTAKE TESTING DATA FETCHING ENGINE ---
+    try:
+        intake_df = pd.read_csv(st.secrets["INTAKE_SHEET_URL"])
+        intake_df.columns = intake_df.columns.str.strip()
+        intake_df.rename(columns={'Athlete': 'Name', 'Date': 'Test Date'}, inplace=True)
+        intake_df['Test Date'] = pd.to_datetime(intake_df['Test Date'], errors='coerce')
+        
+        intake_num_cols = [
+            'Hip Add (L)', 'Hip Add (R)', 'Hip Abd (L)', 'Hip Abd (R)',
+            'Calf Raise (L)', 'Calf Raise (R)',
+            'Shoulder IR (L)', 'Shoulder IR (R)', 'Shoulder ER (L)', 'Shoulder ER (R)',
+            'ISO-Y (L)', 'ISO-Y (R)'
+        ]
+        for col in intake_num_cols:
+            if col in intake_df.columns:
+                intake_df[col] = pd.to_numeric(intake_df[col].astype(str).str.replace(r'[^0-9.-]', '', regex=True), errors='coerce').fillna(0.0)
+        
+        intake_df['Season'] = intake_df['Test Date'].apply(assign_season)
+    except:
+        intake_df = pd.DataFrame(columns=['Name', 'Test Date', 'Season'])
+
     phase_df = pd.read_csv(st.secrets["PHASES_SHEET_URL"])
     phase_df = heavy_sanitize(phase_df)
     if 'Phases' in phase_df.columns: phase_df = phase_df.rename(columns={'Phases': 'Phase'})
@@ -203,7 +224,7 @@ def load_all_data():
     except:
         thresh_df = None
         
-    return df.dropna(subset=['Date']), match_df.dropna(subset=['Date']), cmj_df, phase_df, thresh_df, ash_df, er_df
+    return df.dropna(subset=['Date']), match_df.dropna(subset=['Date']), cmj_df, phase_df, thresh_df, ash_df, er_df, intake_df
 
 
 # --- 5. EXECUTION BLOCK CONTEXT ---
@@ -214,7 +235,7 @@ if check_password():
     LOCKED_CONFIG = {'staticPlot': False, 'displayModeBar': False}
 
     try:
-        raw_df, raw_match_df, raw_cmj_df, raw_phase_df, thresh_df, raw_ash_df, raw_er_df = load_all_data()
+        raw_df, raw_match_df, raw_cmj_df, raw_phase_df, thresh_df, raw_ash_df, raw_er_df, raw_intake_df = load_all_data()
 
         # --- GLOBAL SIDEBAR ---
         st.sidebar.markdown("### Season")
@@ -227,10 +248,11 @@ if check_password():
             cmj_master = raw_cmj_df[raw_cmj_df['Season'] == selected_season].copy()
             ash_master = raw_ash_df[raw_ash_df['Season'] == selected_season].copy()
             er_master = raw_er_df[raw_er_df['Season'] == selected_season].copy()
+            intake_master = raw_intake_df[raw_intake_df['Season'] == selected_season].copy()
             phase_master = raw_phase_df[raw_phase_df['Season'] == selected_season].copy()
         else:
             st.sidebar.info("Currently displaying: Testing")
-            df_master, match_master, cmj_master, ash_master, er_master, phase_master = raw_df, raw_match_df, raw_cmj_df, raw_ash_df, raw_er_df, raw_phase_df
+            df_master, match_master, cmj_master, ash_master, er_master, intake_master, phase_master = raw_df, raw_match_df, raw_cmj_df, raw_ash_df, raw_er_df, raw_intake_df, raw_phase_df
             
         full_df_unfiltered = raw_df.copy()
 
@@ -245,14 +267,14 @@ if check_password():
         cmj_col = 'Jump Height (Imp-Mom) [cm]'
         rsi_col = 'RSI-modified [m/s]'
 
-        master_athlete_list = sorted(list(set(raw_df['Name'].unique()) | set(raw_cmj_df['Name'].unique()) | set(raw_ash_df['Name'].unique()) | set(raw_er_df['Name'].unique())))
+        master_athlete_list = sorted(list(set(raw_df['Name'].unique()) | set(raw_cmj_df['Name'].unique()) | set(raw_ash_df['Name'].unique()) | set(raw_er_df['Name'].unique()) | set(raw_intake_df['Name'].unique())))
         session_list = df_master[df_master['Session_Name'].notna()].sort_values('Date', ascending=False)['Session_Name'].unique().tolist()
 
         st.markdown('<div class="main-logo-container" style="text-align: center; margin-top: 10px; margin-bottom: 15px;"><img src="https://upload.wikimedia.org/wikipedia/commons/thumb/f/fc/Tennessee_Lady_Volunteers_logo.svg/1280px-Tennessee_Lady_Volunteers_logo.svg.png" width="120"><div style="color: #FF8200; font-size: 2rem; font-weight: 900; margin-top: 10px;">LADY VOLS VOLLEYBALL PERFORMANCE</div></div>', unsafe_allow_html=True)
 
         if selected_season == "Testing":
             st.markdown('<div class="section-header">Testing Profile</div>', unsafe_allow_html=True)
-            testing_season_tabs = st.tabs(["Spring Testing", "Summer Testing", "Pre-Season Testing", "Season Comparison"])
+            testing_season_tabs = st.tabs(["Spring Testing", "Summer Testing", "Pre-Season Testing", "Intake Testing", "Season Comparison"])
             
             # --- TAB 1, 2, 3: INDIVIDUAL SEASONAL TESTING ---
             for tab_idx, s_label in enumerate(["Spring", "Summer", "Pre-Season"]):
@@ -374,8 +396,69 @@ if check_password():
                     else:
                         st.info(f"No External Rotation ROM testing records logged for {selected_athlete_test} in {s_label}.")
 
-            # --- TAB 4: CROSS-SEASON TESTING COMPARISON ---
+            # --- TAB 4: INTAKE TESTING TAB ---
             with testing_season_tabs[3]:
+                st.markdown("### Athlete Intake Assessment Data")
+                c_int_ath, _ = st.columns([2, 2])
+                with c_int_ath:
+                    selected_intake_athlete = st.selectbox("Select Athlete for Intake Assessment", master_athlete_list, key="intake_ath_select")
+
+                intake_ath_data = raw_intake_df[raw_intake_df['Name'] == selected_intake_athlete].sort_values('Test Date')
+
+                if not intake_ath_data.empty:
+                    latest_intake = intake_ath_data.iloc[-1]
+                    st.markdown(f"**Latest Test Date:** {latest_intake['Test Date'].strftime('%m/%d/%Y')}")
+                    
+                    # --- ROW 1: HIP ADD / ABD & CALF RAISE ---
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        st.markdown('<h4 style="color:#4895DB; font-weight:800;">HIP ADDUCTION & ABDUCTION</h4>', unsafe_allow_html=True)
+                        m1, m2, m3, m4 = st.columns(4)
+                        m1.metric("Add (L)", f"{latest_intake.get('Hip Add (L)', 0):.1f} N")
+                        m2.metric("Add (R)", f"{latest_intake.get('Hip Add (R)', 0):.1f} N")
+                        m3.metric("Abd (L)", f"{latest_intake.get('Hip Abd (L)', 0):.1f} N")
+                        m4.metric("Abd (R)", f"{latest_intake.get('Hip Abd (R)', 0):.1f} N")
+
+                    with col2:
+                        st.markdown('<h4 style="color:#4895DB; font-weight:800;">SINGLE LEG CALF RAISE</h4>', unsafe_allow_html=True)
+                        c_l, c_r = st.columns(2)
+                        c_l.metric("Calf Raise (L)", f"{int(latest_intake.get('Calf Raise (L)', 0))} reps")
+                        c_r.metric("Calf Raise (R)", f"{int(latest_intake.get('Calf Raise (R)', 0))} reps")
+
+                    st.markdown('<hr style="display:block !important; margin:15px 0; border:0; border-top:1px solid #E5E5E7;" />', unsafe_allow_html=True)
+
+                    # --- ROW 2: SHOULDER IR/ER & ISO-Y ---
+                    col3, col4 = st.columns(2)
+                    with col3:
+                        st.markdown('<h4 style="color:#4895DB; font-weight:800;">SHOULDER IR / ER</h4>', unsafe_allow_html=True)
+                        s1, s2, s3, s4 = st.columns(4)
+                        s1.metric("IR (L)", f"{latest_intake.get('Shoulder IR (L)', 0):.1f}°")
+                        s2.metric("IR (R)", f"{latest_intake.get('Shoulder IR (R)', 0):.1f}°")
+                        s3.metric("ER (L)", f"{latest_intake.get('Shoulder ER (L)', 0):.1f}°")
+                        s4.metric("ER (R)", f"{latest_intake.get('Shoulder ER (R)', 0):.1f}°")
+
+                    with col4:
+                        st.markdown('<h4 style="color:#4895DB; font-weight:800;">ISO-Y STRENGTH</h4>', unsafe_allow_html=True)
+                        y_l, y_r = st.columns(2)
+                        y_l.metric("ISO-Y (L)", f"{latest_intake.get('ISO-Y (L)', 0):.1f} N")
+                        y_r.metric("ISO-Y (R)", f"{latest_intake.get('ISO-Y (R)', 0):.1f} N")
+
+                    # Historical Tracking Chart
+                    st.markdown("#### Historical Assessment Trends")
+                    fig_intake = go.Figure()
+                    if 'Hip Add (L)' in intake_ath_data.columns:
+                        fig_intake.add_trace(go.Scatter(x=intake_ath_data['Test Date'], y=intake_ath_data['Hip Add (L)'], name="Hip Add (L)", mode='lines+markers'))
+                    if 'ISO-Y (L)' in intake_ath_data.columns:
+                        fig_intake.add_trace(go.Scatter(x=intake_ath_data['Test Date'], y=intake_ath_data['ISO-Y (L)'], name="ISO-Y (L)", mode='lines+markers'))
+                    
+                    fig_intake.update_layout(height=240, margin=dict(l=0, r=0, t=10, b=0), template="simple_white", showlegend=True)
+                    st.plotly_chart(fig_intake, use_container_width=True, config=LOCKED_CONFIG, key="intake_history_chart")
+
+                else:
+                    st.info(f"No Intake Testing records found for {selected_intake_athlete}.")
+
+            # --- TAB 5: CROSS-SEASON TESTING COMPARISON ---
+            with testing_season_tabs[4]:
                 st.markdown("### Multi-Season Testing Performance Comparison")
                 c_comp_ath, _ = st.columns([2, 2])
                 with c_comp_ath:
@@ -395,7 +478,7 @@ if check_password():
 
                         fig_comp_cmj = make_subplots(specs=[[{"secondary_y": True}]])
                         
-                        # Bar trace: CMJ Height text inside middle of bars with white font to avoid collisions
+                        # Bar trace
                         fig_comp_cmj.add_trace(
                             go.Bar(
                                 x=cmj_avg_season['Season'], 
@@ -411,7 +494,7 @@ if check_password():
                             secondary_y=False
                         )
                         
-                        # Line trace: RSI-mod text sitting clearly above markers
+                        # Line trace
                         fig_comp_cmj.add_trace(
                             go.Scatter(
                                 x=cmj_avg_season['Season'], 
