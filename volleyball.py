@@ -163,50 +163,57 @@ def load_all_data():
         cmj_df['Week'] = pd.to_numeric(cmj_df['Week'].astype(str).str.extract(r'(\d+)', expand=False), errors='coerce').fillna(0).astype(int)
     cmj_df['Season'] = cmj_df['Test Date'].apply(assign_season)
 
+    # ASH Sheet (Contains ASH Shoulder + ISO-Y tests)
     try:
         ash_df = pd.read_csv(st.secrets["ASH_SHEET_URL"])
         ash_df.columns = ash_df.columns.str.strip()
         ash_df.rename(columns={'Athlete': 'Name', 'Date': 'Test Date'}, inplace=True)
         ash_df['Test Date'] = pd.to_datetime(ash_df['Test Date'], errors='coerce')
-        for col in ['Peak Vertical Force [N] (L)', 'Peak Vertical Force [N] (R)', 'Peak Vertical Force [N] (Asym)(%)']:
+        for col in ['Peak Vertical Force [N] (L)', 'Peak Vertical Force [N] (R)', 'Peak Vertical Force [N] (Asym)(%)', 'Peak Vertical Force / BM [N/kg] (L)', 'Peak Vertical Force / BM [N/kg] (R)']:
             if col in ash_df.columns:
                 ash_df[col] = pd.to_numeric(ash_df[col].astype(str).str.replace(r'[^0-9.-]', '', regex=True), errors='coerce').fillna(0.0)
         ash_df['Season'] = ash_df['Test Date'].apply(assign_season)
     except:
         ash_df = pd.DataFrame(columns=['Name', 'Test Date', 'Isometric Type', 'Peak Vertical Force [N] (L)', 'Peak Vertical Force [N] (R)', 'Peak Vertical Force [N] (Asym)(%)', 'Season'])
 
+    # External Rotation / Shoulder IR/ER Sheet
     try:
         er_df = pd.read_csv(st.secrets["ER_SHEET_URL"])
         er_df.columns = er_df.columns.str.strip()
         er_df.rename(columns={'Athlete': 'Name', 'Date': 'Test Date'}, inplace=True)
         er_df['Test Date'] = pd.to_datetime(er_df['Test Date'], errors='coerce')
-        for col in ['L Max ROM (°)', 'R Max ROM (°)', 'ROM Asymmetry (%)']:
+        for col in ['L Max ROM (°)', 'R Max ROM (°)', 'ROM Asymmetry (%)', 'Shoulder IR (L)', 'Shoulder IR (R)', 'Shoulder ER (L)', 'Shoulder ER (R)']:
             if col in er_df.columns:
                 er_df[col] = pd.to_numeric(er_df[col].astype(str).str.replace(r'[^0-9.-]', '', regex=True), errors='coerce').fillna(0.0)
         er_df['Season'] = er_df['Test Date'].apply(assign_season)
     except:
         er_df = pd.DataFrame(columns=['Name', 'Test Date', 'Movement', 'L Max ROM (°)', 'R Max ROM (°)', 'ROM Asymmetry (%)', 'Season'])
 
-    # --- INTAKE TESTING DATA FETCHING ENGINE ---
+    # Single Leg Calf Raise Sheet
     try:
-        intake_df = pd.read_csv(st.secrets["INTAKE_SHEET_URL"])
-        intake_df.columns = intake_df.columns.str.strip()
-        intake_df.rename(columns={'Athlete': 'Name', 'Date': 'Test Date'}, inplace=True)
-        intake_df['Test Date'] = pd.to_datetime(intake_df['Test Date'], errors='coerce')
-        
-        intake_num_cols = [
-            'Hip Add (L)', 'Hip Add (R)', 'Hip Abd (L)', 'Hip Abd (R)',
-            'Calf Raise (L)', 'Calf Raise (R)',
-            'Shoulder IR (L)', 'Shoulder IR (R)', 'Shoulder ER (L)', 'Shoulder ER (R)',
-            'ISO-Y (L)', 'ISO-Y (R)'
-        ]
-        for col in intake_num_cols:
-            if col in intake_df.columns:
-                intake_df[col] = pd.to_numeric(intake_df[col].astype(str).str.replace(r'[^0-9.-]', '', regex=True), errors='coerce').fillna(0.0)
-        
-        intake_df['Season'] = intake_df['Test Date'].apply(assign_season)
+        calf_df = pd.read_csv(st.secrets["CALF_SHEET_URL"])
+        calf_df.columns = calf_df.columns.str.strip()
+        calf_df.rename(columns={'Athlete': 'Name', 'Date': 'Test Date'}, inplace=True)
+        calf_df['Test Date'] = pd.to_datetime(calf_df['Test Date'], errors='coerce')
+        for col in ['Peak Vertical Force [N] (L)', 'Peak Vertical Force [N] (R)', 'Peak Vertical Force / BM [N/kg] (L)', 'Peak Vertical Force / BM [N/kg] (R)']:
+            if col in calf_df.columns:
+                calf_df[col] = pd.to_numeric(calf_df[col].astype(str).str.replace(r'[^0-9.-]', '', regex=True), errors='coerce').fillna(0.0)
+        calf_df['Season'] = calf_df['Test Date'].apply(assign_season)
     except:
-        intake_df = pd.DataFrame(columns=['Name', 'Test Date', 'Season'])
+        calf_df = pd.DataFrame(columns=['Name', 'Test Date', 'Season'])
+
+    # Hip Add & Abd Sheet
+    try:
+        hip_df = pd.read_csv(st.secrets["HIP_SHEET_URL"])
+        hip_df.columns = hip_df.columns.str.strip()
+        hip_df.rename(columns={'Athlete': 'Name', 'Date': 'Test Date'}, inplace=True)
+        hip_df['Test Date'] = pd.to_datetime(hip_df['Test Date'], errors='coerce')
+        for col in ['Hip Add (L)', 'Hip Add (R)', 'Hip Abd (L)', 'Hip Abd (R)']:
+            if col in hip_df.columns:
+                hip_df[col] = pd.to_numeric(hip_df[col].astype(str).str.replace(r'[^0-9.-]', '', regex=True), errors='coerce').fillna(0.0)
+        hip_df['Season'] = hip_df['Test Date'].apply(assign_season)
+    except:
+        hip_df = pd.DataFrame(columns=['Name', 'Test Date', 'Season'])
 
     phase_df = pd.read_csv(st.secrets["PHASES_SHEET_URL"])
     phase_df = heavy_sanitize(phase_df)
@@ -224,7 +231,7 @@ def load_all_data():
     except:
         thresh_df = None
         
-    return df.dropna(subset=['Date']), match_df.dropna(subset=['Date']), cmj_df, phase_df, thresh_df, ash_df, er_df, intake_df
+    return df.dropna(subset=['Date']), match_df.dropna(subset=['Date']), cmj_df, phase_df, thresh_df, ash_df, er_df, calf_df, hip_df
 
 
 # --- 5. EXECUTION BLOCK CONTEXT ---
@@ -235,7 +242,7 @@ if check_password():
     LOCKED_CONFIG = {'staticPlot': False, 'displayModeBar': False}
 
     try:
-        raw_df, raw_match_df, raw_cmj_df, raw_phase_df, thresh_df, raw_ash_df, raw_er_df, raw_intake_df = load_all_data()
+        raw_df, raw_match_df, raw_cmj_df, raw_phase_df, thresh_df, raw_ash_df, raw_er_df, raw_calf_df, raw_hip_df = load_all_data()
 
         # --- GLOBAL SIDEBAR ---
         st.sidebar.markdown("### Season")
@@ -248,11 +255,12 @@ if check_password():
             cmj_master = raw_cmj_df[raw_cmj_df['Season'] == selected_season].copy()
             ash_master = raw_ash_df[raw_ash_df['Season'] == selected_season].copy()
             er_master = raw_er_df[raw_er_df['Season'] == selected_season].copy()
-            intake_master = raw_intake_df[raw_intake_df['Season'] == selected_season].copy()
+            calf_master = raw_calf_df[raw_calf_df['Season'] == selected_season].copy()
+            hip_master = raw_hip_df[raw_hip_df['Season'] == selected_season].copy()
             phase_master = raw_phase_df[raw_phase_df['Season'] == selected_season].copy()
         else:
             st.sidebar.info("Currently displaying: Testing")
-            df_master, match_master, cmj_master, ash_master, er_master, intake_master, phase_master = raw_df, raw_match_df, raw_cmj_df, raw_ash_df, raw_er_df, raw_intake_df, raw_phase_df
+            df_master, match_master, cmj_master, ash_master, er_master, calf_master, hip_master, phase_master = raw_df, raw_match_df, raw_cmj_df, raw_ash_df, raw_er_df, raw_calf_df, raw_hip_df, raw_phase_df
             
         full_df_unfiltered = raw_df.copy()
 
@@ -267,7 +275,14 @@ if check_password():
         cmj_col = 'Jump Height (Imp-Mom) [cm]'
         rsi_col = 'RSI-modified [m/s]'
 
-        master_athlete_list = sorted(list(set(raw_df['Name'].unique()) | set(raw_cmj_df['Name'].unique()) | set(raw_ash_df['Name'].unique()) | set(raw_er_df['Name'].unique()) | set(raw_intake_df['Name'].unique())))
+        master_athlete_list = sorted(list(
+            set(raw_df['Name'].unique()) | 
+            set(raw_cmj_df['Name'].unique()) | 
+            set(raw_ash_df['Name'].unique()) | 
+            set(raw_er_df['Name'].unique()) |
+            set(raw_calf_df['Name'].unique()) |
+            set(raw_hip_df['Name'].unique())
+        ))
         session_list = df_master[df_master['Session_Name'].notna()].sort_values('Date', ascending=False)['Session_Name'].unique().tolist()
 
         st.markdown('<div class="main-logo-container" style="text-align: center; margin-top: 10px; margin-bottom: 15px;"><img src="https://upload.wikimedia.org/wikipedia/commons/thumb/f/fc/Tennessee_Lady_Volunteers_logo.svg/1280px-Tennessee_Lady_Volunteers_logo.svg.png" width="120"><div style="color: #FF8200; font-size: 2rem; font-weight: 900; margin-top: 10px;">LADY VOLS VOLLEYBALL PERFORMANCE</div></div>', unsafe_allow_html=True)
@@ -403,59 +418,91 @@ if check_password():
                 with c_int_ath:
                     selected_intake_athlete = st.selectbox("Select Athlete for Intake Assessment", master_athlete_list, key="intake_ath_select")
 
-                intake_ath_data = raw_intake_df[raw_intake_df['Name'] == selected_intake_athlete].sort_values('Test Date')
+                calf_ath = raw_calf_df[raw_calf_df['Name'] == selected_intake_athlete].sort_values('Test Date')
+                hip_ath = raw_hip_df[raw_hip_df['Name'] == selected_intake_athlete].sort_values('Test Date')
+                sh_ath = raw_er_df[raw_er_df['Name'] == selected_intake_athlete].sort_values('Test Date')
+                isoy_ath = raw_ash_df[(raw_ash_df['Name'] == selected_intake_athlete) & (raw_ash_df['Isometric Type'].str.contains('ISO-Y|Y', case=False, na=False))].sort_values('Test Date')
 
-                if not intake_ath_data.empty:
-                    latest_intake = intake_ath_data.iloc[-1]
-                    st.markdown(f"**Latest Test Date:** {latest_intake['Test Date'].strftime('%m/%d/%Y')}")
-                    
-                    # --- ROW 1: HIP ADD / ABD & CALF RAISE ---
+                has_data = not (calf_ath.empty and hip_ath.empty and sh_ath.empty and isoy_ath.empty)
+
+                if has_data:
+                    # --- ROW 1: HIP ADD / ABD & SINGLE LEG CALF RAISE ---
                     col1, col2 = st.columns(2)
+                    
                     with col1:
                         st.markdown('<h4 style="color:#4895DB; font-weight:800;">HIP ADDUCTION & ABDUCTION</h4>', unsafe_allow_html=True)
-                        m1, m2, m3, m4 = st.columns(4)
-                        m1.metric("Add (L)", f"{latest_intake.get('Hip Add (L)', 0):.1f} N")
-                        m2.metric("Add (R)", f"{latest_intake.get('Hip Add (R)', 0):.1f} N")
-                        m3.metric("Abd (L)", f"{latest_intake.get('Hip Abd (L)', 0):.1f} N")
-                        m4.metric("Abd (R)", f"{latest_intake.get('Hip Abd (R)', 0):.1f} N")
+                        if not hip_ath.empty:
+                            latest_hip = hip_ath.iloc[-1]
+                            m1, m2, m3, m4 = st.columns(4)
+                            m1.metric("Add (L)", f"{latest_hip.get('Hip Add (L)', 0):.1f} N")
+                            m2.metric("Add (R)", f"{latest_hip.get('Hip Add (R)', 0):.1f} N")
+                            m3.metric("Abd (L)", f"{latest_hip.get('Hip Abd (L)', 0):.1f} N")
+                            m4.metric("Abd (R)", f"{latest_hip.get('Hip Abd (R)', 0):.1f} N")
+                        else:
+                            st.info("No Hip Add/Abd records logged.")
 
                     with col2:
-                        st.markdown('<h4 style="color:#4895DB; font-weight:800;">SINGLE LEG CALF RAISE</h4>', unsafe_allow_html=True)
-                        c_l, c_r = st.columns(2)
-                        c_l.metric("Calf Raise (L)", f"{int(latest_intake.get('Calf Raise (L)', 0))} reps")
-                        c_r.metric("Calf Raise (R)", f"{int(latest_intake.get('Calf Raise (R)', 0))} reps")
+                        st.markdown('<h4 style="color:#4895DB; font-weight:800;">SINGLE LEG CALF RAISE (FORCE)</h4>', unsafe_allow_html=True)
+                        if not calf_ath.empty:
+                            latest_calf = calf_ath.iloc[-1]
+                            cL_f = latest_calf.get('Peak Vertical Force [N] (L)', 0.0)
+                            cR_f = latest_calf.get('Peak Vertical Force [N] (R)', 0.0)
+                            cL_bm = latest_calf.get('Peak Vertical Force / BM [N/kg] (L)', 0.0)
+                            cR_bm = latest_calf.get('Peak Vertical Force / BM [N/kg] (R)', 0.0)
+                            asym = latest_calf.get('Peak Vertical Force [N] (Asym)(%)', 'N/A')
+
+                            c1, c2, c3, c4 = st.columns(4)
+                            c1.metric("Force L", f"{cL_f:.0f} N")
+                            c2.metric("Force R", f"{cR_f:.0f} N")
+                            c3.metric("N/kg (L)", f"{cL_bm:.2f}")
+                            c4.metric("N/kg (R)", f"{cR_bm:.2f}")
+                            st.markdown(f"<p style='text-align:center; font-size:12px; color:grey; margin-top:5px;'><b>Asymmetry:</b> {asym}</p>", unsafe_allow_html=True)
+                        else:
+                            st.info("No Single Leg Calf Raise records logged.")
 
                     st.markdown('<hr style="display:block !important; margin:15px 0; border:0; border-top:1px solid #E5E5E7;" />', unsafe_allow_html=True)
 
-                    # --- ROW 2: SHOULDER IR/ER & ISO-Y ---
+                    # --- ROW 2: SHOULDER IR/ER & ISO-Y (FROM ASH SHEET) ---
                     col3, col4 = st.columns(2)
                     with col3:
                         st.markdown('<h4 style="color:#4895DB; font-weight:800;">SHOULDER IR / ER</h4>', unsafe_allow_html=True)
-                        s1, s2, s3, s4 = st.columns(4)
-                        s1.metric("IR (L)", f"{latest_intake.get('Shoulder IR (L)', 0):.1f}°")
-                        s2.metric("IR (R)", f"{latest_intake.get('Shoulder IR (R)', 0):.1f}°")
-                        s3.metric("ER (L)", f"{latest_intake.get('Shoulder ER (L)', 0):.1f}°")
-                        s4.metric("ER (R)", f"{latest_intake.get('Shoulder ER (R)', 0):.1f}°")
+                        if not sh_ath.empty:
+                            latest_sh = sh_ath.iloc[-1]
+                            s1, s2, s3, s4 = st.columns(4)
+                            s1.metric("IR (L)", f"{latest_sh.get('Shoulder IR (L)', latest_sh.get('L Max ROM (°)', 0)):.1f}°")
+                            s2.metric("IR (R)", f"{latest_sh.get('Shoulder IR (R)', latest_sh.get('R Max ROM (°)', 0)):.1f}°")
+                            s3.metric("ER (L)", f"{latest_sh.get('Shoulder ER (L)', 0):.1f}°")
+                            s4.metric("ER (R)", f"{latest_sh.get('Shoulder ER (R)', 0):.1f}°")
+                        else:
+                            st.info("No Shoulder IR/ER records logged.")
 
                     with col4:
-                        st.markdown('<h4 style="color:#4895DB; font-weight:800;">ISO-Y STRENGTH</h4>', unsafe_allow_html=True)
-                        y_l, y_r = st.columns(2)
-                        y_l.metric("ISO-Y (L)", f"{latest_intake.get('ISO-Y (L)', 0):.1f} N")
-                        y_r.metric("ISO-Y (R)", f"{latest_intake.get('ISO-Y (R)', 0):.1f} N")
+                        st.markdown('<h4 style="color:#4895DB; font-weight:800;">ISO-Y STRENGTH (ASH SHEET)</h4>', unsafe_allow_html=True)
+                        if not isoy_ath.empty:
+                            latest_isoy = isoy_ath.iloc[-1]
+                            yL = latest_isoy.get('Peak Vertical Force [N] (L)', 0.0)
+                            yR = latest_isoy.get('Peak Vertical Force [N] (R)', 0.0)
+                            y_asym = latest_isoy.get('Peak Vertical Force [N] (Asym)(%)', 0.0)
 
-                    # Historical Tracking Chart
-                    st.markdown("#### Historical Assessment Trends")
+                            y1, y2, y3 = st.columns(3)
+                            y1.metric("Force L", f"{yL:.0f} N")
+                            y2.metric("Force R", f"{yR:.0f} N")
+                            y3.metric("Asymmetry", f"{y_asym:+.1f}%")
+                        else:
+                            st.info("No ISO-Y test records logged on ASH Sheet.")
+
+                    # Historical Trend Comparison Chart
+                    st.markdown("#### Single Leg Force & Strength Trends")
                     fig_intake = go.Figure()
-                    if 'Hip Add (L)' in intake_ath_data.columns:
-                        fig_intake.add_trace(go.Scatter(x=intake_ath_data['Test Date'], y=intake_ath_data['Hip Add (L)'], name="Hip Add (L)", mode='lines+markers'))
-                    if 'ISO-Y (L)' in intake_ath_data.columns:
-                        fig_intake.add_trace(go.Scatter(x=intake_ath_data['Test Date'], y=intake_ath_data['ISO-Y (L)'], name="ISO-Y (L)", mode='lines+markers'))
+                    if not calf_ath.empty:
+                        fig_intake.add_trace(go.Scatter(x=calf_ath['Test Date'], y=calf_ath['Peak Vertical Force [N] (L)'], name="Calf Force (L)", mode='lines+markers', line=dict(color='#4895DB')))
+                        fig_intake.add_trace(go.Scatter(x=calf_ath['Test Date'], y=calf_ath['Peak Vertical Force [N] (R)'], name="Calf Force (R)", mode='lines+markers', line=dict(color='#FF8200', dash='dash')))
                     
                     fig_intake.update_layout(height=240, margin=dict(l=0, r=0, t=10, b=0), template="simple_white", showlegend=True)
                     st.plotly_chart(fig_intake, use_container_width=True, config=LOCKED_CONFIG, key="intake_history_chart")
 
                 else:
-                    st.info(f"No Intake Testing records found for {selected_intake_athlete}.")
+                    st.info(f"No Intake Assessment records found for {selected_intake_athlete}.")
 
             # --- TAB 5: CROSS-SEASON TESTING COMPARISON ---
             with testing_season_tabs[4]:
@@ -478,7 +525,6 @@ if check_password():
 
                         fig_comp_cmj = make_subplots(specs=[[{"secondary_y": True}]])
                         
-                        # Bar trace
                         fig_comp_cmj.add_trace(
                             go.Bar(
                                 x=cmj_avg_season['Season'], 
@@ -494,7 +540,6 @@ if check_password():
                             secondary_y=False
                         )
                         
-                        # Line trace
                         fig_comp_cmj.add_trace(
                             go.Scatter(
                                 x=cmj_avg_season['Season'], 
