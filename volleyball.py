@@ -59,28 +59,40 @@ st.markdown("""
     .gallery-photo { border-radius: 50%; width: 110px; height: 110px; object-fit: cover; border: 4px solid #FF8200; }
     .section-header { font-size: 20px; font-weight: 800; color: #4895DB; border-bottom: 2px solid #FF8200; margin-top: 15px; margin-bottom: 10px; padding-bottom: 5px; text-transform: uppercase; }
 
-    /* Intake Cards Container Styling */
-    .intake-card {
+    /* Intake Compliance Styling */
+    .compliance-card {
         border: 1px solid #E5E5E7;
         border-radius: 12px;
         padding: 15px;
         background-color: #FFFFFF;
-        margin-bottom: 15px;
+        margin-bottom: 20px;
     }
-    .intake-card-header {
+    .compliance-card-header {
         font-weight: 800;
         font-size: 15px;
         color: #4895DB;
         border-bottom: 2px solid #FF8200;
         padding-bottom: 4px;
         margin-bottom: 12px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
     }
-    .intake-col-title {
+    .status-badge-green {
+        background-color: #28a745;
+        color: white;
+        padding: 3px 10px;
+        border-radius: 12px;
+        font-size: 11px;
         font-weight: 800;
-        font-size: 13px;
-        color: #1D1D1F;
-        margin-bottom: 8px;
-        text-transform: uppercase;
+    }
+    .status-badge-red {
+        background-color: #dc3545;
+        color: white;
+        padding: 3px 10px;
+        border-radius: 12px;
+        font-size: 11px;
+        font-weight: 800;
     }
 
     @media print {
@@ -454,9 +466,9 @@ if check_password():
                     else:
                         st.info(f"No External Rotation ROM testing records logged for {selected_athlete_test} in {s_label}.")
 
-            # --- TAB 4: INTAKE TESTING TAB ---
+            # --- TAB 4: INTAKE TESTING COMPLIANCE BOARD ---
             with testing_season_tabs[3]:
-                st.markdown("### Athlete Intake Assessment Data")
+                st.markdown("### Athlete Intake Performance Compliance Dashboard")
                 c_int_ath, _ = st.columns([2, 2])
                 with c_int_ath:
                     selected_intake_athlete = st.selectbox("Select Athlete for Intake Assessment", master_athlete_list, key="intake_ath_select")
@@ -476,18 +488,24 @@ if check_password():
                         pct = (diff / initial) * 100
                         arrow = "↑" if diff >= 0 else "↓"
                         color = "#28a745" if diff >= 0 else "#dc3545"
-                        return f"{fmt.format(current)}{unit} <span style='color:{color}; font-size:13px; font-weight:bold;'>({arrow} {abs(pct):.1f}%)</span>"
+                        return f"{fmt.format(current)}{unit} <span style='color:{color}; font-size:12px; font-weight:bold;'>({arrow} {abs(pct):.1f}%)</span>"
+
+                    def render_compliance_badge(is_met):
+                        if is_met:
+                            return '<span class="status-badge-green">TARGET MET</span>'
+                        else:
+                            return '<span class="status-badge-red">UNMET</span>'
 
                     # --- ROW 1: HIP AD/AB & SINGLE LEG CALF RAISE ---
                     col1, col2 = st.columns(2)
                     
                     with col1:
-                        st.markdown('<div class="intake-card"><div class="intake-card-header">HIP AD/AB FORCE & RATIOS</div>', unsafe_allow_html=True)
+                        st.markdown('<div class="compliance-card"><div class="compliance-card-header">HIP AD/AB FORCE & RATIOS</div>', unsafe_allow_html=True)
                         if not hip_ath.empty:
                             hip_ad = hip_ath[hip_ath['Direction'].str.contains('AD', case=False, na=False)] if 'Direction' in hip_ath.columns else hip_ath
                             hip_ab = hip_ath[hip_ath['Direction'].str.contains('AB', case=False, na=False)] if 'Direction' in hip_ath.columns else hip_ath
 
-                            def render_hip_side_by_side(dir_df, dir_label):
+                            def render_hip_side_by_side(dir_df, dir_label, force_target=250.0):
                                 if not dir_df.empty:
                                     base = dir_df.iloc[0]
                                     latest = dir_df.iloc[-1]
@@ -500,27 +518,29 @@ if check_password():
                                     l_imb = latest.get('Max Imbalance', 0.0)
                                     lL_rat, lR_rat = latest.get('L Max Ratio', 0.0), latest.get('R Max Ratio', 0.0)
 
-                                    st.markdown(f"**Direction: {dir_label}**")
+                                    is_met = (lL_f >= force_target) and (lR_f >= force_target)
+
+                                    st.markdown(f"<div style='display:flex; justify-content:space-between; align-items:center;'><b>Direction: {dir_label}</b> (Target: {force_target:.0f} N) {render_compliance_badge(is_met)}</div>", unsafe_allow_html=True)
                                     hc1, hc2 = st.columns(2)
                                     
                                     with hc1:
-                                        st.markdown(f"<div class='intake-col-title'>Initial Test ({base['Test Date'].strftime('%m/%d/%Y')})</div>", unsafe_allow_html=True)
+                                        st.markdown(f"<div class='intake-col-title' style='margin-top:6px;'>Initial Test ({base['Test Date'].strftime('%m/%d/%Y')})</div>", unsafe_allow_html=True)
                                         st.markdown(f"L Force: **{bL_f:.1f} N** &nbsp;|&nbsp; R Force: **{bR_f:.1f} N**<br>Imbalance: **{b_imb:.1f}%**<br>L Ratio: **{bL_rat:.2f}** &nbsp;|&nbsp; R Ratio: **{bR_rat:.2f}**", unsafe_allow_html=True)
 
                                     with hc2:
-                                        st.markdown(f"<div class='intake-col-title'>Latest Test ({latest['Test Date'].strftime('%m/%d/%Y')})</div>", unsafe_allow_html=True)
+                                        st.markdown(f"<div class='intake-col-title' style='margin-top:6px;'>Latest Test ({latest['Test Date'].strftime('%m/%d/%Y')})</div>", unsafe_allow_html=True)
                                         st.markdown(f"L Force: {render_val_with_arrow(lL_f, bL_f, '{:.1f}', ' N')} &nbsp;|&nbsp; R Force: {render_val_with_arrow(lR_f, bR_f, '{:.1f}', ' N')}<br>Imbalance: {l_imb:.1f}%<br>L Ratio: {render_val_with_arrow(lL_rat, bL_rat, '{:.2f}')} &nbsp;|&nbsp; R Ratio: {render_val_with_arrow(lR_rat, bR_rat, '{:.2f}')}", unsafe_allow_html=True)
 
                                     st.markdown("<hr style='margin:10px 0; border-top:1px solid #E5E5E7;'>", unsafe_allow_html=True)
 
-                            render_hip_side_by_side(hip_ad, "Adduction (AD)")
-                            render_hip_side_by_side(hip_ab, "Abduction (AB)")
+                            render_hip_side_by_side(hip_ad, "Adduction (AD)", force_target=250.0)
+                            render_hip_side_by_side(hip_ab, "Abduction (AB)", force_target=250.0)
                         else:
                             st.info("No Hip AD/AB records logged.")
                         st.markdown('</div>', unsafe_allow_html=True)
 
                     with col2:
-                        st.markdown('<div class="intake-card"><div class="intake-card-header">SINGLE LEG CALF RAISE</div>', unsafe_allow_html=True)
+                        st.markdown('<div class="compliance-card"><div class="compliance-card-header">SINGLE LEG CALF RAISE</div>', unsafe_allow_html=True)
                         if not calf_ath.empty:
                             base_calf = calf_ath.iloc[0]
                             latest_calf = calf_ath.iloc[-1]
@@ -536,6 +556,11 @@ if check_password():
                             lcL_bm = latest_calf.get('Peak Vertical Force / BM [N/kg] (L)', 0.0)
                             lcR_bm = latest_calf.get('Peak Vertical Force / BM [N/kg] (R)', 0.0)
                             l_asym = latest_calf.get('Peak Vertical Force [N] (Asym)(%)', 'N/A')
+
+                            target_force = 1800.0
+                            is_met_calf = (lcL_f >= target_force) and (lcR_f >= target_force)
+
+                            st.markdown(f"<div style='display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;'><b>Force Standard:</b> {target_force:.0f} N {render_compliance_badge(is_met_calf)}</div>", unsafe_allow_html=True)
 
                             cc1, cc2 = st.columns(2)
                             with cc1:
@@ -553,12 +578,12 @@ if check_password():
                     # --- ROW 2: SHOULDER IR/ER & ISO-Y ---
                     col3, col4 = st.columns(2)
                     with col3:
-                        st.markdown('<div class="intake-card"><div class="intake-card-header">SHOULDER IR / ER FORCE</div>', unsafe_allow_html=True)
+                        st.markdown('<div class="compliance-card"><div class="compliance-card-header">SHOULDER IR / ER FORCE</div>', unsafe_allow_html=True)
                         if not sh_ath.empty:
                             sh_ir = sh_ath[sh_ath['Direction'].str.contains('Internal|IR', case=False, na=False)] if 'Direction' in sh_ath.columns else sh_ath
                             sh_er = sh_ath[sh_ath['Direction'].str.contains('External|ER', case=False, na=False)] if 'Direction' in sh_ath.columns else sh_ath
 
-                            def render_sh_side_by_side(dir_df, dir_label):
+                            def render_sh_side_by_side(dir_df, dir_label, force_target=120.0):
                                 if not dir_df.empty:
                                     base = dir_df.iloc[0]
                                     latest = dir_df.iloc[-1]
@@ -571,27 +596,29 @@ if check_password():
                                     l_imb = latest.get('Max Imbalance', 0.0)
                                     lL_rat, lR_rat = latest.get('L Max Ratio', 0.0), latest.get('R Max Ratio', 0.0)
 
-                                    st.markdown(f"**Direction: {dir_label}**")
+                                    is_met = (lL_f >= force_target) and (lR_f >= force_target)
+
+                                    st.markdown(f"<div style='display:flex; justify-content:space-between; align-items:center;'><b>Direction: {dir_label}</b> (Target: {force_target:.0f} N) {render_compliance_badge(is_met)}</div>", unsafe_allow_html=True)
                                     sc1, sc2 = st.columns(2)
 
                                     with sc1:
-                                        st.markdown(f"<div class='intake-col-title'>Initial Test ({base['Test Date'].strftime('%m/%d/%Y')})</div>", unsafe_allow_html=True)
+                                        st.markdown(f"<div class='intake-col-title' style='margin-top:6px;'>Initial Test ({base['Test Date'].strftime('%m/%d/%Y')})</div>", unsafe_allow_html=True)
                                         st.markdown(f"L Force: **{bL_f:.1f} N** &nbsp;|&nbsp; R Force: **{bR_f:.1f} N**<br>Imbalance: **{b_imb:.1f}%**<br>L Ratio: **{bL_rat:.2f}** &nbsp;|&nbsp; R Ratio: **{bR_rat:.2f}**", unsafe_allow_html=True)
 
                                     with sc2:
-                                        st.markdown(f"<div class='intake-col-title'>Latest Test ({latest['Test Date'].strftime('%m/%d/%Y')})</div>", unsafe_allow_html=True)
+                                        st.markdown(f"<div class='intake-col-title' style='margin-top:6px;'>Latest Test ({latest['Test Date'].strftime('%m/%d/%Y')})</div>", unsafe_allow_html=True)
                                         st.markdown(f"L Force: {render_val_with_arrow(lL_f, bL_f, '{:.1f}', ' N')} &nbsp;|&nbsp; R Force: {render_val_with_arrow(lR_f, bR_f, '{:.1f}', ' N')}<br>Imbalance: {l_imb:.1f}%<br>L Ratio: {render_val_with_arrow(lL_rat, bL_rat, '{:.2f}')} &nbsp;|&nbsp; R Ratio: {render_val_with_arrow(lR_rat, bR_rat, '{:.2f}')}", unsafe_allow_html=True)
 
                                     st.markdown("<hr style='margin:10px 0; border-top:1px solid #E5E5E7;'>", unsafe_allow_html=True)
 
-                            render_sh_side_by_side(sh_ir, "Internal Rotation (IR)")
-                            render_sh_side_by_side(sh_er, "External Rotation (ER)")
+                            render_sh_side_by_side(sh_ir, "Internal Rotation (IR)", force_target=120.0)
+                            render_sh_side_by_side(sh_er, "External Rotation (ER)", force_target=120.0)
                         else:
                             st.info("No Shoulder IR/ER records logged.")
                         st.markdown('</div>', unsafe_allow_html=True)
 
                     with col4:
-                        st.markdown('<div class="intake-card"><div class="intake-card-header">ISO-Y STRENGTH (ASH SHEET)</div>', unsafe_allow_html=True)
+                        st.markdown('<div class="compliance-card"><div class="compliance-card-header">ISO-Y STRENGTH (ASH SHEET)</div>', unsafe_allow_html=True)
                         if not isoy_ath.empty:
                             base_isoy = isoy_ath.iloc[0]
                             latest_isoy = isoy_ath.iloc[-1]
@@ -603,6 +630,11 @@ if check_password():
                             lyL = latest_isoy.get('Peak Vertical Force [N] (L)', 0.0)
                             lyR = latest_isoy.get('Peak Vertical Force [N] (R)', 0.0)
                             ly_asym = latest_isoy.get('Peak Vertical Force [N] (Asym)(%)', 0.0)
+
+                            target_isoy = 150.0
+                            is_met_isoy = (lyL >= target_isoy) and (lyR >= target_isoy)
+
+                            st.markdown(f"<div style='display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;'><b>Strength Standard:</b> {target_isoy:.0f} N {render_compliance_badge(is_met_isoy)}</div>", unsafe_allow_html=True)
 
                             yc1, yc2 = st.columns(2)
                             with yc1:
