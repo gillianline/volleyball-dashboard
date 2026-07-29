@@ -208,7 +208,7 @@ def load_all_data():
         hip_df.columns = hip_df.columns.str.strip()
         hip_df.rename(columns={'Athlete': 'Name', 'Date': 'Test Date'}, inplace=True)
         hip_df['Test Date'] = pd.to_datetime(hip_df['Test Date'], errors='coerce')
-        for col in ['L Max Force (N)', 'R Max Force (N)', 'Max Imbalance']:
+        for col in ['L Max Force (N)', 'R Max Force (N)', 'Max Imbalance', 'L Max Ratio', 'R Max Ratio']:
             if col in hip_df.columns:
                 hip_df[col] = pd.to_numeric(hip_df[col].astype(str).str.replace(r'[^0-9.-]', '', regex=True), errors='coerce').fillna(0.0)
         hip_df['Season'] = hip_df['Test Date'].apply(assign_season)
@@ -441,40 +441,67 @@ if check_password():
                 has_data = not (calf_ath.empty and hip_ath.empty and sh_ath.empty and isoy_ath.empty)
 
                 if has_data:
+                    # Helper delta renderer
+                    def render_delta(current, initial, fmt="{:.1f}", unit=""):
+                        if initial == 0:
+                            return f"{fmt.format(current)}{unit}"
+                        diff = current - initial
+                        pct = (diff / initial) * 100
+                        arrow = "↑" if diff >= 0 else "↓"
+                        color = "#28a745" if diff >= 0 else "#dc3545"
+                        return f"{fmt.format(current)}{unit} <span style='color:{color}; font-size:14px; font-weight:bold;'>({arrow} {abs(pct):.1f}%)</span>"
+
                     # --- ROW 1: HIP AD/AB & SINGLE LEG CALF RAISE ---
                     col1, col2 = st.columns(2)
                     
                     with col1:
-                        st.markdown('<h4 style="color:#4895DB; font-weight:800;">HIP AD/AB FORCE</h4>', unsafe_allow_html=True)
+                        st.markdown('<h4 style="color:#4895DB; font-weight:800;">HIP AD/AB FORCE & RATIOS</h4>', unsafe_allow_html=True)
                         if not hip_ath.empty:
+                            base_hip = hip_ath.iloc[0]
                             latest_hip = hip_ath.iloc[-1]
+
                             hL_f = latest_hip.get('L Max Force (N)', 0.0)
                             hR_f = latest_hip.get('R Max Force (N)', 0.0)
                             h_imb = latest_hip.get('Max Imbalance', 0.0)
+                            hL_rat = latest_hip.get('L Max Ratio', 0.0)
+                            hR_rat = latest_hip.get('R Max Ratio', 0.0)
+
+                            bL_f = base_hip.get('L Max Force (N)', 0.0)
+                            bR_f = base_hip.get('R Max Force (N)', 0.0)
+                            bL_rat = base_hip.get('L Max Ratio', 0.0)
+                            bR_rat = base_hip.get('R Max Ratio', 0.0)
 
                             h1, h2, h3 = st.columns(3)
-                            h1.metric("L Max Force", f"{hL_f:.1f} N")
-                            h2.metric("R Max Force", f"{hR_f:.1f} N")
-                            h3.metric("Max Imbalance", f"{h_imb:.1f}%")
+                            h1.markdown(f"**L Max Force**<br>{render_delta(hL_f, bL_f, '{:.1f}', ' N')}", unsafe_allow_html=True)
+                            h2.markdown(f"**R Max Force**<br>{render_delta(hR_f, bR_f, '{:.1f}', ' N')}", unsafe_allow_html=True)
+                            h3.markdown(f"**Max Imbalance**<br>{h_imb:.1f}%", unsafe_allow_html=True)
+
+                            st.markdown(f"<div style='margin-top:10px;'><p style='margin:0; font-size:13px; color:#1D1D1F;'><b>L Max Ratio:</b> {render_delta(hL_rat, bL_rat, '{:.2f}')} &nbsp;|&nbsp; <b>R Max Ratio:</b> {render_delta(hR_rat, bR_rat, '{:.2f}')}</p></div>", unsafe_allow_html=True)
+                            st.markdown(f"<p style='font-size:11px; color:grey; margin-top:4px;'>Baseline Date: {base_hip['Test Date'].strftime('%m/%d/%Y')} | Tests Logged: {len(hip_ath)}</p>", unsafe_allow_html=True)
                         else:
                             st.info("No Hip AD/AB records logged.")
 
                     with col2:
                         st.markdown('<h4 style="color:#4895DB; font-weight:800;">SINGLE LEG CALF RAISE</h4>', unsafe_allow_html=True)
                         if not calf_ath.empty:
+                            base_calf = calf_ath.iloc[0]
                             latest_calf = calf_ath.iloc[-1]
+
                             cL_f = latest_calf.get('Peak Vertical Force [N] (L)', 0.0)
                             cR_f = latest_calf.get('Peak Vertical Force [N] (R)', 0.0)
                             cL_bm = latest_calf.get('Peak Vertical Force / BM [N/kg] (L)', 0.0)
                             cR_bm = latest_calf.get('Peak Vertical Force / BM [N/kg] (R)', 0.0)
                             asym = latest_calf.get('Peak Vertical Force [N] (Asym)(%)', 'N/A')
 
+                            bcL_f = base_calf.get('Peak Vertical Force [N] (L)', 0.0)
+                            bcR_f = base_calf.get('Peak Vertical Force [N] (R)', 0.0)
+
                             c1, c2, c3, c4 = st.columns(4)
-                            c1.metric("Force L", f"{cL_f:.0f} N")
-                            c2.metric("Force R", f"{cR_f:.0f} N")
-                            c3.metric("N/kg (L)", f"{cL_bm:.2f}")
-                            c4.metric("N/kg (R)", f"{cR_bm:.2f}")
-                            st.markdown(f"<p style='text-align:center; font-size:12px; color:grey; margin-top:5px;'><b>Asymmetry:</b> {asym}</p>", unsafe_allow_html=True)
+                            c1.markdown(f"**Force L**<br>{render_delta(cL_f, bcL_f, '{:.0f}', ' N')}", unsafe_allow_html=True)
+                            c2.markdown(f"**Force R**<br>{render_delta(cR_f, bcR_f, '{:.0f}', ' N')}", unsafe_allow_html=True)
+                            c3.markdown(f"**N/kg (L)**<br>{cL_bm:.2f}", unsafe_allow_html=True)
+                            c4.markdown(f"**N/kg (R)**<br>{cR_bm:.2f}", unsafe_allow_html=True)
+                            st.markdown(f"<p style='font-size:11px; color:grey; margin-top:8px;'><b>Asymmetry:</b> {asym} &nbsp;|&nbsp; Baseline Date: {base_calf['Test Date'].strftime('%m/%d/%Y')} | Tests Logged: {len(calf_ath)}</p>", unsafe_allow_html=True)
                         else:
                             st.info("No Single Leg Calf Raise records logged.")
 
@@ -485,45 +512,74 @@ if check_password():
                     with col3:
                         st.markdown('<h4 style="color:#4895DB; font-weight:800;">SHOULDER IR / ER FORCE</h4>', unsafe_allow_html=True)
                         if not sh_ath.empty:
+                            base_sh = sh_ath.iloc[0]
                             latest_sh = sh_ath.iloc[-1]
+
                             sL_f = latest_sh.get('L Max Force (N)', 0.0)
                             sR_f = latest_sh.get('R Max Force (N)', 0.0)
                             s_imb = latest_sh.get('Max Imbalance', 0.0)
                             sL_rat = latest_sh.get('L Max Ratio', 0.0)
                             sR_rat = latest_sh.get('R Max Ratio', 0.0)
 
+                            bsL_f = base_sh.get('L Max Force (N)', 0.0)
+                            bsR_f = base_sh.get('R Max Force (N)', 0.0)
+                            bsL_rat = base_sh.get('L Max Ratio', 0.0)
+                            bsR_rat = base_sh.get('R Max Ratio', 0.0)
+
                             s1, s2, s3 = st.columns(3)
-                            s1.metric("L Max Force", f"{sL_f:.1f} N")
-                            s2.metric("R Max Force", f"{sR_f:.1f} N")
-                            s3.metric("Max Imbalance", f"{s_imb:.1f}%")
-                            st.markdown(f"<p style='text-align:center; font-size:12px; color:grey; margin-top:5px;'><b>Max Ratio:</b> L: {sL_rat:.2f} | R: {sR_rat:.2f}</p>", unsafe_allow_html=True)
+                            s1.markdown(f"**L Max Force**<br>{render_delta(sL_f, bsL_f, '{:.1f}', ' N')}", unsafe_allow_html=True)
+                            s2.markdown(f"**R Max Force**<br>{render_delta(sR_f, bsR_f, '{:.1f}', ' N')}", unsafe_allow_html=True)
+                            s3.markdown(f"**Max Imbalance**<br>{s_imb:.1f}%", unsafe_allow_html=True)
+                            st.markdown(f"<div style='margin-top:10px;'><p style='margin:0; font-size:13px; color:#1D1D1F;'><b>L Max Ratio:</b> {render_delta(sL_rat, bsL_rat, '{:.2f}')} &nbsp;|&nbsp; <b>R Max Ratio:</b> {render_delta(sR_rat, bsR_rat, '{:.2f}')}</p></div>", unsafe_allow_html=True)
+                            st.markdown(f"<p style='font-size:11px; color:grey; margin-top:4px;'>Baseline Date: {base_sh['Test Date'].strftime('%m/%d/%Y')} | Tests Logged: {len(sh_ath)}</p>", unsafe_allow_html=True)
                         else:
                             st.info("No Shoulder IR/ER records logged.")
 
                     with col4:
                         st.markdown('<h4 style="color:#4895DB; font-weight:800;">ISO-Y STRENGTH (ASH SHEET)</h4>', unsafe_allow_html=True)
                         if not isoy_ath.empty:
+                            base_isoy = isoy_ath.iloc[0]
                             latest_isoy = isoy_ath.iloc[-1]
+
                             yL = latest_isoy.get('Peak Vertical Force [N] (L)', 0.0)
                             yR = latest_isoy.get('Peak Vertical Force [N] (R)', 0.0)
                             y_asym = latest_isoy.get('Peak Vertical Force [N] (Asym)(%)', 0.0)
 
+                            byL = base_isoy.get('Peak Vertical Force [N] (L)', 0.0)
+                            byR = base_isoy.get('Peak Vertical Force [N] (R)', 0.0)
+
                             y1, y2, y3 = st.columns(3)
-                            y1.metric("Force L", f"{yL:.0f} N")
-                            y2.metric("Force R", f"{yR:.0f} N")
-                            y3.metric("Asymmetry", f"{y_asym:+.1f}%")
+                            y1.markdown(f"**Force L**<br>{render_delta(yL, byL, '{:.0f}', ' N')}", unsafe_allow_html=True)
+                            y2.markdown(f"**Force R**<br>{render_delta(yR, byR, '{:.0f}', ' N')}", unsafe_allow_html=True)
+                            y3.markdown(f"**Asymmetry**<br>{y_asym:+.1f}%", unsafe_allow_html=True)
+                            st.markdown(f"<p style='font-size:11px; color:grey; margin-top:8px;'>Baseline Date: {base_isoy['Test Date'].strftime('%m/%d/%Y')} | Tests Logged: {len(isoy_ath)}</p>", unsafe_allow_html=True)
                         else:
                             st.info("No ISO-Y test records logged on ASH Sheet.")
 
-                    # Historical Trend Comparison Chart
-                    st.markdown("#### Single Leg Force & Strength Trends")
-                    fig_intake = go.Figure()
-                    if not calf_ath.empty:
-                        fig_intake.add_trace(go.Scatter(x=calf_ath['Test Date'], y=calf_ath['Peak Vertical Force [N] (L)'], name="Calf Force (L)", mode='lines+markers', line=dict(color='#4895DB')))
-                        fig_intake.add_trace(go.Scatter(x=calf_ath['Test Date'], y=calf_ath['Peak Vertical Force [N] (R)'], name="Calf Force (R)", mode='lines+markers', line=dict(color='#FF8200', dash='dash')))
-                    
-                    fig_intake.update_layout(height=240, margin=dict(l=0, r=0, t=10, b=0), template="simple_white", showlegend=True)
-                    st.plotly_chart(fig_intake, use_container_width=True, config=LOCKED_CONFIG, key="intake_history_chart")
+                    st.markdown('<hr style="display:block !important; margin:15px 0; border:0; border-top:1px solid #E5E5E7;" />', unsafe_allow_html=True)
+
+                    # --- MULTI-TEST HISTORICAL RECORD TABLE ---
+                    st.markdown("#### Historical Assessment Log (Test-over-Test)")
+                    test_type_choice = st.radio("Select Test Dataset to View History", ["Hip AD/AB", "Single Leg Calf Raise", "Shoulder IR/ER", "ISO-Y (ASH)"], horizontal=True, key="intake_history_choice")
+
+                    if test_type_choice == "Hip AD/AB" and not hip_ath.empty:
+                        df_display = hip_ath.copy()
+                        df_display['Date'] = df_display['Test Date'].dt.strftime('%m/%d/%Y')
+                        st.dataframe(df_display[['Date', 'L Max Force (N)', 'R Max Force (N)', 'Max Imbalance', 'L Max Ratio', 'R Max Ratio']], use_container_width=True, hide_index=True)
+                    elif test_type_choice == "Single Leg Calf Raise" and not calf_ath.empty:
+                        df_display = calf_ath.copy()
+                        df_display['Date'] = df_display['Test Date'].dt.strftime('%m/%d/%Y')
+                        st.dataframe(df_display[['Date', 'Peak Vertical Force [N] (L)', 'Peak Vertical Force [N] (R)', 'Peak Vertical Force / BM [N/kg] (L)', 'Peak Vertical Force / BM [N/kg] (R)', 'Peak Vertical Force [N] (Asym)(%)']], use_container_width=True, hide_index=True)
+                    elif test_type_choice == "Shoulder IR/ER" and not sh_ath.empty:
+                        df_display = sh_ath.copy()
+                        df_display['Date'] = df_display['Test Date'].dt.strftime('%m/%d/%Y')
+                        st.dataframe(df_display[['Date', 'L Max Force (N)', 'R Max Force (N)', 'Max Imbalance', 'L Max Ratio', 'R Max Ratio']], use_container_width=True, hide_index=True)
+                    elif test_type_choice == "ISO-Y (ASH)" and not isoy_ath.empty:
+                        df_display = isoy_ath.copy()
+                        df_display['Date'] = df_display['Test Date'].dt.strftime('%m/%d/%Y')
+                        st.dataframe(df_display[['Date', 'Peak Vertical Force [N] (L)', 'Peak Vertical Force [N] (R)', 'Peak Vertical Force [N] (Asym)(%)']], use_container_width=True, hide_index=True)
+                    else:
+                        st.info("No recorded history found for this specific test selection.")
 
                 else:
                     st.info(f"No Intake Assessment records found for {selected_intake_athlete}.")
