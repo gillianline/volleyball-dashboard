@@ -1303,71 +1303,7 @@ if check_password():
                         m_rate = s_m_avg[m] / s_m_avg['Duration'] if s_m_avg['Duration'] > 0 else 0
                         overall_html += f"""<tr><td style="padding: 10px; border: 1px solid #ddd;"><b>{m}</b></td><td style="padding: 10px; border: 1px solid #ddd;">{p_rate:.2f}</td><td style="padding: 10px; border: 1px solid #ddd;">{m_rate:.2f}</td><td style="padding: 10px; border: 1px solid #ddd; font-weight: bold;">{(((m_rate - p_rate) / p_rate * 100) if p_rate > 0 else 0):+.1f}%</td></tr>"""
                     st.markdown(overall_html + "</table>", unsafe_allow_html=True)
-# ==========================================
-            # --- TAB CLAUSE 6: POSITION ANALYSIS ------
-            # ==========================================
-            elif st.session_state.active_tab_state == "Position Analysis":
-                df_t7 = df_master.copy()
-                st.markdown('<div class="section-header">Positional Performance Trends</div>', unsafe_allow_html=True)
-                
-                if df_t7.empty or df_t7['Week'].dropna().empty:
-                    st.warning("No practice data recorded yet for the selected season.")
-                else:
-                    pos_filter_an = st.selectbox("Select Position to Analyze", sorted([p for p in df_t7['Position'].unique() if p != "N/A"]), key="pos_an_filt_main_t7")
-                    
-                    max_wk = df_t7['Week'].max()
-                    if pd.isna(max_wk): max_wk = 0
-                    
-                    rec_4 = list(range(max(0, int(max_wk) - 3), int(max_wk) + 1))
-                    tr_df = df_t7[(df_t7['Week'].isin(rec_4)) & (df_t7['Position'] == pos_filter_an)]
-                    players_in_pos = sorted(tr_df['Name'].unique()) if not tr_df.empty else []
-                    
-                    if players_in_pos:
-                        tr_metrics = ["Player Load", "Estimated Distance (y)", "Explosive Efforts", "Total Jumps"]
-                        pos_weekly_sums = tr_df.groupby(['Week', 'Name'])[tr_metrics].sum().reset_index()
-                        pos_avg_weekly_total = pos_weekly_sums[tr_metrics].max().fillna(0.0)
 
-                        for name in players_in_pos:
-                            p_data = tr_df[tr_df['Name'] == name]
-                            p_weekly_sums = p_data.groupby('Week')[tr_metrics].sum().reset_index()
-                            p_avg_weekly_total = p_weekly_sums[tr_metrics].max().fillna(0.0)
-
-                            # Helper function to prevent NaN formatting crashes
-                            def safe_fmt(val):
-                                return "0" if pd.isna(val) or math.isnan(val) else f"{val:.0f}"
-
-                            c_card1, c_card2 = st.columns([1.5, 3], gap="large")
-                            with c_card1:
-                                photo_url_val = p_data["PhotoURL"].iloc[0] if ("PhotoURL" in p_data.columns and not p_data.empty) else "https://www.w3schools.com/howto/img_avatar.png"
-                                st.markdown(f"""<div class="player-row-container" style="padding: 20px; border: 1px solid #E5E5E7; border-radius:15px; background:white; margin-bottom: 0px;"><div style="text-align:center; padding:15px; background:#f8f9fa; border-bottom:2px solid #FF8200; border-radius: 12px;"><div style="width:90px; height:90px; border-radius:50%; background-color: white; overflow: hidden; display: flex; align-items: center; justify-content: center; border: 3px solid #FF8200; margin: 0 auto 10px auto;"><img src="{photo_url_val}" style="width:100%; height:100%; object-fit: contain;"></div><p style="margin:0; font-weight:900; color:#1D1D1F; font-size:18px;">{name}</p><p style="margin:0; font-size:12px; color:grey;">Weekly Max Volume</p></div><table class="scout-table" style="width:100%; margin-top:15px;"><thead><tr><th>Metric</th><th>Athlete Max</th><th>Pos. Max Total</th></tr></thead><tbody><tr><td style="font-weight:700;">Player Load</td><td>{safe_fmt(p_avg_weekly_total['Player Load'])}</td><td>{safe_fmt(pos_avg_weekly_total['Player Load'])}</td></tr><tr><td style="font-weight:700;">Est. Dist (y)</td><td>{safe_fmt(p_avg_weekly_total['Estimated Distance (y)'])}</td><td>{safe_fmt(pos_avg_weekly_total['Estimated Distance (y)'])}</td></tr><tr><td style="font-weight:700;">Explosive</td><td>{safe_fmt(p_avg_weekly_total['Explosive Efforts'])}</td><td>{safe_fmt(pos_avg_weekly_total['Explosive Efforts'])}</td></tr><tr><td style="font-weight:700;">Total Jumps</td><td>{safe_fmt(p_avg_weekly_total['Total Jumps'])}</td><td>{safe_fmt(pos_avg_weekly_total['Total Jumps'])}</td></tr></tbody></table></div>""", unsafe_allow_html=True)
-
-                            with c_card2:
-                                st.write("<div style='height: 25px;'></div>", unsafe_allow_html=True)
-                                t_cols = st.columns(2) 
-                                for i, m in enumerate(tr_metrics):
-                                    with t_cols[i % 2]:
-                                        fig_t = go.Figure()
-                                        p_t = p_data.groupby('Week')[m].sum().reset_index()
-                                        fig_t.add_trace(go.Scatter(x=p_t['Week'], y=p_t[m], name="Athlete", line=dict(color='#4895DB', width=4), mode='lines+markers'))
-                                        g_t = tr_df.groupby(['Week', 'Name'])[m].sum().reset_index().groupby('Week')[m].max().reset_index()
-                                        fig_t.add_trace(go.Scatter(x=g_t['Week'], y=g_t[m], name="Pos. Max", line=dict(color='#FF8200', dash='dash', width=2), mode='lines'))
-                                        
-                                        fig_t.update_layout(
-                                            title=dict(text=f"<b>Weekly Trend: {m.split(' (')[0]}</b>", font=dict(size=12), x=0.5, y=0.95), 
-                                            xaxis=dict(dtick=1, showgrid=False, title="Week"), 
-                                            yaxis=dict(showgrid=True, gridcolor='#F5F5F7', rangemode='tozero', title=m), 
-                                            height=270, 
-                                            margin=dict(l=20, r=20, t=50, b=65), 
-                                            showlegend=True, 
-                                            legend=dict(orientation="h", y=-0.4, x=0.5, xanchor="center"), 
-                                            template="simple_white"
-                                        )
-                                        st.plotly_chart(fig_t, use_container_width=True, config=LOCKED_CONFIG, key=f"trend_{name}_{m}_t7")
-                            st.write("<div style='height: 30px;'></div>", unsafe_allow_html=True)
-                    else:
-                        st.info("No recorded positional data found for the current week range.")
-
-                        
             # ==========================================
             # --- TAB CLAUSE 5: MATCH SUMMARY ----------
             # ==========================================
@@ -1421,7 +1357,59 @@ if check_password():
                                 fig_ath.add_trace(go.Bar(name=f"Load ({r['Session_Name']})", x=['Player Load'], y=[r['Player Load']], marker=dict(color=m_map[r['Session_Name']], opacity=0.3), showlegend=False, offsetgroup=r['Session_Name']), secondary_y=True)
                             fig_ath.update_layout(barmode='group', height=260, margin=dict(l=10, r=10, t=10, b=80), template="simple_white", font=dict(color="#333333", size=10), legend=dict(orientation="h", yanchor="top", y=-0.3, xanchor="center", x=0.5), yaxis=dict(showgrid=False, title="Jumps / Efforts"), yaxis2=dict(showgrid=False, title="Player Load", overlaying='y', side='right'))
                             st.plotly_chart(fig_ath, use_container_width=True, config=LOCKED_CONFIG, key=f"match_breakdown_{name}")
-                        st.markdown('</div>', unsafe_allow_html=
+                        st.markdown('</div>', unsafe_allow_html=True)
+
+            # ==========================================
+            # --- TAB CLAUSE 6: POSITION ANALYSIS ------
+            # ==========================================
+            elif st.session_state.active_tab_state == "Position Analysis":
+                df_t7 = df_master.copy()
+                st.markdown('<div class="section-header">Positional Performance Trends</div>', unsafe_allow_html=True)
+                pos_filter_an = st.selectbox("Select Position to Analyze", sorted([p for p in df_t7['Position'].unique() if p != "N/A"]), key="pos_an_filt_main_t7")
+                
+                max_wk = df_t7['Week'].max()
+                rec_4 = list(range(max(0, int(max_wk) - 3), int(max_wk) + 1))
+                tr_df = df_t7[(df_t7['Week'].isin(rec_4)) & (df_t7['Position'] == pos_filter_an)]
+                players_in_pos = sorted(tr_df['Name'].unique())
+                
+                if players_in_pos:
+                    tr_metrics = ["Player Load", "Estimated Distance (y)", "Explosive Efforts", "Total Jumps"]
+                    pos_weekly_sums = tr_df.groupby(['Week', 'Name'])[tr_metrics].sum().reset_index()
+                    pos_avg_weekly_total = pos_weekly_sums[tr_metrics].max()
+
+                    for name in players_in_pos:
+                        p_data = tr_df[tr_df['Name'] == name]
+                        p_weekly_sums = p_data.groupby('Week')[tr_metrics].sum().reset_index()
+                        p_avg_weekly_total = p_weekly_sums[tr_metrics].max()
+
+                        c_card1, c_card2 = st.columns([1.5, 3], gap="large")
+                        with c_card1:
+                            st.markdown(f"""<div class="player-row-container" style="padding: 20px; border: 1px solid #E5E5E7; border-radius:15px; background:white; margin-bottom: 0px;"><div style="text-align:center; padding:15px; background:#f8f9fa; border-bottom:2px solid #FF8200; border-radius: 12px;"><div style="width:90px; height:90px; border-radius:50%; background-color: white; overflow: hidden; display: flex; align-items: center; justify-content: center; border: 3px solid #FF8200; margin: 0 auto 10px auto;"><img src="{p_data["PhotoURL"].iloc[0]}" style="width:100%; height:100%; object-fit: contain;"></div><p style="margin:0; font-weight:900; color:#1D1D1F; font-size:18px;">{name}</p><p style="margin:0; font-size:12px; color:grey;">Weekly Max Volume</p></div><table class="scout-table" style="width:100%; margin-top:15px;"><thead><tr><th>Metric</th><th>Athlete Max</th><th>Pos. Max Total</th></tr></thead><tbody><tr><td style="font-weight:700;">Player Load</td><td>{p_avg_weekly_total['Player Load']:.0f}</td><td>{pos_avg_weekly_total['Player Load']:.0f}</td></tr><tr><td style="font-weight:700;">Est. Dist (y)</td><td>{p_avg_weekly_total['Estimated Distance (y)']:.0f}</td><td>{pos_avg_weekly_total['Estimated Distance (y)']:.0f}</td></tr><tr><td style="font-weight:700;">Explosive</td><td>{p_avg_weekly_total['Explosive Efforts']:.0f}</td><td>{pos_avg_weekly_total['Explosive Efforts']:.0f}</td></tr><tr><td style="font-weight:700;">Total Jumps</td><td>{p_avg_weekly_total['Total Jumps']:.0f}</td><td>{pos_avg_weekly_total['Total Jumps']:.0f}</td></tr></tbody></table></div>""", unsafe_allow_html=True)
+
+                        with c_card2:
+                            st.write("<div style='height: 25px;'></div>", unsafe_allow_html=True)
+                            t_cols = st.columns(2) 
+                            for i, m in enumerate(tr_metrics):
+                                with t_cols[i % 2]:
+                                    fig_t = go.Figure()
+                                    p_t = p_data.groupby('Week')[m].sum().reset_index()
+                                    fig_t.add_trace(go.Scatter(x=p_t['Week'], y=p_t[m], name="Athlete", line=dict(color='#4895DB', width=4), mode='lines+markers'))
+                                    g_t = tr_df.groupby(['Week', 'Name'])[m].sum().reset_index().groupby('Week')[m].max().reset_index()
+                                    fig_t.add_trace(go.Scatter(x=g_t['Week'], y=g_t[m], name="Pos. Max", line=dict(color='#FF8200', dash='dash', width=2), mode='lines'))
+                                    
+                                    fig_t.update_layout(
+                                        title=dict(text=f"<b>Weekly Trend: {m.split(' (')[0]}</b>", font=dict(size=12), x=0.5, y=0.95), 
+                                        xaxis=dict(dtick=1, showgrid=False, title="Week"), 
+                                        yaxis=dict(showgrid=True, gridcolor='#F5F5F7', rangemode='tozero', title=m), 
+                                        height=270, 
+                                        margin=dict(l=20, r=20, t=50, b=65), 
+                                        showlegend=True, 
+                                        legend=dict(orientation="h", y=-0.4, x=0.5, xanchor="center"), 
+                                        template="simple_white"
+                                    )
+                                    st.plotly_chart(fig_t, use_container_width=True, config=LOCKED_CONFIG, key=f"trend_{name}_{m}_t7")
+                        st.write("<div style='height: 30px;'></div>", unsafe_allow_html=True)
+
             # ==========================================
             # --- TAB CLAUSE 7: PHASE ANALYSIS ---------
             # ==========================================
