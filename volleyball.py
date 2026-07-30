@@ -1011,7 +1011,7 @@ if check_password():
                                     val = p_session_row[k]
                                     mx = lb_sums[k].max() if (not lb_sums.empty and k in lb_sums.columns and lb_sums[k].max() > 0) else 1.0
                                     avg = lb_sums[k].mean() if (not lb_sums.empty and k in lb_sums.columns and lb_sums[k].mean() > 0) else 1.0
-                                    g = math.ceil((val / mx) * 100) if mx > 0 else 0
+                                    g = math.ceil((val / avg) * 100) if avg > 0 else 0  # <--- Changed mx to avg
                                     t_grade += g; c_metrics += 1
                                     diff = (val - avg) / avg if avg != 0 else 0
                                     h_class = "class='bg-highlight-red'" if abs(diff) > 0.10 else ""
@@ -1068,9 +1068,10 @@ if check_password():
                                 r_html = ""; t_grade = 0; c_metrics = 0
                                 for k in filtered_metrics_comb:
                                     val = p_session_row[k]
+                                    val = p_session_row[k]
                                     mx = lb_sums[k].max() if not lb_sums.empty else 1.0
                                     avg = lb_sums[k].mean() if not lb_sums.empty else 1.0
-                                    g = math.ceil((val / mx) * 100) if mx > 0 else 0
+                                    g = math.ceil((val / avg) * 100) if avg > 0 else 0
                                     t_grade += g; c_metrics += 1
                                     diff = (val - avg) / avg if avg != 0 else 0
                                     h_class = "class='bg-highlight-red'" if abs(diff) > 0.15 else ""
