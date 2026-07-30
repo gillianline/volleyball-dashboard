@@ -147,6 +147,8 @@ def load_all_data():
         m = date_val.month
         d = date_val.day
         y = date_val.year
+    
+        # Pre-Season starts July 30th onward
         if y == 2026 and m == 7 and d >= 30: return 'Pre-Season'
         elif y == 2026 and m >= 8: return 'Pre-Season'
         elif 1 <= m <= 4: return 'Spring'
