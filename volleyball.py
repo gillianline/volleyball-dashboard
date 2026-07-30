@@ -151,7 +151,7 @@ def load_all_data():
         elif y == 2026 and m >= 8: return 'Pre-Season'
         elif 1 <= m <= 4: return 'Spring'
         elif m == 5 and d >= 26: return 'Summer'
-        elif m >= 5 and m <= 8: return 'Summer'
+        elif m >= 5 and m <= 7: return 'Summer'
         else: return 'Spring'
 
     df = pd.read_csv(st.secrets["GOOGLE_SHEET_URL"])
