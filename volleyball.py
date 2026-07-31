@@ -811,9 +811,9 @@ if check_password():
                     p_row = pd.Series({m: 0.0 for m in all_metrics})
                     p_row['Name'] = selected_athlete_prof
 
+                # Updated: Look at individual practice records in the 30-day lookback window instead of daily combined sums
                 p_full_prof = df_t0[df_t0['Name'] == selected_athlete_prof]
-                daily_sums_prof = p_full_prof.groupby('Date')[all_metrics].sum().reset_index()
-                lb_prof = daily_sums_prof[(daily_sums_prof['Date'].dt.date >= curr_date_prof.date() - timedelta(days=30)) & (daily_sums_prof['Date'].dt.date <= curr_date_prof.date())]
+                lb_prof = p_full_prof[(p_full_prof['Date'].dt.date >= curr_date_prof.date() - timedelta(days=30)) & (p_full_prof['Date'].dt.date <= curr_date_prof.date())]
 
                 filtered_metrics_prof = [m for m in all_metrics if m not in ['High Jumps', 'Moderate Jumps', 'High Intensity Movement']]
                 r_html_prof = ""; t_grade_prof = 0; c_metrics_prof = 0
@@ -1003,8 +1003,9 @@ if check_password():
                                 p_session_row = display_df[display_df['Name'] == name].iloc[0]
                                 p_full_g = df_t1[df_t1['Name'] == name]
                                 
-                                daily_sums_g = p_full_g.groupby('Date')[all_metrics].sum().reset_index()
-                                lb_sums = daily_sums_g[(daily_sums_g['Date'].dt.date >= curr_date_gal.date() - timedelta(days=30)) & (daily_sums_g['Date'].dt.date <= curr_date_gal.date())]
+                                # Updated: Derive 30-day max benchmarks directly from session-level entries
+                                p_full_g = df_t1[df_t1['Name'] == name]
+                                lb_sums = p_full_g[(p_full_g['Date'].dt.date >= curr_date_gal.date() - timedelta(days=30)) & (p_full_g['Date'].dt.date <= curr_date_gal.date())]
                                 
                                 r_html = ""; t_grade = 0; c_metrics = 0
                                 for k in filtered_metrics_gal:
