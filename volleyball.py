@@ -812,8 +812,15 @@ if check_password():
                     p_row['Name'] = selected_athlete_prof
 
                 # Updated: Look at individual practice records in the 30-day lookback window instead of daily combined sums
+                # Updated: Look at practice sessions up to the current row index/Sheet_Order within the 30-day window
                 p_full_prof = df_t0[df_t0['Name'] == selected_athlete_prof]
-                lb_prof = p_full_prof[(p_full_prof['Date'].dt.date >= curr_date_prof.date() - timedelta(days=30)) & (p_full_prof['Date'].dt.date <= curr_date_prof.date())]
+                curr_order = p_row.get('Sheet_Order', float('inf'))
+
+                lb_prof = p_full_prof[
+                    (p_full_prof['Date'].dt.date >= curr_date_prof.date() - timedelta(days=30)) & 
+                    (p_full_prof['Date'].dt.date <= curr_date_prof.date()) &
+                    (p_full_prof['Sheet_Order'] <= curr_order)
+                ]
 
                 filtered_metrics_prof = [m for m in all_metrics if m not in ['High Jumps', 'Moderate Jumps', 'High Intensity Movement']]
                 r_html_prof = ""; t_grade_prof = 0; c_metrics_prof = 0
@@ -1004,8 +1011,14 @@ if check_password():
                                 p_full_g = df_t1[df_t1['Name'] == name]
                                 
                                 # Updated: Derive 30-day max benchmarks directly from session-level entries
-                                p_full_g = df_t1[df_t1['Name'] == name]
-                                lb_sums = p_full_g[(p_full_g['Date'].dt.date >= curr_date_gal.date() - timedelta(days=30)) & (p_full_g['Date'].dt.date <= curr_date_gal.date())]
+                                # Updated: Ensure practice 1 only looks at historical sessions + itself, not future sessions on the same day
+                                curr_order = p_session_row.get('Sheet_Order', float('inf'))
+
+                                lb_sums = p_full_g[
+                                    (p_full_g['Date'].dt.date >= curr_date_gal.date() - timedelta(days=30)) & 
+                                    (p_full_g['Date'].dt.date <= curr_date_gal.date()) &
+                                    (p_full_g['Sheet_Order'] <= curr_order)
+                                ]
                                 
                                 r_html = ""; t_grade = 0; c_metrics = 0
                                 for k in filtered_metrics_gal:
