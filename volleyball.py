@@ -1270,10 +1270,24 @@ if check_password():
                                 
                         fig_master.update_layout(
                             template="simple_white", 
-                            height=480, 
-                            xaxis=dict(type='category', title="Date"), 
-                            yaxis=dict(range=[0, 120], automargin=True, tickvals=[0, 20, 40, 60, 80, 100]), 
-                            legend=dict(orientation="h", yanchor="bottom", y=-0.2, x=0.5, xanchor="center")
+                            height=500, 
+                            margin=dict(l=40, r=20, t=40, b=90),
+                            xaxis=dict(
+                                type='category', 
+                                title=dict(text="Date", standoff=15)
+                            ), 
+                            yaxis=dict(
+                                range=[0, 120], 
+                                automargin=True, 
+                                tickvals=[0, 20, 40, 60, 80, 100]
+                            ), 
+                            legend=dict(
+                                orientation="h", 
+                                yanchor="top", 
+                                y=-0.28, 
+                                x=0.5, 
+                                xanchor="center"
+                            )
                         )
                         st.plotly_chart(fig_master, use_container_width=True, key=f"master_full_flow_{sel_ath_hist}_t4")
 
