@@ -1175,32 +1175,96 @@ if check_password():
                     sel_ath_hist = st.selectbox("Select Athlete", sorted(df_t4['Name'].unique()), key="master_ath_sel_t4")
                     p_full = df_t4[df_t4['Name'] == sel_ath_hist].copy()
                     p_full['Date'] = pd.to_datetime(p_full['Date'])
-                    daily_raw = p_full.groupby(['Date', 'Week']).agg({**{m: 'sum' for m in metrics_to_score}, 'Session_Name': lambda x: ' | '.join(x.astype(str)), 'Session_Type': lambda x: ' | '.join(x.astype(str))}).reset_index().sort_values('Date')
-                
+                    
+                    # Sort sessions chronologically and maintain session-level granularity
+                    p_sessions = p_full.sort_values(['Date', 'Sheet_Order']).reset_index(drop=True)
+                    
+                    # Count practices per day to create distinct labels for multi-practice days
+                    p_sessions['Day_Practice_Num'] = p_sessions.groupby(p_sessions['Date'].dt.date).cumcount() + 1
+                    p_sessions['Day_Practice_Total'] = p_sessions.groupby(p_sessions['Date'].dt.date)['Date'].transform('count')
+
                     scores_list = []
-                    for idx, row in daily_raw.iterrows():
+                    for idx, row in p_sessions.iterrows():
                         row_grades = []
-                        lb_sums = daily_raw[(daily_raw['Date'] >= row['Date'] - timedelta(days=30)) & (daily_raw['Date'] <= row['Date'])]
+                        curr_order = row.get('Sheet_Order', float('inf'))
+                        
+                        # Lookback: individual practice sessions up to the current session (ignoring future sessions on same day)
+                        lb_sums = p_full[
+                            (p_full['Date'] >= row['Date'] - timedelta(days=30)) & 
+                            (p_full['Date'] <= row['Date']) &
+                            (p_full['Sheet_Order'] <= curr_order)
+                        ]
+                        
                         for m in metrics_to_score:
                             val = row[m]
-                            mx = lb_sums[m].max()
+                            mx = lb_sums[m].max() if not lb_sums.empty else 1.0
                             row_grades.append(math.ceil((val / mx) * 100) if mx > 0 else 0)
+                            
                         is_match = any(w in str(row['Session_Name']).upper() or w in str(row['Session_Type']).upper() for w in ['MATCH', 'GAME'])
-                        scores_list.append({'Date': row['Date'], 'Display': row['Date'].strftime('%m/%d'), 'Score': int(math.ceil(sum(row_grades) / len(row_grades))), 'Type': 'Match' if is_match else 'Practice', 'Week': str(row['Week'])})
+                        
+                        # Format x-axis label (e.g., "08/12 P1", "08/12 P2" if multiple practices occur)
+                        base_date_str = row['Date'].strftime('%m/%d')
+                        if row['Day_Practice_Total'] > 1 and not is_match:
+                            display_str = f"{base_date_str} P{row['Day_Practice_Num']}"
+                        else:
+                            display_str = base_date_str
+
+                        scores_list.append({
+                            'Date': row['Date'], 
+                            'Sheet_Order': curr_order,
+                            'Display': display_str, 
+                            'Score': int(math.ceil(sum(row_grades) / len(row_grades))) if row_grades else 0, 
+                            'Type': 'Match' if is_match else 'Practice', 
+                            'Week': str(row['Week'])
+                        })
                 
                     master_df_history = pd.DataFrame(scores_list).reset_index(drop=True)
                     st.markdown(f"### Full Season Performance: {sel_ath_hist}")
                     if not master_df_history.empty:
                         fig_master = px.line(master_df_history, x='Display', y='Score', range_y=[0, 110])
+                        
                         prac_df = master_df_history[master_df_history['Type'] == 'Practice']
-                        if not prac_df.empty: fig_master.add_trace(go.Scatter(x=prac_df['Display'], y=prac_df['Score'], mode='markers+text', text=prac_df['Score'], textposition="top center", name="Practice", marker=dict(size=8, color='#4895DB', line=dict(width=1, color='white'))))
+                        if not prac_df.empty: 
+                            fig_master.add_trace(go.Scatter(
+                                x=prac_df['Display'], 
+                                y=prac_df['Score'], 
+                                mode='markers+text', 
+                                text=prac_df['Score'], 
+                                textposition="top center", 
+                                name="Practice", 
+                                marker=dict(size=8, color='#4895DB', line=dict(width=1, color='white'))
+                            ))
+                            
                         match_df_line = master_df_history[master_df_history['Type'] == 'Match']
-                        if not match_df_line.empty: fig_master.add_trace(go.Scatter(x=match_df_line['Display'], y=match_df_line['Score'], mode='markers+text', text=[f"<b>{s}</b>" for s in match_df_line['Score']], textposition="top center", name="Match Day", marker=dict(size=15, color='#FF8200', line=dict(width=3, color='#31333F')), textfont=dict(color='#31333F', size=13, weight='bold')))
+                        if not match_df_line.empty: 
+                            fig_master.add_trace(go.Scatter(
+                                x=match_df_line['Display'], 
+                                y=match_df_line['Score'], 
+                                mode='markers+text', 
+                                text=[f"<b>{s}</b>" for s in match_df_line['Score']], 
+                                textposition="top center", 
+                                name="Match Day", 
+                                marker=dict(size=15, color='#FF8200', line=dict(width=3, color='#31333F')), 
+                                textfont=dict(color='#31333F', size=13, weight='bold')
+                            ))
+                            
                         for i in range(1, len(master_df_history)):
                             if master_df_history.iloc[i]['Week'] != master_df_history.iloc[i-1]['Week']:
                                 fig_master.add_vline(x=i-0.5, line_dash="dash", line_color="#515154", opacity=0.3)
-                                fig_master.add_annotation(x=i-0.5, y=0.98, yref="paper", text=f"Wk {master_df_history.iloc[i]['Week']}", showarrow=False, bgcolor="white", font=dict(size=10, color="#515154"), yanchor="top")
-                        fig_master.update_layout(template="simple_white", height=480, xaxis=dict(type='category', title="Date"), yaxis=dict(range=[0, 120], automargin=True, tickvals=[0, 20, 40, 60, 80, 100]), legend=dict(orientation="h", yanchor="bottom", y=-0.2, x=0.5, xanchor="center"))
+                                fig_master.add_annotation(
+                                    x=i-0.5, y=0.98, yref="paper", 
+                                    text=f"Wk {master_df_history.iloc[i]['Week']}", 
+                                    showarrow=False, bgcolor="white", 
+                                    font=dict(size=10, color="#515154"), yanchor="top"
+                                )
+                                
+                        fig_master.update_layout(
+                            template="simple_white", 
+                            height=480, 
+                            xaxis=dict(type='category', title="Session Date / Practice #"), 
+                            yaxis=dict(range=[0, 120], automargin=True, tickvals=[0, 20, 40, 60, 80, 100]), 
+                            legend=dict(orientation="h", yanchor="bottom", y=-0.2, x=0.5, xanchor="center")
+                        )
                         st.plotly_chart(fig_master, use_container_width=True, key=f"master_full_flow_{sel_ath_hist}_t4")
 
                     st.markdown("### CMJ Baseline vs. Post-Match Recovery")
@@ -1251,19 +1315,29 @@ if check_password():
                         for j in range(2):
                             if i + j < len(ath_names):
                                 name = ath_names[i+j]
-                                p_all = df_t4[df_t4['Name'] == name].copy()
-                                p_daily = p_all.groupby(['Date', 'Week'])[metrics_to_score].sum().reset_index().sort_values('Date')
-                                w_daily = p_daily[p_daily['Week'].astype(str) == str(sel_week)]
+                                p_all = df_t4[df_t4['Name'] == name].sort_values(['Date', 'Sheet_Order']).reset_index(drop=True)
+                                w_daily = p_all[p_all['Week'].astype(str) == str(sel_week)]
                                 
                                 if not w_daily.empty:
                                     card_scores = []
-                                    for _, r in w_daily.iterrows():
+                                    w_daily_counts = w_daily.groupby(w_daily['Date'].dt.date)['Date'].transform('count')
+                                    w_daily_cum = w_daily.groupby(w_daily['Date'].dt.date).cumcount() + 1
+                                    
+                                    for idx, r in w_daily.iterrows():
                                         r_grades = []
-                                        lb = p_daily[(p_daily['Date'] >= r['Date'] - timedelta(days=30)) & (p_daily['Date'] <= r['Date'])]
+                                        curr_order = r.get('Sheet_Order', float('inf'))
+                                        lb = p_all[
+                                            (p_all['Date'] >= r['Date'] - timedelta(days=30)) & 
+                                            (p_all['Date'] <= r['Date']) &
+                                            (p_all['Sheet_Order'] <= curr_order)
+                                        ]
                                         for m in metrics_to_score:
                                             mx = lb[m].max() if not lb.empty else 1.0
                                             r_grades.append(math.ceil((r[m] / mx) * 100) if mx > 0 else 0)
-                                        card_scores.append({'Display': r['Date'].strftime('%m/%d'), 'Score': round(sum(r_grades)/len(r_grades), 0)})
+                                            
+                                        base_str = r['Date'].strftime('%m/%d')
+                                        disp_str = f"{base_str} P{w_daily_cum.loc[idx]}" if w_daily_counts.loc[idx] > 1 else base_str
+                                        card_scores.append({'Display': disp_str, 'Score': round(sum(r_grades)/len(r_grades), 0) if r_grades else 0})
                                     
                                     with cols[j]:
                                         st.markdown(f'<div style="border:1px solid #E5E5E7; border-top:4px solid #FF8200; border-radius:10px 10px 0 0; padding:10px; background:white;"><div style="display:flex; align-items:center; gap:12px;"><div style="width:60px; height:60px; border-radius:50%; background-color:white; overflow: hidden; display: flex; align-items: center; justify-content: center; border: 2px solid white; box-shadow: 0 1px 3px rgba(0,0,0,0.1);"><img src="{p_all.iloc[0]["PhotoURL"]}" style="width:100%; height:100%; object-fit:contain;"></div><p style="margin:0; font-weight:900; font-size:16px; color:#31333F;">{name}</p></div></div>', unsafe_allow_html=True)
