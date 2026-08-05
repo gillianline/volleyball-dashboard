@@ -484,7 +484,7 @@ if check_password():
 
                     hud_col1, hud_col2 = st.columns([1.2, 1.8])
 
-                    # --- LEFT PANEL: ISOLATED HTML COMPONENT ---
+                    # --- LEFT PANEL: LIGHT ANATOMY MAP COMPONENT ---
                     with hud_col1:
                         hud_html = """
                         <!DOCTYPE html>
@@ -498,14 +498,14 @@ if check_password():
                                 font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
                             }
                             .hud-dashboard-card {
-                                background: #0B132B;
+                                background: #FFFFFF;
                                 border-radius: 16px;
                                 padding: 16px;
-                                border: 1px solid #1C2541;
-                                box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+                                border: 1px solid #E5E5E7;
+                                box-shadow: 0 4px 12px rgba(0,0,0,0.03);
                             }
                             .hud-header-title {
-                                color: #FFFFFF;
+                                color: #1D1D1F;
                                 font-weight: 800;
                                 font-size: 13px;
                                 letter-spacing: 1px;
@@ -518,9 +518,9 @@ if check_password():
                                 position: relative;
                                 width: 100%;
                                 height: 380px;
-                                background: #050B1A;
+                                background: #F8F9FA;
                                 border-radius: 12px;
-                                border: 1px solid #1C2541;
+                                border: 1px solid #E5E5E7;
                                 display: flex;
                                 align-items: center;
                                 justify-content: center;
@@ -537,57 +537,63 @@ if check_password():
                                 <div class="hud-header-title">Anatomy Location Map</div>
                                 <div class="hud-body-viewport">
                                     <svg viewBox="0 0 120 220" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">
-                                        <!-- BODY SILHOUETTE GLOW -->
-                                        <g fill="#0B132B" stroke="#6FFFE9" stroke-width="1.2" opacity="0.85">
-                                            <circle cx="60" cy="20" r="9" />
-                                            <path d="M 56 29 L 64 29 L 63 34 L 57 34 Z" />
-                                            <path d="M 32 36 L 88 36 L 82 60 L 38 60 Z" />
-                                            <rect x="23" y="37" width="8" height="36" rx="4" />
-                                            <rect x="89" y="37" width="8" height="36" rx="4" />
-                                            <path d="M 38 61 L 82 61 L 76 88 L 44 88 Z" />
-                                            <path d="M 43 90 L 77 90 L 74 112 L 46 112 Z" />
-                                            <rect x="41" y="114" width="16" height="42" rx="4" />
-                                            <rect x="43" y="158" width="12" height="38" rx="3" />
-                                            <rect x="63" y="114" width="16" height="42" rx="4" />
-                                            <rect x="65" y="158" width="12" height="38" rx="3" />
+                                        <!-- BODY SILHOUETTE (VOL ORANGE/BLUE TONES) -->
+                                        <g stroke="#1D1D1F" stroke-width="1" opacity="0.9">
+                                            <!-- Upper Body (Vol Orange accent fill) -->
+                                            <g fill="#FF8200" fill-opacity="0.15">
+                                                <circle cx="60" cy="20" r="9" />
+                                                <path d="M 56 29 L 64 29 L 63 34 L 57 34 Z" />
+                                                <path d="M 32 36 L 88 36 L 82 60 L 38 60 Z" />
+                                                <rect x="23" y="37" width="8" height="36" rx="4" />
+                                                <rect x="89" y="37" width="8" height="36" rx="4" />
+                                                <path d="M 38 61 L 82 61 L 76 88 L 44 88 Z" />
+                                            </g>
+                                            <!-- Lower Body (Vol Blue accent fill) -->
+                                            <g fill="#4895DB" fill-opacity="0.15">
+                                                <path d="M 43 90 L 77 90 L 74 112 L 46 112 Z" />
+                                                <rect x="41" y="114" width="16" height="42" rx="4" />
+                                                <rect x="43" y="158" width="12" height="38" rx="3" />
+                                                <rect x="63" y="114" width="16" height="42" rx="4" />
+                                                <rect x="65" y="158" width="12" height="38" rx="3" />
+                                            </g>
                                         </g>
 
                                         <!-- NODES & CALLOUT POINTERS -->
                                         <!-- Node 1: Right Shoulder IR/ER -->
-                                        <circle cx="89" cy="42" r="3" fill="#6FFFE9" />
-                                        <line x1="89" y1="42" x2="108" y2="42" stroke="#6FFFE9" stroke-width="1" stroke-dasharray="2,2" />
-                                        <rect x="100" y="36" width="12" height="12" rx="2" fill="#FFFFFF" />
-                                        <text x="106" y="45" font-size="8" font-weight="900" fill="#0B132B" text-anchor="middle">1</text>
+                                        <circle cx="89" cy="42" r="3" fill="#FF8200" />
+                                        <line x1="89" y1="42" x2="108" y2="42" stroke="#FF8200" stroke-width="1.5" stroke-dasharray="2,2" />
+                                        <rect x="100" y="36" width="12" height="12" rx="2" fill="#FF8200" />
+                                        <text x="106" y="45" font-size="8" font-weight="900" fill="#FFFFFF" text-anchor="middle">1</text>
 
                                         <!-- Node 2: ISO-Y Spine/Thoracic -->
-                                        <circle cx="60" cy="48" r="3" fill="#6FFFE9" />
-                                        <line x1="60" y1="48" x2="108" y2="64" stroke="#6FFFE9" stroke-width="1" stroke-dasharray="2,2" />
-                                        <rect x="100" y="58" width="12" height="12" rx="2" fill="#FFFFFF" />
-                                        <text x="106" y="67" font-size="8" font-weight="900" fill="#0B132B" text-anchor="middle">2</text>
+                                        <circle cx="60" cy="48" r="3" fill="#FF8200" />
+                                        <line x1="60" y1="48" x2="108" y2="64" stroke="#FF8200" stroke-width="1.5" stroke-dasharray="2,2" />
+                                        <rect x="100" y="58" width="12" height="12" rx="2" fill="#FF8200" />
+                                        <text x="106" y="67" font-size="8" font-weight="900" fill="#FFFFFF" text-anchor="middle">2</text>
 
                                         <!-- Node 3: Left Shoulder ER ROM -->
-                                        <circle cx="31" cy="42" r="3" fill="#6FFFE9" />
-                                        <line x1="31" y1="42" x2="12" y2="42" stroke="#6FFFE9" stroke-width="1" stroke-dasharray="2,2" />
-                                        <rect x="6" y="36" width="12" height="12" rx="2" fill="#FFFFFF" />
-                                        <text x="12" y="45" font-size="8" font-weight="900" fill="#0B132B" text-anchor="middle">3</text>
+                                        <circle cx="31" cy="42" r="3" fill="#FF8200" />
+                                        <line x1="31" y1="42" x2="12" y2="42" stroke="#FF8200" stroke-width="1.5" stroke-dasharray="2,2" />
+                                        <rect x="6" y="36" width="12" height="12" rx="2" fill="#FF8200" />
+                                        <text x="12" y="45" font-size="8" font-weight="900" fill="#FFFFFF" text-anchor="middle">3</text>
 
                                         <!-- Node 4: Hip Adduction -->
-                                        <circle cx="54" cy="124" r="3" fill="#6FFFE9" />
-                                        <line x1="54" y1="124" x2="108" y2="124" stroke="#6FFFE9" stroke-width="1" stroke-dasharray="2,2" />
-                                        <rect x="100" y="118" width="12" height="12" rx="2" fill="#FFFFFF" />
-                                        <text x="106" y="127" font-size="8" font-weight="900" fill="#0B132B" text-anchor="middle">4</text>
+                                        <circle cx="54" cy="124" r="3" fill="#4895DB" />
+                                        <line x1="54" y1="124" x2="108" y2="124" stroke="#4895DB" stroke-width="1.5" stroke-dasharray="2,2" />
+                                        <rect x="100" y="118" width="12" height="12" rx="2" fill="#4895DB" />
+                                        <text x="106" y="127" font-size="8" font-weight="900" fill="#FFFFFF" text-anchor="middle">4</text>
 
                                         <!-- Node 5: Hip Abduction -->
-                                        <circle cx="38" cy="100" r="3" fill="#6FFFE9" />
-                                        <line x1="38" y1="100" x2="12" y2="114" stroke="#6FFFE9" stroke-width="1" stroke-dasharray="2,2" />
-                                        <rect x="6" y="108" width="12" height="12" rx="2" fill="#FFFFFF" />
-                                        <text x="12" y="117" font-size="8" font-weight="900" fill="#0B132B" text-anchor="middle">5</text>
+                                        <circle cx="38" cy="100" r="3" fill="#4895DB" />
+                                        <line x1="38" y1="100" x2="12" y2="114" stroke="#4895DB" stroke-width="1.5" stroke-dasharray="2,2" />
+                                        <rect x="6" y="108" width="12" height="12" rx="2" fill="#4895DB" />
+                                        <text x="12" y="117" font-size="8" font-weight="900" fill="#FFFFFF" text-anchor="middle">5</text>
 
                                         <!-- Node 6: Calf Raise -->
-                                        <circle cx="71" cy="172" r="3" fill="#6FFFE9" />
-                                        <line x1="71" y1="172" x2="108" y2="172" stroke="#6FFFE9" stroke-width="1" stroke-dasharray="2,2" />
-                                        <rect x="100" y="166" width="12" height="12" rx="2" fill="#FFFFFF" />
-                                        <text x="106" y="175" font-size="8" font-weight="900" fill="#0B132B" text-anchor="middle">6</text>
+                                        <circle cx="71" cy="172" r="3" fill="#4895DB" />
+                                        <line x1="71" y1="172" x2="108" y2="172" stroke="#4895DB" stroke-width="1.5" stroke-dasharray="2,2" />
+                                        <rect x="100" y="166" width="12" height="12" rx="2" fill="#4895DB" />
+                                        <text x="106" y="175" font-size="8" font-weight="900" fill="#FFFFFF" text-anchor="middle">6</text>
                                     </svg>
                                 </div>
                             </div>
@@ -597,19 +603,19 @@ if check_password():
                         import streamlit.components.v1 as components
                         components.html(hud_html, height=450)
 
-                    # --- RIGHT PANEL: ANATOMY LOCATION DETAILS ---
+                    # --- RIGHT PANEL: LIGHT DETAILS CARDS ---
                     with hud_col2:
                         st.markdown("""
                             <style>
                             .hud-details-card {
-                                background: #0B132B;
+                                background: #FFFFFF;
                                 border-radius: 16px;
                                 padding: 20px;
-                                border: 1px solid #1C2541;
-                                box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+                                border: 1px solid #E5E5E7;
+                                box-shadow: 0 4px 12px rgba(0,0,0,0.03);
                             }
-                            .hud-header-title {
-                                color: #FFFFFF;
+                            .hud-header-title-light {
+                                color: #1D1D1F;
                                 font-weight: 800;
                                 font-size: 13px;
                                 letter-spacing: 1px;
@@ -618,28 +624,47 @@ if check_password():
                                 padding-bottom: 6px;
                                 margin-bottom: 16px;
                             }
-                            .hud-metric-row {
-                                background: rgba(28, 37, 65, 0.6);
+                            .hud-metric-row-light {
+                                background: #F8F9FA;
                                 border-left: 4px solid #FF8200;
                                 border-radius: 8px;
                                 padding: 10px 14px;
                                 margin-bottom: 10px;
-                                color: #FFFFFF;
+                                color: #1D1D1F;
+                                border-top: 1px solid #E5E5E7;
+                                border-right: 1px solid #E5E5E7;
+                                border-bottom: 1px solid #E5E5E7;
                             }
-                            .hud-metric-row-blue {
-                                background: rgba(28, 37, 65, 0.6);
+                            .hud-metric-row-light-blue {
+                                background: #F8F9FA;
                                 border-left: 4px solid #4895DB;
                                 border-radius: 8px;
                                 padding: 10px 14px;
                                 margin-bottom: 10px;
-                                color: #FFFFFF;
+                                color: #1D1D1F;
+                                border-top: 1px solid #E5E5E7;
+                                border-right: 1px solid #E5E5E7;
+                                border-bottom: 1px solid #E5E5E7;
                             }
-                            .node-badge {
+                            .node-badge-orange {
                                 display: inline-block;
                                 width: 20px;
                                 height: 20px;
-                                background: #FFFFFF;
-                                color: #0B132B;
+                                background: #FF8200;
+                                color: #FFFFFF;
+                                font-weight: 900;
+                                font-size: 11px;
+                                border-radius: 4px;
+                                text-align: center;
+                                line-height: 20px;
+                                margin-right: 8px;
+                            }
+                            .node-badge-blue {
+                                display: inline-block;
+                                width: 20px;
+                                height: 20px;
+                                background: #4895DB;
+                                color: #FFFFFF;
                                 font-weight: 900;
                                 font-size: 11px;
                                 border-radius: 4px;
@@ -649,7 +674,7 @@ if check_password():
                             }
                             </style>
                             <div class="hud-details-card">
-                                <div class="hud-header-title">Anatomy Location Assessment Details</div>
+                                <div class="hud-header-title-light">Anatomy Location Assessment Details</div>
                         """, unsafe_allow_html=True)
 
                         # NODE 1: SHOULDER IR/ER
@@ -670,12 +695,12 @@ if check_password():
                             latest_date_str = ir_latest.get('Test Date', pd.Timestamp.now()).strftime('%m/%d/%Y') if not ir_latest.empty else "N/A"
 
                             st.markdown(f"""
-                                <div class="hud-metric-row">
+                                <div class="hud-metric-row-light">
                                     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
-                                        <span style="font-weight:800; font-size:12px; color:#6FFFE9;"><span class="node-badge">1</span>SHOULDER IR / ER FORCE</span>
-                                        <span style="font-size:10px; color:#A0AABF;">Latest: {latest_date_str}</span>
+                                        <span style="font-weight:800; font-size:12px; color:#1D1D1F;"><span class="node-badge-orange">1</span>SHOULDER IR / ER FORCE</span>
+                                        <span style="font-size:10px; color:#6E6E73; font-weight:600;">Latest: {latest_date_str}</span>
                                     </div>
-                                    <div style="font-size:11px; line-height:1.4;">
+                                    <div style="font-size:11px; line-height:1.4; color:#1D1D1F;">
                                         <b>Internal (IR):</b> Initial L {ir_bL:.1f}N | R {ir_bR:.1f}N &nbsp;→&nbsp; <b>Latest:</b> L {render_val_with_arrow(ir_lL, ir_bL, '{:.1f}', 'N')} | R {render_val_with_arrow(ir_lR, ir_bR, '{:.1f}', 'N')}<br>
                                         <b>External (ER):</b> Initial L {er_bL:.1f}N | R {er_bR:.1f}N &nbsp;→&nbsp; <b>Latest:</b> L {render_val_with_arrow(er_lL, er_bL, '{:.1f}', 'N')} | R {render_val_with_arrow(er_lR, er_bR, '{:.1f}', 'N')}
                                     </div>
@@ -689,12 +714,12 @@ if check_password():
                             lyL, lyR = l_y.get('Peak Vertical Force [N] (L)', 0.0), l_y.get('Peak Vertical Force [N] (R)', 0.0)
 
                             st.markdown(f"""
-                                <div class="hud-metric-row">
+                                <div class="hud-metric-row-light">
                                     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
-                                        <span style="font-weight:800; font-size:12px; color:#6FFFE9;"><span class="node-badge">2</span>ISO-Y STRENGTH (ASH SHEET)</span>
-                                        <span style="font-size:10px; color:#A0AABF;">Latest: {l_y['Test Date'].strftime('%m/%d/%Y')}</span>
+                                        <span style="font-weight:800; font-size:12px; color:#1D1D1F;"><span class="node-badge-orange">2</span>ISO-Y STRENGTH (ASH SHEET)</span>
+                                        <span style="font-size:10px; color:#6E6E73; font-weight:600;">Latest: {l_y['Test Date'].strftime('%m/%d/%Y')}</span>
                                     </div>
-                                    <div style="font-size:11px; line-height:1.4;">
+                                    <div style="font-size:11px; line-height:1.4; color:#1D1D1F;">
                                         <b>Initial Force:</b> L {byL:.0f}N | R {byR:.0f}N &nbsp;→&nbsp; <b>Latest:</b> L {render_val_with_arrow(lyL, byL, '{:.0f}', 'N')} | R {render_val_with_arrow(lyR, byR, '{:.0f}', 'N')}
                                     </div>
                                 </div>
@@ -707,12 +732,12 @@ if check_password():
                             lerL, lerR = l_er.get('L Max ROM (°)', 0.0), l_er.get('R Max ROM (°)', 0.0)
 
                             st.markdown(f"""
-                                <div class="hud-metric-row">
+                                <div class="hud-metric-row-light">
                                     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
-                                        <span style="font-weight:800; font-size:12px; color:#6FFFE9;"><span class="node-badge">3</span>EXTERNAL ROTATION ROM</span>
-                                        <span style="font-size:10px; color:#A0AABF;">Latest: {l_er['Test Date'].strftime('%m/%d/%Y')}</span>
+                                        <span style="font-weight:800; font-size:12px; color:#1D1D1F;"><span class="node-badge-orange">3</span>EXTERNAL ROTATION ROM</span>
+                                        <span style="font-size:10px; color:#6E6E73; font-weight:600;">Latest: {l_er['Test Date'].strftime('%m/%d/%Y')}</span>
                                     </div>
-                                    <div style="font-size:11px; line-height:1.4;">
+                                    <div style="font-size:11px; line-height:1.4; color:#1D1D1F;">
                                         <b>Initial ROM:</b> L {berL:.1f}° | R {berR:.1f}° &nbsp;→&nbsp; <b>Latest:</b> L {render_val_with_arrow(lerL, berL, '{:.1f}', '°')} | R {render_val_with_arrow(lerR, berR, '{:.1f}', '°')}
                                     </div>
                                 </div>
@@ -729,12 +754,12 @@ if check_password():
                                 ad_lL, ad_lR = ad_l.get('L Max Force (N)', 0.0), ad_l.get('R Max Force (N)', 0.0)
 
                                 st.markdown(f"""
-                                    <div class="hud-metric-row-blue">
+                                    <div class="hud-metric-row-light-blue">
                                         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
-                                            <span style="font-weight:800; font-size:12px; color:#6FFFE9;"><span class="node-badge">4</span>HIP ADDUCTION (AD) FORCE</span>
-                                            <span style="font-size:10px; color:#A0AABF;">Latest: {ad_l['Test Date'].strftime('%m/%d/%Y')}</span>
+                                            <span style="font-weight:800; font-size:12px; color:#1D1D1F;"><span class="node-badge-blue">4</span>HIP ADDUCTION (AD) FORCE</span>
+                                            <span style="font-size:10px; color:#6E6E73; font-weight:600;">Latest: {ad_l['Test Date'].strftime('%m/%d/%Y')}</span>
                                         </div>
-                                        <div style="font-size:11px; line-height:1.4;">
+                                        <div style="font-size:11px; line-height:1.4; color:#1D1D1F;">
                                             <b>Initial Force:</b> L {ad_bL:.1f}N | R {ad_bR:.1f}N &nbsp;→&nbsp; <b>Latest:</b> L {render_val_with_arrow(ad_lL, ad_bL, '{:.1f}', 'N')} | R {render_val_with_arrow(ad_lR, ad_bR, '{:.1f}', 'N')}
                                         </div>
                                     </div>
@@ -746,12 +771,12 @@ if check_password():
                                 ab_lL, ab_lR = ab_l.get('L Max Force (N)', 0.0), ab_l.get('R Max Force (N)', 0.0)
 
                                 st.markdown(f"""
-                                    <div class="hud-metric-row-blue">
+                                    <div class="hud-metric-row-light-blue">
                                         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
-                                            <span style="font-weight:800; font-size:12px; color:#6FFFE9;"><span class="node-badge">5</span>HIP ABDUCTION (AB) FORCE</span>
-                                            <span style="font-size:10px; color:#A0AABF;">Latest: {ab_l['Test Date'].strftime('%m/%d/%Y')}</span>
+                                            <span style="font-weight:800; font-size:12px; color:#1D1D1F;"><span class="node-badge-blue">5</span>HIP ABDUCTION (AB) FORCE</span>
+                                            <span style="font-size:10px; color:#6E6E73; font-weight:600;">Latest: {ab_l['Test Date'].strftime('%m/%d/%Y')}</span>
                                         </div>
-                                        <div style="font-size:11px; line-height:1.4;">
+                                        <div style="font-size:11px; line-height:1.4; color:#1D1D1F;">
                                             <b>Initial Force:</b> L {ab_bL:.1f}N | R {ab_bR:.1f}N &nbsp;→&nbsp; <b>Latest:</b> L {render_val_with_arrow(ab_lL, ab_bL, '{:.1f}', 'N')} | R {render_val_with_arrow(ab_lR, ab_bR, '{:.1f}', 'N')}
                                         </div>
                                     </div>
@@ -765,12 +790,12 @@ if check_password():
                             bcL_bm = b_c.get('Peak Vertical Force / BM [N/kg] (L)', 0.0)
 
                             st.markdown(f"""
-                                <div class="hud-metric-row-blue">
+                                <div class="hud-metric-row-light-blue">
                                     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
-                                        <span style="font-weight:800; font-size:12px; color:#6FFFE9;"><span class="node-badge">6</span>SINGLE LEG CALF RAISE</span>
-                                        <span style="font-size:10px; color:#A0AABF;">Latest: {l_c['Test Date'].strftime('%m/%d/%Y')}</span>
+                                        <span style="font-weight:800; font-size:12px; color:#1D1D1F;"><span class="node-badge-blue">6</span>SINGLE LEG CALF RAISE</span>
+                                        <span style="font-size:10px; color:#6E6E73; font-weight:600;">Latest: {l_c['Test Date'].strftime('%m/%d/%Y')}</span>
                                     </div>
-                                    <div style="font-size:11px; line-height:1.4;">
+                                    <div style="font-size:11px; line-height:1.4; color:#1D1D1F;">
                                         <b>Initial Force:</b> L {bcL:.0f}N ({bcL_bm:.2f} N/kg) | R {bcR:.0f}N &nbsp;→&nbsp; <b>Latest:</b> L {render_val_with_arrow(lcL, bcL, '{:.0f}', 'N')} | R {render_val_with_arrow(lcR, bcR, '{:.0f}', 'N')}
                                     </div>
                                 </div>
@@ -780,6 +805,7 @@ if check_password():
 
                 else:
                     st.info(f"No Intake Assessment records found for {selected_intake_athlete}.")
+                    
                     
             # --- TAB 5: CROSS-SEASON TESTING COMPARISON ---
             with testing_season_tabs[4]:
