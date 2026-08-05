@@ -483,7 +483,7 @@ if check_password():
 
                     hud_col1, hud_col2 = st.columns([1.2, 1.8])
 
-                    # --- LEFT PANEL: REALISTIC ANATOMY MAP COMPONENT ---
+                    # --- LEFT PANEL: ILLUSTRATED ANATOMICAL MAP ---
                     with hud_col1:
                         hud_html = """
                         <!DOCTYPE html>
@@ -536,58 +536,74 @@ if check_password():
                                 <div class="hud-header-title">Anatomy Location Map</div>
                                 <div class="hud-body-viewport">
                                     <svg viewBox="0 0 120 220" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">
-                                        <!-- ANATOMICAL BODY SILHOUETTE -->
-                                        <g stroke="#1D1D1F" stroke-width="1.2" stroke-linejoin="round" opacity="0.85">
-                                            <!-- Upper Body & Arms (Vol Orange Accent) -->
-                                            <g fill="#FF8200" fill-opacity="0.18">
-                                                <!-- Head & Neck -->
-                                                <circle cx="60" cy="20" r="8.5" />
-                                                <!-- Torso, Shoulders & Arms Contour -->
-                                                <path d="M 56 28 
-                                                         C 54 32, 38 35, 30 38
-                                                         C 26 39, 23 48, 24 65
-                                                         C 25 78, 23 90, 23 98
-                                                         C 23 100, 28 100, 29 98
-                                                         C 30 90, 31 75, 33 65
-                                                         C 34 60, 38 58, 40 60
-                                                         C 42 70, 43 80, 44 88
-                                                         L 76 88
-                                                         C 77 80, 78 70, 80 60
-                                                         C 82 58, 86 60, 87 65
-                                                         C 89 75, 90 90, 91 98
-                                                         C 92 100, 97 100, 97 98
-                                                         C 97 90, 95 78, 96 65
-                                                         C 97 48, 94 39, 90 38
-                                                         C 82 35, 66 32, 64 28 Z" />
+                                        <g stroke="#1D1D1F" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
+                                            <!-- HEAD & FACIAL FEATURES -->
+                                            <path d="M 52 18 C 52 10, 68 10, 68 18 C 68 28, 63 32, 60 32 C 57 32, 52 28, 52 18 Z" fill="#FFE0D0" />
+                                            <!-- Ears -->
+                                            <path d="M 51 20 C 49 20, 49 25, 52 26" fill="#FFE0D0" />
+                                            <path d="M 69 20 C 71 20, 71 25, 68 26" fill="#FFE0D0" />
+                                            <!-- Eyes & Nose -->
+                                            <ellipse cx="56" cy="20" rx="1.5" ry="1" fill="#1D1D1F" />
+                                            <ellipse cx="64" cy="20" rx="1.5" ry="1" fill="#1D1D1F" />
+                                            <path d="M 60 21 L 59 25 L 61 25" fill="none" stroke-width="0.8" />
+                                            <path d="M 57 28 C 59 29, 61 29, 63 28" fill="none" stroke-width="1" />
+                                            
+                                            <!-- NECK -->
+                                            <path d="M 55 31 L 55 37 M 65 31 L 65 37" fill="none" stroke-width="1" />
+                                            
+                                            <!-- MUSCLE GROUPS (Vol Orange / Blue Accent Fills) -->
+                                            <!-- Facial Muscles -->
+                                            <path d="M 53 14 C 55 12, 65 12, 67 14 C 66 18, 54 18, 53 14 Z" fill="#FF8200" fill-opacity="0.6" />
+                                            
+                                            <!-- Chest (Pectorals) -->
+                                            <path d="M 44 42 C 50 42, 58 45, 59 52 C 50 54, 42 50, 44 42 Z" fill="#FF8200" fill-opacity="0.5" />
+                                            <path d="M 76 42 C 70 42, 62 45, 61 52 C 70 54, 78 50, 76 42 Z" fill="#FF8200" fill-opacity="0.5" />
+                                            
+                                            <!-- Shoulders (Deltoids) -->
+                                            <path d="M 38 41 C 42 38, 45 42, 42 52 C 36 50, 35 44, 38 41 Z" fill="#FF8200" fill-opacity="0.6" />
+                                            <path d="M 82 41 C 78 38, 75 42, 78 52 C 84 50, 85 44, 82 41 Z" fill="#FF8200" fill-opacity="0.6" />
+                                            
+                                            <!-- Biceps & Forearms -->
+                                            <path d="M 35 52 C 38 52, 39 63, 33 68 C 30 63, 31 54, 35 52 Z" fill="#FF8200" fill-opacity="0.4" />
+                                            <path d="M 85 52 C 82 52, 81 63, 87 68 C 90 63, 89 54, 85 52 Z" fill="#FF8200" fill-opacity="0.4" />
+                                            <path d="M 32 70 C 35 70, 33 88, 28 92 C 26 88, 28 72, 32 70 Z" fill="#FF8200" fill-opacity="0.4" />
+                                            <path d="M 88 70 C 85 70, 87 88, 92 92 C 94 88, 92 72, 88 70 Z" fill="#FF8200" fill-opacity="0.4" />
+                                            
+                                            <!-- Abs (Rectus Abdominis) -->
+                                            <g fill="#FF8200" fill-opacity="0.55">
+                                                <rect x="52" y="54" width="7" height="6" rx="1" />
+                                                <rect x="61" y="54" width="7" height="6" rx="1" />
+                                                <rect x="52" y="62" width="7" height="6" rx="1" />
+                                                <rect x="61" y="62" width="7" height="6" rx="1" />
+                                                <rect x="53" y="70" width="6" height="7" rx="1" />
+                                                <rect x="61" y="70" width="6" height="7" rx="1" />
                                             </g>
-                                            <!-- Lower Body, Hips & Legs (Vol Blue Accent) -->
-                                            <g fill="#4895DB" fill-opacity="0.18">
-                                                <path d="M 44 88
-                                                         C 40 92, 36 98, 36 106
-                                                         C 36 115, 39 125, 41 138
-                                                         C 42 145, 41 152, 42 155
-                                                         C 42 165, 41 180, 43 196
-                                                         C 44 200, 50 200, 52 196
-                                                         C 53 180, 52 165, 53 155
-                                                         C 54 148, 54 135, 54 124
-                                                         C 54 116, 57 110, 60 108
-                                                         C 63 110, 66 116, 66 124
-                                                         C 66 135, 66 148, 67 155
-                                                         C 68 165, 67 180, 68 196
-                                                         C 70 200, 76 200, 77 196
-                                                         C 79 180, 78 165, 78 155
-                                                         C 79 152, 78 145, 79 138
-                                                         C 81 125, 84 115, 84 106
-                                                         C 84 98, 80 92, 76 88 Z" />
-                                            </g>
+
+                                            <!-- Quads & Hips -->
+                                            <path d="M 44 94 C 42 102, 42 118, 48 126 C 53 118, 51 100, 48 94 Z" fill="#4895DB" fill-opacity="0.5" />
+                                            <path d="M 76 94 C 78 102, 78 118, 72 126 C 67 118, 69 100, 72 94 Z" fill="#4895DB" fill-opacity="0.5" />
+                                            <path d="M 49 94 C 52 105, 52 118, 53 128 C 55 120, 55 102, 52 94 Z" fill="#4895DB" fill-opacity="0.4" />
+                                            <path d="M 71 94 C 68 105, 68 118, 67 128 C 65 120, 65 102, 68 94 Z" fill="#4895DB" fill-opacity="0.4" />
+
+                                            <!-- Calves (Gastrocnemius / Tibialis) -->
+                                            <path d="M 43 140 C 40 148, 41 165, 45 178 C 47 165, 48 148, 47 140 Z" fill="#4895DB" fill-opacity="0.55" />
+                                            <path d="M 77 140 C 80 148, 79 165, 75 178 C 73 165, 72 148, 73 140 Z" fill="#4895DB" fill-opacity="0.55" />
+
+                                            <!-- HANDS & FEET OUTLINES -->
+                                            <!-- Hands (Anatomical Position - Palms Forward) -->
+                                            <path d="M 27 94 C 24 97, 21 101, 19 105 C 18 109, 20 113, 22 113 C 24 113, 27 106, 29 100 Z" fill="#FFE0D0" />
+                                            <path d="M 93 94 C 96 97, 99 101, 101 105 C 102 109, 100 113, 98 113 C 96 113, 93 106, 91 100 Z" fill="#FFE0D0" />
+                                            <!-- Feet -->
+                                            <path d="M 43 194 L 41 204 L 50 205 L 50 194 Z" fill="#FFE0D0" />
+                                            <path d="M 77 194 L 79 204 L 70 205 L 70 194 Z" fill="#FFE0D0" />
                                         </g>
 
                                         <!-- NODES & CALLOUT POINTERS -->
                                         <!-- Node 1: Right Shoulder IR/ER -->
-                                        <circle cx="89" cy="42" r="3" fill="#FF8200" />
-                                        <line x1="89" y1="42" x2="108" y2="42" stroke="#FF8200" stroke-width="1.5" stroke-dasharray="2,2" />
-                                        <rect x="100" y="36" width="12" height="12" rx="2" fill="#FF8200" />
-                                        <text x="106" y="45" font-size="8" font-weight="900" fill="#FFFFFF" text-anchor="middle">1</text>
+                                        <circle cx="83" cy="44" r="3" fill="#FF8200" />
+                                        <line x1="83" y1="44" x2="108" y2="44" stroke="#FF8200" stroke-width="1.5" stroke-dasharray="2,2" />
+                                        <rect x="100" y="38" width="12" height="12" rx="2" fill="#FF8200" />
+                                        <text x="106" y="47" font-size="8" font-weight="900" fill="#FFFFFF" text-anchor="middle">1</text>
 
                                         <!-- Node 2: ISO-Y Spine/Thoracic -->
                                         <circle cx="60" cy="48" r="3" fill="#FF8200" />
@@ -596,22 +612,22 @@ if check_password():
                                         <text x="106" y="67" font-size="8" font-weight="900" fill="#FFFFFF" text-anchor="middle">2</text>
 
                                         <!-- Node 3: Hip Adduction -->
-                                        <circle cx="54" cy="124" r="3" fill="#4895DB" />
-                                        <line x1="54" y1="124" x2="108" y2="124" stroke="#4895DB" stroke-width="1.5" stroke-dasharray="2,2" />
-                                        <rect x="100" y="118" width="12" height="12" rx="2" fill="#4895DB" />
-                                        <text x="106" y="127" font-size="8" font-weight="900" fill="#FFFFFF" text-anchor="middle">3</text>
+                                        <circle cx="53" cy="116" r="3" fill="#4895DB" />
+                                        <line x1="53" y1="116" x2="108" y2="116" stroke="#4895DB" stroke-width="1.5" stroke-dasharray="2,2" />
+                                        <rect x="100" y="110" width="12" height="12" rx="2" fill="#4895DB" />
+                                        <text x="106" y="119" font-size="8" font-weight="900" fill="#FFFFFF" text-anchor="middle">3</text>
 
                                         <!-- Node 4: Hip Abduction -->
-                                        <circle cx="38" cy="100" r="3" fill="#4895DB" />
-                                        <line x1="38" y1="100" x2="12" y2="114" stroke="#4895DB" stroke-width="1.5" stroke-dasharray="2,2" />
-                                        <rect x="6" y="108" width="12" height="12" rx="2" fill="#4895DB" />
-                                        <text x="12" y="117" font-size="8" font-weight="900" fill="#FFFFFF" text-anchor="middle">4</text>
+                                        <circle cx="43" cy="100" r="3" fill="#4895DB" />
+                                        <line x1="43" y1="100" x2="12" y2="108" stroke="#4895DB" stroke-width="1.5" stroke-dasharray="2,2" />
+                                        <rect x="6" y="102" width="12" height="12" rx="2" fill="#4895DB" />
+                                        <text x="12" y="111" font-size="8" font-weight="900" fill="#FFFFFF" text-anchor="middle">4</text>
 
                                         <!-- Node 5: Calf Raise -->
-                                        <circle cx="71" cy="172" r="3" fill="#4895DB" />
-                                        <line x1="71" y1="172" x2="108" y2="172" stroke="#4895DB" stroke-width="1.5" stroke-dasharray="2,2" />
-                                        <rect x="100" y="166" width="12" height="12" rx="2" fill="#4895DB" />
-                                        <text x="106" y="175" font-size="8" font-weight="900" fill="#FFFFFF" text-anchor="middle">5</text>
+                                        <circle cx="76" cy="158" r="3" fill="#4895DB" />
+                                        <line x1="76" y1="158" x2="108" y2="158" stroke="#4895DB" stroke-width="1.5" stroke-dasharray="2,2" />
+                                        <rect x="100" y="152" width="12" height="12" rx="2" fill="#4895DB" />
+                                        <text x="106" y="161" font-size="8" font-weight="900" fill="#FFFFFF" text-anchor="middle">5</text>
                                     </svg>
                                 </div>
                             </div>
