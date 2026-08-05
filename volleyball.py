@@ -458,7 +458,7 @@ if check_password():
 
             # --- TAB 4: INTAKE TESTING TAB ---
             with testing_season_tabs[3]:
-                st.markdown("### Athlete Intake Assessment Body Map Profile")
+                st.markdown("<h3 style='color:#1D1D1F; font-weight:900; text-transform:uppercase;'>Athlete Intake Assessment</h3>", unsafe_allow_html=True)
                 c_int_ath, _ = st.columns([2, 2])
                 with c_int_ath:
                     selected_intake_athlete = st.selectbox("Select Athlete for Intake Assessment", master_athlete_list, key="intake_ath_select")
@@ -481,210 +481,271 @@ if check_password():
                         color = "#28a745" if diff >= 0 else "#dc3545"
                         return f"{fmt.format(current)}{unit} <span style='color:{color}; font-size:11px; font-weight:bold;'>({arrow}{abs(pct):.1f}%)</span>"
 
+                    # --- DARK ANATOMY HUD CSS ENGINE ---
                     st.markdown("""
                         <style>
-                        .body-section-card-upper {
-                            background: #FFFFFF;
-                            border-radius: 12px;
-                            padding: 16px;
-                            border: 1px solid #E5E5E7;
-                            border-top: 4px solid #FF8200;
-                            box-shadow: 0 4px 6px rgba(0,0,0,0.03);
-                            margin-bottom: 15px;
+                        .hud-dashboard-card {
+                            background: #0B132B;
+                            border-radius: 16px;
+                            padding: 24px;
+                            border: 1px solid #1C2541;
+                            box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+                            margin-bottom: 20px;
                         }
-                        .body-section-card-lower {
-                            background: #FFFFFF;
-                            border-radius: 12px;
-                            padding: 16px;
-                            border: 1px solid #E5E5E7;
-                            border-top: 4px solid #4895DB;
-                            box-shadow: 0 4px 6px rgba(0,0,0,0.03);
-                            margin-bottom: 15px;
-                        }
-                        .upper-body-header {
-                            color: #FF8200;
-                            font-weight: 900;
-                            font-size: 15px;
+                        .hud-header-title {
+                            color: #FFFFFF;
+                            font-weight: 800;
+                            font-size: 16px;
+                            letter-spacing: 1px;
+                            text-transform: uppercase;
                             border-bottom: 2px solid #FF8200;
-                            padding-bottom: 4px;
-                            margin-bottom: 12px;
-                            text-transform: uppercase;
+                            padding-bottom: 6px;
+                            margin-bottom: 16px;
                         }
-                        .lower-body-header {
-                            color: #4895DB;
-                            font-weight: 900;
-                            font-size: 15px;
-                            border-bottom: 2px solid #4895DB;
-                            padding-bottom: 4px;
-                            margin-bottom: 12px;
-                            text-transform: uppercase;
-                        }
-                        .svg-body-wrapper {
+                        .hud-body-wrapper {
+                            position: relative;
                             text-align: center;
-                            padding: 15px 10px;
-                            background: #FFFFFF;
-                            border-radius: 15px;
-                            border: 1px solid #E5E5E7;
-                            box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+                            padding: 10px;
                         }
-                        .intake-metric-box {
-                            background-color: #F8F9FA;
+                        .hud-metric-row {
+                            background: rgba(28, 37, 65, 0.6);
+                            border-left: 4px solid #FF8200;
                             border-radius: 8px;
-                            padding: 8px 12px;
-                            margin-bottom: 8px;
+                            padding: 10px 14px;
+                            margin-bottom: 12px;
+                            color: #FFFFFF;
+                        }
+                        .hud-metric-row-blue {
+                            background: rgba(28, 37, 65, 0.6);
+                            border-left: 4px solid #4895DB;
+                            border-radius: 8px;
+                            padding: 10px 14px;
+                            margin-bottom: 12px;
+                            color: #FFFFFF;
+                        }
+                        .node-badge {
+                            display: inline-block;
+                            width: 22px;
+                            height: 22px;
+                            background: #FFFFFF;
+                            color: #0B132B;
+                            font-weight: 900;
+                            font-size: 11px;
+                            border-radius: 4px;
+                            text-align: center;
+                            line-height: 22px;
+                            margin-right: 8px;
                         }
                         </style>
                     """, unsafe_allow_html=True)
 
-                    body_col1, body_col2 = st.columns([1, 2.5])
+                    # --- MAIN 2-COLUMN DASHBOARD GRID ---
+                    hud_col1, hud_col2 = st.columns([1.2, 1.8])
 
-                    with body_col1:
+                    # --- LEFT PANEL: ANATOMICAL VECTOR WITH FLOATING POINTER NODES ---
+                    with hud_col1:
                         st.markdown("""
-                            <div class="svg-body-wrapper">
-                                <h4 style="margin:0 0 12px 0; font-size:13px; font-weight:800; color:#1D1D1F; text-transform:uppercase;">Assessment Anatomy Map</h4>
-                                <svg width="170" height="360" viewBox="0 0 100 200" xmlns="http://www.w3.org/2000/svg">
-                                    <!-- UPPER BODY / TORSO / ARMS (LADY VOL ORANGE #FF8200) -->
-                                    <g fill="#FF8200" stroke="#FFFFFF" stroke-width="1.2">
-                                        <!-- Head & Neck -->
-                                        <circle cx="50" cy="18" r="9" />
-                                        <path d="M 46 27 L 54 27 L 53 33 L 47 33 Z" />
-                                        <!-- Shoulders, Chest & Upper Torso -->
-                                        <path d="M 24 35 L 76 35 L 70 58 L 30 58 Z" />
-                                        <!-- Arms -->
-                                        <rect x="15" y="36" width="8" height="34" rx="4" />
-                                        <rect x="77" y="36" width="8" height="34" rx="4" />
-                                        <!-- Core / Midsection -->
-                                        <path d="M 30 59 L 70 59 L 66 86 L 34 86 Z" />
-                                    </g>
-                                    
-                                    <!-- BOUNDARY DIVIDER -->
-                                    <line x1="8" y1="88" x2="92" y2="88" stroke="#1D1D1F" stroke-width="1.5" stroke-dasharray="3,3" opacity="0.4" />
+                            <div class="hud-dashboard-card">
+                                <div class="hud-header-title">Anatomy Location Map</div>
+                                <div class="hud-body-wrapper">
+                                    <svg width="220" height="420" viewBox="0 0 120 220" xmlns="http://www.w3.org/2000/svg">
+                                        <!-- ANATOMICAL BODY SILHOUETTE -->
+                                        <g stroke="#3A506B" stroke-width="1.2" fill-opacity="0.15">
+                                            <!-- Upper Body Group (Vol Orange Glow) -->
+                                            <g fill="#FF8200">
+                                                <circle cx="60" cy="18" r="9" />
+                                                <path d="M 56 27 L 64 27 L 63 33 L 57 33 Z" />
+                                                <path d="M 34 35 L 86 35 L 80 58 L 40 58 Z" />
+                                                <rect x="25" y="36" width="8" height="34" rx="4" />
+                                                <rect x="87" y="36" width="8" height="34" rx="4" />
+                                                <path d="M 40 59 L 80 59 L 76 86 L 44 86 Z" />
+                                            </g>
 
-                                    <!-- LOWER BODY / HIPS / LEGS / CALVES (LADY VOL BLUE #4895DB) -->
-                                    <g fill="#4895DB" stroke="#FFFFFF" stroke-width="1.2">
-                                        <!-- Pelvis / Hips -->
-                                        <path d="M 33 90 L 67 90 L 65 110 L 35 110 Z" />
-                                        <!-- Left Leg (Thigh & Calf) -->
-                                        <rect x="30" y="112" width="18" height="42" rx="4" />
-                                        <rect x="32" y="156" width="14" height="38" rx="3" />
-                                        <!-- Right Leg (Thigh & Calf) -->
-                                        <rect x="52" y="112" width="18" height="42" rx="4" />
-                                        <rect x="54" y="156" width="14" height="38" rx="3" />
-                                    </g>
-                                </svg>
-                                <div style="display:flex; justify-content:center; gap:12px; margin-top:10px; font-size:11px; font-weight:800;">
-                                    <span style="color:#FF8200;">■ UPPER BODY</span>
-                                    <span style="color:#4895DB;">■ LOWER BODY</span>
+                                            <!-- Lower Body Group (Vol Blue Glow) -->
+                                            <g fill="#4895DB">
+                                                <path d="M 43 90 L 77 90 L 75 110 L 45 110 Z" />
+                                                <rect x="40" y="112" width="18" height="42" rx="4" />
+                                                <rect x="42" y="156" width="14" height="38" rx="3" />
+                                                <rect x="62" y="112" width="18" height="42" rx="4" />
+                                                <rect x="64" y="156" width="14" height="38" rx="3" />
+                                            </g>
+                                        </g>
+
+                                        <!-- POINTER LINES & TARGET NODES -->
+                                        <!-- 1: Shoulder IR/ER (Right Shoulder Joint) -->
+                                        <circle cx="87" cy="40" r="4" fill="none" stroke="#6FFFE9" stroke-width="2" />
+                                        <line x1="87" y1="40" x2="108" y2="40" stroke="#6FFFE9" stroke-width="1.5" stroke-dasharray="2,2" />
+                                        <rect x="100" y="33" width="14" height="14" rx="3" fill="#FFFFFF" />
+                                        <text x="107" y="44" font-size="10" font-weight="900" fill="#0B132B" text-anchor="middle">1</text>
+
+                                        <!-- 2: ISO-Y Strength (Upper Spine/Thoracic) -->
+                                        <circle cx="60" cy="48" r="4" fill="none" stroke="#6FFFE9" stroke-width="2" />
+                                        <line x1="60" y1="48" x2="108" y2="62" stroke="#6FFFE9" stroke-width="1.5" stroke-dasharray="2,2" />
+                                        <rect x="100" y="55" width="14" height="14" rx="3" fill="#FFFFFF" />
+                                        <text x="107" y="66" font-size="10" font-weight="900" fill="#0B132B" text-anchor="middle">2</text>
+
+                                        <!-- 3: External Rotation ROM (Left Shoulder) -->
+                                        <circle cx="33" cy="40" r="4" fill="none" stroke="#6FFFE9" stroke-width="2" />
+                                        <line x1="33" y1="40" x2="12" y2="80" stroke="#6FFFE9" stroke-width="1.5" stroke-dasharray="2,2" />
+                                        <rect x="5" y="73" width="14" height="14" rx="3" fill="#FFFFFF" />
+                                        <text x="12" y="84" font-size="10" font-weight="900" fill="#0B132B" text-anchor="middle">3</text>
+
+                                        <!-- 4: Hip Adduction (Adductor/Inner Thigh) -->
+                                        <circle cx="56" cy="122" r="4" fill="none" stroke="#6FFFE9" stroke-width="2" />
+                                        <line x1="56" y1="122" x2="108" y2="122" stroke="#6FFFE9" stroke-width="1.5" stroke-dasharray="2,2" />
+                                        <rect x="100" y="115" width="14" height="14" rx="3" fill="#FFFFFF" />
+                                        <text x="107" y="126" font-size="10" font-weight="900" fill="#0B132B" text-anchor="middle">4</text>
+
+                                        <!-- 5: Hip Abduction (Outer Hip/Glute Med) -->
+                                        <circle cx="38" cy="100" r="4" fill="none" stroke="#6FFFE9" stroke-width="2" />
+                                        <line x1="38" y1="100" x2="12" y2="140" stroke="#6FFFE9" stroke-width="1.5" stroke-dasharray="2,2" />
+                                        <rect x="5" y="133" width="14" height="14" rx="3" fill="#FFFFFF" />
+                                        <text x="12" y="144" font-size="10" font-weight="900" fill="#0B132B" text-anchor="middle">5</text>
+
+                                        <!-- 6: Single Leg Calf Raise (Gastroc/Calf) -->
+                                        <circle cx="71" cy="172" r="4" fill="none" stroke="#6FFFE9" stroke-width="2" />
+                                        <line x1="71" y1="172" x2="108" y2="172" stroke="#6FFFE9" stroke-width="1.5" stroke-dasharray="2,2" />
+                                        <rect x="100" y="165" width="14" height="14" rx="3" fill="#FFFFFF" />
+                                        <text x="107" y="176" font-size="10" font-weight="900" fill="#0B132B" text-anchor="middle">6</text>
+                                    </svg>
                                 </div>
                             </div>
                         """, unsafe_allow_html=True)
 
-                    with body_col2:
-                        # --- UPPER BODY TESTS (ORANGE SECTION) ---
-                        st.markdown('<div class="body-section-card-upper"><div class="upper-body-header">Upper Body Intake Metrics</div>', unsafe_allow_html=True)
-                        ub_c1, ub_c2 = st.columns(2)
-                        
-                        # 1. SHOULDER IR/ER
-                        with ub_c1:
-                            st.markdown("<p style='font-size:13px; font-weight:800; color:#1D1D1F; margin-bottom:6px;'>SHOULDER IR / ER FORCE</p>", unsafe_allow_html=True)
-                            if not sh_ath.empty:
-                                sh_ir = sh_ath[sh_ath['Direction'].str.contains('Internal|IR', case=False, na=False)] if 'Direction' in sh_ath.columns else sh_ath
-                                sh_er = sh_ath[sh_ath['Direction'].str.contains('External|ER', case=False, na=False)] if 'Direction' in sh_ath.columns else sh_ath
+                    # --- RIGHT PANEL: DETAILED METRICS LINKED TO NODES ---
+                    with hud_col2:
+                        st.markdown('<div class="hud-dashboard-card">', unsafe_allow_html=True)
+                        st.markdown('<div class="hud-header-title">Anatomy Location Assessment Details</div>', unsafe_allow_html=True)
 
-                                def render_sh_block(dir_df, label):
-                                    if not dir_df.empty:
-                                        base, latest = dir_df.iloc[0], dir_df.iloc[-1]
-                                        bL, bR = base.get('L Max Force (N)', 0.0), base.get('R Max Force (N)', 0.0)
-                                        lL, lR = latest.get('L Max Force (N)', 0.0), latest.get('R Max Force (N)', 0.0)
-                                        st.markdown(f"""
-                                            <div class="intake-metric-box">
-                                                <div style="font-size:11px; font-weight:700; color:#FF8200;">{label}</div>
-                                                <div style="font-size:11px;"><b>Initial ({base['Test Date'].strftime('%m/%d')}):</b> L {bL:.1f}N | R {bR:.1f}N</div>
-                                                <div style="font-size:11px;"><b>Latest ({latest['Test Date'].strftime('%m/%d')}):</b> L {render_val_with_arrow(lL, bL, '{:.1f}', 'N')} | R {render_val_with_arrow(lR, bR, '{:.1f}', 'N')}</div>
-                                            </div>
-                                        """, unsafe_allow_html=True)
-
-                                render_sh_block(sh_ir, "Internal Rotation (IR)")
-                                render_sh_block(sh_er, "External Rotation (ER)")
-                            else:
-                                st.info("No Shoulder IR/ER dataset found.")
-
-                        # 2. ISO-Y & ROM
-                        with ub_c2:
-                            st.markdown("<p style='font-size:13px; font-weight:800; color:#1D1D1F; margin-bottom:6px;'>ISO-Y STRENGTH & ROM</p>", unsafe_allow_html=True)
-                            if not isoy_ath.empty:
-                                b_y, l_y = isoy_ath.iloc[0], isoy_ath.iloc[-1]
-                                byL, byR = b_y.get('Peak Vertical Force [N] (L)', 0.0), b_y.get('Peak Vertical Force [N] (R)', 0.0)
-                                lyL, lyR = l_y.get('Peak Vertical Force [N] (L)', 0.0), l_y.get('Peak Vertical Force [N] (R)', 0.0)
-                                st.markdown(f"""
-                                    <div class="intake-metric-box">
-                                        <div style="font-size:11px; font-weight:700; color:#FF8200;">ISO-Y Strength (ASH Sheet)</div>
-                                        <div style="font-size:11px;"><b>Initial ({b_y['Test Date'].strftime('%m/%d')}):</b> L {byL:.0f}N | R {byR:.0f}N</div>
-                                        <div style="font-size:11px;"><b>Latest ({l_y['Test Date'].strftime('%m/%d')}):</b> L {render_val_with_arrow(lyL, byL, '{:.0f}', 'N')} | R {render_val_with_arrow(lyR, byR, '{:.0f}', 'N')}</div>
-                                    </div>
-                                """, unsafe_allow_html=True)
+                        # --- UPPER BODY METRIC CARDS ---
+                        # NODE 1: SHOULDER IR/ER
+                        if not sh_ath.empty:
+                            sh_ir = sh_ath[sh_ath['Direction'].str.contains('Internal|IR', case=False, na=False)] if 'Direction' in sh_ath.columns else sh_ath
+                            sh_er = sh_ath[sh_ath['Direction'].str.contains('External|ER', case=False, na=False)] if 'Direction' in sh_ath.columns else sh_ath
                             
-                            if not er_ath.empty:
-                                b_er, l_er = er_ath.iloc[0], er_ath.iloc[-1]
-                                berL, berR = b_er.get('L Max ROM (°)', 0.0), b_er.get('R Max ROM (°)', 0.0)
-                                lerL, lerR = l_er.get('L Max ROM (°)', 0.0), l_er.get('R Max ROM (°)', 0.0)
+                            ir_base, ir_latest = (sh_ir.iloc[0], sh_ir.iloc[-1]) if not sh_ir.empty else ({}, {})
+                            er_base, er_latest = (sh_er.iloc[0], sh_er.iloc[-1]) if not sh_er.empty else ({}, {})
+
+                            ir_bL, ir_bR = ir_base.get('L Max Force (N)', 0.0), ir_base.get('R Max Force (N)', 0.0)
+                            ir_lL, ir_lR = ir_latest.get('L Max Force (N)', 0.0), ir_latest.get('R Max Force (N)', 0.0)
+                            
+                            er_bL, er_bR = er_base.get('L Max Force (N)', 0.0), er_base.get('R Max Force (N)', 0.0)
+                            er_lL, er_lR = er_latest.get('L Max Force (N)', 0.0), er_latest.get('R Max Force (N)', 0.0)
+
+                            st.markdown(f"""
+                                <div class="hud-metric-row">
+                                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                                        <span style="font-weight:800; font-size:13px; color:#6FFFE9;"><span class="node-badge">1</span>SHOULDER IR / ER FORCE</span>
+                                        <span style="font-size:11px; color:#A0AABF;">Latest: {ir_latest.get('Test Date', pd.Timestamp.now()).strftime('%m/%d/%Y')}</span>
+                                    </div>
+                                    <div style="font-size:12px; line-height:1.5;">
+                                        <b>Internal (IR):</b> Initial L {ir_bL:.1f}N | R {ir_bR:.1f}N &nbsp;→&nbsp; <b>Latest:</b> L {render_val_with_arrow(ir_lL, ir_bL, '{:.1f}', 'N')} | R {render_val_with_arrow(ir_lR, ir_bR, '{:.1f}', 'N')}<br>
+                                        <b>External (ER):</b> Initial L {er_bL:.1f}N | R {er_bR:.1f}N &nbsp;→&nbsp; <b>Latest:</b> L {render_val_with_arrow(er_lL, er_bL, '{:.1f}', 'N')} | R {render_val_with_arrow(er_lR, er_bR, '{:.1f}', 'N')}
+                                    </div>
+                                </div>
+                            """, unsafe_allow_html=True)
+
+                        # NODE 2: ISO-Y STRENGTH
+                        if not isoy_ath.empty:
+                            b_y, l_y = isoy_ath.iloc[0], isoy_ath.iloc[-1]
+                            byL, byR = b_y.get('Peak Vertical Force [N] (L)', 0.0), b_y.get('Peak Vertical Force [N] (R)', 0.0)
+                            lyL, lyR = l_y.get('Peak Vertical Force [N] (L)', 0.0), l_y.get('Peak Vertical Force [N] (R)', 0.0)
+
+                            st.markdown(f"""
+                                <div class="hud-metric-row">
+                                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                                        <span style="font-weight:800; font-size:13px; color:#6FFFE9;"><span class="node-badge">2</span>ISO-Y STRENGTH (ASH SHEET)</span>
+                                        <span style="font-size:11px; color:#A0AABF;">Latest: {l_y['Test Date'].strftime('%m/%d/%Y')}</span>
+                                    </div>
+                                    <div style="font-size:12px; line-height:1.5;">
+                                        <b>Initial Force:</b> L {byL:.0f}N | R {byR:.0f}N<br>
+                                        <b>Latest Force:</b> L {render_val_with_arrow(lyL, byL, '{:.0f}', 'N')} | R {render_val_with_arrow(lyR, byR, '{:.0f}', 'N')}
+                                    </div>
+                                </div>
+                            """, unsafe_allow_html=True)
+
+                        # NODE 3: EXTERNAL ROTATION ROM
+                        if not er_ath.empty:
+                            b_er, l_er = er_ath.iloc[0], er_ath.iloc[-1]
+                            berL, berR = b_er.get('L Max ROM (°)', 0.0), b_er.get('R Max ROM (°)', 0.0)
+                            lerL, lerR = l_er.get('L Max ROM (°)', 0.0), l_er.get('R Max ROM (°)', 0.0)
+
+                            st.markdown(f"""
+                                <div class="hud-metric-row">
+                                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                                        <span style="font-weight:800; font-size:13px; color:#6FFFE9;"><span class="node-badge">3</span>EXTERNAL ROTATION ROM</span>
+                                        <span style="font-size:11px; color:#A0AABF;">Latest: {l_er['Test Date'].strftime('%m/%d/%Y')}</span>
+                                    </div>
+                                    <div style="font-size:12px; line-height:1.5;">
+                                        <b>Initial ROM:</b> L {berL:.1f}° | R {berR:.1f}°<br>
+                                        <b>Latest ROM:</b> L {render_val_with_arrow(lerL, berL, '{:.1f}', '°')} | R {render_val_with_arrow(lerR, berR, '{:.1f}', '°')}
+                                    </div>
+                                </div>
+                            """, unsafe_allow_html=True)
+
+                        # --- LOWER BODY METRIC CARDS ---
+                        if not hip_ath.empty:
+                            hip_ad = hip_ath[hip_ath['Direction'].str.contains('AD', case=False, na=False)] if 'Direction' in hip_ath.columns else hip_ath
+                            hip_ab = hip_ath[hip_ath['Direction'].str.contains('AB', case=False, na=False)] if 'Direction' in hip_ath.columns else hip_ath
+
+                            # NODE 4: HIP ADDUCTION
+                            if not hip_ad.empty:
+                                ad_b, ad_l = hip_ad.iloc[0], hip_ad.iloc[-1]
+                                ad_bL, ad_bR = ad_b.get('L Max Force (N)', 0.0), ad_b.get('R Max Force (N)', 0.0)
+                                ad_lL, ad_lR = ad_l.get('L Max Force (N)', 0.0), ad_l.get('R Max Force (N)', 0.0)
+
                                 st.markdown(f"""
-                                    <div class="intake-metric-box">
-                                        <div style="font-size:11px; font-weight:700; color:#FF8200;">External Rotation ROM</div>
-                                        <div style="font-size:11px;"><b>Initial ({b_er['Test Date'].strftime('%m/%d')}):</b> L {berL:.1f}° | R {berR:.1f}°</div>
-                                        <div style="font-size:11px;"><b>Latest ({l_er['Test Date'].strftime('%m/%d')}):</b> L {render_val_with_arrow(lerL, berL, '{:.1f}', '°')} | R {render_val_with_arrow(lerR, berR, '{:.1f}', '°')}</div>
+                                    <div class="hud-metric-row-blue">
+                                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                                            <span style="font-weight:800; font-size:13px; color:#6FFFE9;"><span class="node-badge">4</span>HIP ADDUCTION (AD) FORCE</span>
+                                            <span style="font-size:11px; color:#A0AABF;">Latest: {ad_l['Test Date'].strftime('%m/%d/%Y')}</span>
+                                        </div>
+                                        <div style="font-size:12px; line-height:1.5;">
+                                            <b>Initial Force:</b> L {ad_bL:.1f}N | R {ad_bR:.1f}N<br>
+                                            <b>Latest Force:</b> L {render_val_with_arrow(ad_lL, ad_bL, '{:.1f}', 'N')} | R {render_val_with_arrow(ad_lR, ad_bR, '{:.1f}', 'N')}
+                                        </div>
                                     </div>
                                 """, unsafe_allow_html=True)
-                        st.markdown('</div>', unsafe_allow_html=True)
 
-                        # --- LOWER BODY TESTS (BLUE SECTION) ---
-                        st.markdown('<div class="body-section-card-lower"><div class="lower-body-header">Lower Body Intake Metrics</div>', unsafe_allow_html=True)
-                        lb_c1, lb_c2 = st.columns(2)
-                        
-                        # 1. HIP AD/AB
-                        with lb_c1:
-                            st.markdown("<p style='font-size:13px; font-weight:800; color:#1D1D1F; margin-bottom:6px;'>HIP AD / AB FORCE</p>", unsafe_allow_html=True)
-                            if not hip_ath.empty:
-                                hip_ad = hip_ath[hip_ath['Direction'].str.contains('AD', case=False, na=False)] if 'Direction' in hip_ath.columns else hip_ath
-                                hip_ab = hip_ath[hip_ath['Direction'].str.contains('AB', case=False, na=False)] if 'Direction' in hip_ath.columns else hip_ath
-
-                                def render_hip_block(dir_df, label):
-                                    if not dir_df.empty:
-                                        base, latest = dir_df.iloc[0], dir_df.iloc[-1]
-                                        bL, bR = base.get('L Max Force (N)', 0.0), base.get('R Max Force (N)', 0.0)
-                                        lL, lR = latest.get('L Max Force (N)', 0.0), latest.get('R Max Force (N)', 0.0)
-                                        st.markdown(f"""
-                                            <div class="intake-metric-box">
-                                                <div style="font-size:11px; font-weight:700; color:#4895DB;">{label}</div>
-                                                <div style="font-size:11px;"><b>Initial ({base['Test Date'].strftime('%m/%d')}):</b> L {bL:.1f}N | R {bR:.1f}N</div>
-                                                <div style="font-size:11px;"><b>Latest ({latest['Test Date'].strftime('%m/%d')}):</b> L {render_val_with_arrow(lL, bL, '{:.1f}', 'N')} | R {render_val_with_arrow(lR, bR, '{:.1f}', 'N')}</div>
-                                            </div>
-                                        """, unsafe_allow_html=True)
-
-                                render_hip_block(hip_ad, "Adduction (AD)")
-                                render_hip_block(hip_ab, "Abduction (AB)")
-                            else:
-                                st.info("No Hip AD/AB dataset found.")
-
-                        # 2. SINGLE LEG CALF RAISE
-                        with lb_c2:
-                            st.markdown("<p style='font-size:13px; font-weight:800; color:#1D1D1F; margin-bottom:6px;'>SINGLE LEG CALF RAISE</p>", unsafe_allow_html=True)
-                            if not calf_ath.empty:
-                                b_c, l_c = calf_ath.iloc[0], calf_ath.iloc[-1]
-                                bcL, bcR = b_c.get('Peak Vertical Force [N] (L)', 0.0), b_c.get('Peak Vertical Force [N] (R)', 0.0)
-                                lcL, lcR = l_c.get('Peak Vertical Force [N] (L)', 0.0), l_c.get('Peak Vertical Force [N] (R)', 0.0)
-                                bcL_bm, bcR_bm = b_c.get('Peak Vertical Force / BM [N/kg] (L)', 0.0), b_c.get('Peak Vertical Force / BM [N/kg] (R)', 0.0)
-                                lcL_bm, lcR_bm = l_c.get('Peak Vertical Force / BM [N/kg] (L)', 0.0), l_c.get('Peak Vertical Force / BM [N/kg] (R)', 0.0)
+                            # NODE 5: HIP ABDUCTION
+                            if not hip_ab.empty:
+                                ab_b, ab_l = hip_ab.iloc[0], hip_ab.iloc[-1]
+                                ab_bL, ab_bR = ab_b.get('L Max Force (N)', 0.0), ab_b.get('R Max Force (N)', 0.0)
+                                ab_lL, ab_lR = ab_l.get('L Max Force (N)', 0.0), ab_l.get('R Max Force (N)', 0.0)
 
                                 st.markdown(f"""
-                                    <div class="intake-metric-box">
-                                        <div style="font-size:11px; font-weight:700; color:#4895DB;">Peak Vertical Force & N/kg</div>
-                                        <div style="font-size:11px;"><b>Initial ({b_c['Test Date'].strftime('%m/%d')}):</b> L {bcL:.0f}N ({bcL_bm:.2f} N/kg) | R {bcR:.0f}N ({bcR_bm:.2f} N/kg)</div>
-                                        <div style="font-size:11px;"><b>Latest ({l_c['Test Date'].strftime('%m/%d')}):</b> L {render_val_with_arrow(lcL, bcL, '{:.0f}', 'N')} | R {render_val_with_arrow(lcR, bcR, '{:.0f}', 'N')}</div>
+                                    <div class="hud-metric-row-blue">
+                                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                                            <span style="font-weight:800; font-size:13px; color:#6FFFE9;"><span class="node-badge">5</span>HIP ABDUCTION (AB) FORCE</span>
+                                            <span style="font-size:11px; color:#A0AABF;">Latest: {ab_l['Test Date'].strftime('%m/%d/%Y')}</span>
+                                        </div>
+                                        <div style="font-size:12px; line-height:1.5;">
+                                            <b>Initial Force:</b> L {ab_bL:.1f}N | R {ab_bR:.1f}N<br>
+                                            <b>Latest Force:</b> L {render_val_with_arrow(ab_lL, ab_bL, '{:.1f}', 'N')} | R {render_val_with_arrow(ab_lR, ab_bR, '{:.1f}', 'N')}
+                                        </div>
                                     </div>
                                 """, unsafe_allow_html=True)
-                            else:
-                                st.info("No Single Leg Calf Raise dataset found.")
+
+                        # NODE 6: SINGLE LEG CALF RAISE
+                        if not calf_ath.empty:
+                            b_c, l_c = calf_ath.iloc[0], calf_ath.iloc[-1]
+                            bcL, bcR = b_c.get('Peak Vertical Force [N] (L)', 0.0), b_c.get('Peak Vertical Force [N] (R)', 0.0)
+                            lcL, lcR = l_c.get('Peak Vertical Force [N] (L)', 0.0), l_c.get('Peak Vertical Force [N] (R)', 0.0)
+                            bcL_bm, bcR_bm = b_c.get('Peak Vertical Force / BM [N/kg] (L)', 0.0), b_c.get('Peak Vertical Force / BM [N/kg] (R)', 0.0)
+
+                            st.markdown(f"""
+                                <div class="hud-metric-row-blue">
+                                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                                        <span style="font-weight:800; font-size:13px; color:#6FFFE9;"><span class="node-badge">6</span>SINGLE LEG CALF RAISE</span>
+                                        <span style="font-size:11px; color:#A0AABF;">Latest: {l_c['Test Date'].strftime('%m/%d/%Y')}</span>
+                                    </div>
+                                    <div style="font-size:12px; line-height:1.5;">
+                                        <b>Initial Force:</b> L {bcL:.0f}N ({bcL_bm:.2f} N/kg) | R {bcR:.0f}N<br>
+                                        <b>Latest Force:</b> L {render_val_with_arrow(lcL, bcL, '{:.0f}', 'N')} | R {render_val_with_arrow(lcR, bcR, '{:.0f}', 'N')}
+                                    </div>
+                                </div>
+                            """, unsafe_allow_html=True)
+
                         st.markdown('</div>', unsafe_allow_html=True)
 
                 else:
