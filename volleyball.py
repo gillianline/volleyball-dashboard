@@ -697,7 +697,7 @@ if check_password():
                             st.markdown(f"""
                                 <div class="hud-metric-row-light">
                                     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
-                                        <span style="font-weight:800; font-size:12px; color:#1D1D1F;"><span class="node-badge-orange">1</span>SHOULDER IR / ER FORCE</span>
+                                        <span style="font-weight:800; font-size:12px; color:#1D1D1F;"><span class="node-badge-orange">1</span>SHOULDER IR / ER</span>
                                         <span style="font-size:10px; color:#6E6E73; font-weight:600;">Latest: {latest_date_str}</span>
                                     </div>
                                     <div style="font-size:11px; line-height:1.4; color:#1D1D1F;">
@@ -716,7 +716,7 @@ if check_password():
                             st.markdown(f"""
                                 <div class="hud-metric-row-light">
                                     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
-                                        <span style="font-weight:800; font-size:12px; color:#1D1D1F;"><span class="node-badge-orange">2</span>ISO-Y STRENGTH (ASH SHEET)</span>
+                                        <span style="font-weight:800; font-size:12px; color:#1D1D1F;"><span class="node-badge-orange">2</span>ISO-Y STRENGTH</span>
                                         <span style="font-size:10px; color:#6E6E73; font-weight:600;">Latest: {l_y['Test Date'].strftime('%m/%d/%Y')}</span>
                                     </div>
                                     <div style="font-size:11px; line-height:1.4; color:#1D1D1F;">
@@ -756,7 +756,7 @@ if check_password():
                                 st.markdown(f"""
                                     <div class="hud-metric-row-light-blue">
                                         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
-                                            <span style="font-weight:800; font-size:12px; color:#1D1D1F;"><span class="node-badge-blue">4</span>HIP ADDUCTION (AD) FORCE</span>
+                                            <span style="font-weight:800; font-size:12px; color:#1D1D1F;"><span class="node-badge-blue">4</span>HIP ADDUCTION (AD)</span>
                                             <span style="font-size:10px; color:#6E6E73; font-weight:600;">Latest: {ad_l['Test Date'].strftime('%m/%d/%Y')}</span>
                                         </div>
                                         <div style="font-size:11px; line-height:1.4; color:#1D1D1F;">
@@ -773,7 +773,7 @@ if check_password():
                                 st.markdown(f"""
                                     <div class="hud-metric-row-light-blue">
                                         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
-                                            <span style="font-weight:800; font-size:12px; color:#1D1D1F;"><span class="node-badge-blue">5</span>HIP ABDUCTION (AB) FORCE</span>
+                                            <span style="font-weight:800; font-size:12px; color:#1D1D1F;"><span class="node-badge-blue">5</span>HIP ABDUCTION (AB)</span>
                                             <span style="font-size:10px; color:#6E6E73; font-weight:600;">Latest: {ab_l['Test Date'].strftime('%m/%d/%Y')}</span>
                                         </div>
                                         <div style="font-size:11px; line-height:1.4; color:#1D1D1F;">
