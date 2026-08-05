@@ -483,7 +483,7 @@ if check_password():
 
                     hud_col1, hud_col2 = st.columns([1.2, 1.8])
 
-                    # --- LEFT PANEL: HIGHLY DEFINED ANATOMICAL MUSCLE MAP ---
+                    # --- LEFT PANEL: REALISTIC PROPORTIONAL ATHLETIC ANATOMY MAP ---
                     with hud_col1:
                         hud_html = """
                         <!DOCTYPE html>
@@ -537,116 +537,78 @@ if check_password():
                                 <div class="hud-body-viewport">
                                     <svg viewBox="0 0 140 220" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">
                                         <defs>
-                                            <linearGradient id="bodySkinGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                                                <stop offset="0%" stop-color="#CFD3D6" />
-                                                <stop offset="35%" stop-color="#F2F4F7" />
-                                                <stop offset="65%" stop-color="#E4E8EC" />
-                                                <stop offset="100%" stop-color="#B6BAC0" />
+                                            <linearGradient id="anatomicalBodyGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                                                <stop offset="0%" stop-color="#C5CACC" />
+                                                <stop offset="25%" stop-color="#E8ECEE" />
+                                                <stop offset="50%" stop-color="#F2F5F7" />
+                                                <stop offset="75%" stop-color="#D0D5D8" />
+                                                <stop offset="100%" stop-color="#9AA0A6" />
                                             </linearGradient>
                                         </defs>
 
                                         <!-- DROP SHADOW AT BASE -->
                                         <ellipse cx="68" cy="214" rx="20" ry="3.5" fill="#000000" opacity="0.12" />
 
-                                        <!-- BASE BODY SILHOUETTE WITH SMOOTH CURVES -->
+                                        <!-- REALISTIC PROPORTIONAL HUMAN MANNEQUIN (SQUARE SHOULDERS, STRAIGHT ERECT POSTURE, SEPARATED LIMBS) -->
                                         <g stroke="#2C3036" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
                                             
-                                            <path d="M 68 8 
-                                                     C 73 8, 77 11, 77 17 
-                                                     C 77 23, 73 27, 71 28
-                                                     C 72 30, 74 32, 77 33
-                                                     C 83 35, 93 39, 98 46
-                                                     C 102 52, 106 66, 107 76
-                                                     C 108 86, 108 96, 107 106
-                                                     C 107 110, 104 112, 102 110
-                                                     C 100 102, 98 92, 95 82
-                                                     C 92 72, 89 66, 86 66
-                                                     C 86 76, 85 88, 84 98
-                                                     C 83 108, 84 118, 83 130
-                                                     C 81 144, 79 158, 80 172
-                                                     C 81 184, 82 195, 83 203
-                                                     C 83 208, 78 211, 75 211
-                                                     C 73 211, 71 207, 71 200
-                                                     C 71 186, 71 170, 71 155
-                                                     C 71 140, 71 126, 71 114
-                                                     C 70 126, 68 140, 68 155
-                                                     C 68 170, 66 186, 66 200
-                                                     C 66 207, 63 211, 60 211
-                                                     C 56 211, 53 208, 54 203
-                                                     C 56 195, 57 184, 57 172
-                                                     C 57 158, 55 144, 53 130
-                                                     C 51 118, 51 108, 50 98
-                                                     C 49 88, 47 76, 47 66
-                                                     C 45 66, 42 72, 39 82
-                                                     C 36 92, 33 102, 31 110
-                                                     C 29 112, 26 110, 26 106
-                                                     C 26 96, 26 86, 27 76
-                                                     C 28 66, 32 52, 36 46
-                                                     C 41 39, 51 35, 57 33
-                                                     C 60 32, 62 30, 63 28
-                                                     C 61 27, 57 23, 57 17
-                                                     C 57 11, 61 8, 68 8 Z" 
-                                                  fill="url(#bodySkinGradient)" />
+                                            <!-- Head & Neck -->
+                                            <ellipse cx="68" cy="17" rx="7" ry="9" fill="url(#anatomicalBodyGrad)" />
+                                            <!-- Neck with Trapezoid Taper -->
+                                            <path d="M 65 25 L 63 33 M 71 25 L 73 33" stroke-width="1.2" />
+
+                                            <!-- Shoulders & Upper Back (Square Broad Athletic Base) -->
+                                            <path d="M 63 33 C 58 33, 48 36, 42 40 L 40 50 C 44 49, 48 44, 52 44 M 73 33 C 78 33, 88 36, 94 40 L 96 50 C 92 49, 88 44, 84 44" fill="url(#anatomicalBodyGrad)" />
+
+                                            <!-- Arms (Separated Natural A-Pose with Palms Outward) -->
+                                            <!-- Left Arm -->
+                                            <path d="M 42 40 C 39 48, 35 60, 32 72 L 28 85 L 25 96 M 40 50 L 34 72 L 31 85 L 29 95" fill="url(#anatomicalBodyGrad)" />
+                                            <!-- Left Hand & Fingers -->
+                                            <path d="M 25 96 C 23 99, 21 102, 20 105 M 26 97 C 24 101, 23 104, 22 107 M 28 97 C 27 101, 25 104, 24 107 M 30 96 C 29 100, 28 103, 27 105" fill="none" stroke-width="0.9" />
+                                            
+                                            <!-- Right Arm -->
+                                            <path d="M 94 40 C 97 48, 101 60, 104 72 L 108 85 L 111 96 M 96 50 L 102 72 L 105 85 L 107 95" fill="url(#anatomicalBodyGrad)" />
+                                            <!-- Right Hand & Fingers -->
+                                            <path d="M 111 96 C 113 99, 115 102, 116 105 M 110 97 C 112 101, 113 104, 114 107 M 108 97 C 109 101, 111 104, 112 107 M 106 96 C 107 100, 108 103, 109 105" fill="none" stroke-width="0.9" />
+
+                                            <!-- Torso & Waist (Erect Athletic Taper to Hips) -->
+                                            <path d="M 52 44 L 54 75 L 52 92 L 68 106 L 84 92 L 82 75 L 84 44 Z" fill="url(#anatomicalBodyGrad)" />
+
+                                            <!-- Lower Body (Distinct Separated Thighs, Knees, Calves, Feet) -->
+                                            <!-- Left Leg -->
+                                            <path d="M 52 92 C 50 105, 49 122, 53 138 C 55 144, 55 152, 54 162 C 52 175, 52 192, 54 205 L 48 210 L 58 210 L 59 203 C 60 190, 60 175, 60 162 C 60 152, 60 144, 62 138 C 66 122, 66 105, 68 106 Z" fill="url(#anatomicalBodyGrad)" />
+                                            <!-- Right Leg -->
+                                            <path d="M 84 92 C 86 105, 87 122, 83 138 C 81 144, 81 152, 82 162 C 84 175, 84 192, 82 205 L 88 210 L 78 210 L 77 203 C 76 190, 76 175, 76 162 C 76 152, 76 144, 74 138 C 70 122, 70 105, 68 106 Z" fill="url(#anatomicalBodyGrad)" />
 
                                             <!-- ORANGE PLUMB LINE (ANATOMICAL AXIS) -->
                                             <line x1="68" y1="8" x2="68" y2="211" stroke="#FF8200" stroke-width="1.3" />
 
                                             <!-- RED HORIZONTAL GUIDELINES -->
-                                            <line x1="53" y1="116" x2="83" y2="116" stroke="#D32F2F" stroke-width="1.1" />
-                                            <line x1="57" y1="165" x2="79" y2="165" stroke="#D32F2F" stroke-width="1.1" />
+                                            <line x1="51" y1="116" x2="85" y2="116" stroke="#D32F2F" stroke-width="1.1" />
+                                            <line x1="55" y1="168" x2="81" y2="168" stroke="#D32F2F" stroke-width="1.1" />
 
-                                            <!-- HIGHLY DEFINED MUSCULATURE OUTLINES (Chest, Abs, Quads, Calves) -->
-                                            <g stroke="#3A3F46" stroke-width="1" fill="none">
-                                                <!-- Neck Muscles (Sternocleidomastoid) -->
-                                                <path d="M 64 28 C 65 33, 67 36, 68 37" />
-                                                <path d="M 72 28 C 71 33, 69 36, 68 37" />
-                                                
-                                                <!-- Clavicle / Collarbone -->
-                                                <path d="M 68 37 C 60 35, 52 38, 48 40 M 68 37 C 76 35, 84 38, 88 40" stroke-width="1.1" />
-                                                
-                                                <!-- Shoulder Caps (Deltoids) -->
-                                                <path d="M 47 40 C 42 45, 41 55, 47 62 C 50 56, 50 46, 47 40 Z" fill="#DDE2E6" opacity="0.6" />
-                                                <path d="M 89 40 C 94 45, 95 55, 89 62 C 86 56, 86 46, 89 40 Z" fill="#DDE2E6" opacity="0.6" />
-                                                
-                                                <!-- Pectorals (Chest Definition) -->
-                                                <path d="M 52 42 C 60 41, 67 45, 68 53 C 60 55, 52 51, 52 42 Z" fill="#E2E7EC" opacity="0.7" />
-                                                <path d="M 84 42 C 76 41, 69 45, 68 53 C 76 55, 84 51, 84 42 Z" fill="#E2E7EC" opacity="0.7" />
-                                                
-                                                <!-- Six-Pack Abdominal Muscles (Distinct Defined Segments) -->
-                                                <g stroke="#2C3036" stroke-width="0.95" fill="#E5EAEE">
-                                                    <path d="M 59 56 C 63 55, 67 55, 67 61 C 63 62, 59 61, 59 56 Z" />
-                                                    <path d="M 77 56 C 73 55, 69 55, 69 61 C 73 62, 77 61, 77 56 Z" />
-                                                    <path d="M 58 64 C 63 63, 67 63, 67 69 C 63 70, 58 69, 58 64 Z" />
-                                                    <path d="M 78 64 C 73 63, 69 63, 69 69 C 73 70, 78 69, 78 64 Z" />
-                                                    <path d="M 59 72 C 63 71, 67 71, 67 77 C 63 78, 59 77, 59 72 Z" />
-                                                    <path d="M 77 72 C 73 71, 69 71, 69 77 C 73 78, 77 77, 77 72 Z" />
-                                                </g>
-                                                
-                                                <!-- Serratus / Obliques -->
-                                                <path d="M 48 60 C 52 61, 55 64, 57 66" />
-                                                <path d="M 88 60 C 84 61, 81 64, 79 66" />
-                                                <path d="M 49 68 C 53 69, 55 72, 57 74" />
-                                                <path d="M 87 68 C 83 69, 81 72, 79 74" />
-
-                                                <!-- Hip / Inguinal Crease -->
-                                                <path d="M 52 92 C 58 98, 64 105, 68 108" stroke-width="1.1" />
-                                                <path d="M 84 92 C 78 98, 72 105, 68 108" stroke-width="1.1" />
-
-                                                <!-- Quadriceps (Vastus Medialis / Lateralis Definition) -->
-                                                <path d="M 53 98 C 50 108, 51 125, 57 138 C 61 125, 60 108, 53 98 Z" fill="#DDE3E8" opacity="0.6" />
-                                                <path d="M 83 98 C 86 108, 85 125, 79 138 C 75 125, 76 108, 83 98 Z" fill="#DDE3E8" opacity="0.6" />
-                                                <path d="M 62 104 C 58 115, 58 132, 62 142 C 65 132, 64 115, 62 104 Z" fill="#D5DCF1" opacity="0.6" />
-                                                <path d="M 74 104 C 78 115, 78 132, 74 142 C 71 132, 72 115, 74 104 Z" fill="#D5DCF1" opacity="0.6" />
-
-                                                <!-- Knees (Kneecaps / Patella) -->
-                                                <ellipse cx="60" cy="147" rx="3" ry="3.8" stroke-width="1" fill="#E8EDF2" />
-                                                <ellipse cx="76" cy="147" rx="3" ry="3.8" stroke-width="1" fill="#E8EDF2" />
-
-                                                <!-- Calves (Gastrocnemius & Shin Bone Lines) -->
-                                                <path d="M 55 152 C 52 160, 52 175, 57 188 C 58 175, 58 160, 55 152 Z" fill="#D5DCF1" opacity="0.65" />
-                                                <path d="M 81 152 C 84 160, 84 175, 79 188 C 78 175, 78 160, 81 152 Z" fill="#D5DCF1" opacity="0.65" />
-                                                <path d="M 60 152 L 58 198" stroke-width="1" />
-                                                <path d="M 76 152 L 78 198" stroke-width="1" />
+                                            <!-- ANATOMICAL DEFINITION LINES (Chest, Abs, Quads, Knees, Calves) -->
+                                            <g stroke="#3A3F46" stroke-width="0.9" fill="none">
+                                                <!-- Collarbone -->
+                                                <path d="M 68 35 C 60 34, 52 37, 46 40 M 68 35 C 76 34, 84 37, 90 40" stroke-width="1" />
+                                                <!-- Chest / Pectorals -->
+                                                <path d="M 52 44 C 60 43, 67 47, 68 54 C 60 56, 52 52, 52 44 Z" fill="#E2E7EC" opacity="0.6" />
+                                                <path d="M 84 44 C 76 43, 69 47, 68 54 C 76 56, 84 52, 84 44 Z" fill="#E2E7EC" opacity="0.6" />
+                                                <!-- Abs (6-Pack Grid) -->
+                                                <path d="M 58 58 C 64 57, 72 57, 78 58" />
+                                                <path d="M 58 66 C 64 65, 72 65, 78 66" />
+                                                <path d="M 59 74 C 64 73, 72 73, 77 74" />
+                                                <!-- Inguinal Crease -->
+                                                <path d="M 52 92 C 58 98, 64 103, 68 106 M 84 92 C 78 98, 72 103, 68 106" stroke-width="1" />
+                                                <!-- Quads Definition -->
+                                                <path d="M 52 96 C 49 108, 50 125, 57 138" />
+                                                <path d="M 84 96 C 87 108, 86 125, 79 138" />
+                                                <!-- Knees -->
+                                                <ellipse cx="57" cy="142" rx="3" ry="3.5" stroke-width="0.9" fill="#E8EDF2" />
+                                                <ellipse cx="79" cy="142" rx="3" ry="3.5" stroke-width="0.9" fill="#E8EDF2" />
+                                                <!-- Calves Definition -->
+                                                <path d="M 54 150 C 51 160, 52 178, 56 195" />
+                                                <path d="M 82 150 C 85 160, 84 178, 80 195" />
                                             </g>
                                         </g>
 
@@ -658,10 +620,10 @@ if check_password():
                                         <text x="119" y="50" font-size="9" font-weight="900" fill="#FFFFFF" text-anchor="middle">1</text>
 
                                         <!-- Node 2: ISO-Y Spine/Thoracic (Orange) -->
-                                        <circle cx="68" cy="53" r="3.5" fill="#FF8200" stroke="#FFFFFF" stroke-width="1" />
-                                        <line x1="68" y1="53" x2="118" y2="67" stroke="#FF8200" stroke-width="1.8" stroke-dasharray="2,2" />
-                                        <rect x="112" y="60" width="14" height="14" rx="3" fill="#FF8200" />
-                                        <text x="119" y="71" font-size="9" font-weight="900" fill="#FFFFFF" text-anchor="middle">2</text>
+                                        <circle cx="68" cy="54" r="3.5" fill="#FF8200" stroke="#FFFFFF" stroke-width="1" />
+                                        <line x1="68" y1="54" x2="118" y2="68" stroke="#FF8200" stroke-width="1.8" stroke-dasharray="2,2" />
+                                        <rect x="112" y="61" width="14" height="14" rx="3" fill="#FF8200" />
+                                        <text x="119" y="72" font-size="9" font-weight="900" fill="#FFFFFF" text-anchor="middle">2</text>
 
                                         <!-- Node 3: Hip Adduction (Blue) -->
                                         <circle cx="74" cy="122" r="3.5" fill="#4895DB" stroke="#FFFFFF" stroke-width="1" />
