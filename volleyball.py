@@ -483,7 +483,7 @@ if check_password():
 
                     hud_col1, hud_col2 = st.columns([1.2, 1.8])
 
-                    # --- LEFT PANEL: CONNECTED ANATOMICAL OUTLINE MAP ---
+                    # --- LEFT PANEL: SMOOTH CONTINUOUS BODY SILHOUETTE ---
                     with hud_col1:
                         hud_html = """
                         <!DOCTYPE html>
@@ -517,9 +517,9 @@ if check_password():
                                 position: relative;
                                 width: 100%;
                                 height: 380px;
-                                background: #F8F9FA;
+                                background: #111215;
                                 border-radius: 12px;
-                                border: 1px solid #E5E5E7;
+                                border: 1px solid #2C2D30;
                                 display: flex;
                                 align-items: center;
                                 justify-content: center;
@@ -536,84 +536,70 @@ if check_password():
                                 <div class="hud-header-title">Anatomy Location Map</div>
                                 <div class="hud-body-viewport">
                                     <svg viewBox="0 0 140 220" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">
-                                        <!-- BASE BODY OUTLINE (Connects head, neck, torso, waist, legs, feet) -->
-                                        <g stroke="#1D1D1F" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                                            <!-- Head & Facial Features -->
-                                            <ellipse cx="70" cy="18" rx="8" ry="10" fill="#FFE0D0" />
-                                            <path d="M 62 18 C 60 18, 60 23, 62 24" fill="#FFE0D0" />
-                                            <path d="M 78 18 C 80 18, 80 23, 78 24" fill="#FFE0D0" />
-                                            <ellipse cx="67" cy="18" rx="1.2" ry="1.2" fill="#1D1D1F" />
-                                            <ellipse cx="73" cy="18" rx="1.2" ry="1.2" fill="#1D1D1F" />
-                                            <path d="M 70 19 L 69 22 L 71 22" fill="none" stroke-width="1" />
-                                            <path d="M 67 25 C 69 26, 71 25, 73 25" fill="none" stroke-width="1.2" />
+                                        <defs>
+                                            <linearGradient id="bodySkinGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                                                <stop offset="0%" stop-color="#E8B89B" />
+                                                <stop offset="50%" stop-color="#DCA080" />
+                                                <stop offset="100%" stop-color="#C88B6E" />
+                                            </linearGradient>
+                                        </defs>
 
-                                            <!-- Full Body Silhouette Outline Path -->
-                                            <path d="M 66 28 
-                                                     L 66 35 
-                                                     C 58 35, 52 38, 48 42
-                                                     C 46 48, 43 65, 41 78
-                                                     C 39 88, 36 94, 34 102
-                                                     L 40 102
-                                                     C 42 94, 45 88, 47 78
-                                                     C 50 65, 53 58, 55 52
-                                                     C 55 65, 56 76, 58 82
-                                                     C 60 88, 62 94, 62 98
-                                                     C 62 108, 58 118, 55 132
-                                                     C 53 140, 52 152, 54 165
-                                                     C 56 178, 55 188, 52 192
-                                                     L 48 202 L 57 202 L 57 192
-                                                     C 59 188, 60 178, 60 165
-                                                     C 60 152, 62 140, 64 132
-                                                     C 66 122, 68 112, 70 106
-                                                     C 72 112, 74 122, 76 132
-                                                     C 78 140, 80 152, 80 165
-                                                     C 80 178, 81 188, 83 192
-                                                     L 83 202 L 92 202 L 88 192
-                                                     C 85 188, 84 178, 86 165
-                                                     C 88 152, 87 140, 85 132
-                                                     C 82 118, 78 108, 78 98
-                                                     C 78 94, 80 88, 82 82
-                                                     C 84 76, 85 65, 85 52
-                                                     C 87 58, 90 65, 93 78
-                                                     C 95 88, 98 94, 100 102
-                                                     L 106 102
-                                                     C 104 94, 101 88, 99 78
-                                                     C 97 65, 94 48, 92 42
-                                                     C 88 38, 82 35, 74 35
-                                                     L 74 28 Z" fill="#FFE0D0" />
+                                        <!-- SINGLE CONTINUOUS SMOOTH HUMAN BODY SILHOUETTE -->
+                                        <path d="M 70 8 
+                                                 C 75 8, 79 12, 79 18 
+                                                 C 79 24, 75 27, 73 28
+                                                 C 73 30, 75 32, 78 33
+                                                 C 84 34, 95 38, 100 45
+                                                 C 104 51, 108 65, 110 75
+                                                 C 112 85, 114 95, 115 105
+                                                 C 115 108, 112 110, 110 108
+                                                 C 107 100, 105 88, 101 78
+                                                 C 98 70, 94 65, 91 65
+                                                 C 91 75, 89 88, 88 98
+                                                 C 87 108, 88 120, 86 132
+                                                 C 84 145, 81 155, 81 168
+                                                 C 81 180, 83 192, 84 200
+                                                 C 84 204, 80 205, 77 205
+                                                 C 74 205, 72 201, 72 195
+                                                 C 72 182, 70 168, 70 155
+                                                 C 70 142, 70 130, 70 120
+                                                 C 70 130, 70 142, 70 155
+                                                 C 70 168, 68 182, 68 195
+                                                 C 68 201, 66 205, 63 205
+                                                 C 60 205, 56 204, 56 200
+                                                 C 57 192, 59 180, 59 168
+                                                 C 59 155, 56 145, 54 132
+                                                 C 52 120, 53 108, 52 98
+                                                 C 51 88, 49 75, 49 65
+                                                 C 46 65, 42 70, 39 78
+                                                 C 35 88, 33 100, 30 108
+                                                 C 28 110, 25 108, 25 105
+                                                 C 26 95, 28 85, 30 75
+                                                 C 32 65, 36 51, 40 45
+                                                 C 45 38, 56 34, 62 33
+                                                 C 65 32, 67 30, 67 28
+                                                 C 65 27, 61 24, 61 18
+                                                 C 61 12, 65 8, 70 8 Z" 
+                                              fill="url(#bodySkinGradient)" 
+                                              stroke="#221510" 
+                                              stroke-width="1.2" 
+                                              stroke-linejoin="round" />
 
-                                            <!-- MUSCLE OVERLAYS (Positioned naturally inside the outline) -->
-                                            <!-- Shoulders -->
-                                            <path d="M 48 37 C 54 35, 58 40, 55 49 C 50 48, 45 42, 48 37 Z" fill="#FFB380" />
-                                            <path d="M 92 37 C 86 35, 82 40, 85 49 C 90 48, 95 42, 92 37 Z" fill="#FFB380" />
-
-                                            <!-- Chest -->
-                                            <path d="M 57 38 C 65 38, 68 45, 68 50 C 60 52, 53 48, 57 38 Z" fill="#FFB380" />
-                                            <path d="M 83 38 C 75 38, 72 45, 72 50 C 80 52, 87 48, 83 38 Z" fill="#FFB380" />
-
-                                            <!-- Abs Grid -->
-                                            <g fill="#FFB380">
-                                                <rect x="63" y="53" width="6" height="7" rx="1.5" />
-                                                <rect x="71" y="53" width="6" height="7" rx="1.5" />
-                                                <rect x="63" y="62" width="6" height="7" rx="1.5" />
-                                                <rect x="71" y="62" width="6" height="7" rx="1.5" />
-                                                <rect x="64" y="71" width="5" height="7" rx="1.5" />
-                                                <rect x="71" y="71" width="5" height="7" rx="1.5" />
-                                            </g>
-
-                                            <!-- Thighs / Hips -->
-                                            <path d="M 53 96 C 48 96, 48 124, 55 132 C 58 124, 57 101, 53 96 Z" fill="#A4CEF4" />
-                                            <path d="M 87 96 C 92 96, 92 124, 85 132 C 82 124, 83 101, 87 96 Z" fill="#A4CEF4" />
-                                            <path d="M 61 98 C 58 104, 58 122, 63 132 C 66 122, 65 104, 61 98 Z" fill="#A4CEF4" />
-                                            <path d="M 79 98 C 82 104, 82 122, 77 132 C 74 122, 75 104, 79 98 Z" fill="#A4CEF4" />
-
-                                            <!-- Calves -->
-                                            <path d="M 54 144 C 50 152, 51 170, 56 182 C 58 170, 59 152, 58 144 Z" fill="#A4CEF4" />
-                                            <path d="M 86 144 C 90 152, 89 170, 84 182 C 82 170, 81 152, 82 144 Z" fill="#A4CEF4" />
+                                        <!-- ANATOMICAL SHADING LINES (Pectorals, Ribs & Abs contour) -->
+                                        <g stroke="#9E5D47" stroke-width="0.8" fill="none" opacity="0.6">
+                                            <!-- Pectoral Lines -->
+                                            <path d="M 60 38 Q 66 45 70 45 Q 74 45 80 38" />
+                                            <path d="M 54 44 Q 64 48 70 48 Q 76 48 86 44" />
+                                            <!-- Midline (Linea Alba) -->
+                                            <line x1="70" y1="48" x2="70" y2="92" stroke-width="1" />
+                                            <!-- Abdominal Lines -->
+                                            <path d="M 61 58 Q 70 60 79 58" />
+                                            <path d="M 62 68 Q 70 70 78 68" />
+                                            <path d="M 63 78 Q 70 80 77 78" />
                                         </g>
 
                                         <!-- NODES & CALLOUT LINES / BADGES -->
-                                        <!-- Node 1: Left Shoulder IR/ER (Orange) -->
+                                        <!-- Node 1: Shoulder IR/ER (Orange) -->
                                         <circle cx="92" cy="42" r="3.5" fill="#FF8200" stroke="#FFFFFF" stroke-width="1" />
                                         <line x1="92" y1="42" x2="118" y2="42" stroke="#FF8200" stroke-width="1.8" stroke-dasharray="2,2" />
                                         <rect x="112" y="35" width="14" height="14" rx="3" fill="#FF8200" />
@@ -626,22 +612,22 @@ if check_password():
                                         <text x="119" y="68" font-size="9" font-weight="900" fill="#FFFFFF" text-anchor="middle">2</text>
 
                                         <!-- Node 3: Hip Adduction (Blue) -->
-                                        <circle cx="78" cy="118" r="3.5" fill="#4895DB" stroke="#FFFFFF" stroke-width="1" />
-                                        <line x1="78" y1="118" x2="118" y2="118" stroke="#4895DB" stroke-width="1.8" stroke-dasharray="2,2" />
-                                        <rect x="112" y="111" width="14" height="14" rx="3" fill="#4895DB" />
-                                        <text x="119" y="122" font-size="9" font-weight="900" fill="#FFFFFF" text-anchor="middle">3</text>
+                                        <circle cx="73" cy="120" r="3.5" fill="#4895DB" stroke="#FFFFFF" stroke-width="1" />
+                                        <line x1="73" y1="120" x2="118" y2="120" stroke="#4895DB" stroke-width="1.8" stroke-dasharray="2,2" />
+                                        <rect x="112" y="113" width="14" height="14" rx="3" fill="#4895DB" />
+                                        <text x="119" y="124" font-size="9" font-weight="900" fill="#FFFFFF" text-anchor="middle">3</text>
 
                                         <!-- Node 4: Hip Abduction (Blue) -->
-                                        <circle cx="51" cy="106" r="3.5" fill="#4895DB" stroke="#FFFFFF" stroke-width="1" />
-                                        <line x1="51" y1="106" x2="22" y2="106" stroke="#4895DB" stroke-width="1.8" stroke-dasharray="2,2" />
-                                        <rect x="14" y="99" width="14" height="14" rx="3" fill="#4895DB" />
-                                        <text x="21" y="110" font-size="9" font-weight="900" fill="#FFFFFF" text-anchor="middle">4</text>
+                                        <circle cx="53" cy="112" r="3.5" fill="#4895DB" stroke="#FFFFFF" stroke-width="1" />
+                                        <line x1="53" y1="112" x2="22" y2="112" stroke="#4895DB" stroke-width="1.8" stroke-dasharray="2,2" />
+                                        <rect x="14" y="105" width="14" height="14" rx="3" fill="#4895DB" />
+                                        <text x="21" y="116" font-size="9" font-weight="900" fill="#FFFFFF" text-anchor="middle">4</text>
 
                                         <!-- Node 5: Single Leg Calf Raise (Blue) -->
-                                        <circle cx="85" cy="160" r="3.5" fill="#4895DB" stroke="#FFFFFF" stroke-width="1" />
-                                        <line x1="85" y1="160" x2="118" y2="160" stroke="#4895DB" stroke-width="1.8" stroke-dasharray="2,2" />
-                                        <rect x="112" y="153" width="14" height="14" rx="3" fill="#4895DB" />
-                                        <text x="119" y="164" font-size="9" font-weight="900" fill="#FFFFFF" text-anchor="middle">5</text>
+                                        <circle cx="81" cy="165" r="3.5" fill="#4895DB" stroke="#FFFFFF" stroke-width="1" />
+                                        <line x1="81" y1="165" x2="118" y2="165" stroke="#4895DB" stroke-width="1.8" stroke-dasharray="2,2" />
+                                        <rect x="112" y="158" width="14" height="14" rx="3" fill="#4895DB" />
+                                        <text x="119" y="169" font-size="9" font-weight="900" fill="#FFFFFF" text-anchor="middle">5</text>
                                     </svg>
                                 </div>
                             </div>
@@ -835,6 +821,7 @@ if check_password():
 
                 else:
                     st.info(f"No Intake Assessment records found for {selected_intake_athlete}.")
+                    
                     
                     
             # --- TAB 5: CROSS-SEASON TESTING COMPARISON ---
