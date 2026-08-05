@@ -481,13 +481,13 @@ if check_password():
                         color = "#28a745" if diff >= 0 else "#dc3545"
                         return f"{fmt.format(current)}{unit} <span style='color:{color}; font-size:11px; font-weight:bold;'>({arrow}{abs(pct):.1f}%)</span>"
 
-                    # --- SPORT HORIZON HUD CSS STYLING ENGINE ---
+                    # --- HUD DASHBOARD CSS ---
                     st.markdown("""
                         <style>
                         .hud-dashboard-card {
                             background: #0B132B;
                             border-radius: 16px;
-                            padding: 24px;
+                            padding: 20px;
                             border: 1px solid #1C2541;
                             box-shadow: 0 8px 24px rgba(0,0,0,0.3);
                             margin-bottom: 20px;
@@ -502,31 +502,17 @@ if check_password():
                             padding-bottom: 6px;
                             margin-bottom: 16px;
                         }
-                        .hud-image-container {
+                        .hud-body-viewport {
                             position: relative;
                             width: 100%;
-                            max-width: 280px;
-                            margin: 0 auto;
-                            border-radius: 12px;
-                            overflow: hidden;
+                            height: 380px;
                             background: #050B1A;
-                            padding: 10px;
+                            border-radius: 12px;
                             border: 1px solid #1C2541;
-                        }
-                        .hud-anatomy-img {
-                            width: 100%;
-                            height: auto;
-                            display: block;
-                            filter: contrast(1.15) brightness(0.9);
-                            mix-blend-mode: screen;
-                        }
-                        .hud-svg-overlay {
-                            position: absolute;
-                            top: 0;
-                            left: 0;
-                            width: 100%;
-                            height: 100%;
-                            pointer-events: none;
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            overflow: hidden;
                         }
                         .hud-metric-row {
                             background: rgba(28, 37, 65, 0.6);
@@ -562,58 +548,74 @@ if check_password():
 
                     hud_col1, hud_col2 = st.columns([1.2, 1.8])
 
-                    # --- LEFT PANEL: REAL ANATOMICAL IMAGE WITH HUD OVERLAY ---
+                    # --- LEFT PANEL: ANATOMY LOCATION MAP ---
                     with hud_col1:
                         st.markdown("""
                             <div class="hud-dashboard-card">
                                 <div class="hud-header-title">Anatomy Location Map</div>
-                                <div class="hud-image-container">
-                                    <!-- BASE BODY IMAGE (Replace URL with your hosted image or local file path if preferred) -->
-                                    <img src="https://raw.githubusercontent.com/visgl/deck.gl-data/master/website/3d-body.png" class="hud-anatomy-img" alt="Anatomy Silhouette">
-                                    
-                                    <!-- OVERLAID SVG TARGET POINTERS & NUMBER CALLOUTS -->
-                                    <svg class="hud-svg-overlay" viewBox="0 0 100 200" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
-                                        <!-- 1: Shoulder IR/ER (Right Shoulder Joint) -->
-                                        <circle cx="72" cy="40" r="3" fill="none" stroke="#6FFFE9" stroke-width="1.5" />
-                                        <line x1="72" y1="40" x2="90" y2="40" stroke="#6FFFE9" stroke-width="1" stroke-dasharray="2,2" />
-                                        <rect x="85" y="34" width="12" height="12" rx="2" fill="#FFFFFF" />
-                                        <text x="91" y="43" font-size="8" font-weight="900" fill="#0B132B" text-anchor="middle">1</text>
+                                <div class="hud-body-viewport">
+                                    <svg width="200" height="360" viewBox="0 0 120 220" xmlns="http://www.w3.org/2000/svg">
+                                        <!-- BODY SILHOUETTE GLOW -->
+                                        <g fill="none" stroke="#6FFFE9" stroke-width="1.2" opacity="0.85">
+                                            <!-- Head & Neck -->
+                                            <circle cx="60" cy="20" r="9" fill="#0B132B" />
+                                            <path d="M 56 29 L 64 29 L 63 34 L 57 34 Z" fill="#0B132B" />
+                                            <!-- Shoulders & Upper Body -->
+                                            <path d="M 32 36 L 88 36 L 82 60 L 38 60 Z" fill="#0B132B" />
+                                            <rect x="23" y="37" width="8" height="36" rx="4" fill="#0B132B" />
+                                            <rect x="89" y="37" width="8" height="36" rx="4" fill="#0B132B" />
+                                            <!-- Torso -->
+                                            <path d="M 38 61 L 82 61 L 76 88 L 44 88 Z" fill="#0B132B" />
+                                            <!-- Hips & Legs -->
+                                            <path d="M 43 90 L 77 90 L 74 112 L 46 112 Z" fill="#0B132B" />
+                                            <rect x="41" y="114" width="16" height="42" rx="4" fill="#0B132B" />
+                                            <rect x="43" y="158" width="12" height="38" rx="3" fill="#0B132B" />
+                                            <rect x="63" y="114" width="16" height="42" rx="4" fill="#0B132B" />
+                                            <rect x="65" y="158" width="12" height="38" rx="3" fill="#0B132B" />
+                                        </g>
 
-                                        <!-- 2: ISO-Y Strength (Upper Spine/Thoracic) -->
-                                        <circle cx="50" cy="48" r="3" fill="none" stroke="#6FFFE9" stroke-width="1.5" />
-                                        <line x1="50" y1="48" x2="90" y2="60" stroke="#6FFFE9" stroke-width="1" stroke-dasharray="2,2" />
-                                        <rect x="85" y="54" width="12" height="12" rx="2" fill="#FFFFFF" />
-                                        <text x="91" y="63" font-size="8" font-weight="900" fill="#0B132B" text-anchor="middle">2</text>
+                                        <!-- NODES & CALLOUT POINTERS -->
+                                        <!-- Node 1: Right Shoulder IR/ER -->
+                                        <circle cx="89" cy="42" r="3" fill="#6FFFE9" />
+                                        <line x1="89" y1="42" x2="108" y2="42" stroke="#6FFFE9" stroke-width="1" stroke-dasharray="2,2" />
+                                        <rect x="100" y="36" width="12" height="12" rx="2" fill="#FFFFFF" />
+                                        <text x="106" y="45" font-size="8" font-weight="900" fill="#0B132B" text-anchor="middle">1</text>
 
-                                        <!-- 3: External Rotation ROM (Left Shoulder) -->
-                                        <circle cx="28" cy="40" r="3" fill="none" stroke="#6FFFE9" stroke-width="1.5" />
-                                        <line x1="28" y1="40" x2="10" y2="40" stroke="#6FFFE9" stroke-width="1" stroke-dasharray="2,2" />
-                                        <rect x="3" y="34" width="12" height="12" rx="2" fill="#FFFFFF" />
-                                        <text x="9" y="43" font-size="8" font-weight="900" fill="#0B132B" text-anchor="middle">3</text>
+                                        <!-- Node 2: ISO-Y Spine/Thoracic -->
+                                        <circle cx="60" cy="48" r="3" fill="#6FFFE9" />
+                                        <line x1="60" y1="48" x2="108" y2="64" stroke="#6FFFE9" stroke-width="1" stroke-dasharray="2,2" />
+                                        <rect x="100" y="58" width="12" height="12" rx="2" fill="#FFFFFF" />
+                                        <text x="106" y="67" font-size="8" font-weight="900" fill="#0B132B" text-anchor="middle">2</text>
 
-                                        <!-- 4: Hip Adduction (Adductor/Inner Thigh) -->
-                                        <circle cx="45" cy="105" r="3" fill="none" stroke="#6FFFE9" stroke-width="1.5" />
-                                        <line x1="45" y1="105" x2="90" y2="105" stroke="#6FFFE9" stroke-width="1" stroke-dasharray="2,2" />
-                                        <rect x="85" y="99" width="12" height="12" rx="2" fill="#FFFFFF" />
-                                        <text x="91" y="108" font-size="8" font-weight="900" fill="#0B132B" text-anchor="middle">4</text>
+                                        <!-- Node 3: Left Shoulder ER ROM -->
+                                        <circle cx="31" cy="42" r="3" fill="#6FFFE9" />
+                                        <line x1="31" y1="42" x2="12" y2="42" stroke="#6FFFE9" stroke-width="1" stroke-dasharray="2,2" />
+                                        <rect x="6" y="36" width="12" height="12" rx="2" fill="#FFFFFF" />
+                                        <text x="12" y="45" font-size="8" font-weight="900" fill="#0B132B" text-anchor="middle">3</text>
 
-                                        <!-- 5: Hip Abduction (Outer Hip) -->
-                                        <circle cx="34" cy="92" r="3" fill="none" stroke="#6FFFE9" stroke-width="1.5" />
-                                        <line x1="34" y1="92" x2="10" y2="115" stroke="#6FFFE9" stroke-width="1" stroke-dasharray="2,2" />
-                                        <rect x="3" y="109" width="12" height="12" rx="2" fill="#FFFFFF" />
-                                        <text x="9" y="118" font-size="8" font-weight="900" fill="#0B132B" text-anchor="middle">5</text>
+                                        <!-- Node 4: Hip Adduction -->
+                                        <circle cx="54" cy="124" r="3" fill="#6FFFE9" />
+                                        <line x1="54" y1="124" x2="108" y2="124" stroke="#6FFFE9" stroke-width="1" stroke-dasharray="2,2" />
+                                        <rect x="100" y="118" width="12" height="12" rx="2" fill="#FFFFFF" />
+                                        <text x="106" y="127" font-size="8" font-weight="900" fill="#0B132B" text-anchor="middle">4</text>
 
-                                        <!-- 6: Single Leg Calf Raise (Calf) -->
-                                        <circle cx="60" cy="158" r="3" fill="none" stroke="#6FFFE9" stroke-width="1.5" />
-                                        <line x1="60" y1="158" x2="90" y2="158" stroke="#6FFFE9" stroke-width="1" stroke-dasharray="2,2" />
-                                        <rect x="85" y="152" width="12" height="12" rx="2" fill="#FFFFFF" />
-                                        <text x="91" y="161" font-size="8" font-weight="900" fill="#0B132B" text-anchor="middle">6</text>
+                                        <!-- Node 5: Hip Abduction -->
+                                        <circle cx="38" cy="100" r="3" fill="#6FFFE9" />
+                                        <line x1="38" y1="100" x2="12" y2="114" stroke="#6FFFE9" stroke-width="1" stroke-dasharray="2,2" />
+                                        <rect x="6" y="108" width="12" height="12" rx="2" fill="#FFFFFF" />
+                                        <text x="12" y="117" font-size="8" font-weight="900" fill="#0B132B" text-anchor="middle">5</text>
+
+                                        <!-- Node 6: Calf Raise -->
+                                        <circle cx="71" cy="172" r="3" fill="#6FFFE9" />
+                                        <line x1="71" y1="172" x2="108" y2="172" stroke="#6FFFE9" stroke-width="1" stroke-dasharray="2,2" />
+                                        <rect x="100" y="166" width="12" height="12" rx="2" fill="#FFFFFF" />
+                                        <text x="106" y="175" font-size="8" font-weight="900" fill="#0B132B" text-anchor="middle">6</text>
                                     </svg>
                                 </div>
                             </div>
                         """, unsafe_allow_html=True)
 
-                    # --- RIGHT PANEL: METRICS LINKED TO CALLOUT NUMBERS ---
+                    # --- RIGHT PANEL: ANATOMY LOCATION DETAILS ---
                     with hud_col2:
                         st.markdown('<div class="hud-dashboard-card">', unsafe_allow_html=True)
                         st.markdown('<div class="hud-header-title">Anatomy Location Assessment Details</div>', unsafe_allow_html=True)
@@ -638,7 +640,7 @@ if check_password():
 
                             st.markdown(f"""
                                 <div class="hud-metric-row">
-                                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                                    <div style="display:flex; justify-space-between; align-items:center; margin-bottom:4px;">
                                         <span style="font-weight:800; font-size:13px; color:#6FFFE9;"><span class="node-badge">1</span>SHOULDER IR / ER FORCE</span>
                                         <span style="font-size:11px; color:#A0AABF;">Latest: {latest_date_str}</span>
                                     </div>
@@ -687,12 +689,11 @@ if check_password():
                                 </div>
                             """, unsafe_allow_html=True)
 
-                        # LOWER BODY METRIC CARDS
+                        # NODE 4 & 5: HIP AD/AB
                         if not hip_ath.empty:
                             hip_ad = hip_ath[hip_ath['Direction'].str.contains('AD', case=False, na=False)] if 'Direction' in hip_ath.columns else hip_ath
                             hip_ab = hip_ath[hip_ath['Direction'].str.contains('AB', case=False, na=False)] if 'Direction' in hip_ath.columns else hip_ath
 
-                            # NODE 4: HIP ADDUCTION
                             if not hip_ad.empty:
                                 ad_b, ad_l = hip_ad.iloc[0], hip_ad.iloc[-1]
                                 ad_bL, ad_bR = ad_b.get('L Max Force (N)', 0.0), ad_b.get('R Max Force (N)', 0.0)
@@ -711,7 +712,6 @@ if check_password():
                                     </div>
                                 """, unsafe_allow_html=True)
 
-                            # NODE 5: HIP ABDUCTION
                             if not hip_ab.empty:
                                 ab_b, ab_l = hip_ab.iloc[0], hip_ab.iloc[-1]
                                 ab_bL, ab_bR = ab_b.get('L Max Force (N)', 0.0), ab_b.get('R Max Force (N)', 0.0)
