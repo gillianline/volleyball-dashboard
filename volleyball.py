@@ -483,7 +483,7 @@ if check_password():
 
                     hud_col1, hud_col2 = st.columns([1.2, 1.8])
 
-                    # --- LEFT PANEL: CLEAN VECTOR ANATOMY MAP ---
+                    # --- LEFT PANEL: CONNECTED ANATOMICAL OUTLINE MAP ---
                     with hud_col1:
                         hud_html = """
                         <!DOCTYPE html>
@@ -536,8 +536,9 @@ if check_password():
                                 <div class="hud-header-title">Anatomy Location Map</div>
                                 <div class="hud-body-viewport">
                                     <svg viewBox="0 0 140 220" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">
+                                        <!-- BASE BODY OUTLINE (Connects head, neck, torso, waist, legs, feet) -->
                                         <g stroke="#1D1D1F" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                                            <!-- HEAD & FACE -->
+                                            <!-- Head & Facial Features -->
                                             <ellipse cx="70" cy="18" rx="8" ry="10" fill="#FFE0D0" />
                                             <path d="M 62 18 C 60 18, 60 23, 62 24" fill="#FFE0D0" />
                                             <path d="M 78 18 C 80 18, 80 23, 78 24" fill="#FFE0D0" />
@@ -545,21 +546,52 @@ if check_password():
                                             <ellipse cx="73" cy="18" rx="1.2" ry="1.2" fill="#1D1D1F" />
                                             <path d="M 70 19 L 69 22 L 71 22" fill="none" stroke-width="1" />
                                             <path d="M 67 25 C 69 26, 71 25, 73 25" fill="none" stroke-width="1.2" />
-                                            
-                                            <!-- NECK -->
-                                            <line x1="66" y1="28" x2="66" y2="35" stroke-width="1.5" />
-                                            <line x1="74" y1="28" x2="74" y2="35" stroke-width="1.5" />
-                                            
-                                            <!-- UPPER BODY MUSCLE BLOCKS (Vol Orange Accent) -->
-                                            <!-- Shoulders (Deltoids) -->
+
+                                            <!-- Full Body Silhouette Outline Path -->
+                                            <path d="M 66 28 
+                                                     L 66 35 
+                                                     C 58 35, 52 38, 48 42
+                                                     C 46 48, 43 65, 41 78
+                                                     C 39 88, 36 94, 34 102
+                                                     L 40 102
+                                                     C 42 94, 45 88, 47 78
+                                                     C 50 65, 53 58, 55 52
+                                                     C 55 65, 56 76, 58 82
+                                                     C 60 88, 62 94, 62 98
+                                                     C 62 108, 58 118, 55 132
+                                                     C 53 140, 52 152, 54 165
+                                                     C 56 178, 55 188, 52 192
+                                                     L 48 202 L 57 202 L 57 192
+                                                     C 59 188, 60 178, 60 165
+                                                     C 60 152, 62 140, 64 132
+                                                     C 66 122, 68 112, 70 106
+                                                     C 72 112, 74 122, 76 132
+                                                     C 78 140, 80 152, 80 165
+                                                     C 80 178, 81 188, 83 192
+                                                     L 83 202 L 92 202 L 88 192
+                                                     C 85 188, 84 178, 86 165
+                                                     C 88 152, 87 140, 85 132
+                                                     C 82 118, 78 108, 78 98
+                                                     C 78 94, 80 88, 82 82
+                                                     C 84 76, 85 65, 85 52
+                                                     C 87 58, 90 65, 93 78
+                                                     C 95 88, 98 94, 100 102
+                                                     L 106 102
+                                                     C 104 94, 101 88, 99 78
+                                                     C 97 65, 94 48, 92 42
+                                                     C 88 38, 82 35, 74 35
+                                                     L 74 28 Z" fill="#FFE0D0" />
+
+                                            <!-- MUSCLE OVERLAYS (Positioned naturally inside the outline) -->
+                                            <!-- Shoulders -->
                                             <path d="M 48 37 C 54 35, 58 40, 55 49 C 50 48, 45 42, 48 37 Z" fill="#FFB380" />
                                             <path d="M 92 37 C 86 35, 82 40, 85 49 C 90 48, 95 42, 92 37 Z" fill="#FFB380" />
-                                            
-                                            <!-- Chest (Pectorals) -->
+
+                                            <!-- Chest -->
                                             <path d="M 57 38 C 65 38, 68 45, 68 50 C 60 52, 53 48, 57 38 Z" fill="#FFB380" />
                                             <path d="M 83 38 C 75 38, 72 45, 72 50 C 80 52, 87 48, 83 38 Z" fill="#FFB380" />
-                                            
-                                            <!-- Abs (Rectus Abdominis 6-Pack Grid) -->
+
+                                            <!-- Abs Grid -->
                                             <g fill="#FFB380">
                                                 <rect x="63" y="53" width="6" height="7" rx="1.5" />
                                                 <rect x="71" y="53" width="6" height="7" rx="1.5" />
@@ -568,31 +600,16 @@ if check_password():
                                                 <rect x="64" y="71" width="5" height="7" rx="1.5" />
                                                 <rect x="71" y="71" width="5" height="7" rx="1.5" />
                                             </g>
-                                            
-                                            <!-- Arms (Biceps & Forearms) -->
-                                            <path d="M 45 50 C 48 50, 49 62, 44 68 C 41 62, 41 52, 45 50 Z" fill="#FFE0D0" />
-                                            <path d="M 95 50 C 92 50, 91 62, 96 68 C 99 62, 99 52, 95 50 Z" fill="#FFE0D0" />
-                                            <path d="M 43 70 C 46 70, 43 88, 39 92 C 37 88, 39 72, 43 70 Z" fill="#FFE0D0" />
-                                            <path d="M 97 70 C 94 70, 97 88, 101 92 C 103 88, 101 72, 97 70 Z" fill="#FFE0D0" />
-                                            <path d="M 37 93 L 34 102 L 40 102 Z" fill="#FFE0D0" />
-                                            <path d="M 103 93 L 106 102 L 100 102 Z" fill="#FFE0D0" />
 
-                                            <!-- LOWER BODY MUSCLE BLOCKS (Vol Blue Accent) -->
-                                            <!-- Hips & Thighs (Adductors & Abductors) -->
-                                            <!-- Outer Thighs (Abduction) -->
+                                            <!-- Thighs / Hips -->
                                             <path d="M 53 96 C 48 96, 48 124, 55 132 C 58 124, 57 101, 53 96 Z" fill="#A4CEF4" />
                                             <path d="M 87 96 C 92 96, 92 124, 85 132 C 82 124, 83 101, 87 96 Z" fill="#A4CEF4" />
-                                            <!-- Inner Thighs (Adduction) -->
                                             <path d="M 61 98 C 58 104, 58 122, 63 132 C 66 122, 65 104, 61 98 Z" fill="#A4CEF4" />
                                             <path d="M 79 98 C 82 104, 82 122, 77 132 C 74 122, 75 104, 79 98 Z" fill="#A4CEF4" />
 
-                                            <!-- Calves (Gastrocnemius) -->
+                                            <!-- Calves -->
                                             <path d="M 54 144 C 50 152, 51 170, 56 182 C 58 170, 59 152, 58 144 Z" fill="#A4CEF4" />
                                             <path d="M 86 144 C 90 152, 89 170, 84 182 C 82 170, 81 152, 82 144 Z" fill="#A4CEF4" />
-
-                                            <!-- Feet -->
-                                            <polygon points="52,192 48,202 57,202 57,192" fill="#FFE0D0" />
-                                            <polygon points="88,192 92,202 83,202 83,192" fill="#FFE0D0" />
                                         </g>
 
                                         <!-- NODES & CALLOUT LINES / BADGES -->
