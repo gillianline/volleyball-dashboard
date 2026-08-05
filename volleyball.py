@@ -483,7 +483,7 @@ if check_password():
 
                     hud_col1, hud_col2 = st.columns([1.2, 1.8])
 
-                    # --- LEFT PANEL: 3D MANNEQUIN VECTOR ANATOMY MAP ---
+                    # --- LEFT PANEL: REALISTIC 3D ANATOMICAL MANNEQUIN ---
                     with hud_col1:
                         hud_html = """
                         <!DOCTYPE html>
@@ -517,9 +517,9 @@ if check_password():
                                 position: relative;
                                 width: 100%;
                                 height: 380px;
-                                background: #EFEFEF;
+                                background: linear-gradient(180deg, #B2EBF2 0%, #E0F7FA 100%);
                                 border-radius: 12px;
-                                border: 1px solid #D1D1D6;
+                                border: 1px solid #B2EBF2;
                                 display: flex;
                                 align-items: center;
                                 justify-content: center;
@@ -537,105 +537,126 @@ if check_password():
                                 <div class="hud-body-viewport">
                                     <svg viewBox="0 0 140 220" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">
                                         <defs>
-                                            <!-- Monochromatic Metallic Shading Gradient (Matching 3D Model) -->
-                                            <linearGradient id="3dBodyGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                                                <stop offset="0%" stop-color="#C2C5CB" />
-                                                <stop offset="35%" stop-color="#ECEFF4" />
-                                                <stop offset="65%" stop-color="#E1E4EA" />
-                                                <stop offset="100%" stop-color="#A2A5AC" />
+                                            <!-- Soft Metallic Skin Gradient for 3D Rendered Mannequin -->
+                                            <linearGradient id="3dSkin" x1="0%" y1="0%" x2="100%" y2="0%">
+                                                <stop offset="0%" stop-color="#C5CACC" />
+                                                <stop offset="25%" stop-color="#E8ECEE" />
+                                                <stop offset="50%" stop-color="#F2F5F7" />
+                                                <stop offset="75%" stop-color="#D0D5D8" />
+                                                <stop offset="100%" stop-color="#9AA0A6" />
                                             </linearGradient>
                                         </defs>
 
-                                        <!-- GROUND DROP SHADOW -->
-                                        <ellipse cx="64" cy="214" rx="22" ry="4" fill="#1D1D1F" opacity="0.18" />
+                                        <!-- DROP SHADOW AT FEET -->
+                                        <ellipse cx="68" cy="214" rx="20" ry="3.5" fill="#000000" opacity="0.15" />
 
-                                        <!-- FULL PROPORTIONAL 3D MANNEQUIN BODY SILHOUETTE -->
-                                        <g stroke="#2C2D30" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round">
+                                        <!-- 3D ANATOMICAL MANNEQUIN (3/4 TURNED POSE) -->
+                                        <g stroke="#3A3F44" stroke-width="0.8" stroke-linecap="round" stroke-linejoin="round">
                                             
-                                            <!-- Head, Neck, Faceless Feature Lines & Center Guide -->
-                                            <path d="M 70 8 C 76 8, 80 12, 80 19 C 80 26, 75 30, 70 30 C 65 30, 60 26, 60 19 C 60 12, 64 8, 70 8 Z" fill="url(#3dBodyGradient)" />
-                                            <path d="M 66 30 L 66 37 M 74 30 L 74 37" fill="none" stroke-width="1" />
-                                            <!-- Jaw / Brow Planes -->
-                                            <path d="M 62 16 L 78 16 M 61 22 L 79 22" fill="none" stroke="#6C707A" stroke-width="0.7" opacity="0.6" />
+                                            <!-- Full Body Outer Silhouette Path -->
+                                            <path d="M 68 8 
+                                                     C 73 8, 77 11, 77 17 
+                                                     C 77 23, 73 27, 71 28
+                                                     C 72 30, 74 32, 77 33
+                                                     C 83 35, 93 39, 98 46
+                                                     C 102 52, 106 66, 107 76
+                                                     C 108 86, 108 96, 107 106
+                                                     C 107 110, 104 112, 102 110
+                                                     C 100 102, 98 92, 95 82
+                                                     C 92 72, 89 66, 86 66
+                                                     C 86 76, 85 88, 84 98
+                                                     C 83 108, 84 118, 83 130
+                                                     C 81 144, 79 158, 80 172
+                                                     C 81 184, 82 195, 83 203
+                                                     C 83 208, 78 211, 75 211
+                                                     C 73 211, 71 207, 71 200
+                                                     C 71 186, 71 170, 71 155
+                                                     C 71 140, 71 126, 71 114
+                                                     C 70 126, 68 140, 68 155
+                                                     C 68 170, 66 186, 66 200
+                                                     C 66 207, 63 211, 60 211
+                                                     C 56 211, 53 208, 54 203
+                                                     C 56 195, 57 184, 57 172
+                                                     C 57 158, 55 144, 53 130
+                                                     C 51 118, 51 108, 50 98
+                                                     C 49 88, 47 76, 47 66
+                                                     C 45 66, 42 72, 39 82
+                                                     C 36 92, 33 102, 31 110
+                                                     C 29 112, 26 110, 26 106
+                                                     C 26 96, 26 86, 27 76
+                                                     C 28 66, 32 52, 36 46
+                                                     C 41 39, 51 35, 57 33
+                                                     C 60 32, 62 30, 63 28
+                                                     C 61 27, 57 23, 57 17
+                                                     C 57 11, 61 8, 68 8 Z" 
+                                                  fill="url(#3dSkin)" />
 
-                                            <!-- FULL CONTINUOUS ATHLETIC MANNEQUIN BODY -->
-                                            <path d="M 66 37 
-                                                     C 58 37, 51 40, 46 45
-                                                     C 43 52, 40 68, 37 82
-                                                     C 34 94, 30 102, 28 110
-                                                     C 28 112, 31 113, 33 111
-                                                     C 35 105, 38 96, 42 85
-                                                     C 45 74, 48 66, 51 60
-                                                     C 52 70, 53 82, 54 90
-                                                     C 55 98, 56 105, 55 110
-                                                     C 54 122, 53 138, 55 152
-                                                     C 57 168, 58 184, 56 195
-                                                     C 55 202, 53 208, 50 210
-                                                     L 61 210
-                                                     C 62 206, 63 198, 63 190
-                                                     C 63 175, 64 160, 64 145
-                                                     C 64 132, 65 120, 67 110
-                                                     C 69 120, 70 132, 70 145
-                                                     C 70 160, 71 175, 71 190
-                                                     C 71 198, 72 206, 73 210
-                                                     L 84 210
-                                                     C 81 208, 79 202, 78 195
-                                                     C 76 184, 77 168, 79 152
-                                                     C 81 138, 80 122, 79 110
-                                                     C 78 105, 79 98, 80 90
-                                                     C 81 82, 82 70, 83 60
-                                                     C 86 66, 89 74, 92 85
-                                                     C 96 96, 99 105, 101 111
-                                                     C 103 113, 106 112, 106 110
-                                                     C 104 102, 100 94, 97 82
-                                                     C 94 68, 91 52, 88 45
-                                                     C 83 40, 76 37, 74 37 Z" 
-                                                  fill="url(#3dBodyGradient)" />
+                                            <!-- ORANGE ANATOMICAL CENTER AXIS PLUMB LINE -->
+                                            <path d="M 68 8 
+                                                     C 69 22, 69 35, 69 48 
+                                                     C 69 68, 69 88, 69 110 
+                                                     C 69 135, 71 160, 70 185 
+                                                     C 70 195, 70 205, 70 211" 
+                                                  stroke="#FF8200" 
+                                                  stroke-width="1.3" 
+                                                  fill="none" />
 
-                                            <!-- ORANGE PLUMB LINE (ANATOMICAL ALIGNMENT AXIS) -->
-                                            <line x1="70" y1="8" x2="70" y2="210" stroke="#FF8200" stroke-width="1.2" opacity="0.85" />
+                                            <!-- ORANGE / RED GUIDELINE GRID OVERLAYS -->
+                                            <g stroke="#FF8200" stroke-width="0.8" fill="none" opacity="0.8">
+                                                <!-- Shoulder Horizon Curve -->
+                                                <path d="M 45 38 C 58 35, 78 35, 91 38" />
+                                                <!-- Upper Thigh Guide Line -->
+                                                <path d="M 52 116 L 82 116" stroke="#D32F2F" stroke-width="1" />
+                                                <!-- Lower Leg Guide Line -->
+                                                <path d="M 57 165 L 79 165" stroke="#D32F2F" stroke-width="1" />
+                                            </g>
 
-                                            <!-- MUSCLE DIVISION & PLANE MAP LINES (Fine Wireframe Overlay) -->
-                                            <g stroke="#3A3D45" stroke-width="0.75" fill="none" opacity="0.75">
-                                                <!-- Clavicle / Shoulder Caps -->
-                                                <path d="M 70 39 L 52 42 M 70 39 L 88 42" stroke-width="1" />
-                                                <path d="M 46 45 C 50 43, 56 46, 56 53 C 48 55, 43 51, 46 45 Z" />
-                                                <path d="M 94 45 C 90 43, 84 46, 84 53 C 92 55, 97 51, 94 45 Z" />
-                                                <!-- Chest / Pectoral Contour -->
-                                                <path d="M 56 53 C 62 53, 68 58, 68 64 C 60 66, 54 62, 56 53 Z" />
-                                                <path d="M 84 53 C 78 53, 72 58, 72 64 C 80 66, 86 62, 84 53 Z" />
-                                                <!-- Red Waist Planes -->
-                                                <line x1="53" y1="76" x2="87" y2="76" stroke="#D32F2F" stroke-width="1.2" />
-                                                <line x1="54" y1="82" x2="86" y2="82" stroke="#D32F2F" stroke-width="1.2" />
-                                                <!-- Abdominal Segments -->
-                                                <path d="M 62 65 L 78 65 M 63 71 L 77 71 M 64 88 L 76 88" />
-                                                <!-- Quad / Knee Planes -->
-                                                <path d="M 55 110 C 58 118, 61 130, 62 142" />
-                                                <path d="M 79 110 C 76 118, 73 130, 72 142" />
-                                                <ellipse cx="58" cy="148" rx="3.5" ry="4" stroke-width="1" />
-                                                <ellipse cx="76" cy="148" rx="3.5" ry="4" stroke-width="1" />
-                                                <!-- Tibia / Calf Planes -->
-                                                <path d="M 58 152 C 57 165, 55 180, 56 195" />
-                                                <path d="M 76 152 C 77 165, 79 180, 78 195" />
+                                            <!-- ANATOMICAL CONTOUR & MUSCLE MAPPING LINES -->
+                                            <g stroke="#5A6066" stroke-width="0.65" fill="none" opacity="0.65">
+                                                <!-- Neck Muscle Lines -->
+                                                <path d="M 64 28 C 65 33, 67 36, 69 37" />
+                                                <path d="M 72 28 C 71 33, 70 36, 69 37" />
+                                                <!-- Pectorals / Chest Contours -->
+                                                <path d="M 54 44 C 61 43, 68 47, 69 54" />
+                                                <path d="M 84 44 C 77 43, 70 47, 69 54" />
+                                                <!-- Deltoid / Arm Contours -->
+                                                <path d="M 42 45 C 45 52, 48 58, 47 66" />
+                                                <path d="M 94 45 C 91 52, 88 58, 89 66" />
+                                                <!-- Rectus Abdominis Six-Pack Contour Grid -->
+                                                <path d="M 58 62 C 64 61, 74 61, 80 62" />
+                                                <path d="M 58 70 C 64 69, 74 69, 80 70" />
+                                                <path d="M 59 78 C 64 77, 74 77, 79 78" />
+                                                <path d="M 60 86 C 64 85, 74 85, 78 86" />
+                                                <!-- Hip / Inguinal Crease -->
+                                                <path d="M 53 98 C 60 104, 66 110, 69 112" />
+                                                <path d="M 83 98 C 76 104, 72 110, 69 112" />
+                                                <!-- Quad / Patella Muscle Lines -->
+                                                <path d="M 55 110 C 58 122, 60 135, 60 144" />
+                                                <path d="M 81 110 C 78 122, 76 135, 76 144" />
+                                                <ellipse cx="60" cy="147" rx="3" ry="3.5" stroke-width="0.8" />
+                                                <ellipse cx="76" cy="147" rx="3" ry="3.5" stroke-width="0.8" />
+                                                <!-- Shin / Calf Contour Lines -->
+                                                <path d="M 60 151 C 60 165, 59 180, 58 195" />
+                                                <path d="M 76 151 C 76 165, 77 180, 78 195" />
                                             </g>
                                         </g>
 
                                         <!-- NODES & CALLOUT LINES / BADGES -->
                                         <!-- Node 1: Left Shoulder IR/ER (Orange) -->
-                                        <circle cx="91" cy="47" r="3.5" fill="#FF8200" stroke="#FFFFFF" stroke-width="1" />
-                                        <line x1="91" y1="47" x2="118" y2="47" stroke="#FF8200" stroke-width="1.8" stroke-dasharray="2,2" />
-                                        <rect x="112" y="40" width="14" height="14" rx="3" fill="#FF8200" />
-                                        <text x="119" y="51" font-size="9" font-weight="900" fill="#FFFFFF" text-anchor="middle">1</text>
+                                        <circle cx="91" cy="46" r="3.5" fill="#FF8200" stroke="#FFFFFF" stroke-width="1" />
+                                        <line x1="91" y1="46" x2="118" y2="46" stroke="#FF8200" stroke-width="1.8" stroke-dasharray="2,2" />
+                                        <rect x="112" y="39" width="14" height="14" rx="3" fill="#FF8200" />
+                                        <text x="119" y="50" font-size="9" font-weight="900" fill="#FFFFFF" text-anchor="middle">1</text>
 
                                         <!-- Node 2: ISO-Y Spine/Thoracic (Orange) -->
-                                        <circle cx="70" cy="58" r="3.5" fill="#FF8200" stroke="#FFFFFF" stroke-width="1" />
-                                        <line x1="70" y1="58" x2="118" y2="72" stroke="#FF8200" stroke-width="1.8" stroke-dasharray="2,2" />
-                                        <rect x="112" y="65" width="14" height="14" rx="3" fill="#FF8200" />
-                                        <text x="119" y="76" font-size="9" font-weight="900" fill="#FFFFFF" text-anchor="middle">2</text>
+                                        <circle cx="69" cy="54" r="3.5" fill="#FF8200" stroke="#FFFFFF" stroke-width="1" />
+                                        <line x1="69" y1="54" x2="118" y2="68" stroke="#FF8200" stroke-width="1.8" stroke-dasharray="2,2" />
+                                        <rect x="112" y="61" width="14" height="14" rx="3" fill="#FF8200" />
+                                        <text x="119" y="72" font-size="9" font-weight="900" fill="#FFFFFF" text-anchor="middle">2</text>
 
                                         <!-- Node 3: Hip Adduction (Blue) -->
-                                        <circle cx="75" cy="122" r="3.5" fill="#4895DB" stroke="#FFFFFF" stroke-width="1" />
-                                        <line x1="75" y1="122" x2="118" y2="122" stroke="#4895DB" stroke-width="1.8" stroke-dasharray="2,2" />
+                                        <circle cx="74" cy="122" r="3.5" fill="#4895DB" stroke="#FFFFFF" stroke-width="1" />
+                                        <line x1="74" y1="122" x2="118" y2="122" stroke="#4895DB" stroke-width="1.8" stroke-dasharray="2,2" />
                                         <rect x="112" y="115" width="14" height="14" rx="3" fill="#4895DB" />
                                         <text x="119" y="126" font-size="9" font-weight="900" fill="#FFFFFF" text-anchor="middle">3</text>
 
@@ -646,8 +667,8 @@ if check_password():
                                         <text x="21" y="120" font-size="9" font-weight="900" fill="#FFFFFF" text-anchor="middle">4</text>
 
                                         <!-- Node 5: Single Leg Calf Raise (Blue) -->
-                                        <circle cx="78" cy="172" r="3.5" fill="#4895DB" stroke="#FFFFFF" stroke-width="1" />
-                                        <line x1="78" y1="172" x2="118" y2="172" stroke="#4895DB" stroke-width="1.8" stroke-dasharray="2,2" />
+                                        <circle cx="77" cy="172" r="3.5" fill="#4895DB" stroke="#FFFFFF" stroke-width="1" />
+                                        <line x1="77" y1="172" x2="118" y2="172" stroke="#4895DB" stroke-width="1.8" stroke-dasharray="2,2" />
                                         <rect x="112" y="165" width="14" height="14" rx="3" fill="#4895DB" />
                                         <text x="119" y="176" font-size="9" font-weight="900" fill="#FFFFFF" text-anchor="middle">5</text>
                                     </svg>
