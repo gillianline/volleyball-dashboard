@@ -457,7 +457,7 @@ if check_password():
                     else:
                         st.info(f"No External Rotation ROM testing records logged for {selected_athlete_test} in {s_label}.")
 
-            # --- TAB 4: INTAKE TESTING TAB ---
+           # --- TAB 4: INTAKE TESTING TAB ---
             with testing_season_tabs[3]:
                 st.markdown("<h3 style='color:#1D1D1F; font-weight:900; text-transform:uppercase;'>Athlete Intake Assessment</h3>", unsafe_allow_html=True)
                 c_int_ath, _ = st.columns([2, 2])
@@ -467,10 +467,9 @@ if check_password():
                 calf_ath = raw_calf_df[raw_calf_df['Name'] == selected_intake_athlete].sort_values('Test Date')
                 hip_ath = raw_hip_df[raw_hip_df['Name'] == selected_intake_athlete].sort_values('Test Date')
                 sh_ath = raw_shoulder_df[raw_shoulder_df['Name'] == selected_intake_athlete].sort_values('Test Date')
-                er_ath = raw_er_df[raw_er_df['Name'] == selected_intake_athlete].sort_values('Test Date')
                 isoy_ath = raw_ash_df[(raw_ash_df['Name'] == selected_intake_athlete) & (raw_ash_df['Isometric Type'].str.contains('ISO-Y|Y', case=False, na=False))].sort_values('Test Date')
 
-                has_data = not (calf_ath.empty and hip_ath.empty and sh_ath.empty and er_ath.empty and isoy_ath.empty)
+                has_data = not (calf_ath.empty and hip_ath.empty and sh_ath.empty and isoy_ath.empty)
 
                 if has_data:
                     def render_val_with_arrow(current, initial, fmt="{:.1f}", unit=""):
@@ -571,29 +570,23 @@ if check_password():
                                         <rect x="100" y="58" width="12" height="12" rx="2" fill="#FF8200" />
                                         <text x="106" y="67" font-size="8" font-weight="900" fill="#FFFFFF" text-anchor="middle">2</text>
 
-                                        <!-- Node 3: Left Shoulder ER ROM -->
-                                        <circle cx="31" cy="42" r="3" fill="#FF8200" />
-                                        <line x1="31" y1="42" x2="12" y2="42" stroke="#FF8200" stroke-width="1.5" stroke-dasharray="2,2" />
-                                        <rect x="6" y="36" width="12" height="12" rx="2" fill="#FF8200" />
-                                        <text x="12" y="45" font-size="8" font-weight="900" fill="#FFFFFF" text-anchor="middle">3</text>
-
-                                        <!-- Node 4: Hip Adduction -->
+                                        <!-- Node 3: Hip Adduction -->
                                         <circle cx="54" cy="124" r="3" fill="#4895DB" />
                                         <line x1="54" y1="124" x2="108" y2="124" stroke="#4895DB" stroke-width="1.5" stroke-dasharray="2,2" />
                                         <rect x="100" y="118" width="12" height="12" rx="2" fill="#4895DB" />
-                                        <text x="106" y="127" font-size="8" font-weight="900" fill="#FFFFFF" text-anchor="middle">4</text>
+                                        <text x="106" y="127" font-size="8" font-weight="900" fill="#FFFFFF" text-anchor="middle">3</text>
 
-                                        <!-- Node 5: Hip Abduction -->
+                                        <!-- Node 4: Hip Abduction -->
                                         <circle cx="38" cy="100" r="3" fill="#4895DB" />
                                         <line x1="38" y1="100" x2="12" y2="114" stroke="#4895DB" stroke-width="1.5" stroke-dasharray="2,2" />
                                         <rect x="6" y="108" width="12" height="12" rx="2" fill="#4895DB" />
-                                        <text x="12" y="117" font-size="8" font-weight="900" fill="#FFFFFF" text-anchor="middle">5</text>
+                                        <text x="12" y="117" font-size="8" font-weight="900" fill="#FFFFFF" text-anchor="middle">4</text>
 
-                                        <!-- Node 6: Calf Raise -->
+                                        <!-- Node 5: Calf Raise -->
                                         <circle cx="71" cy="172" r="3" fill="#4895DB" />
                                         <line x1="71" y1="172" x2="108" y2="172" stroke="#4895DB" stroke-width="1.5" stroke-dasharray="2,2" />
                                         <rect x="100" y="166" width="12" height="12" rx="2" fill="#4895DB" />
-                                        <text x="106" y="175" font-size="8" font-weight="900" fill="#FFFFFF" text-anchor="middle">6</text>
+                                        <text x="106" y="175" font-size="8" font-weight="900" fill="#FFFFFF" text-anchor="middle">5</text>
                                     </svg>
                                 </div>
                             </div>
@@ -696,7 +689,7 @@ if check_password():
 
                             st.markdown(f"""
                                 <div class="hud-metric-row-light">
-                                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                                    <div style="display:flex; justify-space-between; align-items:center; margin-bottom:4px;">
                                         <span style="font-weight:800; font-size:12px; color:#1D1D1F;"><span class="node-badge-orange">1</span>SHOULDER IR / ER</span>
                                         <span style="font-size:10px; color:#6E6E73; font-weight:600;">Latest: {latest_date_str}</span>
                                     </div>
@@ -725,25 +718,7 @@ if check_password():
                                 </div>
                             """, unsafe_allow_html=True)
 
-                        # NODE 3: EXTERNAL ROTATION ROM
-                        if not er_ath.empty:
-                            b_er, l_er = er_ath.iloc[0], er_ath.iloc[-1]
-                            berL, berR = b_er.get('L Max ROM (°)', 0.0), b_er.get('R Max ROM (°)', 0.0)
-                            lerL, lerR = l_er.get('L Max ROM (°)', 0.0), l_er.get('R Max ROM (°)', 0.0)
-
-                            st.markdown(f"""
-                                <div class="hud-metric-row-light">
-                                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
-                                        <span style="font-weight:800; font-size:12px; color:#1D1D1F;"><span class="node-badge-orange">3</span>EXTERNAL ROTATION ROM</span>
-                                        <span style="font-size:10px; color:#6E6E73; font-weight:600;">Latest: {l_er['Test Date'].strftime('%m/%d/%Y')}</span>
-                                    </div>
-                                    <div style="font-size:11px; line-height:1.4; color:#1D1D1F;">
-                                        <b>Initial ROM:</b> L {berL:.1f}° | R {berR:.1f}° &nbsp;→&nbsp; <b>Latest:</b> L {render_val_with_arrow(lerL, berL, '{:.1f}', '°')} | R {render_val_with_arrow(lerR, berR, '{:.1f}', '°')}
-                                    </div>
-                                </div>
-                            """, unsafe_allow_html=True)
-
-                        # NODE 4 & 5: HIP AD/AB
+                        # NODE 3 & 4: HIP AD/AB
                         if not hip_ath.empty:
                             hip_ad = hip_ath[hip_ath['Direction'].str.contains('AD', case=False, na=False)] if 'Direction' in hip_ath.columns else hip_ath
                             hip_ab = hip_ath[hip_ath['Direction'].str.contains('AB', case=False, na=False)] if 'Direction' in hip_ath.columns else hip_ath
@@ -756,7 +731,7 @@ if check_password():
                                 st.markdown(f"""
                                     <div class="hud-metric-row-light-blue">
                                         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
-                                            <span style="font-weight:800; font-size:12px; color:#1D1D1F;"><span class="node-badge-blue">4</span>HIP ADDUCTION (AD)</span>
+                                            <span style="font-weight:800; font-size:12px; color:#1D1D1F;"><span class="node-badge-blue">3</span>HIP ADDUCTION (AD)</span>
                                             <span style="font-size:10px; color:#6E6E73; font-weight:600;">Latest: {ad_l['Test Date'].strftime('%m/%d/%Y')}</span>
                                         </div>
                                         <div style="font-size:11px; line-height:1.4; color:#1D1D1F;">
@@ -773,7 +748,7 @@ if check_password():
                                 st.markdown(f"""
                                     <div class="hud-metric-row-light-blue">
                                         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
-                                            <span style="font-weight:800; font-size:12px; color:#1D1D1F;"><span class="node-badge-blue">5</span>HIP ABDUCTION (AB)</span>
+                                            <span style="font-weight:800; font-size:12px; color:#1D1D1F;"><span class="node-badge-blue">4</span>HIP ABDUCTION (AB)</span>
                                             <span style="font-size:10px; color:#6E6E73; font-weight:600;">Latest: {ab_l['Test Date'].strftime('%m/%d/%Y')}</span>
                                         </div>
                                         <div style="font-size:11px; line-height:1.4; color:#1D1D1F;">
@@ -782,7 +757,7 @@ if check_password():
                                     </div>
                                 """, unsafe_allow_html=True)
 
-                        # NODE 6: SINGLE LEG CALF RAISE
+                        # NODE 5: SINGLE LEG CALF RAISE
                         if not calf_ath.empty:
                             b_c, l_c = calf_ath.iloc[0], calf_ath.iloc[-1]
                             bcL, bcR = b_c.get('Peak Vertical Force [N] (L)', 0.0), b_c.get('Peak Vertical Force [N] (R)', 0.0)
@@ -792,7 +767,7 @@ if check_password():
                             st.markdown(f"""
                                 <div class="hud-metric-row-light-blue">
                                     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
-                                        <span style="font-weight:800; font-size:12px; color:#1D1D1F;"><span class="node-badge-blue">6</span>SINGLE LEG CALF RAISE</span>
+                                        <span style="font-weight:800; font-size:12px; color:#1D1D1F;"><span class="node-badge-blue">5</span>SINGLE LEG CALF RAISE</span>
                                         <span style="font-size:10px; color:#6E6E73; font-weight:600;">Latest: {l_c['Test Date'].strftime('%m/%d/%Y')}</span>
                                     </div>
                                     <div style="font-size:11px; line-height:1.4; color:#1D1D1F;">
