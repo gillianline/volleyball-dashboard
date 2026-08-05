@@ -481,7 +481,7 @@ if check_password():
                         color = "#28a745" if diff >= 0 else "#dc3545"
                         return f"{fmt.format(current)}{unit} <span style='color:{color}; font-size:11px; font-weight:bold;'>({arrow}{abs(pct):.1f}%)</span>"
 
-                    # --- DARK ANATOMY HUD CSS ENGINE ---
+                    # --- SPORT HORIZON HUD CSS STYLING ENGINE ---
                     st.markdown("""
                         <style>
                         .hud-dashboard-card {
@@ -495,17 +495,38 @@ if check_password():
                         .hud-header-title {
                             color: #FFFFFF;
                             font-weight: 800;
-                            font-size: 16px;
+                            font-size: 15px;
                             letter-spacing: 1px;
                             text-transform: uppercase;
                             border-bottom: 2px solid #FF8200;
                             padding-bottom: 6px;
                             margin-bottom: 16px;
                         }
-                        .hud-body-wrapper {
+                        .hud-image-container {
                             position: relative;
-                            text-align: center;
+                            width: 100%;
+                            max-width: 280px;
+                            margin: 0 auto;
+                            border-radius: 12px;
+                            overflow: hidden;
+                            background: #050B1A;
                             padding: 10px;
+                            border: 1px solid #1C2541;
+                        }
+                        .hud-anatomy-img {
+                            width: 100%;
+                            height: auto;
+                            display: block;
+                            filter: contrast(1.15) brightness(0.9);
+                            mix-blend-mode: screen;
+                        }
+                        .hud-svg-overlay {
+                            position: absolute;
+                            top: 0;
+                            left: 0;
+                            width: 100%;
+                            height: 100%;
+                            pointer-events: none;
                         }
                         .hud-metric-row {
                             background: rgba(28, 37, 65, 0.6);
@@ -525,106 +546,87 @@ if check_password():
                         }
                         .node-badge {
                             display: inline-block;
-                            width: 22px;
-                            height: 22px;
+                            width: 20px;
+                            height: 20px;
                             background: #FFFFFF;
                             color: #0B132B;
                             font-weight: 900;
                             font-size: 11px;
                             border-radius: 4px;
                             text-align: center;
-                            line-height: 22px;
+                            line-height: 20px;
                             margin-right: 8px;
                         }
                         </style>
                     """, unsafe_allow_html=True)
 
-                    # --- MAIN 2-COLUMN DASHBOARD GRID ---
                     hud_col1, hud_col2 = st.columns([1.2, 1.8])
 
-                    # --- LEFT PANEL: ANATOMICAL VECTOR WITH FLOATING POINTER NODES ---
+                    # --- LEFT PANEL: REAL ANATOMICAL IMAGE WITH HUD OVERLAY ---
                     with hud_col1:
                         st.markdown("""
                             <div class="hud-dashboard-card">
                                 <div class="hud-header-title">Anatomy Location Map</div>
-                                <div class="hud-body-wrapper">
-                                    <svg width="220" height="420" viewBox="0 0 120 220" xmlns="http://www.w3.org/2000/svg">
-                                        <!-- ANATOMICAL BODY SILHOUETTE -->
-                                        <g stroke="#3A506B" stroke-width="1.2" fill-opacity="0.15">
-                                            <!-- Upper Body Group (Vol Orange Glow) -->
-                                            <g fill="#FF8200">
-                                                <circle cx="60" cy="18" r="9" />
-                                                <path d="M 56 27 L 64 27 L 63 33 L 57 33 Z" />
-                                                <path d="M 34 35 L 86 35 L 80 58 L 40 58 Z" />
-                                                <rect x="25" y="36" width="8" height="34" rx="4" />
-                                                <rect x="87" y="36" width="8" height="34" rx="4" />
-                                                <path d="M 40 59 L 80 59 L 76 86 L 44 86 Z" />
-                                            </g>
-
-                                            <!-- Lower Body Group (Vol Blue Glow) -->
-                                            <g fill="#4895DB">
-                                                <path d="M 43 90 L 77 90 L 75 110 L 45 110 Z" />
-                                                <rect x="40" y="112" width="18" height="42" rx="4" />
-                                                <rect x="42" y="156" width="14" height="38" rx="3" />
-                                                <rect x="62" y="112" width="18" height="42" rx="4" />
-                                                <rect x="64" y="156" width="14" height="38" rx="3" />
-                                            </g>
-                                        </g>
-
-                                        <!-- POINTER LINES & TARGET NODES -->
+                                <div class="hud-image-container">
+                                    <!-- BASE BODY IMAGE (Replace URL with your hosted image or local file path if preferred) -->
+                                    <img src="https://raw.githubusercontent.com/visgl/deck.gl-data/master/website/3d-body.png" class="hud-anatomy-img" alt="Anatomy Silhouette">
+                                    
+                                    <!-- OVERLAID SVG TARGET POINTERS & NUMBER CALLOUTS -->
+                                    <svg class="hud-svg-overlay" viewBox="0 0 100 200" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
                                         <!-- 1: Shoulder IR/ER (Right Shoulder Joint) -->
-                                        <circle cx="87" cy="40" r="4" fill="none" stroke="#6FFFE9" stroke-width="2" />
-                                        <line x1="87" y1="40" x2="108" y2="40" stroke="#6FFFE9" stroke-width="1.5" stroke-dasharray="2,2" />
-                                        <rect x="100" y="33" width="14" height="14" rx="3" fill="#FFFFFF" />
-                                        <text x="107" y="44" font-size="10" font-weight="900" fill="#0B132B" text-anchor="middle">1</text>
+                                        <circle cx="72" cy="40" r="3" fill="none" stroke="#6FFFE9" stroke-width="1.5" />
+                                        <line x1="72" y1="40" x2="90" y2="40" stroke="#6FFFE9" stroke-width="1" stroke-dasharray="2,2" />
+                                        <rect x="85" y="34" width="12" height="12" rx="2" fill="#FFFFFF" />
+                                        <text x="91" y="43" font-size="8" font-weight="900" fill="#0B132B" text-anchor="middle">1</text>
 
                                         <!-- 2: ISO-Y Strength (Upper Spine/Thoracic) -->
-                                        <circle cx="60" cy="48" r="4" fill="none" stroke="#6FFFE9" stroke-width="2" />
-                                        <line x1="60" y1="48" x2="108" y2="62" stroke="#6FFFE9" stroke-width="1.5" stroke-dasharray="2,2" />
-                                        <rect x="100" y="55" width="14" height="14" rx="3" fill="#FFFFFF" />
-                                        <text x="107" y="66" font-size="10" font-weight="900" fill="#0B132B" text-anchor="middle">2</text>
+                                        <circle cx="50" cy="48" r="3" fill="none" stroke="#6FFFE9" stroke-width="1.5" />
+                                        <line x1="50" y1="48" x2="90" y2="60" stroke="#6FFFE9" stroke-width="1" stroke-dasharray="2,2" />
+                                        <rect x="85" y="54" width="12" height="12" rx="2" fill="#FFFFFF" />
+                                        <text x="91" y="63" font-size="8" font-weight="900" fill="#0B132B" text-anchor="middle">2</text>
 
                                         <!-- 3: External Rotation ROM (Left Shoulder) -->
-                                        <circle cx="33" cy="40" r="4" fill="none" stroke="#6FFFE9" stroke-width="2" />
-                                        <line x1="33" y1="40" x2="12" y2="80" stroke="#6FFFE9" stroke-width="1.5" stroke-dasharray="2,2" />
-                                        <rect x="5" y="73" width="14" height="14" rx="3" fill="#FFFFFF" />
-                                        <text x="12" y="84" font-size="10" font-weight="900" fill="#0B132B" text-anchor="middle">3</text>
+                                        <circle cx="28" cy="40" r="3" fill="none" stroke="#6FFFE9" stroke-width="1.5" />
+                                        <line x1="28" y1="40" x2="10" y2="40" stroke="#6FFFE9" stroke-width="1" stroke-dasharray="2,2" />
+                                        <rect x="3" y="34" width="12" height="12" rx="2" fill="#FFFFFF" />
+                                        <text x="9" y="43" font-size="8" font-weight="900" fill="#0B132B" text-anchor="middle">3</text>
 
                                         <!-- 4: Hip Adduction (Adductor/Inner Thigh) -->
-                                        <circle cx="56" cy="122" r="4" fill="none" stroke="#6FFFE9" stroke-width="2" />
-                                        <line x1="56" y1="122" x2="108" y2="122" stroke="#6FFFE9" stroke-width="1.5" stroke-dasharray="2,2" />
-                                        <rect x="100" y="115" width="14" height="14" rx="3" fill="#FFFFFF" />
-                                        <text x="107" y="126" font-size="10" font-weight="900" fill="#0B132B" text-anchor="middle">4</text>
+                                        <circle cx="45" cy="105" r="3" fill="none" stroke="#6FFFE9" stroke-width="1.5" />
+                                        <line x1="45" y1="105" x2="90" y2="105" stroke="#6FFFE9" stroke-width="1" stroke-dasharray="2,2" />
+                                        <rect x="85" y="99" width="12" height="12" rx="2" fill="#FFFFFF" />
+                                        <text x="91" y="108" font-size="8" font-weight="900" fill="#0B132B" text-anchor="middle">4</text>
 
-                                        <!-- 5: Hip Abduction (Outer Hip/Glute Med) -->
-                                        <circle cx="38" cy="100" r="4" fill="none" stroke="#6FFFE9" stroke-width="2" />
-                                        <line x1="38" y1="100" x2="12" y2="140" stroke="#6FFFE9" stroke-width="1.5" stroke-dasharray="2,2" />
-                                        <rect x="5" y="133" width="14" height="14" rx="3" fill="#FFFFFF" />
-                                        <text x="12" y="144" font-size="10" font-weight="900" fill="#0B132B" text-anchor="middle">5</text>
+                                        <!-- 5: Hip Abduction (Outer Hip) -->
+                                        <circle cx="34" cy="92" r="3" fill="none" stroke="#6FFFE9" stroke-width="1.5" />
+                                        <line x1="34" y1="92" x2="10" y2="115" stroke="#6FFFE9" stroke-width="1" stroke-dasharray="2,2" />
+                                        <rect x="3" y="109" width="12" height="12" rx="2" fill="#FFFFFF" />
+                                        <text x="9" y="118" font-size="8" font-weight="900" fill="#0B132B" text-anchor="middle">5</text>
 
-                                        <!-- 6: Single Leg Calf Raise (Gastroc/Calf) -->
-                                        <circle cx="71" cy="172" r="4" fill="none" stroke="#6FFFE9" stroke-width="2" />
-                                        <line x1="71" y1="172" x2="108" y2="172" stroke="#6FFFE9" stroke-width="1.5" stroke-dasharray="2,2" />
-                                        <rect x="100" y="165" width="14" height="14" rx="3" fill="#FFFFFF" />
-                                        <text x="107" y="176" font-size="10" font-weight="900" fill="#0B132B" text-anchor="middle">6</text>
+                                        <!-- 6: Single Leg Calf Raise (Calf) -->
+                                        <circle cx="60" cy="158" r="3" fill="none" stroke="#6FFFE9" stroke-width="1.5" />
+                                        <line x1="60" y1="158" x2="90" y2="158" stroke="#6FFFE9" stroke-width="1" stroke-dasharray="2,2" />
+                                        <rect x="85" y="152" width="12" height="12" rx="2" fill="#FFFFFF" />
+                                        <text x="91" y="161" font-size="8" font-weight="900" fill="#0B132B" text-anchor="middle">6</text>
                                     </svg>
                                 </div>
                             </div>
                         """, unsafe_allow_html=True)
 
-                    # --- RIGHT PANEL: DETAILED METRICS LINKED TO NODES ---
+                    # --- RIGHT PANEL: METRICS LINKED TO CALLOUT NUMBERS ---
                     with hud_col2:
                         st.markdown('<div class="hud-dashboard-card">', unsafe_allow_html=True)
                         st.markdown('<div class="hud-header-title">Anatomy Location Assessment Details</div>', unsafe_allow_html=True)
 
-                        # --- UPPER BODY METRIC CARDS ---
                         # NODE 1: SHOULDER IR/ER
                         if not sh_ath.empty:
                             sh_ir = sh_ath[sh_ath['Direction'].str.contains('Internal|IR', case=False, na=False)] if 'Direction' in sh_ath.columns else sh_ath
                             sh_er = sh_ath[sh_ath['Direction'].str.contains('External|ER', case=False, na=False)] if 'Direction' in sh_ath.columns else sh_ath
                             
-                            ir_base, ir_latest = (sh_ir.iloc[0], sh_ir.iloc[-1]) if not sh_ir.empty else ({}, {})
-                            er_base, er_latest = (sh_er.iloc[0], sh_er.iloc[-1]) if not sh_er.empty else ({}, {})
+                            ir_base = sh_ir.iloc[0] if not sh_ir.empty else pd.Series()
+                            ir_latest = sh_ir.iloc[-1] if not sh_ir.empty else pd.Series()
+                            er_base = sh_er.iloc[0] if not sh_er.empty else pd.Series()
+                            er_latest = sh_er.iloc[-1] if not sh_er.empty else pd.Series()
 
                             ir_bL, ir_bR = ir_base.get('L Max Force (N)', 0.0), ir_base.get('R Max Force (N)', 0.0)
                             ir_lL, ir_lR = ir_latest.get('L Max Force (N)', 0.0), ir_latest.get('R Max Force (N)', 0.0)
@@ -632,11 +634,13 @@ if check_password():
                             er_bL, er_bR = er_base.get('L Max Force (N)', 0.0), er_base.get('R Max Force (N)', 0.0)
                             er_lL, er_lR = er_latest.get('L Max Force (N)', 0.0), er_latest.get('R Max Force (N)', 0.0)
 
+                            latest_date_str = ir_latest.get('Test Date', pd.Timestamp.now()).strftime('%m/%d/%Y') if not ir_latest.empty else "N/A"
+
                             st.markdown(f"""
                                 <div class="hud-metric-row">
                                     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
                                         <span style="font-weight:800; font-size:13px; color:#6FFFE9;"><span class="node-badge">1</span>SHOULDER IR / ER FORCE</span>
-                                        <span style="font-size:11px; color:#A0AABF;">Latest: {ir_latest.get('Test Date', pd.Timestamp.now()).strftime('%m/%d/%Y')}</span>
+                                        <span style="font-size:11px; color:#A0AABF;">Latest: {latest_date_str}</span>
                                     </div>
                                     <div style="font-size:12px; line-height:1.5;">
                                         <b>Internal (IR):</b> Initial L {ir_bL:.1f}N | R {ir_bR:.1f}N &nbsp;→&nbsp; <b>Latest:</b> L {render_val_with_arrow(ir_lL, ir_bL, '{:.1f}', 'N')} | R {render_val_with_arrow(ir_lR, ir_bR, '{:.1f}', 'N')}<br>
@@ -683,7 +687,7 @@ if check_password():
                                 </div>
                             """, unsafe_allow_html=True)
 
-                        # --- LOWER BODY METRIC CARDS ---
+                        # LOWER BODY METRIC CARDS
                         if not hip_ath.empty:
                             hip_ad = hip_ath[hip_ath['Direction'].str.contains('AD', case=False, na=False)] if 'Direction' in hip_ath.columns else hip_ath
                             hip_ab = hip_ath[hip_ath['Direction'].str.contains('AB', case=False, na=False)] if 'Direction' in hip_ath.columns else hip_ath
@@ -731,7 +735,7 @@ if check_password():
                             b_c, l_c = calf_ath.iloc[0], calf_ath.iloc[-1]
                             bcL, bcR = b_c.get('Peak Vertical Force [N] (L)', 0.0), b_c.get('Peak Vertical Force [N] (R)', 0.0)
                             lcL, lcR = l_c.get('Peak Vertical Force [N] (L)', 0.0), l_c.get('Peak Vertical Force [N] (R)', 0.0)
-                            bcL_bm, bcR_bm = b_c.get('Peak Vertical Force / BM [N/kg] (L)', 0.0), b_c.get('Peak Vertical Force / BM [N/kg] (R)', 0.0)
+                            bcL_bm = b_c.get('Peak Vertical Force / BM [N/kg] (L)', 0.0)
 
                             st.markdown(f"""
                                 <div class="hud-metric-row-blue">
