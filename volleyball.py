@@ -549,45 +549,57 @@ if check_password():
                                         <!-- DROP SHADOW AT BASE -->
                                         <ellipse cx="68" cy="214" rx="20" ry="3.5" fill="#000000" opacity="0.12" />
 
-                                        <!-- REALISTIC PROPORTIONAL HUMAN MANNEQUIN (SQUARE SHOULDERS, STRAIGHT ERECT POSTURE, SEPARATED LIMBS) -->
+                                        <!-- REALISTIC PROPORTIONAL HUMAN MANNEQUIN (FULL VOLUME ARMS) -->
                                         <g stroke="#2C3036" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
                                             
                                             <!-- Head & Neck -->
                                             <ellipse cx="68" cy="17" rx="7" ry="9" fill="url(#anatomicalBodyGrad)" />
-                                            <!-- Neck with Trapezoid Taper -->
                                             <path d="M 65 25 L 63 33 M 71 25 L 73 33" stroke-width="1.2" />
 
-                                            <!-- Shoulders & Upper Back (Square Broad Athletic Base) -->
-                                            <path d="M 63 33 C 58 33, 48 36, 42 40 L 40 50 C 44 49, 48 44, 52 44 M 73 33 C 78 33, 88 36, 94 40 L 96 50 C 92 49, 88 44, 84 44" fill="url(#anatomicalBodyGrad)" />
+                                            <!-- Shoulders (Symmetrical Deltoid Caps) -->
+                                            <path d="M 63 33 C 58 33, 48 36, 42 40 C 37 43, 36 50, 39 56 L 43 56 C 47 52, 49 46, 52 44 M 73 33 C 78 33, 88 36, 94 40 C 99 43, 100 50, 97 56 L 93 56 C 89 52, 87 46, 84 44" fill="url(#anatomicalBodyGrad)" />
 
-                                            <!-- Arms (Separated Natural A-Pose with Palms Outward) -->
-                                            <!-- Left Arm -->
-                                            <path d="M 42 40 C 39 48, 35 60, 32 72 L 28 85 L 25 96 M 40 50 L 34 72 L 31 85 L 29 95" fill="url(#anatomicalBodyGrad)" />
-                                            <!-- Left Hand & Fingers -->
-                                            <path d="M 25 96 C 23 99, 21 102, 20 105 M 26 97 C 24 101, 23 104, 22 107 M 28 97 C 27 101, 25 104, 24 107 M 30 96 C 29 100, 28 103, 27 105" fill="none" stroke-width="0.9" />
+                                            <!-- Left Arm (Full Volume Bicep, Forearm, Hand & Fingers) -->
+                                            <path d="M 42 40 
+                                                     C 37 43, 35 52, 33 64 
+                                                     C 31 74, 29 82, 27 92 
+                                                     C 25 96, 23 100, 22 104
+                                                     C 21 106, 23 107, 25 106
+                                                     C 27 104, 28 98, 30 92
+                                                     C 33 82, 36 74, 38 64
+                                                     C 40 54, 42 48, 43 56 Z" 
+                                                  fill="url(#anatomicalBodyGrad)" />
+                                            <path d="M 22 104 C 20 106, 18 108, 17 110 M 23 105 C 21 108, 20 110, 19 112 M 24 105 C 23 108, 22 110, 21 112 M 25 104 C 25 107, 24 109, 23 111" fill="none" stroke-width="0.8" />
                                             
-                                            <!-- Right Arm -->
-                                            <path d="M 94 40 C 97 48, 101 60, 104 72 L 108 85 L 111 96 M 96 50 L 102 72 L 105 85 L 107 95" fill="url(#anatomicalBodyGrad)" />
-                                            <!-- Right Hand & Fingers -->
-                                            <path d="M 111 96 C 113 99, 115 102, 116 105 M 110 97 C 112 101, 113 104, 114 107 M 108 97 C 109 101, 111 104, 112 107 M 106 96 C 107 100, 108 103, 109 105" fill="none" stroke-width="0.9" />
+                                            <!-- Right Arm (Full Volume Bicep, Forearm, Hand & Fingers) -->
+                                            <path d="M 94 40 
+                                                     C 99 43, 101 52, 103 64 
+                                                     C 105 74, 107 82, 109 92 
+                                                     C 111 96, 113 100, 114 104
+                                                     C 115 106, 113 107, 111 106
+                                                     C 109 104, 108 98, 106 92
+                                                     C 103 82, 100 74, 98 64
+                                                     C 96 54, 94 48, 93 56 Z" 
+                                                  fill="url(#anatomicalBodyGrad)" />
+                                            <path d="M 114 104 C 116 106, 118 108, 119 110 M 113 105 C 115 108, 116 110, 117 112 M 112 105 C 113 108, 114 110, 115 112 M 111 104 C 111 107, 112 109, 113 111" fill="none" stroke-width="0.8" />
 
-                                            <!-- Torso & Waist (Erect Athletic Taper to Hips) -->
+                                            <!-- Torso & Waist -->
                                             <path d="M 52 44 L 54 75 L 52 92 L 68 106 L 84 92 L 82 75 L 84 44 Z" fill="url(#anatomicalBodyGrad)" />
 
-                                            <!-- Lower Body (Distinct Separated Thighs, Knees, Calves, Feet) -->
+                                            <!-- Lower Body (Thighs, Knees, Calves, Feet) -->
                                             <!-- Left Leg -->
                                             <path d="M 52 92 C 50 105, 49 122, 53 138 C 55 144, 55 152, 54 162 C 52 175, 52 192, 54 205 L 48 210 L 58 210 L 59 203 C 60 190, 60 175, 60 162 C 60 152, 60 144, 62 138 C 66 122, 66 105, 68 106 Z" fill="url(#anatomicalBodyGrad)" />
                                             <!-- Right Leg -->
                                             <path d="M 84 92 C 86 105, 87 122, 83 138 C 81 144, 81 152, 82 162 C 84 175, 84 192, 82 205 L 88 210 L 78 210 L 77 203 C 76 190, 76 175, 76 162 C 76 152, 76 144, 74 138 C 70 122, 70 105, 68 106 Z" fill="url(#anatomicalBodyGrad)" />
 
-                                            <!-- ORANGE PLUMB LINE (ANATOMICAL AXIS) -->
+                                            <!-- ORANGE PLUMB LINE -->
                                             <line x1="68" y1="8" x2="68" y2="211" stroke="#FF8200" stroke-width="1.3" />
 
                                             <!-- RED HORIZONTAL GUIDELINES -->
                                             <line x1="51" y1="116" x2="85" y2="116" stroke="#D32F2F" stroke-width="1.1" />
                                             <line x1="55" y1="168" x2="81" y2="168" stroke="#D32F2F" stroke-width="1.1" />
 
-                                            <!-- ANATOMICAL DEFINITION LINES (Chest, Abs, Quads, Knees, Calves) -->
+                                            <!-- ANATOMICAL DEFINITION LINES -->
                                             <g stroke="#3A3F46" stroke-width="0.9" fill="none">
                                                 <!-- Collarbone -->
                                                 <path d="M 68 35 C 60 34, 52 37, 46 40 M 68 35 C 76 34, 84 37, 90 40" stroke-width="1" />
@@ -598,6 +610,9 @@ if check_password():
                                                 <path d="M 58 58 C 64 57, 72 57, 78 58" />
                                                 <path d="M 58 66 C 64 65, 72 65, 78 66" />
                                                 <path d="M 59 74 C 64 73, 72 73, 77 74" />
+                                                <!-- Arm Muscle Separation Creases -->
+                                                <path d="M 39 56 C 37 62, 35 70, 33 78" stroke-width="0.75" />
+                                                <path d="M 97 56 C 99 62, 101 70, 103 78" stroke-width="0.75" />
                                                 <!-- Inguinal Crease -->
                                                 <path d="M 52 92 C 58 98, 64 103, 68 106 M 84 92 C 78 98, 72 103, 68 106" stroke-width="1" />
                                                 <!-- Quads Definition -->
@@ -835,7 +850,6 @@ if check_password():
 
                 else:
                     st.info(f"No Intake Assessment records found for {selected_intake_athlete}.")
-                    
                     
                     
             # --- TAB 5: CROSS-SEASON TESTING COMPARISON ---
