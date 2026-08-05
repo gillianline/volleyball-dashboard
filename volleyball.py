@@ -483,7 +483,7 @@ if check_password():
 
                     hud_col1, hud_col2 = st.columns([1.2, 1.8])
 
-                    # --- LEFT PANEL: ILLUSTRATED ANATOMICAL MAP ---
+                    # --- LEFT PANEL: CLEAN VECTOR ANATOMY MAP ---
                     with hud_col1:
                         hud_html = """
                         <!DOCTYPE html>
@@ -535,99 +535,96 @@ if check_password():
                             <div class="hud-dashboard-card">
                                 <div class="hud-header-title">Anatomy Location Map</div>
                                 <div class="hud-body-viewport">
-                                    <svg viewBox="0 0 120 220" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">
-                                        <g stroke="#1D1D1F" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
-                                            <!-- HEAD & FACIAL FEATURES -->
-                                            <path d="M 52 18 C 52 10, 68 10, 68 18 C 68 28, 63 32, 60 32 C 57 32, 52 28, 52 18 Z" fill="#FFE0D0" />
-                                            <!-- Ears -->
-                                            <path d="M 51 20 C 49 20, 49 25, 52 26" fill="#FFE0D0" />
-                                            <path d="M 69 20 C 71 20, 71 25, 68 26" fill="#FFE0D0" />
-                                            <!-- Eyes & Nose -->
-                                            <ellipse cx="56" cy="20" rx="1.5" ry="1" fill="#1D1D1F" />
-                                            <ellipse cx="64" cy="20" rx="1.5" ry="1" fill="#1D1D1F" />
-                                            <path d="M 60 21 L 59 25 L 61 25" fill="none" stroke-width="0.8" />
-                                            <path d="M 57 28 C 59 29, 61 29, 63 28" fill="none" stroke-width="1" />
+                                    <svg viewBox="0 0 140 220" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">
+                                        <g stroke="#1D1D1F" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                                            <!-- HEAD & FACE -->
+                                            <ellipse cx="70" cy="18" rx="8" ry="10" fill="#FFE0D0" />
+                                            <path d="M 62 18 C 60 18, 60 23, 62 24" fill="#FFE0D0" />
+                                            <path d="M 78 18 C 80 18, 80 23, 78 24" fill="#FFE0D0" />
+                                            <ellipse cx="67" cy="18" rx="1.2" ry="1.2" fill="#1D1D1F" />
+                                            <ellipse cx="73" cy="18" rx="1.2" ry="1.2" fill="#1D1D1F" />
+                                            <path d="M 70 19 L 69 22 L 71 22" fill="none" stroke-width="1" />
+                                            <path d="M 67 25 C 69 26, 71 25, 73 25" fill="none" stroke-width="1.2" />
                                             
                                             <!-- NECK -->
-                                            <path d="M 55 31 L 55 37 M 65 31 L 65 37" fill="none" stroke-width="1" />
+                                            <line x1="66" y1="28" x2="66" y2="35" stroke-width="1.5" />
+                                            <line x1="74" y1="28" x2="74" y2="35" stroke-width="1.5" />
                                             
-                                            <!-- MUSCLE GROUPS (Vol Orange / Blue Accent Fills) -->
-                                            <!-- Facial Muscles -->
-                                            <path d="M 53 14 C 55 12, 65 12, 67 14 C 66 18, 54 18, 53 14 Z" fill="#FF8200" fill-opacity="0.6" />
+                                            <!-- UPPER BODY MUSCLE BLOCKS (Vol Orange Accent) -->
+                                            <!-- Shoulders (Deltoids) -->
+                                            <path d="M 48 37 C 54 35, 58 40, 55 49 C 50 48, 45 42, 48 37 Z" fill="#FFB380" />
+                                            <path d="M 92 37 C 86 35, 82 40, 85 49 C 90 48, 95 42, 92 37 Z" fill="#FFB380" />
                                             
                                             <!-- Chest (Pectorals) -->
-                                            <path d="M 44 42 C 50 42, 58 45, 59 52 C 50 54, 42 50, 44 42 Z" fill="#FF8200" fill-opacity="0.5" />
-                                            <path d="M 76 42 C 70 42, 62 45, 61 52 C 70 54, 78 50, 76 42 Z" fill="#FF8200" fill-opacity="0.5" />
+                                            <path d="M 57 38 C 65 38, 68 45, 68 50 C 60 52, 53 48, 57 38 Z" fill="#FFB380" />
+                                            <path d="M 83 38 C 75 38, 72 45, 72 50 C 80 52, 87 48, 83 38 Z" fill="#FFB380" />
                                             
-                                            <!-- Shoulders (Deltoids) -->
-                                            <path d="M 38 41 C 42 38, 45 42, 42 52 C 36 50, 35 44, 38 41 Z" fill="#FF8200" fill-opacity="0.6" />
-                                            <path d="M 82 41 C 78 38, 75 42, 78 52 C 84 50, 85 44, 82 41 Z" fill="#FF8200" fill-opacity="0.6" />
-                                            
-                                            <!-- Biceps & Forearms -->
-                                            <path d="M 35 52 C 38 52, 39 63, 33 68 C 30 63, 31 54, 35 52 Z" fill="#FF8200" fill-opacity="0.4" />
-                                            <path d="M 85 52 C 82 52, 81 63, 87 68 C 90 63, 89 54, 85 52 Z" fill="#FF8200" fill-opacity="0.4" />
-                                            <path d="M 32 70 C 35 70, 33 88, 28 92 C 26 88, 28 72, 32 70 Z" fill="#FF8200" fill-opacity="0.4" />
-                                            <path d="M 88 70 C 85 70, 87 88, 92 92 C 94 88, 92 72, 88 70 Z" fill="#FF8200" fill-opacity="0.4" />
-                                            
-                                            <!-- Abs (Rectus Abdominis) -->
-                                            <g fill="#FF8200" fill-opacity="0.55">
-                                                <rect x="52" y="54" width="7" height="6" rx="1" />
-                                                <rect x="61" y="54" width="7" height="6" rx="1" />
-                                                <rect x="52" y="62" width="7" height="6" rx="1" />
-                                                <rect x="61" y="62" width="7" height="6" rx="1" />
-                                                <rect x="53" y="70" width="6" height="7" rx="1" />
-                                                <rect x="61" y="70" width="6" height="7" rx="1" />
+                                            <!-- Abs (Rectus Abdominis 6-Pack Grid) -->
+                                            <g fill="#FFB380">
+                                                <rect x="63" y="53" width="6" height="7" rx="1.5" />
+                                                <rect x="71" y="53" width="6" height="7" rx="1.5" />
+                                                <rect x="63" y="62" width="6" height="7" rx="1.5" />
+                                                <rect x="71" y="62" width="6" height="7" rx="1.5" />
+                                                <rect x="64" y="71" width="5" height="7" rx="1.5" />
+                                                <rect x="71" y="71" width="5" height="7" rx="1.5" />
                                             </g>
+                                            
+                                            <!-- Arms (Biceps & Forearms) -->
+                                            <path d="M 45 50 C 48 50, 49 62, 44 68 C 41 62, 41 52, 45 50 Z" fill="#FFE0D0" />
+                                            <path d="M 95 50 C 92 50, 91 62, 96 68 C 99 62, 99 52, 95 50 Z" fill="#FFE0D0" />
+                                            <path d="M 43 70 C 46 70, 43 88, 39 92 C 37 88, 39 72, 43 70 Z" fill="#FFE0D0" />
+                                            <path d="M 97 70 C 94 70, 97 88, 101 92 C 103 88, 101 72, 97 70 Z" fill="#FFE0D0" />
+                                            <path d="M 37 93 L 34 102 L 40 102 Z" fill="#FFE0D0" />
+                                            <path d="M 103 93 L 106 102 L 100 102 Z" fill="#FFE0D0" />
 
-                                            <!-- Quads & Hips -->
-                                            <path d="M 44 94 C 42 102, 42 118, 48 126 C 53 118, 51 100, 48 94 Z" fill="#4895DB" fill-opacity="0.5" />
-                                            <path d="M 76 94 C 78 102, 78 118, 72 126 C 67 118, 69 100, 72 94 Z" fill="#4895DB" fill-opacity="0.5" />
-                                            <path d="M 49 94 C 52 105, 52 118, 53 128 C 55 120, 55 102, 52 94 Z" fill="#4895DB" fill-opacity="0.4" />
-                                            <path d="M 71 94 C 68 105, 68 118, 67 128 C 65 120, 65 102, 68 94 Z" fill="#4895DB" fill-opacity="0.4" />
+                                            <!-- LOWER BODY MUSCLE BLOCKS (Vol Blue Accent) -->
+                                            <!-- Hips & Thighs (Adductors & Abductors) -->
+                                            <!-- Outer Thighs (Abduction) -->
+                                            <path d="M 53 96 C 48 96, 48 124, 55 132 C 58 124, 57 101, 53 96 Z" fill="#A4CEF4" />
+                                            <path d="M 87 96 C 92 96, 92 124, 85 132 C 82 124, 83 101, 87 96 Z" fill="#A4CEF4" />
+                                            <!-- Inner Thighs (Adduction) -->
+                                            <path d="M 61 98 C 58 104, 58 122, 63 132 C 66 122, 65 104, 61 98 Z" fill="#A4CEF4" />
+                                            <path d="M 79 98 C 82 104, 82 122, 77 132 C 74 122, 75 104, 79 98 Z" fill="#A4CEF4" />
 
-                                            <!-- Calves (Gastrocnemius / Tibialis) -->
-                                            <path d="M 43 140 C 40 148, 41 165, 45 178 C 47 165, 48 148, 47 140 Z" fill="#4895DB" fill-opacity="0.55" />
-                                            <path d="M 77 140 C 80 148, 79 165, 75 178 C 73 165, 72 148, 73 140 Z" fill="#4895DB" fill-opacity="0.55" />
+                                            <!-- Calves (Gastrocnemius) -->
+                                            <path d="M 54 144 C 50 152, 51 170, 56 182 C 58 170, 59 152, 58 144 Z" fill="#A4CEF4" />
+                                            <path d="M 86 144 C 90 152, 89 170, 84 182 C 82 170, 81 152, 82 144 Z" fill="#A4CEF4" />
 
-                                            <!-- HANDS & FEET OUTLINES -->
-                                            <!-- Hands (Anatomical Position - Palms Forward) -->
-                                            <path d="M 27 94 C 24 97, 21 101, 19 105 C 18 109, 20 113, 22 113 C 24 113, 27 106, 29 100 Z" fill="#FFE0D0" />
-                                            <path d="M 93 94 C 96 97, 99 101, 101 105 C 102 109, 100 113, 98 113 C 96 113, 93 106, 91 100 Z" fill="#FFE0D0" />
                                             <!-- Feet -->
-                                            <path d="M 43 194 L 41 204 L 50 205 L 50 194 Z" fill="#FFE0D0" />
-                                            <path d="M 77 194 L 79 204 L 70 205 L 70 194 Z" fill="#FFE0D0" />
+                                            <polygon points="52,192 48,202 57,202 57,192" fill="#FFE0D0" />
+                                            <polygon points="88,192 92,202 83,202 83,192" fill="#FFE0D0" />
                                         </g>
 
-                                        <!-- NODES & CALLOUT POINTERS -->
-                                        <!-- Node 1: Right Shoulder IR/ER -->
-                                        <circle cx="83" cy="44" r="3" fill="#FF8200" />
-                                        <line x1="83" y1="44" x2="108" y2="44" stroke="#FF8200" stroke-width="1.5" stroke-dasharray="2,2" />
-                                        <rect x="100" y="38" width="12" height="12" rx="2" fill="#FF8200" />
-                                        <text x="106" y="47" font-size="8" font-weight="900" fill="#FFFFFF" text-anchor="middle">1</text>
+                                        <!-- NODES & CALLOUT LINES / BADGES -->
+                                        <!-- Node 1: Left Shoulder IR/ER (Orange) -->
+                                        <circle cx="92" cy="42" r="3.5" fill="#FF8200" stroke="#FFFFFF" stroke-width="1" />
+                                        <line x1="92" y1="42" x2="118" y2="42" stroke="#FF8200" stroke-width="1.8" stroke-dasharray="2,2" />
+                                        <rect x="112" y="35" width="14" height="14" rx="3" fill="#FF8200" />
+                                        <text x="119" y="46" font-size="9" font-weight="900" fill="#FFFFFF" text-anchor="middle">1</text>
 
-                                        <!-- Node 2: ISO-Y Spine/Thoracic -->
-                                        <circle cx="60" cy="48" r="3" fill="#FF8200" />
-                                        <line x1="60" y1="48" x2="108" y2="64" stroke="#FF8200" stroke-width="1.5" stroke-dasharray="2,2" />
-                                        <rect x="100" y="58" width="12" height="12" rx="2" fill="#FF8200" />
-                                        <text x="106" y="67" font-size="8" font-weight="900" fill="#FFFFFF" text-anchor="middle">2</text>
+                                        <!-- Node 2: ISO-Y Spine/Thoracic (Orange) -->
+                                        <circle cx="70" cy="46" r="3.5" fill="#FF8200" stroke="#FFFFFF" stroke-width="1" />
+                                        <line x1="70" y1="46" x2="118" y2="64" stroke="#FF8200" stroke-width="1.8" stroke-dasharray="2,2" />
+                                        <rect x="112" y="57" width="14" height="14" rx="3" fill="#FF8200" />
+                                        <text x="119" y="68" font-size="9" font-weight="900" fill="#FFFFFF" text-anchor="middle">2</text>
 
-                                        <!-- Node 3: Hip Adduction -->
-                                        <circle cx="53" cy="116" r="3" fill="#4895DB" />
-                                        <line x1="53" y1="116" x2="108" y2="116" stroke="#4895DB" stroke-width="1.5" stroke-dasharray="2,2" />
-                                        <rect x="100" y="110" width="12" height="12" rx="2" fill="#4895DB" />
-                                        <text x="106" y="119" font-size="8" font-weight="900" fill="#FFFFFF" text-anchor="middle">3</text>
+                                        <!-- Node 3: Hip Adduction (Blue) -->
+                                        <circle cx="78" cy="118" r="3.5" fill="#4895DB" stroke="#FFFFFF" stroke-width="1" />
+                                        <line x1="78" y1="118" x2="118" y2="118" stroke="#4895DB" stroke-width="1.8" stroke-dasharray="2,2" />
+                                        <rect x="112" y="111" width="14" height="14" rx="3" fill="#4895DB" />
+                                        <text x="119" y="122" font-size="9" font-weight="900" fill="#FFFFFF" text-anchor="middle">3</text>
 
-                                        <!-- Node 4: Hip Abduction -->
-                                        <circle cx="43" cy="100" r="3" fill="#4895DB" />
-                                        <line x1="43" y1="100" x2="12" y2="108" stroke="#4895DB" stroke-width="1.5" stroke-dasharray="2,2" />
-                                        <rect x="6" y="102" width="12" height="12" rx="2" fill="#4895DB" />
-                                        <text x="12" y="111" font-size="8" font-weight="900" fill="#FFFFFF" text-anchor="middle">4</text>
+                                        <!-- Node 4: Hip Abduction (Blue) -->
+                                        <circle cx="51" cy="106" r="3.5" fill="#4895DB" stroke="#FFFFFF" stroke-width="1" />
+                                        <line x1="51" y1="106" x2="22" y2="106" stroke="#4895DB" stroke-width="1.8" stroke-dasharray="2,2" />
+                                        <rect x="14" y="99" width="14" height="14" rx="3" fill="#4895DB" />
+                                        <text x="21" y="110" font-size="9" font-weight="900" fill="#FFFFFF" text-anchor="middle">4</text>
 
-                                        <!-- Node 5: Calf Raise -->
-                                        <circle cx="76" cy="158" r="3" fill="#4895DB" />
-                                        <line x1="76" y1="158" x2="108" y2="158" stroke="#4895DB" stroke-width="1.5" stroke-dasharray="2,2" />
-                                        <rect x="100" y="152" width="12" height="12" rx="2" fill="#4895DB" />
-                                        <text x="106" y="161" font-size="8" font-weight="900" fill="#FFFFFF" text-anchor="middle">5</text>
+                                        <!-- Node 5: Single Leg Calf Raise (Blue) -->
+                                        <circle cx="85" cy="160" r="3.5" fill="#4895DB" stroke="#FFFFFF" stroke-width="1" />
+                                        <line x1="85" y1="160" x2="118" y2="160" stroke="#4895DB" stroke-width="1.8" stroke-dasharray="2,2" />
+                                        <rect x="112" y="153" width="14" height="14" rx="3" fill="#4895DB" />
+                                        <text x="119" y="164" font-size="9" font-weight="900" fill="#FFFFFF" text-anchor="middle">5</text>
                                     </svg>
                                 </div>
                             </div>
@@ -821,7 +818,6 @@ if check_password():
 
                 else:
                     st.info(f"No Intake Assessment records found for {selected_intake_athlete}.")
-                    
                     
                     
             # --- TAB 5: CROSS-SEASON TESTING COMPARISON ---
