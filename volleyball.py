@@ -483,7 +483,7 @@ if check_password():
 
                     hud_col1, hud_col2 = st.columns([1.2, 1.8])
 
-                    # --- LEFT PANEL: LIGHT ANATOMY MAP COMPONENT ---
+                    # --- LEFT PANEL: REALISTIC ANATOMY MAP COMPONENT ---
                     with hud_col1:
                         hud_html = """
                         <!DOCTYPE html>
@@ -536,24 +536,49 @@ if check_password():
                                 <div class="hud-header-title">Anatomy Location Map</div>
                                 <div class="hud-body-viewport">
                                     <svg viewBox="0 0 120 220" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">
-                                        <!-- BODY SILHOUETTE (VOL ORANGE/BLUE TONES) -->
-                                        <g stroke="#1D1D1F" stroke-width="1" opacity="0.9">
-                                            <!-- Upper Body (Vol Orange accent fill) -->
-                                            <g fill="#FF8200" fill-opacity="0.15">
-                                                <circle cx="60" cy="20" r="9" />
-                                                <path d="M 56 29 L 64 29 L 63 34 L 57 34 Z" />
-                                                <path d="M 32 36 L 88 36 L 82 60 L 38 60 Z" />
-                                                <rect x="23" y="37" width="8" height="36" rx="4" />
-                                                <rect x="89" y="37" width="8" height="36" rx="4" />
-                                                <path d="M 38 61 L 82 61 L 76 88 L 44 88 Z" />
+                                        <!-- ANATOMICAL BODY SILHOUETTE -->
+                                        <g stroke="#1D1D1F" stroke-width="1.2" stroke-linejoin="round" opacity="0.85">
+                                            <!-- Upper Body & Arms (Vol Orange Accent) -->
+                                            <g fill="#FF8200" fill-opacity="0.18">
+                                                <!-- Head & Neck -->
+                                                <circle cx="60" cy="20" r="8.5" />
+                                                <!-- Torso, Shoulders & Arms Contour -->
+                                                <path d="M 56 28 
+                                                         C 54 32, 38 35, 30 38
+                                                         C 26 39, 23 48, 24 65
+                                                         C 25 78, 23 90, 23 98
+                                                         C 23 100, 28 100, 29 98
+                                                         C 30 90, 31 75, 33 65
+                                                         C 34 60, 38 58, 40 60
+                                                         C 42 70, 43 80, 44 88
+                                                         L 76 88
+                                                         C 77 80, 78 70, 80 60
+                                                         C 82 58, 86 60, 87 65
+                                                         C 89 75, 90 90, 91 98
+                                                         C 92 100, 97 100, 97 98
+                                                         C 97 90, 95 78, 96 65
+                                                         C 97 48, 94 39, 90 38
+                                                         C 82 35, 66 32, 64 28 Z" />
                                             </g>
-                                            <!-- Lower Body (Vol Blue accent fill) -->
-                                            <g fill="#4895DB" fill-opacity="0.15">
-                                                <path d="M 43 90 L 77 90 L 74 112 L 46 112 Z" />
-                                                <rect x="41" y="114" width="16" height="42" rx="4" />
-                                                <rect x="43" y="158" width="12" height="38" rx="3" />
-                                                <rect x="63" y="114" width="16" height="42" rx="4" />
-                                                <rect x="65" y="158" width="12" height="38" rx="3" />
+                                            <!-- Lower Body, Hips & Legs (Vol Blue Accent) -->
+                                            <g fill="#4895DB" fill-opacity="0.18">
+                                                <path d="M 44 88
+                                                         C 40 92, 36 98, 36 106
+                                                         C 36 115, 39 125, 41 138
+                                                         C 42 145, 41 152, 42 155
+                                                         C 42 165, 41 180, 43 196
+                                                         C 44 200, 50 200, 52 196
+                                                         C 53 180, 52 165, 53 155
+                                                         C 54 148, 54 135, 54 124
+                                                         C 54 116, 57 110, 60 108
+                                                         C 63 110, 66 116, 66 124
+                                                         C 66 135, 66 148, 67 155
+                                                         C 68 165, 67 180, 68 196
+                                                         C 70 200, 76 200, 77 196
+                                                         C 79 180, 78 165, 78 155
+                                                         C 79 152, 78 145, 79 138
+                                                         C 81 125, 84 115, 84 106
+                                                         C 84 98, 80 92, 76 88 Z" />
                                             </g>
                                         </g>
 
@@ -689,7 +714,7 @@ if check_password():
 
                             st.markdown(f"""
                                 <div class="hud-metric-row-light">
-                                    <div style="display:flex; justify-space-between; align-items:center; margin-bottom:4px;">
+                                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
                                         <span style="font-weight:800; font-size:12px; color:#1D1D1F;"><span class="node-badge-orange">1</span>SHOULDER IR / ER</span>
                                         <span style="font-size:10px; color:#6E6E73; font-weight:600;">Latest: {latest_date_str}</span>
                                     </div>
@@ -780,6 +805,7 @@ if check_password():
 
                 else:
                     st.info(f"No Intake Assessment records found for {selected_intake_athlete}.")
+                    
                     
                     
             # --- TAB 5: CROSS-SEASON TESTING COMPARISON ---
