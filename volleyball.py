@@ -458,7 +458,7 @@ if check_password():
 
             # --- TAB 4: INTAKE TESTING TAB ---
             with testing_season_tabs[3]:
-                st.markdown("### Athlete Intake Assessment Data")
+                st.markdown("### Athlete Intake Assessment Body Map Profile")
                 c_int_ath, _ = st.columns([2, 2])
                 with c_int_ath:
                     selected_intake_athlete = st.selectbox("Select Athlete for Intake Assessment", master_athlete_list, key="intake_ath_select")
@@ -466,9 +466,10 @@ if check_password():
                 calf_ath = raw_calf_df[raw_calf_df['Name'] == selected_intake_athlete].sort_values('Test Date')
                 hip_ath = raw_hip_df[raw_hip_df['Name'] == selected_intake_athlete].sort_values('Test Date')
                 sh_ath = raw_shoulder_df[raw_shoulder_df['Name'] == selected_intake_athlete].sort_values('Test Date')
+                er_ath = raw_er_df[raw_er_df['Name'] == selected_intake_athlete].sort_values('Test Date')
                 isoy_ath = raw_ash_df[(raw_ash_df['Name'] == selected_intake_athlete) & (raw_ash_df['Isometric Type'].str.contains('ISO-Y|Y', case=False, na=False))].sort_values('Test Date')
 
-                has_data = not (calf_ath.empty and hip_ath.empty and sh_ath.empty and isoy_ath.empty)
+                has_data = not (calf_ath.empty and hip_ath.empty and sh_ath.empty and er_ath.empty and isoy_ath.empty)
 
                 if has_data:
                     def render_val_with_arrow(current, initial, fmt="{:.1f}", unit=""):
@@ -478,145 +479,185 @@ if check_password():
                         pct = (diff / initial) * 100
                         arrow = "↑" if diff >= 0 else "↓"
                         color = "#28a745" if diff >= 0 else "#dc3545"
-                        return f"{fmt.format(current)}{unit} <span style='color:{color}; font-size:13px; font-weight:bold;'>({arrow} {abs(pct):.1f}%)</span>"
+                        return f"{fmt.format(current)}{unit} <span style='color:{color}; font-size:12px; font-weight:bold;'>({arrow}{abs(pct):.1f}%)</span>"
 
-                    # --- ROW 1: HIP AD/AB & SINGLE LEG CALF RAISE ---
-                    col1, col2 = st.columns(2)
-                    
-                    with col1:
-                        st.markdown('<div class="intake-card"><div class="intake-card-header">HIP AD/AB FORCE & RATIOS</div>', unsafe_allow_html=True)
-                        if not hip_ath.empty:
-                            hip_ad = hip_ath[hip_ath['Direction'].str.contains('AD', case=False, na=False)] if 'Direction' in hip_ath.columns else hip_ath
-                            hip_ab = hip_ath[hip_ath['Direction'].str.contains('AB', case=False, na=False)] if 'Direction' in hip_ath.columns else hip_ath
+                    # --- ANATOMICAL BODY MAP CSS & HTML ENGINE ---
+                    st.markdown("""
+                        <style>
+                        .body-map-container {
+                            display: flex;
+                            flex-direction: column;
+                            align-items: center;
+                            gap: 20px;
+                            margin-top: 15px;
+                        }
+                        .body-section-card {
+                            background: #FFFFFF;
+                            border-radius: 12px;
+                            padding: 15px;
+                            border: 1px solid #E5E5E7;
+                            box-shadow: 0 4px 6px rgba(0,0,0,0.04);
+                            margin-bottom: 15px;
+                        }
+                        .upper-body-header {
+                            color: #D32F2F;
+                            font-weight: 900;
+                            font-size: 16px;
+                            border-bottom: 2px solid #D32F2F;
+                            padding-bottom: 4px;
+                            margin-bottom: 10px;
+                            text-transform: uppercase;
+                        }
+                        .lower-body-header {
+                            color: #1E88E5;
+                            font-weight: 900;
+                            font-size: 16px;
+                            border-bottom: 2px solid #1E88E5;
+                            padding-bottom: 4px;
+                            margin-bottom: 10px;
+                            text-transform: uppercase;
+                        }
+                        .svg-body-wrapper {
+                            text-align: center;
+                            padding: 10px;
+                            background: #F8F9FA;
+                            border-radius: 15px;
+                            border: 1px solid #E5E5E7;
+                        }
+                        </style>
+                    """, unsafe_allow_html=True)
 
-                            def render_hip_side_by_side(dir_df, dir_label):
-                                if not dir_df.empty:
-                                    base = dir_df.iloc[0]
-                                    latest = dir_df.iloc[-1]
+                    body_col1, body_col2 = st.columns([1, 2.5])
 
-                                    bL_f, bR_f = base.get('L Max Force (N)', 0.0), base.get('R Max Force (N)', 0.0)
-                                    b_imb = base.get('Max Imbalance', 0.0)
-                                    bL_rat, bR_rat = base.get('L Max Ratio', 0.0), base.get('R Max Ratio', 0.0)
-
-                                    lL_f, lR_f = latest.get('L Max Force (N)', 0.0), latest.get('R Max Force (N)', 0.0)
-                                    l_imb = latest.get('Max Imbalance', 0.0)
-                                    lL_rat, lR_rat = latest.get('L Max Ratio', 0.0), latest.get('R Max Ratio', 0.0)
-
-                                    st.markdown(f"**Direction: {dir_label}**")
-                                    hc1, hc2 = st.columns(2)
+                    with body_col1:
+                        st.markdown("""
+                            <div class="svg-body-wrapper">
+                                <h4 style="margin:0 0 10px 0; font-size:14px; font-weight:800; color:#1D1D1F;">ASSESSMENT ANATOMY MAP</h4>
+                                <svg width="180" height="380" viewBox="0 0 100 200" xmlns="http://www.w3.org/2000/svg">
+                                    <!-- UPPER BODY / TORSO / ARMS (RED) -->
+                                    <g fill="#D32F2F" stroke="#FFFFFF" stroke-width="1">
+                                        <!-- Head & Neck -->
+                                        <circle cx="50" cy="18" r="10" />
+                                        <rect x="47" y="28" width="6" height="6" rx="2" />
+                                        <!-- Shoulders & Upper Chest -->
+                                        <path d="M 25 36 L 75 36 L 70 55 L 30 55 Z" />
+                                        <!-- Arms -->
+                                        <rect x="16" y="38" width="8" height="32" rx="4" />
+                                        <rect x="76" y="38" width="8" height="32" rx="4" />
+                                        <!-- Torso / Core -->
+                                        <rect x="30" y="56" width="40" height="30" rx="3" />
+                                    </g>
                                     
-                                    with hc1:
-                                        st.markdown(f"<div class='intake-col-title'>Initial Test ({base['Test Date'].strftime('%m/%d/%Y')})</div>", unsafe_allow_html=True)
-                                        st.markdown(f"L Force: **{bL_f:.1f} N** &nbsp;|&nbsp; R Force: **{bR_f:.1f} N**<br>Imbalance: **{b_imb:.1f}%**<br>L Ratio: **{bL_rat:.2f}** &nbsp;|&nbsp; R Ratio: **{bR_rat:.2f}**", unsafe_allow_html=True)
+                                    <!-- DIVIDER LINE -->
+                                    <line x1="10" y1="90" x2="90" y2="90" stroke="#FF8200" stroke-width="2" stroke-dasharray="3,3" />
 
-                                    with hc2:
-                                        st.markdown(f"<div class='intake-col-title'>Latest Test ({latest['Test Date'].strftime('%m/%d/%Y')})</div>", unsafe_allow_html=True)
-                                        st.markdown(f"L Force: {render_val_with_arrow(lL_f, bL_f, '{:.1f}', ' N')} &nbsp;|&nbsp; R Force: {render_val_with_arrow(lR_f, bR_f, '{:.1f}', ' N')}<br>Imbalance: {l_imb:.1f}%<br>L Ratio: {render_val_with_arrow(lL_rat, bL_rat, '{:.2f}')} &nbsp;|&nbsp; R Ratio: {render_val_with_arrow(lR_rat, bR_rat, '{:.2f}')}", unsafe_allow_html=True)
+                                    <!-- LOWER BODY / LEGS / CALVES (BLUE) -->
+                                    <g fill="#1E88E5" stroke="#FFFFFF" stroke-width="1">
+                                        <!-- Hips / Pelvis -->
+                                        <path d="M 28 92 L 72 92 L 68 112 L 32 112 Z" />
+                                        <!-- Left Leg (Thigh & Calf) -->
+                                        <rect x="30" y="114" width="17" height="40" rx="4" />
+                                        <rect x="32" y="156" width="13" height="36" rx="3" />
+                                        <!-- Right Leg (Thigh & Calf) -->
+                                        <rect x="53" y="114" width="17" height="40" rx="4" />
+                                        <rect x="55" y="156" width="13" height="36" rx="3" />
+                                    </g>
+                                </svg>
+                                <div style="display:flex; justify-content:center; gap:15px; margin-top:8px; font-size:11px; font-weight:bold;">
+                                    <span style="color:#D32F2F;">■ UPPER BODY</span>
+                                    <span style="color:#1E88E5;">■ LOWER BODY</span>
+                                </div>
+                            </div>
+                        """, unsafe_allow_html=True)
 
-                                    st.markdown("<hr style='margin:10px 0; border-top:1px solid #E5E5E7;'>", unsafe_allow_html=True)
+                    with body_col2:
+                        # --- UPPER BODY TESTS (RED CALLOUT SECTION) ---
+                        st.markdown('<div class="body-section-card"><div class="upper-body-header">Upper Body Intake Metrics (Shoulder, ISO-Y & ROM)</div>', unsafe_allow_html=True)
+                        
+                        ub_c1, ub_c2 = st.columns(2)
+                        
+                        # 1. SHOULDER IR/ER
+                        with ub_c1:
+                            st.markdown("<b>Shoulder IR / ER Force</b>", unsafe_allow_html=True)
+                            if not sh_ath.empty:
+                                sh_ir = sh_ath[sh_ath['Direction'].str.contains('Internal|IR', case=False, na=False)] if 'Direction' in sh_ath.columns else sh_ath
+                                sh_er = sh_ath[sh_ath['Direction'].str.contains('External|ER', case=False, na=False)] if 'Direction' in sh_ath.columns else sh_ath
 
-                            render_hip_side_by_side(hip_ad, "Adduction (AD)")
-                            render_hip_side_by_side(hip_ab, "Abduction (AB)")
-                        else:
-                            st.info("No Hip AD/AB records logged.")
+                                def render_sh_block(dir_df, label):
+                                    if not dir_df.empty:
+                                        base, latest = dir_df.iloc[0], dir_df.iloc[-1]
+                                        bL, bR = base.get('L Max Force (N)', 0.0), base.get('R Max Force (N)', 0.0)
+                                        lL, lR = latest.get('L Max Force (N)', 0.0), latest.get('R Max Force (N)', 0.0)
+                                        st.caption(f"**{label}**")
+                                        st.markdown(f"<span style='font-size:11px;'><b>Initial ({base['Test Date'].strftime('%m/%d')}):</b> L {bL:.1f}N | R {bR:.1f}N</span><br>"
+                                                    f"<span style='font-size:11px;'><b>Latest ({latest['Test Date'].strftime('%m/%d')}):</b> L {render_val_with_arrow(lL, bL, '{:.1f}', 'N')} | R {render_val_with_arrow(lR, bR, '{:.1f}', 'N')}</span>", unsafe_allow_html=True)
+
+                                render_sh_block(sh_ir, "Internal Rotation (IR)")
+                                render_sh_block(sh_er, "External Rotation (ER)")
+                            else:
+                                st.info("No Shoulder IR/ER logs.")
+
+                        # 2. ISO-Y & ROM
+                        with ub_c2:
+                            st.markdown("<b>ISO-Y & External Rotation ROM</b>", unsafe_allow_html=True)
+                            if not isoy_ath.empty:
+                                b_y, l_y = isoy_ath.iloc[0], isoy_ath.iloc[-1]
+                                byL, byR = b_y.get('Peak Vertical Force [N] (L)', 0.0), b_y.get('Peak Vertical Force [N] (R)', 0.0)
+                                lyL, lyR = l_y.get('Peak Vertical Force [N] (L)', 0.0), l_y.get('Peak Vertical Force [N] (R)', 0.0)
+                                st.caption("**ISO-Y Strength (ASH Sheet)**")
+                                st.markdown(f"<span style='font-size:11px;'><b>Initial ({b_y['Test Date'].strftime('%m/%d')}):</b> L {byL:.0f}N | R {byR:.0f}N</span><br>"
+                                            f"<span style='font-size:11px;'><b>Latest ({l_y['Test Date'].strftime('%m/%d')}):</b> L {render_val_with_arrow(lyL, byL, '{:.0f}', 'N')} | R {render_val_with_arrow(lyR, byR, '{:.0f}', 'N')}</span>", unsafe_allow_html=True)
+                            
+                            if not er_ath.empty:
+                                b_er, l_er = er_ath.iloc[0], er_ath.iloc[-1]
+                                berL, berR = b_er.get('L Max ROM (°)', 0.0), b_er.get('R Max ROM (°)', 0.0)
+                                lerL, lerR = l_er.get('L Max ROM (°)', 0.0), l_er.get('R Max ROM (°)', 0.0)
+                                st.caption("**External Rotation ROM**")
+                                st.markdown(f"<span style='font-size:11px;'><b>Initial ({b_er['Test Date'].strftime('%m/%d')}):</b> L {berL:.1f}° | R {berR:.1f}°</span><br>"
+                                            f"<span style='font-size:11px;'><b>Latest ({l_er['Test Date'].strftime('%m/%d')}):</b> L {render_val_with_arrow(lerL, berL, '{:.1f}', '°')} | R {render_val_with_arrow(lerR, berR, '{:.1f}', '°')}</span>", unsafe_allow_html=True)
                         st.markdown('</div>', unsafe_allow_html=True)
 
-                    with col2:
-                        st.markdown('<div class="intake-card"><div class="intake-card-header">SINGLE LEG CALF RAISE</div>', unsafe_allow_html=True)
-                        if not calf_ath.empty:
-                            base_calf = calf_ath.iloc[0]
-                            latest_calf = calf_ath.iloc[-1]
+                        # --- LOWER BODY TESTS (BLUE CALLOUT SECTION) ---
+                        st.markdown('<div class="body-section-card"><div class="lower-body-header">Lower Body Intake Metrics (Hip AD/AB & Calf Raise)</div>', unsafe_allow_html=True)
+                        
+                        lb_c1, lb_c2 = st.columns(2)
+                        
+                        # 1. HIP AD/AB
+                        with lb_c1:
+                            st.markdown("<b>Hip AD / AB Force & Ratios</b>", unsafe_allow_html=True)
+                            if not hip_ath.empty:
+                                hip_ad = hip_ath[hip_ath['Direction'].str.contains('AD', case=False, na=False)] if 'Direction' in hip_ath.columns else hip_ath
+                                hip_ab = hip_ath[hip_ath['Direction'].str.contains('AB', case=False, na=False)] if 'Direction' in hip_ath.columns else hip_ath
 
-                            bcL_f = base_calf.get('Peak Vertical Force [N] (L)', 0.0)
-                            bcR_f = base_calf.get('Peak Vertical Force [N] (R)', 0.0)
-                            bcL_bm = base_calf.get('Peak Vertical Force / BM [N/kg] (L)', 0.0)
-                            bcR_bm = base_calf.get('Peak Vertical Force / BM [N/kg] (R)', 0.0)
-                            b_asym = base_calf.get('Peak Vertical Force [N] (Asym)(%)', 'N/A')
+                                def render_hip_block(dir_df, label):
+                                    if not dir_df.empty:
+                                        base, latest = dir_df.iloc[0], dir_df.iloc[-1]
+                                        bL, bR = base.get('L Max Force (N)', 0.0), base.get('R Max Force (N)', 0.0)
+                                        lL, lR = latest.get('L Max Force (N)', 0.0), latest.get('R Max Force (N)', 0.0)
+                                        st.caption(f"**{label}**")
+                                        st.markdown(f"<span style='font-size:11px;'><b>Initial ({base['Test Date'].strftime('%m/%d')}):</b> L {bL:.1f}N | R {bR:.1f}N</span><br>"
+                                                    f"<span style='font-size:11px;'><b>Latest ({latest['Test Date'].strftime('%m/%d')}):</b> L {render_val_with_arrow(lL, bL, '{:.1f}', 'N')} | R {render_val_with_arrow(lR, bR, '{:.1f}', 'N')}</span>", unsafe_allow_html=True)
 
-                            lcL_f = latest_calf.get('Peak Vertical Force [N] (L)', 0.0)
-                            lcR_f = latest_calf.get('Peak Vertical Force [N] (R)', 0.0)
-                            lcL_bm = latest_calf.get('Peak Vertical Force / BM [N/kg] (L)', 0.0)
-                            lcR_bm = latest_calf.get('Peak Vertical Force / BM [N/kg] (R)', 0.0)
-                            l_asym = latest_calf.get('Peak Vertical Force [N] (Asym)(%)', 'N/A')
+                                render_hip_block(hip_ad, "Adduction (AD)")
+                                render_hip_block(hip_ab, "Abduction (AB)")
+                            else:
+                                st.info("No Hip AD/AB logs.")
 
-                            cc1, cc2 = st.columns(2)
-                            with cc1:
-                                st.markdown(f"<div class='intake-col-title'>Initial Test ({base_calf['Test Date'].strftime('%m/%d/%Y')})</div>", unsafe_allow_html=True)
-                                st.markdown(f"Force L: **{bcL_f:.0f} N** &nbsp;|&nbsp; Force R: **{bcR_f:.0f} N**<br>N/kg (L): **{bcL_bm:.2f}** &nbsp;|&nbsp; N/kg (R): **{bcR_bm:.2f}**<br>Asymmetry: **{b_asym}**", unsafe_allow_html=True)
+                        # 2. SINGLE LEG CALF RAISE
+                        with lb_c2:
+                            st.markdown("<b>Single Leg Calf Raise</b>", unsafe_allow_html=True)
+                            if not calf_ath.empty:
+                                b_c, l_c = calf_ath.iloc[0], calf_ath.iloc[-1]
+                                bcL, bcR = b_c.get('Peak Vertical Force [N] (L)', 0.0), b_c.get('Peak Vertical Force [N] (R)', 0.0)
+                                lcL, lcR = l_c.get('Peak Vertical Force [N] (L)', 0.0), l_c.get('Peak Vertical Force [N] (R)', 0.0)
+                                bcL_bm, bcR_bm = b_c.get('Peak Vertical Force / BM [N/kg] (L)', 0.0), b_c.get('Peak Vertical Force / BM [N/kg] (R)', 0.0)
+                                lcL_bm, lcR_bm = l_c.get('Peak Vertical Force / BM [N/kg] (L)', 0.0), l_c.get('Peak Vertical Force / BM [N/kg] (R)', 0.0)
 
-                            with cc2:
-                                st.markdown(f"<div class='intake-col-title'>Latest Test ({latest_calf['Test Date'].strftime('%m/%d/%Y')})</div>", unsafe_allow_html=True)
-                                st.markdown(f"Force L: {render_val_with_arrow(lcL_f, bcL_f, '{:.0f}', ' N')} &nbsp;|&nbsp; Force R: {render_val_with_arrow(lcR_f, bcR_f, '{:.0f}', ' N')}<br>N/kg (L): {render_val_with_arrow(lcL_bm, bcL_bm, '{:.2f}')} &nbsp;|&nbsp; N/kg (R): {render_val_with_arrow(lcR_bm, bcR_bm, '{:.2f}')}<br>Asymmetry: {l_asym}", unsafe_allow_html=True)
-
-                        else:
-                            st.info("No Single Leg Calf Raise records logged.")
-                        st.markdown('</div>', unsafe_allow_html=True)
-
-                    # --- ROW 2: SHOULDER IR/ER & ISO-Y ---
-                    col3, col4 = st.columns(2)
-                    with col3:
-                        st.markdown('<div class="intake-card"><div class="intake-card-header">SHOULDER IR / ER FORCE</div>', unsafe_allow_html=True)
-                        if not sh_ath.empty:
-                            sh_ir = sh_ath[sh_ath['Direction'].str.contains('Internal|IR', case=False, na=False)] if 'Direction' in sh_ath.columns else sh_ath
-                            sh_er = sh_ath[sh_ath['Direction'].str.contains('External|ER', case=False, na=False)] if 'Direction' in sh_ath.columns else sh_ath
-
-                            def render_sh_side_by_side(dir_df, dir_label):
-                                if not dir_df.empty:
-                                    base = dir_df.iloc[0]
-                                    latest = dir_df.iloc[-1]
-
-                                    bL_f, bR_f = base.get('L Max Force (N)', 0.0), base.get('R Max Force (N)', 0.0)
-                                    b_imb = base.get('Max Imbalance', 0.0)
-                                    bL_rat, bR_rat = base.get('L Max Ratio', 0.0), base.get('R Max Ratio', 0.0)
-
-                                    lL_f, lR_f = latest.get('L Max Force (N)', 0.0), latest.get('R Max Force (N)', 0.0)
-                                    l_imb = latest.get('Max Imbalance', 0.0)
-                                    lL_rat, lR_rat = latest.get('L Max Ratio', 0.0), latest.get('R Max Ratio', 0.0)
-
-                                    st.markdown(f"**Direction: {dir_label}**")
-                                    sc1, sc2 = st.columns(2)
-
-                                    with sc1:
-                                        st.markdown(f"<div class='intake-col-title'>Initial Test ({base['Test Date'].strftime('%m/%d/%Y')})</div>", unsafe_allow_html=True)
-                                        st.markdown(f"L Force: **{bL_f:.1f} N** &nbsp;|&nbsp; R Force: **{bR_f:.1f} N**<br>Imbalance: **{b_imb:.1f}%**<br>L Ratio: **{bL_rat:.2f}** &nbsp;|&nbsp; R Ratio: **{bR_rat:.2f}**", unsafe_allow_html=True)
-
-                                    with sc2:
-                                        st.markdown(f"<div class='intake-col-title'>Latest Test ({latest['Test Date'].strftime('%m/%d/%Y')})</div>", unsafe_allow_html=True)
-                                        st.markdown(f"L Force: {render_val_with_arrow(lL_f, bL_f, '{:.1f}', ' N')} &nbsp;|&nbsp; R Force: {render_val_with_arrow(lR_f, bR_f, '{:.1f}', ' N')}<br>Imbalance: {l_imb:.1f}%<br>L Ratio: {render_val_with_arrow(lL_rat, bL_rat, '{:.2f}')} &nbsp;|&nbsp; R Ratio: {render_val_with_arrow(lR_rat, bR_rat, '{:.2f}')}", unsafe_allow_html=True)
-
-                                    st.markdown("<hr style='margin:10px 0; border-top:1px solid #E5E5E7;'>", unsafe_allow_html=True)
-
-                            render_sh_side_by_side(sh_ir, "Internal Rotation (IR)")
-                            render_sh_side_by_side(sh_er, "External Rotation (ER)")
-                        else:
-                            st.info("No Shoulder IR/ER records logged.")
-                        st.markdown('</div>', unsafe_allow_html=True)
-
-                    with col4:
-                        st.markdown('<div class="intake-card"><div class="intake-card-header">ISO-Y STRENGTH (ASH SHEET)</div>', unsafe_allow_html=True)
-                        if not isoy_ath.empty:
-                            base_isoy = isoy_ath.iloc[0]
-                            latest_isoy = isoy_ath.iloc[-1]
-
-                            byL = base_isoy.get('Peak Vertical Force [N] (L)', 0.0)
-                            byR = base_isoy.get('Peak Vertical Force [N] (R)', 0.0)
-                            by_asym = base_isoy.get('Peak Vertical Force [N] (Asym)(%)', 0.0)
-
-                            lyL = latest_isoy.get('Peak Vertical Force [N] (L)', 0.0)
-                            lyR = latest_isoy.get('Peak Vertical Force [N] (R)', 0.0)
-                            ly_asym = latest_isoy.get('Peak Vertical Force [N] (Asym)(%)', 0.0)
-
-                            yc1, yc2 = st.columns(2)
-                            with yc1:
-                                st.markdown(f"<div class='intake-col-title'>Initial Test ({base_isoy['Test Date'].strftime('%m/%d/%Y')})</div>", unsafe_allow_html=True)
-                                st.markdown(f"Force L: **{byL:.0f} N** &nbsp;|&nbsp; Force R: **{byR:.0f} N**<br>Asymmetry: **{by_asym:+.1f}%**", unsafe_allow_html=True)
-
-                            with yc2:
-                                st.markdown(f"<div class='intake-col-title'>Latest Test ({latest_isoy['Test Date'].strftime('%m/%d/%Y')})</div>", unsafe_allow_html=True)
-                                st.markdown(f"Force L: {render_val_with_arrow(lyL, byL, '{:.0f}', ' N')} &nbsp;|&nbsp; Force R: {render_val_with_arrow(lyR, byR, '{:.0f}', ' N')}<br>Asymmetry: {ly_asym:+.1f}%", unsafe_allow_html=True)
-
-                        else:
-                            st.info("No ISO-Y test records logged on ASH Sheet.")
+                                st.caption("**Peak Vertical Force & N/kg**")
+                                st.markdown(f"<span style='font-size:11px;'><b>Initial ({b_c['Test Date'].strftime('%m/%d')}):</b> L {bcL:.0f}N ({bcL_bm:.2f} N/kg) | R {bcR:.0f}N ({bcR_bm:.2f} N/kg)</span><br>"
+                                            f"<span style='font-size:11px;'><b>Latest ({l_c['Test Date'].strftime('%m/%d')}):</b> L {render_val_with_arrow(lcL, bcL, '{:.0f}', 'N')} | R {render_val_with_arrow(lcR, bcR, '{:.0f}', 'N')}</span>", unsafe_allow_html=True)
+                            else:
+                                st.info("No Single Leg Calf Raise logs.")
                         st.markdown('</div>', unsafe_allow_html=True)
 
                 else:
