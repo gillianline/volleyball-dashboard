@@ -182,6 +182,7 @@ def load_all_data():
     match_df['Session_Type'] = match_df['Activity'].apply(lambda x: 'Game' if any(w in str(x).lower() for w in ['game', 'match', 'v.']) else 'Practice')
     match_df['Season'] = match_df['Date'].apply(assign_season)
 
+    
     cmj_df = pd.read_csv(st.secrets["CMJ_SHEET_URL"])
     cmj_df.columns = cmj_df.columns.str.strip()
     cmj_df.rename(columns={'Athlete': 'Name'}, inplace=True)
@@ -263,6 +264,15 @@ def load_all_data():
     phase_df = heavy_sanitize(phase_df)
     if 'Phases' in phase_df.columns: phase_df = phase_df.rename(columns={'Phases': 'Phase'})
     phase_df['Date'] = pd.to_datetime(phase_df['Date'], errors='coerce')
+    
+    # Ensure Activity/Session_Name column is clean and uniform
+    if 'Activity' in phase_df.columns:
+        phase_df['Activity'] = phase_df['Activity'].astype(str).str.strip()
+    elif 'Session_Name' in phase_df.columns:
+        phase_df['Activity'] = phase_df['Session_Name'].astype(str).str.strip()
+    else:
+        phase_df['Activity'] = ""
+
     date_season_map = df.drop_duplicates('Date').set_index('Date')['Season'].to_dict()
     phase_df['Season'] = phase_df['Date'].map(date_season_map).fillna('Spring')
     
@@ -1178,7 +1188,22 @@ if check_password():
                     st.info("No External Rotation data recorded.")
 
                 st.divider()
-                p_ph = phase_t0[(phase_t0['Name'] == selected_athlete_prof) & (phase_t0['Date'].dt.date == curr_date_prof.date())].copy()
+
+                # Extract target activity/session name for strict phase mapping
+                target_activity = p_meta.get('Activity', p_meta.get('Session_Name', selected_session_prof))
+
+                # Filter phases by Athlete, Date, and matching Activity column
+                p_ph = phase_t0[
+                    (phase_t0['Name'] == selected_athlete_prof) & 
+                    (phase_t0['Date'].dt.date == curr_date_prof.date())
+                ].copy()
+
+                if 'Activity' in p_ph.columns and target_activity:
+                    # Filter strictly by the active session's activity/practice name
+                    p_ph_act = p_ph[p_ph['Activity'].astype(str).str.strip().str.lower() == str(target_activity).strip().lower()]
+                    if not p_ph_act.empty:
+                        p_ph = p_ph_act
+
                 if not p_ph.empty:
                     st.markdown('<div class="section-header">Practice Phase Analysis</div>', unsafe_allow_html=True)
                     fig_ph = make_subplots(specs=[[{"secondary_y": True}]])
