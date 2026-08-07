@@ -944,7 +944,13 @@ if check_password():
                         name=selected_overall_athlete
                     ))
                     fig_radar.update_layout(
-                        polar=dict(radialaxis=dict(visible=True, range=[0, 100], suffix="%")),
+                        polar=dict(
+                            radialaxis=dict(
+                                visible=True, 
+                                range=[0, 100], 
+                                ticksuffix="%"  # <--- Updated from suffix="%"
+                            )
+                        ),
                         showlegend=False,
                         height=380,
                         margin=dict(l=40, r=40, t=30, b=30),
