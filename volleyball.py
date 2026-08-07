@@ -345,7 +345,7 @@ if check_password():
 
         if selected_season == "Testing":
             st.markdown('<div class="section-header">Testing Profile</div>', unsafe_allow_html=True)
-            testing_season_tabs = st.tabs(["Spring Testing", "Summer Testing", "Pre-Season Testing", "Intake Testing", "Season Comparison"])
+            testing_season_tabs = st.tabs(["Spring Testing", "Summer Testing", "Pre-Season Testing", "Intake Testing", "Overall Testing Profile", "Season Comparison"])
             
             # --- TAB 1, 2, 3: INDIVIDUAL SEASONAL TESTING ---
             for tab_idx, s_label in enumerate(["Spring", "Summer", "Pre-Season"]):
@@ -467,7 +467,7 @@ if check_password():
                     else:
                         st.info(f"No External Rotation ROM testing records logged for {selected_athlete_test} in {s_label}.")
 
-          # --- TAB 4: INTAKE TESTING TAB ---
+            # --- TAB 4: INTAKE TESTING TAB ---
             with testing_season_tabs[3]:
                 st.markdown("<h3 style='color:#1D1D1F; font-weight:900; text-transform:uppercase;'>Athlete Intake Assessment</h3>", unsafe_allow_html=True)
                 c_int_ath, _ = st.columns([2, 2])
@@ -860,10 +860,115 @@ if check_password():
 
                 else:
                     st.info(f"No Intake Assessment records found for {selected_intake_athlete}.")
-                    
-                    
-            # --- TAB 5: CROSS-SEASON TESTING COMPARISON ---
+
+            # --- TAB 5: OVERALL TESTING PROFILE ---
             with testing_season_tabs[4]:
+                st.markdown("<h3 style='color:#1D1D1F; font-weight:900; text-transform:uppercase;'>Overall Athletic Testing Profile</h3>", unsafe_allow_html=True)
+                c_ov_ath, _ = st.columns([2, 2])
+                with c_ov_ath:
+                    selected_overall_athlete = st.selectbox("Select Athlete for Overall Profile", master_athlete_list, key="overall_ath_select")
+
+                # Extract Peak Performances across all datasets
+                cmj_p = raw_cmj_df[raw_cmj_df['Name'] == selected_overall_athlete]
+                ash_p = raw_ash_df[raw_ash_df['Name'] == selected_overall_athlete]
+                er_p = raw_er_df[raw_er_df['Name'] == selected_overall_athlete]
+                calf_p = raw_calf_df[raw_calf_df['Name'] == selected_overall_athlete]
+                hip_p = raw_hip_df[raw_hip_df['Name'] == selected_overall_athlete]
+                sh_p = raw_shoulder_df[raw_shoulder_df['Name'] == selected_overall_athlete]
+
+                max_cmj_h = cmj_p[cmj_col].max() if not cmj_p.empty and cmj_col in cmj_p.columns else 0.0
+                max_rsi_val = cmj_p[rsi_col].max() if not cmj_p.empty and rsi_col in cmj_p.columns else 0.0
+                
+                max_ash_l = ash_p['Peak Vertical Force [N] (L)'].max() if not ash_p.empty and 'Peak Vertical Force [N] (L)' in ash_p.columns else 0.0
+                max_ash_r = ash_p['Peak Vertical Force [N] (R)'].max() if not ash_p.empty and 'Peak Vertical Force [N] (R)' in ash_p.columns else 0.0
+
+                max_er_l = er_p['L Max ROM (°)'].max() if not er_p.empty and 'L Max ROM (°)' in er_p.columns else 0.0
+                max_er_r = er_p['R Max ROM (°)'].max() if not er_p.empty and 'R Max ROM (°)' in er_p.columns else 0.0
+
+                max_calf_l = calf_p['Peak Vertical Force [N] (L)'].max() if not calf_p.empty and 'Peak Vertical Force [N] (L)' in calf_p.columns else 0.0
+                max_calf_r = calf_p['Peak Vertical Force [N] (R)'].max() if not calf_p.empty and 'Peak Vertical Force [N] (R)' in calf_p.columns else 0.0
+
+                hip_ad_p = hip_p[hip_p['Direction'].str.contains('AD', case=False, na=False)] if not hip_p.empty and 'Direction' in hip_p.columns else pd.DataFrame()
+                hip_ab_p = hip_p[hip_p['Direction'].str.contains('AB', case=False, na=False)] if not hip_p.empty and 'Direction' in hip_p.columns else pd.DataFrame()
+                
+                max_hip_ad = max(hip_ad_p['L Max Force (N)'].max() if 'L Max Force (N)' in hip_ad_p.columns else 0.0, hip_ad_p['R Max Force (N)'].max() if 'R Max Force (N)' in hip_ad_p.columns else 0.0) if not hip_ad_p.empty else 0.0
+                max_hip_ab = max(hip_ab_p['L Max Force (N)'].max() if 'L Max Force (N)' in hip_ab_p.columns else 0.0, hip_ab_p['R Max Force (N)'].max() if 'R Max Force (N)' in hip_ab_p.columns else 0.0) if not hip_ab_p.empty else 0.0
+
+                sh_ir_p = sh_p[sh_p['Direction'].str.contains('Internal|IR', case=False, na=False)] if not sh_p.empty and 'Direction' in sh_p.columns else pd.DataFrame()
+                sh_er_p = sh_p[sh_p['Direction'].str.contains('External|ER', case=False, na=False)] if not sh_p.empty and 'Direction' in sh_p.columns else pd.DataFrame()
+
+                max_sh_ir = max(sh_ir_p['L Max Force (N)'].max() if 'L Max Force (N)' in sh_ir_p.columns else 0.0, sh_ir_p['R Max Force (N)'].max() if 'R Max Force (N)' in sh_ir_p.columns else 0.0) if not sh_ir_p.empty else 0.0
+                max_sh_er = max(sh_er_p['L Max Force (N)'].max() if 'L Max Force (N)' in sh_er_p.columns else 0.0, sh_er_p['R Max Force (N)'].max() if 'R Max Force (N)' in sh_er_p.columns else 0.0) if not sh_er_p.empty else 0.0
+
+                # Metric Cards HUD
+                m_c1, m_c2, m_c3, m_c4, m_c5, m_c6 = st.columns(6)
+                m_c1.metric("Peak CMJ", f"{max_cmj_h:.1f} cm")
+                m_c2.metric("Peak RSI", f"{max_rsi_val:.2f}")
+                m_c3.metric("Peak ASH (L/R)", f"{max_ash_l:.0f} / {max_ash_r:.0f} N")
+                m_c4.metric("Peak ER ROM", f"{max(max_er_l, max_er_r):.1f}°")
+                m_c5.metric("Peak Calf Raise", f"{max(max_calf_l, max_calf_r):.0f} N")
+                m_c6.metric("Hip AD / AB", f"{max_hip_ad:.0f} / {max_hip_ab:.0f} N")
+
+                st.markdown("<br>", unsafe_allow_html=True)
+                ov_col1, ov_col2 = st.columns([1.8, 2.2])
+
+                with ov_col1:
+                    st.markdown("#### Athletic Performance Profile Radar")
+                    # Relative Percentile Scaling against Team
+                    metrics_labels = ['CMJ Height', 'RSI Modified', 'ASH Iso-I', 'ER ROM', 'Calf Force', 'Hip Adduction']
+                    
+                    team_max_cmj = raw_cmj_df[cmj_col].max() if cmj_col in raw_cmj_df.columns else 1.0
+                    team_max_rsi = raw_cmj_df[rsi_col].max() if rsi_col in raw_cmj_df.columns else 1.0
+                    team_max_ash = max(raw_ash_df['Peak Vertical Force [N] (L)'].max(), raw_ash_df['Peak Vertical Force [N] (R)'].max()) if not raw_ash_df.empty else 1.0
+                    team_max_er = max(raw_er_df['L Max ROM (°)'].max(), raw_er_df['R Max ROM (°)'].max()) if not raw_er_df.empty else 1.0
+                    team_max_calf = max(raw_calf_df['Peak Vertical Force [N] (L)'].max(), raw_calf_df['Peak Vertical Force [N] (R)'].max()) if not raw_calf_df.empty else 1.0
+                    team_max_hip = max(raw_hip_df['L Max Force (N)'].max(), raw_hip_df['R Max Force (N)'].max()) if not raw_hip_df.empty else 1.0
+
+                    # Calculate % relative to team maximums
+                    r_values = [
+                        (max_cmj_h / team_max_cmj * 100) if team_max_cmj > 0 else 0,
+                        (max_rsi_val / team_max_rsi * 100) if team_max_rsi > 0 else 0,
+                        (max(max_ash_l, max_ash_r) / team_max_ash * 100) if team_max_ash > 0 else 0,
+                        (max(max_er_l, max_er_r) / team_max_er * 100) if team_max_er > 0 else 0,
+                        (max(max_calf_l, max_calf_r) / team_max_calf * 100) if team_max_calf > 0 else 0,
+                        (max_hip_ad / team_max_hip * 100) if team_max_hip > 0 else 0
+                    ]
+
+                    fig_radar = go.Figure()
+                    fig_radar.add_trace(go.Scatterpolar(
+                        r=r_values + [r_values[0]],
+                        theta=metrics_labels + [metrics_labels[0]],
+                        fill='toself',
+                        fillcolor='rgba(255, 130, 0, 0.35)',
+                        line=dict(color='#FF8200', width=3),
+                        name=selected_overall_athlete
+                    ))
+                    fig_radar.update_layout(
+                        polar=dict(radialaxis=dict(visible=True, range=[0, 100], suffix="%")),
+                        showlegend=False,
+                        height=380,
+                        margin=dict(l=40, r=40, t=30, b=30),
+                        template="simple_white"
+                    )
+                    st.plotly_chart(fig_radar, use_container_width=True, config=LOCKED_CONFIG, key="overall_testing_radar")
+
+                with ov_col2:
+                    st.markdown("#### Comprehensive Test Summary Matrix")
+                    ov_summary_data = [
+                        {"Test Domain": "Countermovement Jump", "Key Metric": "Max Height", "Value": f"{max_cmj_h:.1f} cm"},
+                        {"Test Domain": "Countermovement Jump", "Key Metric": "Max RSI-Mod", "Value": f"{max_rsi_val:.2f}"},
+                        {"Test Domain": "ASH Shoulder (Iso-I)", "Key Metric": "Peak Force (L / R)", "Value": f"{max_ash_l:.0f} N / {max_ash_r:.0f} N"},
+                        {"Test Domain": "External Rotation", "Key Metric": "Max ROM (L / R)", "Value": f"{max_er_l:.1f}° / {max_er_r:.1f}°"},
+                        {"Test Domain": "Single Leg Calf Raise", "Key Metric": "Peak Force (L / R)", "Value": f"{max_calf_l:.0f} N / {max_calf_r:.0f} N"},
+                        {"Test Domain": "Hip Strength", "Key Metric": "Adduction (AD)", "Value": f"{max_hip_ad:.1f} N"},
+                        {"Test Domain": "Hip Strength", "Key Metric": "Abduction (AB)", "Value": f"{max_hip_ab:.1f} N"},
+                        {"Test Domain": "Shoulder Strength", "Key Metric": "Internal Rotation (IR)", "Value": f"{max_sh_ir:.1f} N"},
+                        {"Test Domain": "Shoulder Strength", "Key Metric": "External Rotation (ER)", "Value": f"{max_sh_er:.1f} N"},
+                    ]
+                    st.dataframe(pd.DataFrame(ov_summary_data), use_container_width=True, hide_index=True)
+                    
+            # --- TAB 6: CROSS-SEASON TESTING COMPARISON ---
+            with testing_season_tabs[5]:
                 st.markdown("### Multi-Season Testing Performance Comparison")
                 c_comp_ath, _ = st.columns([2, 2])
                 with c_comp_ath:
@@ -1051,8 +1156,6 @@ if check_password():
                     p_row = pd.Series({m: 0.0 for m in all_metrics})
                     p_row['Name'] = selected_athlete_prof
 
-                # Updated: Look at individual practice records in the 30-day lookback window instead of daily combined sums
-                # Updated: Look at practice sessions up to the current row index/Sheet_Order within the 30-day window
                 p_full_prof = df_t0[df_t0['Name'] == selected_athlete_prof]
                 curr_order = p_row.get('Sheet_Order', float('inf'))
 
@@ -1189,17 +1292,14 @@ if check_password():
 
                 st.divider()
 
-                # Extract target activity/session name for strict phase mapping
                 target_activity = p_meta.get('Activity', p_meta.get('Session_Name', selected_session_prof))
 
-                # Filter phases by Athlete, Date, and matching Activity column
                 p_ph = phase_t0[
                     (phase_t0['Name'] == selected_athlete_prof) & 
                     (phase_t0['Date'].dt.date == curr_date_prof.date())
                 ].copy()
 
                 if 'Activity' in p_ph.columns and target_activity:
-                    # Filter strictly by the active session's activity/practice name
                     p_ph_act = p_ph[p_ph['Activity'].astype(str).str.strip().str.lower() == str(target_activity).strip().lower()]
                     if not p_ph_act.empty:
                         p_ph = p_ph_act
@@ -1265,8 +1365,6 @@ if check_password():
                                 p_session_row = display_df[display_df['Name'] == name].iloc[0]
                                 p_full_g = df_t1[df_t1['Name'] == name]
                                 
-                                # Updated: Derive 30-day max benchmarks directly from session-level entries
-                                # Updated: Ensure practice 1 only looks at historical sessions + itself, not future sessions on the same day
                                 curr_order = p_session_row.get('Sheet_Order', float('inf'))
 
                                 lb_sums = p_full_g[
@@ -1431,7 +1529,6 @@ if check_password():
                     p_full = df_t4[df_t4['Name'] == sel_ath_hist].copy()
                     p_full['Date'] = pd.to_datetime(p_full['Date'])
                     
-                    # Sort sessions chronologically by Date and Sheet Order
                     p_sessions = p_full.sort_values(['Date', 'Sheet_Order']).reset_index(drop=True)
 
                     scores_list = []
@@ -1439,7 +1536,6 @@ if check_password():
                         row_grades = []
                         curr_order = row.get('Sheet_Order', float('inf'))
                         
-                        # Lookback: individual sessions up to the current session (ignoring future sessions on the same day)
                         lb_sums = p_full[
                             (p_full['Date'] >= row['Date'] - timedelta(days=30)) & 
                             (p_full['Date'] <= row['Date']) &
@@ -1453,7 +1549,6 @@ if check_password():
                             
                         is_match = any(w in str(row['Session_Name']).upper() or w in str(row['Session_Type']).upper() for w in ['MATCH', 'GAME'])
                         
-                        # Keep display solely as Date string so multiple practices share the exact same vertical line on X-axis
                         scores_list.append({
                             'Date': row['Date'], 
                             'Sheet_Order': curr_order,
@@ -1470,7 +1565,6 @@ if check_password():
                     if not master_df_history.empty:
                         fig_master = go.Figure()
                         
-                        # Add connect-the-dots line across all ordered sessions
                         fig_master.add_trace(go.Scatter(
                             x=master_df_history['Display'],
                             y=master_df_history['Score'],
@@ -1480,7 +1574,6 @@ if check_password():
                             hoverinfo='skip'
                         ))
 
-                        # Practice points (plotted on exact same date string line)
                         prac_df = master_df_history[master_df_history['Type'] == 'Practice']
                         if not prac_df.empty: 
                             fig_master.add_trace(go.Scatter(
@@ -1495,7 +1588,6 @@ if check_password():
                                 marker=dict(size=9, color='#4895DB', line=dict(width=1, color='white'))
                             ))
                             
-                        # Match points
                         match_df_line = master_df_history[master_df_history['Type'] == 'Match']
                         if not match_df_line.empty: 
                             fig_master.add_trace(go.Scatter(
@@ -1511,7 +1603,6 @@ if check_password():
                                 textfont=dict(color='#31333F', size=13, weight='bold')
                             ))
                             
-                        # Unique week vertical dividers
                         unique_dates_df = master_df_history.drop_duplicates(subset=['Display']).reset_index(drop=True)
                         for i in range(1, len(unique_dates_df)):
                             if unique_dates_df.iloc[i]['Week'] != unique_dates_df.iloc[i-1]['Week']:
@@ -1704,7 +1795,7 @@ if check_password():
                         ad = tourney_df[tourney_df['Name'] == name]
                         try: correct_photo = df_master[df_master['Name'] == name]['PhotoURL'].iloc[0]
                         except: correct_photo = "https://www.w3schools.com/howto/img_avatar.png"
-                
+                        
                         st.markdown(f'<div class="player-row-container"><div class="player-divider"></div>', unsafe_allow_html=True)
                         side_cols = st.columns([1.5, 2])
                         with side_cols[0]:
@@ -1713,7 +1804,7 @@ if check_password():
                                 card_start += f"<tr><td style='font-weight:700; font-size:11px;'>{r['Session_Name']}</td><td>{int(r['Total Jumps'])}</td><td>{r['Player Load']:.0f}</td><td>{r['Explosive Efforts']:.0f}</td></tr>"
                             card_start += f"<tr style='background:#4895DB; color:white; font-weight:900;'><td>TOTAL</td><td>{int(ad['Total Jumps'].sum())}</td><td>{ad['Player Load'].sum():.0f}</td><td>{ad['Explosive Efforts'].sum():.0f}</td></tr></tbody></table></div>"
                             st.markdown(card_start, unsafe_allow_html=True)
-                
+                        
                         with side_cols[1]:
                             fig_ath = make_subplots(specs=[[{"secondary_y": True}]])
                             for _, r in ad.iterrows():
