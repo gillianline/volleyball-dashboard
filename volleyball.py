@@ -868,6 +868,13 @@ if check_password():
                 with c_ov_ath:
                     selected_overall_athlete = st.selectbox("Select Athlete for Overall Profile", master_athlete_list, key="overall_ath_select")
 
+                # Athlete Metadata Header Card
+                meta_lookup_ov = full_df_unfiltered[full_df_unfiltered['Name'] == selected_overall_athlete]
+                photo_val_ov = meta_lookup_ov['PhotoURL'].iloc[0] if not meta_lookup_ov.empty else "https://www.w3schools.com/howto/img_avatar.png"
+                pos_val_ov = meta_lookup_ov['Position'].iloc[0] if not meta_lookup_ov.empty else "N/A"
+
+                st.markdown(f'<div style="display:flex; align-items:center; gap:20px; padding:15px; background:#f8f9fa; border-radius:15px; border-left:6px solid #FF8200; margin-bottom:20px;"><img src="{photo_val_ov}" class="gallery-photo" style="width:80px; height:80px;"><div><h2 style="margin:0; color:#1D1D1F;">{selected_overall_athlete}</h2><p style="margin:0; color:#4895DB; font-weight:700; font-size:16px;">{pos_val_ov} | Overall All-Time Max Testing Baseline</p></div></div>', unsafe_allow_html=True)
+
                 # Extract Peak Performances across all datasets
                 cmj_p = raw_cmj_df[raw_cmj_df['Name'] == selected_overall_athlete]
                 ash_p = raw_ash_df[raw_ash_df['Name'] == selected_overall_athlete]
@@ -910,68 +917,20 @@ if check_password():
                 m_c6.metric("Hip AD / AB", f"{max_hip_ad:.0f} / {max_hip_ab:.0f} N")
 
                 st.markdown("<br>", unsafe_allow_html=True)
-                ov_col1, ov_col2 = st.columns([1.8, 2.2])
-
-                with ov_col1:
-                    st.markdown("#### Athletic Performance Profile Radar")
-                    # Relative Percentile Scaling against Team
-                    metrics_labels = ['CMJ Height', 'RSI Modified', 'ASH Iso-I', 'ER ROM', 'Calf Force', 'Hip Adduction']
-                    
-                    team_max_cmj = raw_cmj_df[cmj_col].max() if cmj_col in raw_cmj_df.columns else 1.0
-                    team_max_rsi = raw_cmj_df[rsi_col].max() if rsi_col in raw_cmj_df.columns else 1.0
-                    team_max_ash = max(raw_ash_df['Peak Vertical Force [N] (L)'].max(), raw_ash_df['Peak Vertical Force [N] (R)'].max()) if not raw_ash_df.empty else 1.0
-                    team_max_er = max(raw_er_df['L Max ROM (°)'].max(), raw_er_df['R Max ROM (°)'].max()) if not raw_er_df.empty else 1.0
-                    team_max_calf = max(raw_calf_df['Peak Vertical Force [N] (L)'].max(), raw_calf_df['Peak Vertical Force [N] (R)'].max()) if not raw_calf_df.empty else 1.0
-                    team_max_hip = max(raw_hip_df['L Max Force (N)'].max(), raw_hip_df['R Max Force (N)'].max()) if not raw_hip_df.empty else 1.0
-
-                    # Calculate % relative to team maximums
-                    r_values = [
-                        (max_cmj_h / team_max_cmj * 100) if team_max_cmj > 0 else 0,
-                        (max_rsi_val / team_max_rsi * 100) if team_max_rsi > 0 else 0,
-                        (max(max_ash_l, max_ash_r) / team_max_ash * 100) if team_max_ash > 0 else 0,
-                        (max(max_er_l, max_er_r) / team_max_er * 100) if team_max_er > 0 else 0,
-                        (max(max_calf_l, max_calf_r) / team_max_calf * 100) if team_max_calf > 0 else 0,
-                        (max_hip_ad / team_max_hip * 100) if team_max_hip > 0 else 0
-                    ]
-
-                    fig_radar = go.Figure()
-                    fig_radar.add_trace(go.Scatterpolar(
-                        r=r_values + [r_values[0]],
-                        theta=metrics_labels + [metrics_labels[0]],
-                        fill='toself',
-                        fillcolor='rgba(255, 130, 0, 0.35)',
-                        line=dict(color='#FF8200', width=3),
-                        name=selected_overall_athlete
-                    ))
-                    fig_radar.update_layout(
-                        polar=dict(
-                            radialaxis=dict(
-                                visible=True, 
-                                range=[0, 100], 
-                                ticksuffix="%"  # <--- Updated from suffix="%"
-                            )
-                        ),
-                        showlegend=False,
-                        height=380,
-                        margin=dict(l=40, r=40, t=30, b=30),
-                        template="simple_white"
-                    )
-                    st.plotly_chart(fig_radar, use_container_width=True, config=LOCKED_CONFIG, key="overall_testing_radar")
-
-                with ov_col2:
-                    st.markdown("#### Comprehensive Test Summary Matrix")
-                    ov_summary_data = [
-                        {"Test Domain": "Countermovement Jump", "Key Metric": "Max Height", "Value": f"{max_cmj_h:.1f} cm"},
-                        {"Test Domain": "Countermovement Jump", "Key Metric": "Max RSI-Mod", "Value": f"{max_rsi_val:.2f}"},
-                        {"Test Domain": "ASH Shoulder (Iso-I)", "Key Metric": "Peak Force (L / R)", "Value": f"{max_ash_l:.0f} N / {max_ash_r:.0f} N"},
-                        {"Test Domain": "External Rotation", "Key Metric": "Max ROM (L / R)", "Value": f"{max_er_l:.1f}° / {max_er_r:.1f}°"},
-                        {"Test Domain": "Single Leg Calf Raise", "Key Metric": "Peak Force (L / R)", "Value": f"{max_calf_l:.0f} N / {max_calf_r:.0f} N"},
-                        {"Test Domain": "Hip Strength", "Key Metric": "Adduction (AD)", "Value": f"{max_hip_ad:.1f} N"},
-                        {"Test Domain": "Hip Strength", "Key Metric": "Abduction (AB)", "Value": f"{max_hip_ab:.1f} N"},
-                        {"Test Domain": "Shoulder Strength", "Key Metric": "Internal Rotation (IR)", "Value": f"{max_sh_ir:.1f} N"},
-                        {"Test Domain": "Shoulder Strength", "Key Metric": "External Rotation (ER)", "Value": f"{max_sh_er:.1f} N"},
-                    ]
-                    st.dataframe(pd.DataFrame(ov_summary_data), use_container_width=True, hide_index=True)
+                st.markdown("#### Comprehensive Peak Performance Matrix")
+                
+                ov_summary_data = [
+                    {"Test Domain": "Countermovement Jump", "Key Metric": "Max Height", "Peak Value": f"{max_cmj_h:.1f} cm"},
+                    {"Test Domain": "Countermovement Jump", "Key Metric": "Max RSI-Mod", "Peak Value": f"{max_rsi_val:.2f}"},
+                    {"Test Domain": "ASH Shoulder (Iso-I)", "Key Metric": "Peak Force (L / R)", "Peak Value": f"{max_ash_l:.0f} N / {max_ash_r:.0f} N"},
+                    {"Test Domain": "External Rotation", "Key Metric": "Max ROM (L / R)", "Peak Value": f"{max_er_l:.1f}° / {max_er_r:.1f}°"},
+                    {"Test Domain": "Single Leg Calf Raise", "Key Metric": "Peak Force (L / R)", "Peak Value": f"{max_calf_l:.0f} N / {max_calf_r:.0f} N"},
+                    {"Test Domain": "Hip Strength", "Key Metric": "Adduction (AD)", "Peak Value": f"{max_hip_ad:.1f} N"},
+                    {"Test Domain": "Hip Strength", "Key Metric": "Abduction (AB)", "Peak Value": f"{max_hip_ab:.1f} N"},
+                    {"Test Domain": "Shoulder Strength", "Key Metric": "Internal Rotation (IR)", "Peak Value": f"{max_sh_ir:.1f} N"},
+                    {"Test Domain": "Shoulder Strength", "Key Metric": "External Rotation (ER)", "Peak Value": f"{max_sh_er:.1f} N"},
+                ]
+                st.dataframe(pd.DataFrame(ov_summary_data), use_container_width=True, hide_index=True)
                     
             # --- TAB 6: CROSS-SEASON TESTING COMPARISON ---
             with testing_season_tabs[5]:
