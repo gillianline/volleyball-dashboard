@@ -1035,7 +1035,8 @@ if check_password():
                     "Spring Max vs Daily Combined", 
                     "Practice History", 
                     "Position Analysis", 
-                    "Spring v. Summer"
+                    "Spring v. Summer",
+                    "Compliance"
                 ]
             elif selected_season == "Pre-Season":
                 tab_titles = [
@@ -1045,7 +1046,8 @@ if check_password():
                     "Practice History", 
                     "Position Analysis", 
                     "Phase Analysis", 
-                    "Practice Planner"
+                    "Practice Planner",
+                    "Compliance"
                 ]
             else: # Spring
                 tab_titles = [
@@ -1057,7 +1059,8 @@ if check_password():
                     "Match Summary", 
                     "Position Analysis", 
                     "Phase Analysis", 
-                    "Practice Planner"
+                    "Practice Planner",
+                    "Compliance"
                 ]
 
             if "active_tab_state" not in st.session_state or st.session_state.active_tab_state not in tab_titles:
@@ -2044,6 +2047,78 @@ if check_password():
                                     total_session_score = math.ceil((g_load + g_jumps + g_efforts + g_dist + g_jload) / 5)
                                     
                                     with card_cols[col_offset]: st.markdown(f"""<div style="border:1px solid #E5E5E7; border-radius:15px; padding:15px; margin-bottom:20px; background-color:white;"><div style="display:flex; align-items:center; gap:12px; margin-bottom:10px; padding-bottom:8px; border-bottom:2px solid #FF8200;"><img src="{correct_photo}" class="gallery-photo" style="width:55px; height:55px;"><div><p style="margin:0; font-weight:900; color:#1D1D1F; font-size:15px;">{row_day['Session_Name']}</p><p style="margin:0; color:#4895DB; font-weight:700; font-size:12px;">{row_day['Date'].strftime('%m/%d/%Y')} | {pos_label}</p></div></div><div style="display:flex; align-items:center; gap:10px;"><div style="flex:3;"><table class="scout-table"><thead><tr><th>Metric</th><th>Summer</th><th>Spring Max</th></tr></thead><tbody><tr><td>Player Load</td><td>{row_day['Player Load']:.1f}</td><td>{b_load:.1f}</td></tr><tr><td>Total Jumps</td><td>{int(row_day['Total Jumps'])}</td><td>{int(b_jumps)}</td></tr><tr><td>Explosive Efforts</td><td>{int(row_day['Explosive Efforts'])}</td><td>{int(b_efforts)}</td></tr><tr><td>Jump Load</td><td>{row_day['Jump Load']:.1f}</td><td>{b_jload:.1f}</td></tr><tr><td>Est. Distance (y)</td><td>{row_day['Estimated Distance (y)']:.1f}</td><td>{b_dist:.1f}</td></tr></tbody></table></div><div style="flex:1; text-align:center;"><div class="score-box" style="background-color:{get_flipped_gradient(total_session_score)}; font-size:26px; padding:10px 5px; min-width:70px; margin:0 auto;">{total_session_score}</div></div></div></div>""", unsafe_allow_html=True)
+
+            # ==========================================
+            # --- TAB CLAUSE 10: COMPLIANCE ------------
+            # ==========================================
+            elif st.session_state.active_tab_state == "Compliance":
+                st.markdown('<div class="section-header">Athlete Load Compliance & Peak Volume Baseline</div>', unsafe_allow_html=True)
+                
+                comp_tabs = st.tabs(["Spring", "Summer", "Pre-Season", "All-Time Max"])
+                
+                # Daily sums across entire raw dataset since data collection start
+                daily_raw = full_df_unfiltered.groupby(['Name', 'Season', 'Date'])[metrics_to_score].sum().reset_index()
+                all_time_maxes = daily_raw.groupby('Name')[metrics_to_score].max().reset_index()
+                
+                c_pos_filter = st.selectbox("Position Filter", ["All Positions"] + sorted([p for p in full_df_unfiltered['Position'].unique() if p != "N/A"]), key="comp_pos_filter_global")
+                
+                for idx, season_name in enumerate(["Spring", "Summer", "Pre-Season", "All-Time Max"]):
+                    with comp_tabs[idx]:
+                        if season_name in ["Spring", "Summer", "Pre-Season"]:
+                            season_daily = daily_raw[daily_raw['Season'] == season_name]
+                            season_maxes = season_daily.groupby('Name')[metrics_to_score].max().reset_index()
+                        else:
+                            season_maxes = all_time_maxes.copy()
+                            
+                        ath_list = sorted(full_df_unfiltered['Name'].unique())
+                        
+                        if c_pos_filter != "All Positions":
+                            pos_athletes = full_df_unfiltered[full_df_unfiltered['Position'] == c_pos_filter]['Name'].unique()
+                            ath_list = [a for a in ath_list if a in pos_athletes]
+                            
+                        for i in range(0, len(ath_list), 2):
+                            cols = st.columns(2)
+                            for j in range(2):
+                                if i + j < len(ath_list):
+                                    ath_name = ath_list[i + j]
+                                    
+                                    meta_r = full_df_unfiltered[full_df_unfiltered['Name'] == ath_name].iloc[0]
+                                    photo_url = meta_r.get('PhotoURL', "https://www.w3schools.com/howto/img_avatar.png")
+                                    pos_str = meta_r.get('Position', "N/A")
+                                    
+                                    o_row = all_time_maxes[all_time_maxes['Name'] == ath_name]
+                                    s_row = season_maxes[season_maxes['Name'] == ath_name]
+                                    
+                                    r_html = ""
+                                    for m in metrics_to_score:
+                                        o_val = o_row[m].iloc[0] if not o_row.empty else 0.0
+                                        s_val = s_row[m].iloc[0] if not s_row.empty else 0.0
+                                        
+                                        if season_name == "All-Time Max":
+                                            r_html += f"<tr><td>{m}</td><td style='font-weight:700;'>{o_val:.1f}</td></tr>"
+                                        else:
+                                            r_html += f"<tr><td>{m}</td><td>{o_val:.1f}</td><td style='font-weight:700;'>{s_val:.1f}</td></tr>"
+                                            
+                                    table_header = "<thead><tr><th>Metric</th><th>Highest Overall</th></tr></thead>" if season_name == "All-Time Max" else f"<thead><tr><th>Metric</th><th>Overall Max</th><th>{season_name} Max</th></tr></thead>"
+                                    
+                                    with cols[j]:
+                                        st.markdown(f'''
+                                            <div style="border:1px solid #E5E5E7; border-radius:15px; padding:15px; margin-bottom:20px; background-color:white;">
+                                                <div style="display:flex; align-items:center; gap:12px; margin-bottom:10px; padding-bottom:8px; border-bottom:2px solid #FF8200;">
+                                                    <img src="{photo_url}" class="gallery-photo" style="width:55px; height:55px;">
+                                                    <div>
+                                                        <p style="margin:0; font-weight:900; color:#1D1D1F; font-size:16px;">{ath_name}</p>
+                                                        <p style="margin:0; color:#4895DB; font-weight:700; font-size:12px;">{pos_str} | {season_name} Baseline</p>
+                                                    </div>
+                                                </div>
+                                                <table class="scout-table">
+                                                    {table_header}
+                                                    <tbody>
+                                                        {r_html}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        ''', unsafe_allow_html=True)
 
     except Exception as e:
         st.error(f"Sync Error: {e}")
