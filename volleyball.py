@@ -346,73 +346,86 @@ if check_password():
 
         st.markdown('<div class="main-logo-container" style="text-align: center; margin-top: 10px; margin-bottom: 15px;"><img src="https://upload.wikimedia.org/wikipedia/commons/thumb/f/fc/Tennessee_Lady_Volunteers_logo.svg/1280px-Tennessee_Lady_Volunteers_logo.svg.png" width="120"><div style="color: #FF8200; font-size: 2rem; font-weight: 900; margin-top: 10px;">LADY VOLS VOLLEYBALL PERFORMANCE</div></div>', unsafe_allow_html=True)
 
-        if selected_season == "Compliance":
-            st.markdown('<div class="section-header">Athlete Load Compliance & Peak Volume Baseline</div>', unsafe_allow_html=True)
-            
-            comp_tabs = st.tabs(["Spring", "Summer", "Pre-Season", "All-Time Max"])
-            
-            daily_raw = full_df_unfiltered.groupby(['Name', 'Season', 'Date'])[metrics_to_score].sum().reset_index()
-            all_time_maxes = daily_raw.groupby('Name')[metrics_to_score].max().reset_index()
-            
-            c_pos_filter = st.selectbox("Position Filter", ["All Positions"] + sorted([p for p in full_df_unfiltered['Position'].unique() if p != "N/A"]), key="comp_pos_filter_global")
-            
-            for idx, season_name in enumerate(["Spring", "Summer", "Pre-Season", "All-Time Max"]):
-                with comp_tabs[idx]:
-                    if season_name in ["Spring", "Summer", "Pre-Season"]:
-                        season_daily = daily_raw[daily_raw['Season'] == season_name]
-                        season_maxes = season_daily.groupby('Name')[metrics_to_score].max().reset_index()
-                    else:
-                        season_maxes = all_time_maxes.copy()
+        # ==========================================
+            # --- TAB CLAUSE 10: COMPLIANCE ------------
+            # ==========================================
+            elif selected_season == "Compliance":
+                st.markdown('<div class="section-header">Athlete Load Compliance & Peak Volume Baseline</div>', unsafe_allow_html=True)
+                
+                # Position Filter moved to the top level
+                c_pos_filter = st.selectbox(
+                    "Position Filter", 
+                    ["All Positions"] + sorted([p for p in full_df_unfiltered['Position'].unique() if p != "N/A"]), 
+                    key="comp_pos_filter_global"
+                )
+                
+                comp_tabs = st.tabs(["Spring", "Summer", "Pre-Season", "All-Time Max"])
+                
+                # Calculate daily sums across entire dataset
+                daily_raw = full_df_unfiltered.groupby(['Name', 'Season', 'Date'])[metrics_to_score].sum().reset_index()
+                all_time_maxes = daily_raw.groupby('Name')[metrics_to_score].max().reset_index()
+                
+                for idx, season_name in enumerate(["Spring", "Summer", "Pre-Season", "All-Time Max"]):
+                    with comp_tabs[idx]:
+                        if season_name in ["Spring", "Summer", "Pre-Season"]:
+                            season_daily = daily_raw[daily_raw['Season'] == season_name]
+                            season_maxes = season_daily.groupby('Name')[metrics_to_score].max().reset_index()
+                        else:
+                            season_maxes = all_time_maxes.copy()
+                            
+                        ath_list = sorted(full_df_unfiltered['Name'].unique())
                         
-                    ath_list = sorted(full_df_unfiltered['Name'].unique())
-                    
-                    if c_pos_filter != "All Positions":
-                        pos_athletes = full_df_unfiltered[full_df_unfiltered['Position'] == c_pos_filter]['Name'].unique()
-                        ath_list = [a for a in ath_list if a in pos_athletes]
-                        
-                    for i in range(0, len(ath_list), 2):
-                        cols = st.columns(2)
-                        for j in range(2):
-                            if i + j < len(ath_list):
-                                ath_name = ath_list[i + j]
-                                
-                                meta_r = full_df_unfiltered[full_df_unfiltered['Name'] == ath_name].iloc[0]
-                                photo_url = meta_r.get('PhotoURL', "https://www.w3schools.com/howto/img_avatar.png")
-                                pos_str = meta_r.get('Position', "N/A")
-                                
-                                o_row = all_time_maxes[all_time_maxes['Name'] == ath_name]
-                                s_row = season_maxes[season_maxes['Name'] == ath_name]
-                                
-                                r_html = ""
-                                for m in metrics_to_score:
-                                    o_val = o_row[m].iloc[0] if not o_row.empty else 0.0
-                                    s_val = s_row[m].iloc[0] if not s_row.empty else 0.0
+                        if c_pos_filter != "All Positions":
+                            pos_athletes = full_df_unfiltered[full_df_unfiltered['Position'] == c_pos_filter]['Name'].unique()
+                            ath_list = [a for a in ath_list if a in pos_athletes]
+                            
+                        for i in range(0, len(ath_list), 2):
+                            cols = st.columns(2)
+                            for j in range(2):
+                                if i + j < len(ath_list):
+                                    ath_name = ath_list[i + j]
                                     
-                                    if season_name == "All-Time Max":
-                                        r_html += f"<tr><td>{m}</td><td style='font-weight:700;'>{o_val:.1f}</td></tr>"
-                                    else:
-                                        r_html += f"<tr><td>{m}</td><td>{o_val:.1f}</td><td style='font-weight:700;'>{s_val:.1f}</td></tr>"
+                                    meta_r = full_df_unfiltered[full_df_unfiltered['Name'] == ath_name].iloc[0]
+                                    photo_url = meta_r.get('PhotoURL', "https://www.w3schools.com/howto/img_avatar.png")
+                                    pos_str = meta_r.get('Position', "N/A")
+                                    
+                                    o_row = all_time_maxes[all_time_maxes['Name'] == ath_name]
+                                    s_row = season_maxes[season_maxes['Name'] == ath_name]
+                                    
+                                    r_html = ""
+                                    for m in metrics_to_score:
+                                        o_val = o_row[m].iloc[0] if not o_row.empty else 0.0
+                                        s_val = s_row[m].iloc[0] if not s_row.empty else 0.0
                                         
-                                table_header = "<thead><tr><th>Metric</th><th>Highest Overall</th></tr></thead>" if season_name == "All-Time Max" else f"<thead><tr><th>Metric</th><th>Overall Max</th><th>{season_name} Max</th></tr></thead>"
-                                
-                                with cols[j]:
-                                    st.markdown(f'''
-                                        <div style="border:1px solid #E5E5E7; border-radius:15px; padding:15px; margin-bottom:20px; background-color:white;">
-                                            <div style="display:flex; align-items:center; gap:12px; margin-bottom:10px; padding-bottom:8px; border-bottom:2px solid #FF8200;">
-                                                <img src="{photo_url}" class="gallery-photo" style="width:55px; height:55px;">
-                                                <div>
-                                                    <p style="margin:0; font-weight:900; color:#1D1D1F; font-size:16px;">{ath_name}</p>
-                                                    <p style="margin:0; color:#4895DB; font-weight:700; font-size:12px;">{pos_str} | {season_name} Compliance</p>
+                                        # Highlight in green if the season max equals or exceeds all-time overall max
+                                        is_peak = (s_val >= o_val) and (s_val > 0)
+                                        highlight_style = 'style="color: #28a745; font-weight: 800; background-color: #e8f5e9;"' if is_peak else ''
+                                        
+                                        if season_name == "All-Time Max":
+                                            r_html += f"<tr><td>{m}</td><td style='font-weight:700;'>{o_val:.1f}</td></tr>"
+                                        else:
+                                            r_html += f"<tr><td>{m}</td><td>{o_val:.1f}</td><td {highlight_style}>{s_val:.1f}</td></tr>"
+                                            
+                                    table_header = "<thead><tr><th>Metric</th><th>Highest Overall</th></tr></thead>" if season_name == "All-Time Max" else f"<thead><tr><th>Metric</th><th>Overall Max</th><th>{season_name} Max</th></tr></thead>"
+                                    
+                                    with cols[j]:
+                                        st.markdown(f'''
+                                            <div style="border:1px solid #E5E5E7; border-radius:15px; padding:15px; margin-bottom:20px; background-color:white;">
+                                                <div style="display:flex; align-items:center; gap:12px; margin-bottom:10px; padding-bottom:8px; border-bottom:2px solid #FF8200;">
+                                                    <img src="{photo_url}" class="gallery-photo" style="width:55px; height:55px;">
+                                                    <div>
+                                                        <p style="margin:0; font-weight:900; color:#1D1D1F; font-size:16px;">{ath_name}</p>
+                                                        <p style="margin:0; color:#4895DB; font-weight:700; font-size:12px;">{pos_str} | {season_name} Compliance</p>
+                                                    </div>
                                                 </div>
+                                                <table class="scout-table">
+                                                    {table_header}
+                                                    <tbody>
+                                                        {r_html}
+                                                    </tbody>
+                                                </table>
                                             </div>
-                                            <table class="scout-table">
-                                                {table_header}
-                                                <tbody>
-                                                    {r_html}
-                                                </tbody>
-                                            </table>
-                                        </div>
-                                    ''', unsafe_allow_html=True)
+                                        ''', unsafe_allow_html=True)
 
         elif selected_season == "Testing":
             st.markdown('<div class="section-header">Testing Profile</div>', unsafe_allow_html=True)
