@@ -340,7 +340,7 @@ if check_password():
 
         # --- GLOBAL SIDEBAR ---
         st.sidebar.markdown("### View Selection")
-        selected_season = st.sidebar.radio("Select View Mode", ["Spring", "Summer", "Pre-Season", "Testing", "Comparison", "Compliance"], index=2, key="global_season_toggle")
+        selected_season = st.sidebar.radio("Select View Mode", ["Spring", "Summer", "Pre-Season", "Testing", "Comparison"], index=2, key="global_season_toggle")
         
         if selected_season not in ["Testing", "Comparison", "Compliance"]:
             st.sidebar.info(f"Currently displaying: {selected_season} Season Performance Data.")
