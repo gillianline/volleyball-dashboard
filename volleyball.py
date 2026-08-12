@@ -438,11 +438,11 @@ if check_password():
             photo_url = meta_lookup['PhotoURL'].iloc[0] if not meta_lookup.empty else "https://www.w3schools.com/howto/img_avatar.png"
             pos_str = meta_lookup['Position'].iloc[0] if not meta_lookup.empty else "N/A"
 
-            # Top Athlete Header Card
-            st.markdown(f'''
-                <div class="comp-athlete-header">
-                    <img src="{photo_url}" class="comp-athlete-photo">
-                    <div>
+                # Top Athlete Header Card
+                st.markdown(f'''
+                    <div class="comp-athlete-header">
+                        <img src="{photo_url}" class="comp-athlete-photo">
+                        <div>
                         <div style="font-size:22px; font-weight:900; color:#111827;">{selected_comp_ath}</div>
                         <div style="font-size:14px; font-weight:600; color:#64748B;">{pos_str}</div>
                     </div>
@@ -528,9 +528,6 @@ if check_password():
                 # External Rotation ROM (Right)
                 rv, rd, mv, md, pct, db, dn = get_card_stats(raw_er_df, 'R Max ROM (°)')
                 render_compliance_card("External Rotation ROM (Right)", rv, rd, mv, md, pct, db, dn, "°")
-
-    except Exception as e:
-        st.error(f"Sync Error: {e}")
 
 
         elif selected_season == "Testing":
