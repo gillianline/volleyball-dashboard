@@ -523,8 +523,6 @@ if check_password():
                 rv, rd, mv, md, pct, db = get_card_stats(raw_er_df, 'R Max ROM (°)')
                 render_compliance_card("External Rotation ROM (R)", rv, rd, mv, md, pct, db, "°")
 
-    except Exception as e:
-        st.error(f"Sync Error: {e}")
 
         elif selected_season == "Testing":
             st.markdown('<div class="section-header">Testing Profile</div>', unsafe_allow_html=True)
