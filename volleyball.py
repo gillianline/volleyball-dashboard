@@ -32,7 +32,7 @@ st.markdown("""
     .stApp { background-color: #FFFFFF; color: #1D1D1F; }
     hr { display: none !important; }
     
-    /* Lowers password input and adds global top breathing room */
+    /* Global Container Padding */
     .block-container { 
         padding-top: 5rem !important; 
         padding-bottom: 3rem !important; 
@@ -60,28 +60,85 @@ st.markdown("""
     .gallery-photo { border-radius: 50%; width: 110px; height: 110px; object-fit: cover; border: 4px solid #FF8200; }
     .section-header { font-size: 20px; font-weight: 800; color: #4895DB; border-bottom: 2px solid #FF8200; margin-top: 15px; margin-bottom: 10px; padding-bottom: 5px; text-transform: uppercase; }
 
-    /* Intake Cards Container Styling */
-    .intake-card {
-        border: 1px solid #E5E5E7;
+    /* --- EXACT COMPLIANCE CARD UI CSS --- */
+    .comp-athlete-header {
+        border: 1px solid #E2E8F0;
         border-radius: 12px;
-        padding: 15px;
+        padding: 16px 20px;
         background-color: #FFFFFF;
-        margin-bottom: 15px;
+        margin-bottom: 24px;
+        display: flex;
+        align-items: center;
+        gap: 16px;
     }
-    .intake-card-header {
-        font-weight: 800;
-        font-size: 15px;
-        color: #4895DB;
-        border-bottom: 2px solid #FF8200;
-        padding-bottom: 4px;
-        margin-bottom: 12px;
+    .comp-athlete-photo {
+        width: 60px;
+        height: 60px;
+        border-radius: 50%;
+        border: 3px solid #FF8200;
+        object-fit: cover;
     }
-    .intake-col-title {
+    .comp-card-outer {
+        border: 1px solid #E2E8F0;
+        border-radius: 14px;
+        padding: 20px;
+        background-color: #FFFFFF;
+        margin-bottom: 20px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+    }
+    .comp-card-top {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 16px;
+    }
+    .comp-card-title {
+        font-size: 18px;
         font-weight: 800;
-        font-size: 13px;
-        color: #1D1D1F;
-        margin-bottom: 8px;
+        color: #111827;
+    }
+    .comp-pill-badge {
+        background-color: #FCE8E6;
+        color: #D93025;
+        font-size: 12px;
+        font-weight: 700;
+        padding: 4px 12px;
+        border-radius: 16px;
+    }
+    .comp-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+    }
+    .comp-tile {
+        background-color: #F8FAFC;
+        border: 1px solid #F1F5F9;
+        border-radius: 10px;
+        padding: 14px 10px;
+        text-align: center;
+    }
+    .comp-label {
+        font-size: 10px;
+        font-weight: 800;
+        color: #64748B;
         text-transform: uppercase;
+        letter-spacing: 0.6px;
+        margin-bottom: 6px;
+    }
+    .comp-metric-val {
+        font-size: 22px;
+        font-weight: 800;
+        color: #0F172A;
+        line-height: 1.1;
+    }
+    .comp-metric-orange {
+        color: #FF8200 !important;
+    }
+    .comp-subtext {
+        font-size: 11px;
+        color: #94A3B8;
+        margin-top: 6px;
+        font-weight: 500;
     }
 
     @media print {
@@ -149,7 +206,6 @@ def load_all_data():
         d = date_val.day
         y = date_val.year
     
-        # Pre-Season starts July 30th onward
         if y == 2026 and m == 7 and d >= 30: return 'Pre-Season'
         elif y == 2026 and m >= 8: return 'Pre-Season'
         elif 1 <= m <= 4: return 'Spring'
@@ -182,7 +238,6 @@ def load_all_data():
     match_df['Session_Type'] = match_df['Activity'].apply(lambda x: 'Game' if any(w in str(x).lower() for w in ['game', 'match', 'v.']) else 'Practice')
     match_df['Season'] = match_df['Date'].apply(assign_season)
 
-    
     cmj_df = pd.read_csv(st.secrets["CMJ_SHEET_URL"])
     cmj_df.columns = cmj_df.columns.str.strip()
     cmj_df.rename(columns={'Athlete': 'Name'}, inplace=True)
@@ -191,87 +246,66 @@ def load_all_data():
         cmj_df['Week'] = pd.to_numeric(cmj_df['Week'].astype(str).str.extract(r'(\d+)', expand=False), errors='coerce').fillna(0).astype(int)
     cmj_df['Season'] = cmj_df['Test Date'].apply(assign_season)
 
-    # ASH Sheet (Contains ASH Shoulder + ISO-Y)
+    # ASH Sheet
     try:
         ash_df = pd.read_csv(st.secrets["ASH_SHEET_URL"])
         ash_df.columns = ash_df.columns.str.strip()
         ash_df.rename(columns={'Athlete': 'Name', 'Date': 'Test Date'}, inplace=True)
         ash_df['Test Date'] = pd.to_datetime(ash_df['Test Date'], errors='coerce')
-        for col in ['Peak Vertical Force [N] (L)', 'Peak Vertical Force [N] (R)', 'Peak Vertical Force [N] (Asym)(%)', 'Peak Vertical Force / BM [N/kg] (L)', 'Peak Vertical Force / BM [N/kg] (R)']:
+        for col in ['Peak Vertical Force [N] (L)', 'Peak Vertical Force [N] (R)', 'Peak Vertical Force [N] (Asym)(%)']:
             if col in ash_df.columns:
                 ash_df[col] = pd.to_numeric(ash_df[col].astype(str).str.replace(r'[^0-9.-]', '', regex=True), errors='coerce').fillna(0.0)
         ash_df['Season'] = ash_df['Test Date'].apply(assign_season)
     except:
-        ash_df = pd.DataFrame(columns=['Name', 'Test Date', 'Isometric Type', 'Peak Vertical Force [N] (L)', 'Peak Vertical Force [N] (R)', 'Peak Vertical Force [N] (Asym)(%)', 'Season'])
+        ash_df = pd.DataFrame(columns=['Name', 'Test Date', 'Isometric Type', 'Peak Vertical Force [N] (L)', 'Peak Vertical Force [N] (R)', 'Season'])
 
-    # External Rotation (ROM) Sheet
+    # External Rotation Sheet
     try:
         er_df = pd.read_csv(st.secrets["ER_SHEET_URL"])
         er_df.columns = er_df.columns.str.strip()
         er_df.rename(columns={'Athlete': 'Name', 'Date': 'Test Date'}, inplace=True)
         er_df['Test Date'] = pd.to_datetime(er_df['Test Date'], errors='coerce')
-        for col in ['L Max ROM (°)', 'R Max ROM (°)', 'ROM Asymmetry (%)']:
+        for col in ['L Max ROM (°)', 'R Max ROM (°)']:
             if col in er_df.columns:
                 er_df[col] = pd.to_numeric(er_df[col].astype(str).str.replace(r'[^0-9.-]', '', regex=True), errors='coerce').fillna(0.0)
         er_df['Season'] = er_df['Test Date'].apply(assign_season)
     except:
-        er_df = pd.DataFrame(columns=['Name', 'Test Date', 'Movement', 'L Max ROM (°)', 'R Max ROM (°)', 'ROM Asymmetry (%)', 'Season'])
+        er_df = pd.DataFrame(columns=['Name', 'Test Date', 'L Max ROM (°)', 'R Max ROM (°)', 'Season'])
 
-    # Single Leg Calf Raise Sheet
+    # Calf Sheet
     try:
         calf_df = pd.read_csv(st.secrets["CALF_SHEET_URL"])
         calf_df.columns = calf_df.columns.str.strip()
         calf_df.rename(columns={'Athlete': 'Name', 'Date': 'Test Date'}, inplace=True)
         calf_df['Test Date'] = pd.to_datetime(calf_df['Test Date'], errors='coerce')
-        for col in ['Peak Vertical Force [N] (L)', 'Peak Vertical Force [N] (R)', 'Peak Vertical Force / BM [N/kg] (L)', 'Peak Vertical Force / BM [N/kg] (R)']:
-            if col in calf_df.columns:
-                calf_df[col] = pd.to_numeric(calf_df[col].astype(str).str.replace(r'[^0-9.-]', '', regex=True), errors='coerce').fillna(0.0)
         calf_df['Season'] = calf_df['Test Date'].apply(assign_season)
     except:
         calf_df = pd.DataFrame(columns=['Name', 'Test Date', 'Season'])
 
-    # Hip AD/AB Sheet
+    # Hip Sheet
     try:
         hip_df = pd.read_csv(st.secrets["HIP_SHEET_URL"])
         hip_df.columns = hip_df.columns.str.strip()
         hip_df.rename(columns={'Athlete': 'Name', 'Date': 'Test Date'}, inplace=True)
         hip_df['Test Date'] = pd.to_datetime(hip_df['Test Date'], errors='coerce')
-        if 'Direction' in hip_df.columns:
-            hip_df['Direction'] = hip_df['Direction'].astype(str).str.strip()
-        for col in ['L Max Force (N)', 'R Max Force (N)', 'Max Imbalance', 'L Max Ratio', 'R Max Ratio']:
-            if col in hip_df.columns:
-                hip_df[col] = pd.to_numeric(hip_df[col].astype(str).str.replace(r'[^0-9.-]', '', regex=True), errors='coerce').fillna(0.0)
         hip_df['Season'] = hip_df['Test Date'].apply(assign_season)
     except:
-        hip_df = pd.DataFrame(columns=['Name', 'Test Date', 'Direction', 'Season'])
+        hip_df = pd.DataFrame(columns=['Name', 'Test Date', 'Season'])
 
-    # Dedicated Shoulder IR/ER Sheet
+    # Shoulder Sheet
     try:
         shoulder_df = pd.read_csv(st.secrets["SHOULDER_SHEET_URL"])
         shoulder_df.columns = shoulder_df.columns.str.strip()
         shoulder_df.rename(columns={'Athlete': 'Name', 'Date': 'Test Date'}, inplace=True)
         shoulder_df['Test Date'] = pd.to_datetime(shoulder_df['Test Date'], errors='coerce')
-        if 'Direction' in shoulder_df.columns:
-            shoulder_df['Direction'] = shoulder_df['Direction'].astype(str).str.strip()
-        for col in ['L Max Force (N)', 'R Max Force (N)', 'Max Imbalance', 'L Max Ratio', 'R Max Ratio']:
-            if col in shoulder_df.columns:
-                shoulder_df[col] = pd.to_numeric(shoulder_df[col].astype(str).str.replace(r'[^0-9.-]', '', regex=True), errors='coerce').fillna(0.0)
         shoulder_df['Season'] = shoulder_df['Test Date'].apply(assign_season)
     except:
-        shoulder_df = pd.DataFrame(columns=['Name', 'Test Date', 'Direction', 'Season'])
+        shoulder_df = pd.DataFrame(columns=['Name', 'Test Date', 'Season'])
 
     phase_df = pd.read_csv(st.secrets["PHASES_SHEET_URL"])
     phase_df = heavy_sanitize(phase_df)
     if 'Phases' in phase_df.columns: phase_df = phase_df.rename(columns={'Phases': 'Phase'})
     phase_df['Date'] = pd.to_datetime(phase_df['Date'], errors='coerce')
-    
-    # Ensure Activity/Session_Name column is clean and uniform
-    if 'Activity' in phase_df.columns:
-        phase_df['Activity'] = phase_df['Activity'].astype(str).str.strip()
-    elif 'Session_Name' in phase_df.columns:
-        phase_df['Activity'] = phase_df['Session_Name'].astype(str).str.strip()
-    else:
-        phase_df['Activity'] = ""
 
     date_season_map = df.drop_duplicates('Date').set_index('Date')['Season'].to_dict()
     phase_df['Season'] = phase_df['Date'].map(date_season_map).fillna('Spring')
@@ -279,9 +313,6 @@ def load_all_data():
     try:
         thresh_df = pd.read_csv(st.secrets["THRESH_SHEET_URL"])
         thresh_df.columns = thresh_df.columns.str.strip()
-        for col in ['Load_Limit', 'Jump_Limit']:
-            if col in thresh_df.columns:
-                thresh_df[col] = pd.to_numeric(thresh_df[col].astype(str).str.replace(r'[^0-9.]', '', regex=True), errors='coerce').fillna(0).astype(float)
     except:
         thresh_df = None
         
@@ -300,7 +331,7 @@ if check_password():
 
         # --- GLOBAL SIDEBAR ---
         st.sidebar.markdown("### View Selection")
-        selected_season = st.sidebar.radio("Select View Mode", ["Spring", "Summer", "Pre-Season", "Testing", "Comparison", "Compliance"], index=2, key="global_season_toggle")
+        selected_season = st.sidebar.radio("Select View Mode", ["Spring", "Summer", "Pre-Season", "Testing", "Comparison", "Compliance"], index=5, key="global_season_toggle")
         
         if selected_season not in ["Testing", "Comparison", "Compliance"]:
             st.sidebar.info(f"Currently displaying: {selected_season} Season Performance Data.")
@@ -313,24 +344,10 @@ if check_password():
             hip_master = raw_hip_df[raw_hip_df['Season'] == selected_season].copy()
             shoulder_master = raw_shoulder_df[raw_shoulder_df['Season'] == selected_season].copy()
             phase_master = raw_phase_df[raw_phase_df['Season'] == selected_season].copy()
-        elif selected_season == "Testing":
-            st.sidebar.info("Currently displaying: Testing Profiles")
-            df_master, match_master, cmj_master, ash_master, er_master, calf_master, hip_master, shoulder_master, phase_master = raw_df, raw_match_df, raw_cmj_df, raw_ash_df, raw_er_df, raw_calf_df, raw_hip_df, raw_shoulder_df, raw_phase_df
-        elif selected_season == "Comparison":
-            st.sidebar.info("Currently displaying: Athlete Load Comparison & Peak Volume Baseline")
-            df_master, match_master, cmj_master, ash_master, er_master, calf_master, hip_master, shoulder_master, phase_master = raw_df, raw_match_df, raw_cmj_df, raw_ash_df, raw_er_df, raw_calf_df, raw_hip_df, raw_shoulder_df, raw_phase_df
-        else: # Compliance
-            st.sidebar.info("Currently displaying: Test Compliance Tracker")
+        else:
             df_master, match_master, cmj_master, ash_master, er_master, calf_master, hip_master, shoulder_master, phase_master = raw_df, raw_match_df, raw_cmj_df, raw_ash_df, raw_er_df, raw_calf_df, raw_hip_df, raw_shoulder_df, raw_phase_df
 
         full_df_unfiltered = raw_df.copy()
-
-        phase_map = {
-            "Mini Games (Set 1)": "Mini Games", "Mini Games (Set 2)": "Mini Games", "Brizo (2)": "Brizo",
-            "2 Ball (Set 1)": "2 Ball", "2 Ball (Set 2)": "2 Ball", "2 Ball (Set 3)": "2 Ball", "2 Ball (Set 4)": "2 Ball",
-            "serving (2)": "Serving", "serving": "Serving", "Serving (2)": "Serving", "2/3 Hitters (2)": "2/3 Hitters",
-            "5v5 (2)": "5v5", "Serve & Pass": "Serve and Pass"
-        }
         all_metrics = ['Total Jumps', 'Moderate Jumps', 'High Jumps', 'Jump Load', 'Player Load', 'Estimated Distance (y)', 'Explosive Efforts', 'High Intensity Movement']
         metrics_to_score = [m for m in all_metrics if m not in ['High Jumps', 'Moderate Jumps', 'High Intensity Movement']]
         cmj_col = 'Jump Height (Imp-Mom) [cm]'
@@ -340,15 +357,10 @@ if check_password():
             set(raw_df['Name'].unique()) | 
             set(raw_cmj_df['Name'].unique()) | 
             set(raw_ash_df['Name'].unique()) | 
-            set(raw_er_df['Name'].unique()) |
-            set(raw_calf_df['Name'].unique()) |
-            set(raw_hip_df['Name'].unique()) |
-            set(raw_shoulder_df['Name'].unique())
+            set(raw_er_df['Name'].unique())
         ))
-        session_list = df_master[df_master['Session_Name'].notna()].sort_values('Date', ascending=False)['Session_Name'].unique().tolist()
 
         st.markdown('<div class="main-logo-container" style="text-align: center; margin-top: 10px; margin-bottom: 15px;"><img src="https://upload.wikimedia.org/wikipedia/commons/thumb/f/fc/Tennessee_Lady_Volunteers_logo.svg/1280px-Tennessee_Lady_Volunteers_logo.svg.png" width="120"><div style="color: #FF8200; font-size: 2rem; font-weight: 900; margin-top: 10px;">LADY VOLS VOLLEYBALL PERFORMANCE</div></div>', unsafe_allow_html=True)
-
         # ==========================================
         # --- COMPARISON TAB ------------------------
         # ==========================================
