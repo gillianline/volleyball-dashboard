@@ -349,8 +349,8 @@ if check_password():
         else:
             df_master, match_master, cmj_master, ash_master, er_master, calf_master, hip_master, shoulder_master, phase_master = raw_df, raw_match_df, raw_cmj_df, raw_ash_df, raw_er_df, raw_calf_df, raw_hip_df, raw_shoulder_df, raw_phase_df
 
-        # --- SESSION LIST INSTANTIATION ---
-        session_list = df_master.sort_values('Date')['Session_Name'].dropna().unique().tolist() if not df_master.empty else []
+        # --- SESSION LIST SORTED IN DESCENDING ORDER (LATEST FIRST) ---
+        session_list = df_master.sort_values('Date', ascending=False)['Session_Name'].dropna().unique().tolist() if not df_master.empty else []
 
         full_df_unfiltered = raw_df.copy()
         all_metrics = ['Total Jumps', 'Moderate Jumps', 'High Jumps', 'Jump Load', 'Player Load', 'Estimated Distance (y)', 'Explosive Efforts', 'High Intensity Movement']
@@ -1006,7 +1006,7 @@ if check_password():
 
                             st.markdown(f"""
                                 <div class="hud-metric-row-light">
-                                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                                    <div style="display:flex; justify-space-between; align-items:center; margin-bottom:4px;">
                                         <span style="font-weight:800; font-size:12px; color:#1D1D1F;"><span class="node-badge-orange">2</span>ISO-Y STRENGTH</span>
                                         <span style="font-size:10px; color:#6E6E73; font-weight:600;">Latest: {l_y['Test Date'].strftime('%m/%d/%Y')}</span>
                                     </div>
@@ -1330,8 +1330,8 @@ if check_password():
                     curr_date_prof = pd.to_datetime(p_row['Date']) if not p_row.empty else None
                     p_meta = p_row
 
-                if p_row.empty:
-                    curr_date_prof = pd.to_datetime(target_date_str) if (selected_season == "Spring" and selected_session_prof == tournament_label) else pd.to_datetime(df_t0['Date'].max() if not df_t0.empty else "2026-08-06")
+                if p_row.empty or curr_date_prof is None or pd.isna(curr_date_prof):
+                    curr_date_prof = pd.to_datetime(df_t0['Date'].max()) if not df_t0.empty and df_t0['Date'].notna().any() else pd.to_datetime("2026-08-06")
                     meta_lookup = df_t0[df_t0['Name'] == selected_athlete_prof]
                     pos_val = meta_lookup['Position'].iloc[0] if not meta_lookup.empty else "N/A"
                     photo_val = meta_lookup['PhotoURL'].iloc[0] if not meta_lookup.empty else "https://www.w3schools.com/howto/img_avatar.png"
