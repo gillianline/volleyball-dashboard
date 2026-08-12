@@ -430,7 +430,7 @@ if check_password():
         # --- COMPLIANCE TAB -----------------------
         # ==========================================
         elif selected_season == "Compliance":
-            st.markdown('<div class="section-header">Testing Compliance & Recency Tracker</div>', unsafe_allow_html=True)
+            st.markdown('<div class="section-header">Athlete Test Compliance Dashboard</div>', unsafe_allow_html=True)
             
             selected_comp_ath = st.selectbox("Select Athlete", master_athlete_list, key="comp_ath_select_card")
             
@@ -438,13 +438,13 @@ if check_password():
             photo_url = meta_lookup['PhotoURL'].iloc[0] if not meta_lookup.empty else "https://www.w3schools.com/howto/img_avatar.png"
             pos_str = meta_lookup['Position'].iloc[0] if not meta_lookup.empty else "N/A"
 
-            # Top Athlete Header
+            # Top Athlete Header Card
             st.markdown(f'''
-                <div style="border:1px solid #E5E5E7; border-radius:16px; padding:16px; background-color:white; margin-bottom:20px; display:flex; align-items:center; gap:15px;">
-                    <img src="{photo_url}" style="width:65px; height:65px; border-radius:50%; border:3px solid #FF8200; object-fit:cover;">
+                <div class="comp-athlete-header">
+                    <img src="{photo_url}" class="comp-athlete-photo">
                     <div>
-                        <h2 style="margin:0; color:#1D1D1F; font-size:22px;">{selected_comp_ath}</h2>
-                        <p style="margin:0; color:#6E6E73; font-weight:600; font-size:14px;">{pos_str}</p>
+                        <div style="font-size:22px; font-weight:900; color:#111827;">{selected_comp_ath}</div>
+                        <div style="font-size:14px; font-weight:600; color:#64748B;">{pos_str}</div>
                     </div>
                 </div>
             ''', unsafe_allow_html=True)
@@ -454,7 +454,7 @@ if check_password():
             def get_card_stats(df, col_name):
                 ath_df = df[df['Name'] == selected_comp_ath].sort_values('Test Date')
                 if ath_df.empty or col_name not in ath_df.columns:
-                    return 0.0, "N/A", 0.0, "N/A", 0.0, "999 Days"
+                    return 0.0, "N/A", 0.0, "N/A", 0.0, "999 Days", 999
                 
                 recent_row = ath_df.iloc[-1]
                 recent_val = float(recent_row[col_name])
@@ -466,62 +466,71 @@ if check_password():
                 
                 pct_peak = (recent_val / max_val * 100) if max_val > 0 else 0.0
                 days_elapsed = (ref_date - recent_row['Test Date']).days
-                return recent_val, recent_date, max_val, max_date, pct_peak, f"{days_elapsed} Days"
+                return recent_val, recent_date, max_val, max_date, pct_peak, f"{days_elapsed} Days", days_elapsed
 
-            def render_compliance_card(title, recent_val, recent_date, max_val, max_date, pct_peak, days_badge_str, unit=""):
+            def render_compliance_card(title, recent_val, recent_date, max_val, max_date, pct_peak, days_badge_str, days_num, unit=""):
                 st.markdown(f'''
-                <div class="comp-card">
-                    <div style="margin-bottom:15px; overflow:hidden;">
-                        <span style="font-size:16px; font-weight:800; color:#1D1D1F;">{title}</span>
-                        <span class="days-badge">{days_badge_str}</span>
+                <div class="comp-card-outer">
+                    <div class="comp-card-top">
+                        <span class="comp-card-title">{title}</span>
+                        <span class="comp-pill-badge">{days_badge_str}</span>
                     </div>
-                    <div style="display:flex; gap:10px; margin-bottom:10px;">
-                        <div class="comp-box" style="flex:1;">
-                            <div class="comp-title">RECENT</div>
-                            <div class="comp-val">{recent_val:.1f}{unit}</div>
-                            <div class="comp-sub">{recent_date}</div>
+                    <div class="comp-grid">
+                        <div class="comp-tile">
+                            <div class="comp-label">RECENT</div>
+                            <div class="comp-metric-val">{recent_val:.1f}{unit}</div>
+                            <div class="comp-subtext">{recent_date}</div>
                         </div>
-                        <div class="comp-box" style="flex:1;">
-                            <div class="comp-title">ALL-TIME MAX</div>
-                            <div class="comp-val">{max_val:.1f}{unit}</div>
-                            <div class="comp-sub">{max_date}</div>
+                        <div class="comp-tile">
+                            <div class="comp-label">ALL-TIME MAX</div>
+                            <div class="comp-metric-val">{max_val:.1f}{unit}</div>
+                            <div class="comp-subtext">{max_date}</div>
                         </div>
-                    </div>
-                    <div style="display:flex; gap:10px;">
-                        <div class="comp-box" style="flex:1;">
-                            <div class="comp-title">% PEAK OUTPUT</div>
-                            <div class="comp-val" style="color:#FF8200;">{pct_peak:.1f}%</div>
-                            <div class="comp-sub">Recent vs. Peak</div>
+                        <div class="comp-tile">
+                            <div class="comp-label">% PEAK OUTPUT</div>
+                            <div class="comp-metric-val comp-metric-orange">{pct_peak:.1f}%</div>
+                            <div class="comp-subtext">Recent vs. Peak</div>
                         </div>
-                        <div class="comp-box" style="flex:1;">
-                            <div class="comp-title">RECENCY STATUS</div>
-                            <div class="comp-val">{days_badge_str}</div>
-                            <div class="comp-sub">Elapsed Threshold</div>
+                        <div class="comp-tile">
+                            <div class="comp-label">RECENCY STATUS</div>
+                            <div class="comp-metric-val">{days_num} Days</div>
+                            <div class="comp-subtext">Elapsed Threshold</div>
                         </div>
                     </div>
                 </div>
                 ''', unsafe_allow_html=True)
 
-            # Test Domains
-            col_a, col_b = st.columns(2)
+            # --- CARD GRID RENDER ---
+            col_left, col_right = st.columns(2)
 
-            with col_a:
+            with col_left:
                 # CMJ Jump Height
-                rv, rd, mv, md, pct, db = get_card_stats(raw_cmj_df, cmj_col)
-                render_compliance_card("CMJ Height", rv, rd, mv, md, pct, db, " cm")
+                rv, rd, mv, md, pct, db, dn = get_card_stats(raw_cmj_df, cmj_col)
+                render_compliance_card("Max Speed / Jump Height", rv, rd, mv, md, pct, db, dn, " cm")
 
-                # CMJ RSI-modified
-                rv, rd, mv, md, pct, db = get_card_stats(raw_cmj_df, rsi_col)
-                render_compliance_card("RSI Modified", rv, rd, mv, md, pct, db, "")
+                # ASH Shoulder (Left)
+                rv, rd, mv, md, pct, db, dn = get_card_stats(raw_ash_df, 'Peak Vertical Force [N] (L)')
+                render_compliance_card("ASH Shoulder Force (Left)", rv, rd, mv, md, pct, db, dn, " N")
 
-            with col_b:
-                # ASH Left
-                rv, rd, mv, md, pct, db = get_card_stats(raw_ash_df, 'Peak Vertical Force [N] (L)')
-                render_compliance_card("ASH Shoulder Force (L)", rv, rd, mv, md, pct, db, " N")
+                # External Rotation ROM (Left)
+                rv, rd, mv, md, pct, db, dn = get_card_stats(raw_er_df, 'L Max ROM (°)')
+                render_compliance_card("External Rotation ROM (Left)", rv, rd, mv, md, pct, db, dn, "°")
 
-                # External Rotation ROM (R)
-                rv, rd, mv, md, pct, db = get_card_stats(raw_er_df, 'R Max ROM (°)')
-                render_compliance_card("External Rotation ROM (R)", rv, rd, mv, md, pct, db, "°")
+            with col_right:
+                # CMJ RSI Modified
+                rv, rd, mv, md, pct, db, dn = get_card_stats(raw_cmj_df, rsi_col)
+                render_compliance_card("RSI Modified", rv, rd, mv, md, pct, db, dn, "")
+
+                # ASH Shoulder (Right)
+                rv, rd, mv, md, pct, db, dn = get_card_stats(raw_ash_df, 'Peak Vertical Force [N] (R)')
+                render_compliance_card("ASH Shoulder Force (Right)", rv, rd, mv, md, pct, db, dn, " N")
+
+                # External Rotation ROM (Right)
+                rv, rd, mv, md, pct, db, dn = get_card_stats(raw_er_df, 'R Max ROM (°)')
+                render_compliance_card("External Rotation ROM (Right)", rv, rd, mv, md, pct, db, dn, "°")
+
+    except Exception as e:
+        st.error(f"Sync Error: {e}")
 
 
         elif selected_season == "Testing":
