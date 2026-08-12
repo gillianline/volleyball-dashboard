@@ -479,37 +479,47 @@ if check_password():
                 days_elapsed = (ref_date - recent_row['Test Date']).days
                 return recent_val, recent_date, max_val, max_date, pct_peak, f"{days_elapsed} Days", days_elapsed
 
-            def render_compliance_card(title, recent_val, recent_date, max_val, max_date, pct_peak, days_badge_str, days_num, unit=""):
-                st.markdown(f'''
-                <div class="comp-card-outer">
-                    <div class="comp-card-top">
-                        <span class="comp-card-title">{title}</span>
-                        <span class="comp-pill-badge">{days_badge_str}</span>
-                    </div>
-                    <div class="comp-grid">
-                        <div class="comp-tile">
-                            <div class="comp-label">RECENT</div>
-                            <div class="comp-metric-val">{recent_val:.1f}{unit}</div>
-                            <div class="comp-subtext">{recent_date}</div>
-                        </div>
-                        <div class="comp-tile">
-                            <div class="comp-label">ALL-TIME MAX</div>
-                            <div class="comp-metric-val">{max_val:.1f}{unit}</div>
-                            <div class="comp-subtext">{max_date}</div>
-                        </div>
-                        <div class="comp-tile">
-                            <div class="comp-label">% PEAK OUTPUT</div>
-                            <div class="comp-metric-val comp-metric-orange">{pct_peak:.1f}%</div>
-                            <div class="comp-subtext">Recent vs. Peak</div>
-                        </div>
-                        <div class="comp-tile">
-                            <div class="comp-label">RECENCY STATUS</div>
-                            <div class="comp-metric-val">{days_num} Days</div>
-                            <div class="comp-subtext">Elapsed Threshold</div>
-                        </div>
-                    </div>
-                </div>
-                ''', unsafe_allow_html=True)
+            def render_compliance_card(title, recent_val, recent_date, max_val, max_date, pct_peak, days_num, threshold_days=7, unit=""):
+    # Dynamic badge styling: Green if within threshold (e.g. <= 7 days), Pink/Red if overdue
+    if days_num <= threshold_days:
+        badge_bg = "#E6F4EA"
+        badge_color = "#137333"
+        badge_text = f"{days_num} Day" if days_num == 1 else f"{days_num} Days"
+    else:
+        badge_bg = "#FCE8E6"
+        badge_color = "#D93025"
+        badge_text = f"{days_num} Days"
+
+    st.markdown(f'''
+    <div class="comp-card-outer">
+        <div class="comp-card-top">
+            <span class="comp-card-title">{title}</span>
+            <span class="comp-pill-badge" style="background-color: {badge_bg}; color: {badge_color};">{badge_text}</span>
+        </div>
+        <div class="comp-grid">
+            <div class="comp-tile">
+                <div class="comp-label">RECENT</div>
+                <div class="comp-metric-val">{recent_val:.1f}{unit}</div>
+                <div class="comp-subtext">{recent_date}</div>
+            </div>
+            <div class="comp-tile">
+                <div class="comp-label">ALL-TIME MAX</div>
+                <div class="comp-metric-val">{max_val:.1f}{unit}</div>
+                <div class="comp-subtext">{max_date}</div>
+            </div>
+            <div class="comp-tile">
+                <div class="comp-label">% PEAK OUTPUT</div>
+                <div class="comp-metric-val comp-metric-orange">{pct_peak:.1f}%</div>
+                <div class="comp-subtext">Recent vs. Peak</div>
+            </div>
+            <div class="comp-tile">
+                <div class="comp-label">RECENCY STATUS</div>
+                <div class="comp-metric-val" style="color: {badge_color};">{badge_text}</div>
+                <div class="comp-subtext">Elapsed Threshold</div>
+            </div>
+        </div>
+    </div>
+    ''', unsafe_allow_html=True)
 
             col_left, col_right = st.columns(2)
 
