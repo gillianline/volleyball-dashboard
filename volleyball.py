@@ -177,6 +177,8 @@ def get_flipped_gradient(score):
         return "#808080" 
     return "#2D5A27" if score <= 40 else "#D4A017" if score <= 70 else "#A52A2A"
 
+phase_map = {}
+
 # --- 3. HARD DECOUPLED DATA FETCHING ENGINE ---
 @st.cache_data(ttl=10)
 def load_all_data():
@@ -346,6 +348,9 @@ if check_password():
             phase_master = raw_phase_df[raw_phase_df['Season'] == selected_season].copy()
         else:
             df_master, match_master, cmj_master, ash_master, er_master, calf_master, hip_master, shoulder_master, phase_master = raw_df, raw_match_df, raw_cmj_df, raw_ash_df, raw_er_df, raw_calf_df, raw_hip_df, raw_shoulder_df, raw_phase_df
+
+        # --- SESSION LIST INSTANTIATION ---
+        session_list = df_master.sort_values('Date')['Session_Name'].dropna().unique().tolist() if not df_master.empty else []
 
         full_df_unfiltered = raw_df.copy()
         all_metrics = ['Total Jumps', 'Moderate Jumps', 'High Jumps', 'Jump Load', 'Player Load', 'Estimated Distance (y)', 'Explosive Efforts', 'High Intensity Movement']
@@ -1694,7 +1699,7 @@ if check_password():
                     else:
                         st.warning("No performance footprint logged for selected parameters on this date.")
 
-           # ==========================================
+            # ==========================================
             # --- TAB CLAUSE 4: PRACTICE HISTORY -------
             # ==========================================
             elif st.session_state.active_tab_state == "Practice History":
