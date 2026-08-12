@@ -1274,6 +1274,8 @@ if check_password():
                     "Practice Scores", 
                     "Daily Combined Scores", 
                     "Practice History", 
+                    "Match v. Practice", 
+                    "Match Summary", 
                     "Position Analysis", 
                     "Phase Analysis", 
                     "Practice Planner"
