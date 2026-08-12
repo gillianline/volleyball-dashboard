@@ -414,7 +414,7 @@ if check_password():
                                                 <img src="{photo_url}" class="gallery-photo" style="width:55px; height:55px;">
                                                 <div>
                                                     <p style="margin:0; font-weight:900; color:#1D1D1F; font-size:16px;">{ath_name}</p>
-                                                    <p style="margin:0; color:#4895DB; font-weight:700; font-size:12px;">{pos_str} | {season_name} Single-Practice Max</p>
+                                                    <p style="margin:0; color:#4895DB; font-weight:700; font-size:12px;">{pos_str} | {season_name} Max</p>
                                                 </div>
                                              </div>
                                              <table class="scout-table">
