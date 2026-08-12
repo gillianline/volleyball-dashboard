@@ -267,12 +267,19 @@ def load_all_data():
         er_df.columns = er_df.columns.str.strip()
         er_df.rename(columns={'Athlete': 'Name', 'Date': 'Test Date'}, inplace=True)
         er_df['Test Date'] = pd.to_datetime(er_df['Test Date'], errors='coerce')
-        for col in ['L Max ROM (°)', 'R Max ROM (°)']:
+        
+        # Clean all numeric columns (removes "°", "%", "L", "R", etc.)
+        for col in ['L Max ROM (°)', 'R Max ROM (°)', 'ROM Asymmetry (%)']:
             if col in er_df.columns:
-                er_df[col] = pd.to_numeric(er_df[col].astype(str).str.replace(r'[^0-9.-]', '', regex=True), errors='coerce').fillna(0.0)
+                er_df[col] = pd.to_numeric(
+                    er_df[col].astype(str).str.replace(r'[^0-9.-]', '', regex=True), 
+                    errors='coerce'
+                ).fillna(0.0)
+                
         er_df['Season'] = er_df['Test Date'].apply(assign_season)
     except:
-        er_df = pd.DataFrame(columns=['Name', 'Test Date', 'L Max ROM (°)', 'R Max ROM (°)', 'Season'])
+        er_df = pd.DataFrame(columns=['Name', 'Test Date', 'L Max ROM (°)', 'R Max ROM (°)', 'ROM Asymmetry (%)', 'Season'])
+        
 
     # Calf Sheet
     try:
@@ -660,16 +667,17 @@ if check_password():
                     with ec1:
                         baseline_er = p_er_hist[p_er_hist['Season'] == selected_season].head(1)
                         if not baseline_er.empty:
-                            base_l_rom = pd.to_numeric(str(baseline_er.iloc[-1].get('L Max ROM (°)', 0)).replace('°', '').strip(), errors='coerce') or 0.0
-                            base_r_rom = pd.to_numeric(str(baseline_er.iloc[-1].get('R Max ROM (°)', 0)).replace('°', '').strip(), errors='coerce') or 0.0
+                            base_l_rom = float(pd.to_numeric(str(baseline_er.iloc[-1].get('L Max ROM (°)', 0)).replace('°', '').strip(), errors='coerce') or 0.0)
+                            base_r_rom = float(pd.to_numeric(str(baseline_er.iloc[-1].get('R Max ROM (°)', 0)).replace('°', '').strip(), errors='coerce') or 0.0)
                             
                             latest_er = p_er_hist.iloc[-1]
-                            cur_l_rom = pd.to_numeric(str(latest_er.get('L Max ROM (°)', 0)).replace('°', '').strip(), errors='coerce') or 0.0
-                            cur_r_rom = pd.to_numeric(str(latest_er.get('R Max ROM (°)', 0)).replace('°', '').strip(), errors='coerce') or 0.0
+                            cur_l_rom = float(pd.to_numeric(str(latest_er.get('L Max ROM (°)', 0)).replace('°', '').strip(), errors='coerce') or 0.0)
+                            cur_r_rom = float(pd.to_numeric(str(latest_er.get('R Max ROM (°)', 0)).replace('°', '').strip(), errors='coerce') or 0.0)
                             
-                            # Clean string percentage or non-numeric artifact from Asymmetry column
-                            raw_asym = str(latest_er.get('ROM Asymmetry (%)', 0)).replace('%', '').strip()
-                            cur_asym_rom = pd.to_numeric(raw_asym, errors='coerce') or 0.0
+                            # Parse raw strings like "10% L" -> 10.0
+                            raw_asym_val = str(latest_er.get('ROM Asymmetry (%)', 0))
+                            clean_asym_num = pd.to_numeric(re.sub(r'[^0-9.-]', '', raw_asym_val), errors='coerce') if 're' in globals() else pd.to_numeric(raw_asym_val.replace('%', '').replace('L', '').replace('R', '').strip(), errors='coerce')
+                            cur_asym_rom = float(clean_asym_num) if pd.notna(clean_asym_num) else 0.0
 
                             rom_pct_l = ((cur_l_rom - base_l_rom) / base_l_rom * 100) if base_l_rom > 0 else 0.0
                             rom_pct_r = ((cur_r_rom - base_r_rom) / base_r_rom * 100) if base_r_rom > 0 else 0.0
@@ -683,8 +691,8 @@ if check_password():
                             st.markdown(f'<div class="info-box" style="text-align:center; margin-top:10px;"><p style="margin:0; font-size:11px; color:grey;"><b>Asymmetry:</b> {cur_asym_rom:+.1f}%</p><p style="margin:0; font-size:11px; color:grey;"><b>% Change from Base:</b> L: {rom_pct_l:+.1f}% | R: {rom_pct_r:+.1f}%</p><p style="margin:0; font-size:11px; color:grey;"><b>Base ROM:</b> L: {base_l_rom:.1f}° | R: {base_r_rom:.1f}°</p></div>', unsafe_allow_html=True)
                     with ec2:
                         fig_er = go.Figure()
-                        fig_er.add_trace(go.Scatter(x=p_er_hist['Test Date'], y=pd.to_numeric(p_er_hist['L Max ROM (°)'], errors='coerce'), name="Left Max ROM", mode='lines+markers', line=dict(color='#4895DB', width=2.5)))
-                        fig_er.add_trace(go.Scatter(x=p_er_hist['Test Date'], y=pd.to_numeric(p_er_hist['R Max ROM (°)'], errors='coerce'), name="Right Max ROM", mode='lines+markers', line=dict(color='#FF8200', width=2.5, dash='dash')))
+                        fig_er.add_trace(go.Scatter(x=p_er_hist['Test Date'], y=pd.to_numeric(p_er_hist['L Max ROM (°)'].astype(str).str.replace(r'[^0-9.-]', '', regex=True), errors='coerce'), name="Left Max ROM", mode='lines+markers', line=dict(color='#4895DB', width=2.5)))
+                        fig_er.add_trace(go.Scatter(x=p_er_hist['Test Date'], y=pd.to_numeric(p_er_hist['R Max ROM (°)'].astype(str).str.replace(r'[^0-9.-]', '', regex=True), errors='coerce'), name="Right Max ROM", mode='lines+markers', line=dict(color='#FF8200', width=2.5, dash='dash')))
                         fig_er.update_layout(height=160, margin=dict(l=0, r=0, t=10, b=0), showlegend=True, legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0), template="simple_white")
                         st.plotly_chart(fig_er, use_container_width=True, config=LOCKED_CONFIG, key="er_profile_chart_t0")
                 else:
