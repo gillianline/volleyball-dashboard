@@ -177,8 +177,6 @@ def get_flipped_gradient(score):
         return "#808080" 
     return "#2D5A27" if score <= 40 else "#D4A017" if score <= 70 else "#A52A2A"
 
-phase_map = {}
-
 # --- 3. HARD DECOUPLED DATA FETCHING ENGINE ---
 @st.cache_data(ttl=10)
 def load_all_data():
@@ -349,9 +347,6 @@ if check_password():
         else:
             df_master, match_master, cmj_master, ash_master, er_master, calf_master, hip_master, shoulder_master, phase_master = raw_df, raw_match_df, raw_cmj_df, raw_ash_df, raw_er_df, raw_calf_df, raw_hip_df, raw_shoulder_df, raw_phase_df
 
-        # --- SESSION LIST INSTANTIATION ---
-        session_list = df_master.sort_values('Date')['Session_Name'].dropna().unique().tolist() if not df_master.empty else []
-
         full_df_unfiltered = raw_df.copy()
         all_metrics = ['Total Jumps', 'Moderate Jumps', 'High Jumps', 'Jump Load', 'Player Load', 'Estimated Distance (y)', 'Explosive Efforts', 'High Intensity Movement']
         metrics_to_score = [m for m in all_metrics if m not in ['High Jumps', 'Moderate Jumps', 'High Intensity Movement']]
@@ -486,7 +481,7 @@ if check_password():
                 days_since_max = int((ref_date - max_row['Test Date']).days)
                 return recent_val, recent_date, max_val, max_date, pct_peak, days_since_max
 
-            def render_compliance_card(title, recent_val, recent_date, max_val, max_date, pct_peak, max_days_num, threshold_days=7, unit="", decimals=1):
+            def render_compliance_card(title, recent_val, recent_date, max_val, max_date, pct_peak, max_days_num, threshold_days=7, unit=""):
                 # Defensive int conversion
                 try:
                     max_days_num = int(max_days_num)
@@ -503,9 +498,6 @@ if check_password():
                     badge_color = "#D93025"
                     badge_text = "N/A" if max_days_num == 999 else f"{max_days_num} Days"
 
-                # Dynamic decimal formatting based on metric type
-                fmt_str = f"{{:.{decimals}f}}"
-
                 st.markdown(f'''
                 <div class="comp-card-outer">
                     <div class="comp-card-top">
@@ -515,12 +507,12 @@ if check_password():
                     <div class="comp-grid">
                         <div class="comp-tile">
                             <div class="comp-label">RECENT</div>
-                            <div class="comp-metric-val">{fmt_str.format(recent_val)}{unit}</div>
+                            <div class="comp-metric-val">{recent_val:.1f}{unit}</div>
                             <div class="comp-subtext">{recent_date}</div>
                         </div>
                         <div class="comp-tile">
                             <div class="comp-label">ALL-TIME MAX</div>
-                            <div class="comp-metric-val">{fmt_str.format(max_val)}{unit}</div>
+                            <div class="comp-metric-val">{max_val:.1f}{unit}</div>
                             <div class="comp-subtext">{max_date}</div>
                         </div>
                         <div class="comp-tile">
@@ -542,24 +534,23 @@ if check_password():
 
             with col_left:
                 rv, rd, mv, md, pct, dn = get_card_stats(raw_cmj_df, cmj_col)
-                render_compliance_card("CMJ Height", rv, rd, mv, md, pct, dn, threshold_days=7, unit=" cm", decimals=1)
+                render_compliance_card("CMJ Height", rv, rd, mv, md, pct, dn, threshold_days=7, unit=" cm")
 
                 rv, rd, mv, md, pct, dn = get_card_stats(raw_ash_df, 'Peak Vertical Force [N] (L)')
-                render_compliance_card("ASH Shoulder Force (Left)", rv, rd, mv, md, pct, dn, threshold_days=7, unit=" N", decimals=1)
+                render_compliance_card("ASH Shoulder Force (Left)", rv, rd, mv, md, pct, dn, threshold_days=7, unit=" N")
 
                 rv, rd, mv, md, pct, dn = get_card_stats(raw_er_df, 'L Max ROM (°)')
-                render_compliance_card("External Rotation ROM (Left)", rv, rd, mv, md, pct, dn, threshold_days=7, unit="°", decimals=1)
+                render_compliance_card("External Rotation ROM (Left)", rv, rd, mv, md, pct, dn, threshold_days=7, unit="°")
 
             with col_right:
                 rv, rd, mv, md, pct, dn = get_card_stats(raw_cmj_df, rsi_col)
-                # Formatted specifically to 2 decimal places
-                render_compliance_card("RSI Modified", rv, rd, mv, md, pct, dn, threshold_days=7, unit="", decimals=2)
+                render_compliance_card("RSI Modified", rv, rd, mv, md, pct, dn, threshold_days=7, unit="")
 
                 rv, rd, mv, md, pct, dn = get_card_stats(raw_ash_df, 'Peak Vertical Force [N] (R)')
-                render_compliance_card("ASH Shoulder Force (Right)", rv, rd, mv, md, pct, dn, threshold_days=7, unit=" N", decimals=1)
+                render_compliance_card("ASH Shoulder Force (Right)", rv, rd, mv, md, pct, dn, threshold_days=7, unit=" N")
 
                 rv, rd, mv, md, pct, dn = get_card_stats(raw_er_df, 'R Max ROM (°)')
-                render_compliance_card("External Rotation ROM (Right)", rv, rd, mv, md, pct, dn, threshold_days=7, unit="°", decimals=1)
+                render_compliance_card("External Rotation ROM (Right)", rv, rd, mv, md, pct, dn, threshold_days=7, unit="°")
                 
         elif selected_season == "Testing":
             st.markdown('<div class="section-header">Testing Profile</div>', unsafe_allow_html=True)
@@ -1699,7 +1690,7 @@ if check_password():
                     else:
                         st.warning("No performance footprint logged for selected parameters on this date.")
 
-            # ==========================================
+           # ==========================================
             # --- TAB CLAUSE 4: PRACTICE HISTORY -------
             # ==========================================
             elif st.session_state.active_tab_state == "Practice History":
