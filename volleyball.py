@@ -481,7 +481,7 @@ if check_password():
                 days_since_max = int((ref_date - max_row['Test Date']).days)
                 return recent_val, recent_date, max_val, max_date, pct_peak, days_since_max
 
-            def render_compliance_card(title, recent_val, recent_date, max_val, max_date, pct_peak, max_days_num, threshold_days=7, unit=""):
+            def render_compliance_card(title, recent_val, recent_date, max_val, max_date, pct_peak, max_days_num, threshold_days=7, unit="", decimals=1):
                 # Defensive int conversion
                 try:
                     max_days_num = int(max_days_num)
@@ -498,6 +498,9 @@ if check_password():
                     badge_color = "#D93025"
                     badge_text = "N/A" if max_days_num == 999 else f"{max_days_num} Days"
 
+                # Dynamic decimal formatting based on metric type
+                fmt_str = f"{{:.{decimals}f}}"
+
                 st.markdown(f'''
                 <div class="comp-card-outer">
                     <div class="comp-card-top">
@@ -507,12 +510,12 @@ if check_password():
                     <div class="comp-grid">
                         <div class="comp-tile">
                             <div class="comp-label">RECENT</div>
-                            <div class="comp-metric-val">{recent_val:.1f}{unit}</div>
+                            <div class="comp-metric-val">{fmt_str.format(recent_val)}{unit}</div>
                             <div class="comp-subtext">{recent_date}</div>
                         </div>
                         <div class="comp-tile">
                             <div class="comp-label">ALL-TIME MAX</div>
-                            <div class="comp-metric-val">{max_val:.1f}{unit}</div>
+                            <div class="comp-metric-val">{fmt_str.format(max_val)}{unit}</div>
                             <div class="comp-subtext">{max_date}</div>
                         </div>
                         <div class="comp-tile">
@@ -534,23 +537,24 @@ if check_password():
 
             with col_left:
                 rv, rd, mv, md, pct, dn = get_card_stats(raw_cmj_df, cmj_col)
-                render_compliance_card("CMJ Height", rv, rd, mv, md, pct, dn, threshold_days=7, unit=" cm")
+                render_compliance_card("CMJ Height", rv, rd, mv, md, pct, dn, threshold_days=7, unit=" cm", decimals=1)
 
                 rv, rd, mv, md, pct, dn = get_card_stats(raw_ash_df, 'Peak Vertical Force [N] (L)')
-                render_compliance_card("ASH Shoulder Force (Left)", rv, rd, mv, md, pct, dn, threshold_days=7, unit=" N")
+                render_compliance_card("ASH Shoulder Force (Left)", rv, rd, mv, md, pct, dn, threshold_days=7, unit=" N", decimals=1)
 
                 rv, rd, mv, md, pct, dn = get_card_stats(raw_er_df, 'L Max ROM (°)')
-                render_compliance_card("External Rotation ROM (Left)", rv, rd, mv, md, pct, dn, threshold_days=7, unit="°")
+                render_compliance_card("External Rotation ROM (Left)", rv, rd, mv, md, pct, dn, threshold_days=7, unit="°", decimals=1)
 
             with col_right:
                 rv, rd, mv, md, pct, dn = get_card_stats(raw_cmj_df, rsi_col)
-                render_compliance_card("RSI Modified", rv, rd, mv, md, pct, dn, threshold_days=7, unit="")
+                # Formatted specifically to 2 decimal places
+                render_compliance_card("RSI Modified", rv, rd, mv, md, pct, dn, threshold_days=7, unit="", decimals=2)
 
                 rv, rd, mv, md, pct, dn = get_card_stats(raw_ash_df, 'Peak Vertical Force [N] (R)')
-                render_compliance_card("ASH Shoulder Force (Right)", rv, rd, mv, md, pct, dn, threshold_days=7, unit=" N")
+                render_compliance_card("ASH Shoulder Force (Right)", rv, rd, mv, md, pct, dn, threshold_days=7, unit=" N", decimals=1)
 
                 rv, rd, mv, md, pct, dn = get_card_stats(raw_er_df, 'R Max ROM (°)')
-                render_compliance_card("External Rotation ROM (Right)", rv, rd, mv, md, pct, dn, threshold_days=7, unit="°")
+                render_compliance_card("External Rotation ROM (Right)", rv, rd, mv, md, pct, dn, threshold_days=7, unit="°", decimals=1)
                 
         elif selected_season == "Testing":
             st.markdown('<div class="section-header">Testing Profile</div>', unsafe_allow_html=True)
