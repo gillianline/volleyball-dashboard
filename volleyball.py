@@ -438,11 +438,10 @@ if check_password():
             photo_url = meta_lookup['PhotoURL'].iloc[0] if not meta_lookup.empty else "https://www.w3schools.com/howto/img_avatar.png"
             pos_str = meta_lookup['Position'].iloc[0] if not meta_lookup.empty else "N/A"
 
-                # Top Athlete Header Card
-                st.markdown(f'''
-                    <div class="comp-athlete-header">
-                        <img src="{photo_url}" class="comp-athlete-photo">
-                        <div>
+            st.markdown(f'''
+                <div class="comp-athlete-header">
+                    <img src="{photo_url}" class="comp-athlete-photo">
+                    <div>
                         <div style="font-size:22px; font-weight:900; color:#111827;">{selected_comp_ath}</div>
                         <div style="font-size:14px; font-weight:600; color:#64748B;">{pos_str}</div>
                     </div>
@@ -500,32 +499,25 @@ if check_password():
                 </div>
                 ''', unsafe_allow_html=True)
 
-            # --- CARD GRID RENDER ---
             col_left, col_right = st.columns(2)
 
             with col_left:
-                # CMJ Jump Height
                 rv, rd, mv, md, pct, db, dn = get_card_stats(raw_cmj_df, cmj_col)
                 render_compliance_card("Max Speed / Jump Height", rv, rd, mv, md, pct, db, dn, " cm")
 
-                # ASH Shoulder (Left)
                 rv, rd, mv, md, pct, db, dn = get_card_stats(raw_ash_df, 'Peak Vertical Force [N] (L)')
                 render_compliance_card("ASH Shoulder Force (Left)", rv, rd, mv, md, pct, db, dn, " N")
 
-                # External Rotation ROM (Left)
                 rv, rd, mv, md, pct, db, dn = get_card_stats(raw_er_df, 'L Max ROM (°)')
                 render_compliance_card("External Rotation ROM (Left)", rv, rd, mv, md, pct, db, dn, "°")
 
             with col_right:
-                # CMJ RSI Modified
                 rv, rd, mv, md, pct, db, dn = get_card_stats(raw_cmj_df, rsi_col)
                 render_compliance_card("RSI Modified", rv, rd, mv, md, pct, db, dn, "")
 
-                # ASH Shoulder (Right)
                 rv, rd, mv, md, pct, db, dn = get_card_stats(raw_ash_df, 'Peak Vertical Force [N] (R)')
                 render_compliance_card("ASH Shoulder Force (Right)", rv, rd, mv, md, pct, db, dn, " N")
 
-                # External Rotation ROM (Right)
                 rv, rd, mv, md, pct, db, dn = get_card_stats(raw_er_df, 'R Max ROM (°)')
                 render_compliance_card("External Rotation ROM (Right)", rv, rd, mv, md, pct, db, dn, "°")
 
