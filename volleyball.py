@@ -515,7 +515,7 @@ if check_password():
 
             with col_left:
                 rv, rd, mv, md, pct, db, dn = get_card_stats(raw_cmj_df, cmj_col)
-                render_compliance_card("Max Speed / Jump Height", rv, rd, mv, md, pct, db, dn, " cm")
+                render_compliance_card("Jump Height", rv, rd, mv, md, pct, db, dn, " cm")
 
                 rv, rd, mv, md, pct, db, dn = get_card_stats(raw_ash_df, 'Peak Vertical Force [N] (L)')
                 render_compliance_card("ASH Shoulder Force (Left)", rv, rd, mv, md, pct, db, dn, " N")
