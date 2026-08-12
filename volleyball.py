@@ -349,10 +349,12 @@ if check_password():
 
         st.markdown('<div class="main-logo-container" style="text-align: center; margin-top: 10px; margin-bottom: 15px;"><img src="https://upload.wikimedia.org/wikipedia/commons/thumb/f/fc/Tennessee_Lady_Volunteers_logo.svg/1280px-Tennessee_Lady_Volunteers_logo.svg.png" width="120"><div style="color: #FF8200; font-size: 2rem; font-weight: 900; margin-top: 10px;">LADY VOLS VOLLEYBALL PERFORMANCE</div></div>', unsafe_allow_html=True)
 
+        # ==========================================
+        # --- COMPARISON TAB ------------------------
+        # ==========================================
         if selected_season == "Comparison":
-            st.markdown('<div class="section-header">Athlete Load Comparison & Peak Volume Baseline</div>', unsafe_allow_html=True)
+            st.markdown('<div class="section-header">Athlete Practice Peak Volume Baseline</div>', unsafe_allow_html=True)
             
-            # Position Filter at top level
             c_pos_filter = st.selectbox(
                 "Position Filter", 
                 ["All Positions"] + sorted([p for p in full_df_unfiltered['Position'].unique() if p != "N/A"]), 
@@ -361,20 +363,19 @@ if check_password():
             
             comp_tabs = st.tabs(["Spring", "Summer", "Pre-Season", "All-Time Max"])
             
-            # Calculate daily sums across entire dataset
-            daily_raw = full_df_unfiltered.groupby(['Name', 'Season', 'Date'])[metrics_to_score].sum().reset_index()
-            all_time_maxes = daily_raw.groupby('Name')[metrics_to_score].max().reset_index()
+            # Calculates max per session/practice instead of summing combined dates
+            practice_raw = full_df_unfiltered[full_df_unfiltered['Session_Type'] == 'Practice'].copy()
+            all_time_maxes = practice_raw.groupby('Name')[metrics_to_score].max().reset_index()
             
             for idx, season_name in enumerate(["Spring", "Summer", "Pre-Season", "All-Time Max"]):
                 with comp_tabs[idx]:
                     if season_name in ["Spring", "Summer", "Pre-Season"]:
-                        season_daily = daily_raw[daily_raw['Season'] == season_name]
-                        season_maxes = season_daily.groupby('Name')[metrics_to_score].max().reset_index()
+                        season_practices = practice_raw[practice_raw['Season'] == season_name]
+                        season_maxes = season_practices.groupby('Name')[metrics_to_score].max().reset_index()
                     else:
                         season_maxes = all_time_maxes.copy()
                         
                     ath_list = sorted(full_df_unfiltered['Name'].unique())
-                    
                     if c_pos_filter != "All Positions":
                         pos_athletes = full_df_unfiltered[full_df_unfiltered['Position'] == c_pos_filter]['Name'].unique()
                         ath_list = [a for a in ath_list if a in pos_athletes]
@@ -384,7 +385,6 @@ if check_password():
                         for j in range(2):
                             if i + j < len(ath_list):
                                 ath_name = ath_list[i + j]
-                                
                                 meta_r = full_df_unfiltered[full_df_unfiltered['Name'] == ath_name].iloc[0]
                                 photo_url = meta_r.get('PhotoURL', "https://www.w3schools.com/howto/img_avatar.png")
                                 pos_str = meta_r.get('Position', "N/A")
@@ -397,7 +397,6 @@ if check_password():
                                     o_val = o_row[m].iloc[0] if not o_row.empty else 0.0
                                     s_val = s_row[m].iloc[0] if not s_row.empty else 0.0
                                     
-                                    # Highlight in green if season max equals all-time max
                                     is_peak = (s_val >= o_val) and (s_val > 0)
                                     highlight_style = 'style="color: #28a745; font-weight: 800; background-color: #e8f5e9;"' if is_peak else ''
                                     
@@ -406,7 +405,7 @@ if check_password():
                                     else:
                                         r_html += f"<tr><td>{m}</td><td>{o_val:.1f}</td><td {highlight_style}>{s_val:.1f}</td></tr>"
                                         
-                                table_header = "<thead><tr><th>Metric</th><th>Highest Overall</th></tr></thead>" if season_name == "All-Time Max" else f"<thead><tr><th>Metric</th><th>Overall Max</th><th>{season_name} Max</th></tr></thead>"
+                                table_header = "<thead><tr><th>Metric</th><th>Highest Practice</th></tr></thead>" if season_name == "All-Time Max" else f"<thead><tr><th>Metric</th><th>Overall Max</th><th>{season_name} Max</th></tr></thead>"
                                 
                                 with cols[j]:
                                     st.markdown(f'''
@@ -415,7 +414,7 @@ if check_password():
                                                 <img src="{photo_url}" class="gallery-photo" style="width:55px; height:55px;">
                                                 <div>
                                                     <p style="margin:0; font-weight:900; color:#1D1D1F; font-size:16px;">{ath_name}</p>
-                                                    <p style="margin:0; color:#4895DB; font-weight:700; font-size:12px;">{pos_str} | {season_name} Comparison</p>
+                                                    <p style="margin:0; color:#4895DB; font-weight:700; font-size:12px;">{pos_str} | {season_name} Single-Practice Max</p>
                                                 </div>
                                              </div>
                                              <table class="scout-table">
@@ -427,105 +426,105 @@ if check_password():
                                          </div>
                                     ''', unsafe_allow_html=True)
 
+        # ==========================================
+        # --- COMPLIANCE TAB -----------------------
+        # ==========================================
         elif selected_season == "Compliance":
-            st.markdown('<div class="section-header">Testing Compliance Tracker</div>', unsafe_allow_html=True)
+            st.markdown('<div class="section-header">Testing Compliance & Recency Tracker</div>', unsafe_allow_html=True)
             
-            c_comp_col1, c_comp_col2 = st.columns([1.5, 2.5])
-            with c_comp_col1:
-                selected_compliance_season = st.selectbox("Select Season", ["Spring", "Summer", "Pre-Season", "All-Time"], key="comp_season_sel")
-            with c_comp_col2:
-                selected_compliance_pos = st.selectbox("Position Filter", ["All Positions"] + sorted([p for p in full_df_unfiltered['Position'].unique() if p != "N/A"]), key="comp_pos_sel")
-
-            # Get target athletes
-            comp_athletes = master_athlete_list
-            if selected_compliance_pos != "All Positions":
-                pos_ath_names = full_df_unfiltered[full_df_unfiltered['Position'] == selected_compliance_pos]['Name'].unique()
-                comp_athletes = [a for a in comp_athletes if a in pos_ath_names]
-
-            # Filter dataset based on selected season
-            if selected_compliance_season != "All-Time":
-                cmj_c_df = raw_cmj_df[raw_cmj_df['Season'] == selected_compliance_season]
-                ash_c_df = raw_ash_df[raw_ash_df['Season'] == selected_compliance_season]
-                er_c_df = raw_er_df[raw_er_df['Season'] == selected_compliance_season]
-            else:
-                cmj_c_df = raw_cmj_df.copy()
-                ash_c_df = raw_ash_df.copy()
-                er_c_df = raw_er_df.copy()
-
-            # Overview Metrics
-            total_ath = len(comp_athletes)
-            cmj_done = len(set(cmj_c_df['Name'].unique()) & set(comp_athletes))
-            ash_done = len(set(ash_c_df['Name'].unique()) & set(comp_athletes))
-            er_done = len(set(er_c_df['Name'].unique()) & set(comp_athletes))
-
-            m1, m2, m3, m4 = st.columns(4)
-            m1.metric("Active Roster", f"{total_ath}")
-            m2.metric("Jumps (CMJ) Compliant", f"{cmj_done}/{total_ath}", f"{(cmj_done/total_ath*100) if total_ath > 0 else 0:.0f}%")
-            m3.metric("ASH Test Compliant", f"{ash_done}/{total_ath}", f"{(ash_done/total_ath*100) if total_ath > 0 else 0:.0f}%")
-            m4.metric("Ext. Rotation Compliant", f"{er_done}/{total_ath}", f"{(er_done/total_ath*100) if total_ath > 0 else 0:.0f}%")
-
-            st.write("<br>", unsafe_allow_html=True)
+            selected_comp_ath = st.selectbox("Select Athlete", master_athlete_list, key="comp_ath_select_card")
             
-            # Compliance Detailed Table Setup
-            compliance_records = []
-            for ath in comp_athletes:
-                meta_lookup = full_df_unfiltered[full_df_unfiltered['Name'] == ath]
-                pos_str = meta_lookup['Position'].iloc[0] if not meta_lookup.empty else "N/A"
-                
-                # Check CMJ
-                ath_cmj = cmj_c_df[cmj_c_df['Name'] == ath].sort_values('Test Date')
-                has_cmj = not ath_cmj.empty
-                last_cmj_date = ath_cmj['Test Date'].iloc[-1].strftime('%m/%d/%Y') if has_cmj else "Missing"
-                
-                # Check ASH
-                ath_ash = ash_c_df[ash_c_df['Name'] == ath].sort_values('Test Date')
-                has_ash = not ath_ash.empty
-                last_ash_date = ath_ash['Test Date'].iloc[-1].strftime('%m/%d/%Y') if has_ash else "Missing"
-                
-                # Check ER
-                ath_er = er_c_df[er_c_df['Name'] == ath].sort_values('Test Date')
-                has_er = not ath_er.empty
-                last_er_date = ath_er['Test Date'].iloc[-1].strftime('%m/%d/%Y') if has_er else "Missing"
-                
-                # Calculate completion score out of 3
-                score_count = sum([has_cmj, has_ash, has_er])
-                
-                compliance_records.append({
-                    "Name": ath,
-                    "Position": pos_str,
-                    "CMJ Status": "✅ Completed" if has_cmj else "❌ Missing",
-                    "CMJ Last Date": last_cmj_date,
-                    "ASH Test Status": "✅ Completed" if has_ash else "❌ Missing",
-                    "ASH Last Date": last_ash_date,
-                    "ER Test Status": "✅ Completed" if has_er else "❌ Missing",
-                    "ER Last Date": last_er_date,
-                    "Compliance Score": f"{score_count}/3"
-                })
+            meta_lookup = full_df_unfiltered[full_df_unfiltered['Name'] == selected_comp_ath]
+            photo_url = meta_lookup['PhotoURL'].iloc[0] if not meta_lookup.empty else "https://www.w3schools.com/howto/img_avatar.png"
+            pos_str = meta_lookup['Position'].iloc[0] if not meta_lookup.empty else "N/A"
 
-            comp_table_df = pd.DataFrame(compliance_records)
-            
-            st.markdown("#### Individual Testing Compliance Summary")
-            
-            comp_table_html = """<table class="scout-table"><thead><tr><th>Athlete</th><th>Position</th><th>CMJ Test</th><th>Last CMJ</th><th>ASH Test</th><th>Last ASH</th><th>Ext. Rotation</th><th>Last ER</th><th>Overall</th></tr></thead><tbody>"""
-            for _, r in comp_table_df.iterrows():
-                cmj_style = "color:#28a745; font-weight:bold;" if "Completed" in r['CMJ Status'] else "color:#dc3545; font-weight:bold;"
-                ash_style = "color:#28a745; font-weight:bold;" if "Completed" in r['ASH Test Status'] else "color:#dc3545; font-weight:bold;"
-                er_style = "color:#28a745; font-weight:bold;" if "Completed" in r['ER Test Status'] else "color:#dc3545; font-weight:bold;"
+            # Top Athlete Header
+            st.markdown(f'''
+                <div style="border:1px solid #E5E5E7; border-radius:16px; padding:16px; background-color:white; margin-bottom:20px; display:flex; align-items:center; gap:15px;">
+                    <img src="{photo_url}" style="width:65px; height:65px; border-radius:50%; border:3px solid #FF8200; object-fit:cover;">
+                    <div>
+                        <h2 style="margin:0; color:#1D1D1F; font-size:22px;">{selected_comp_ath}</h2>
+                        <p style="margin:0; color:#6E6E73; font-weight:600; font-size:14px;">{pos_str}</p>
+                    </div>
+                </div>
+            ''', unsafe_allow_html=True)
+
+            ref_date = datetime.now()
+
+            def get_card_stats(df, col_name):
+                ath_df = df[df['Name'] == selected_comp_ath].sort_values('Test Date')
+                if ath_df.empty or col_name not in ath_df.columns:
+                    return 0.0, "N/A", 0.0, "N/A", 0.0, "999 Days"
                 
-                comp_table_html += f"""<tr>
-                    <td style="font-weight:700; text-align:left !important; padding-left:15px;">{r['Name']}</td>
-                    <td>{r['Position']}</td>
-                    <td style="{cmj_style}">{r['CMJ Status']}</td>
-                    <td>{r['CMJ Last Date']}</td>
-                    <td style="{ash_style}">{r['ASH Test Status']}</td>
-                    <td>{r['ASH Last Date']}</td>
-                    <td style="{er_style}">{r['ER Test Status']}</td>
-                    <td>{r['ER Last Date']}</td>
-                    <td style="font-weight:900;">{r['Compliance Score']}</td>
-                </tr>"""
-            comp_table_html += "</tbody></table>"
-            
-            st.markdown(comp_table_html, unsafe_allow_html=True)
+                recent_row = ath_df.iloc[-1]
+                recent_val = float(recent_row[col_name])
+                recent_date = recent_row['Test Date'].strftime('%Y-%m-%d')
+                
+                max_row = ath_df.loc[ath_df[col_name].idxmax()]
+                max_val = float(max_row[col_name])
+                max_date = max_row['Test Date'].strftime('%Y-%m-%d')
+                
+                pct_peak = (recent_val / max_val * 100) if max_val > 0 else 0.0
+                days_elapsed = (ref_date - recent_row['Test Date']).days
+                return recent_val, recent_date, max_val, max_date, pct_peak, f"{days_elapsed} Days"
+
+            def render_compliance_card(title, recent_val, recent_date, max_val, max_date, pct_peak, days_badge_str, unit=""):
+                st.markdown(f'''
+                <div class="comp-card">
+                    <div style="margin-bottom:15px; overflow:hidden;">
+                        <span style="font-size:16px; font-weight:800; color:#1D1D1F;">{title}</span>
+                        <span class="days-badge">{days_badge_str}</span>
+                    </div>
+                    <div style="display:flex; gap:10px; margin-bottom:10px;">
+                        <div class="comp-box" style="flex:1;">
+                            <div class="comp-title">RECENT</div>
+                            <div class="comp-val">{recent_val:.1f}{unit}</div>
+                            <div class="comp-sub">{recent_date}</div>
+                        </div>
+                        <div class="comp-box" style="flex:1;">
+                            <div class="comp-title">ALL-TIME MAX</div>
+                            <div class="comp-val">{max_val:.1f}{unit}</div>
+                            <div class="comp-sub">{max_date}</div>
+                        </div>
+                    </div>
+                    <div style="display:flex; gap:10px;">
+                        <div class="comp-box" style="flex:1;">
+                            <div class="comp-title">% PEAK OUTPUT</div>
+                            <div class="comp-val" style="color:#FF8200;">{pct_peak:.1f}%</div>
+                            <div class="comp-sub">Recent vs. Peak</div>
+                        </div>
+                        <div class="comp-box" style="flex:1;">
+                            <div class="comp-title">RECENCY STATUS</div>
+                            <div class="comp-val">{days_badge_str}</div>
+                            <div class="comp-sub">Elapsed Threshold</div>
+                        </div>
+                    </div>
+                </div>
+                ''', unsafe_allow_html=True)
+
+            # Test Domains
+            col_a, col_b = st.columns(2)
+
+            with col_a:
+                # CMJ Jump Height
+                rv, rd, mv, md, pct, db = get_card_stats(raw_cmj_df, cmj_col)
+                render_compliance_card("CMJ Height", rv, rd, mv, md, pct, db, " cm")
+
+                # CMJ RSI-modified
+                rv, rd, mv, md, pct, db = get_card_stats(raw_cmj_df, rsi_col)
+                render_compliance_card("RSI Modified", rv, rd, mv, md, pct, db, "")
+
+            with col_b:
+                # ASH Left
+                rv, rd, mv, md, pct, db = get_card_stats(raw_ash_df, 'Peak Vertical Force [N] (L)')
+                render_compliance_card("ASH Shoulder Force (L)", rv, rd, mv, md, pct, db, " N")
+
+                # External Rotation ROM (R)
+                rv, rd, mv, md, pct, db = get_card_stats(raw_er_df, 'R Max ROM (°)')
+                render_compliance_card("External Rotation ROM (R)", rv, rd, mv, md, pct, db, "°")
+
+    except Exception as e:
+        st.error(f"Sync Error: {e}")
 
         elif selected_season == "Testing":
             st.markdown('<div class="section-header">Testing Profile</div>', unsafe_allow_html=True)
