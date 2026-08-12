@@ -465,7 +465,7 @@ if check_password():
             def get_card_stats(df, col_name):
                 ath_df = df[df['Name'] == selected_comp_ath].sort_values('Test Date')
                 if ath_df.empty or col_name not in ath_df.columns:
-                    return 0.0, "N/A", 0.0, "N/A", 0.0, "999 Days", 999
+                    return 0.0, "N/A", 0.0, "N/A", 0.0, 999
                 
                 recent_row = ath_df.iloc[-1]
                 recent_val = float(recent_row[col_name])
@@ -476,11 +476,19 @@ if check_password():
                 max_date = max_row['Test Date'].strftime('%Y-%m-%d')
                 
                 pct_peak = (recent_val / max_val * 100) if max_val > 0 else 0.0
-                days_elapsed = (ref_date - recent_row['Test Date']).days
-                return recent_val, recent_date, max_val, max_date, pct_peak, f"{days_elapsed} Days", days_elapsed
+                
+                # Ensure days_elapsed is explicitly an integer
+                days_elapsed = int((ref_date - recent_row['Test Date']).days)
+                return recent_val, recent_date, max_val, max_date, pct_peak, days_elapsed
 
             def render_compliance_card(title, recent_val, recent_date, max_val, max_date, pct_peak, days_num, threshold_days=7, unit=""):
-                # Dynamic badge styling: Green if within threshold (e.g. <= 7 days), Pink/Red if overdue
+                # Explicitly cast to int defensively in case string slips through
+                try:
+                    days_num = int(days_num)
+                except (ValueError, TypeError):
+                    days_num = 999
+
+                # Dynamic color status: Green if recent (<= threshold_days), Red if elapsed
                 if days_num <= threshold_days:
                     badge_bg = "#E6F4EA"
                     badge_color = "#137333"
@@ -488,7 +496,7 @@ if check_password():
                 else:
                     badge_bg = "#FCE8E6"
                     badge_color = "#D93025"
-                    badge_text = f"{days_num} Days"
+                    badge_text = "N/A" if days_num == 999 else f"{days_num} Days"
 
                 st.markdown(f'''
                 <div class="comp-card-outer">
@@ -521,29 +529,28 @@ if check_password():
                 </div>
                 ''', unsafe_allow_html=True)
 
+            # --- CARD GRID RENDER ---
             col_left, col_right = st.columns(2)
 
             with col_left:
-                rv, rd, mv, md, pct, db, dn = get_card_stats(raw_cmj_df, cmj_col)
-                render_compliance_card("Jump Height", rv, rd, mv, md, pct, db, dn, " cm")
+                rv, rd, mv, md, pct, dn = get_card_stats(raw_cmj_df, cmj_col)
+                render_compliance_card("CMJ Height", rv, rd, mv, md, pct, dn, threshold_days=7, unit=" cm")
 
-                rv, rd, mv, md, pct, db, dn = get_card_stats(raw_ash_df, 'Peak Vertical Force [N] (L)')
-                render_compliance_card("ASH Shoulder Force (Left)", rv, rd, mv, md, pct, db, dn, " N")
+                rv, rd, mv, md, pct, dn = get_card_stats(raw_ash_df, 'Peak Vertical Force [N] (L)')
+                render_compliance_card("ASH Shoulder Force (Left)", rv, rd, mv, md, pct, dn, threshold_days=7, unit=" N")
 
-                rv, rd, mv, md, pct, db, dn = get_card_stats(raw_er_df, 'L Max ROM (°)')
-                render_compliance_card("External Rotation ROM (Left)", rv, rd, mv, md, pct, db, dn, "°")
+                rv, rd, mv, md, pct, dn = get_card_stats(raw_er_df, 'L Max ROM (°)')
+                render_compliance_card("External Rotation ROM (Left)", rv, rd, mv, md, pct, dn, threshold_days=7, unit="°")
 
             with col_right:
-                rv, rd, mv, md, pct, db, dn = get_card_stats(raw_cmj_df, rsi_col)
-                render_compliance_card("RSI Modified", rv, rd, mv, md, pct, db, dn, "")
+                rv, rd, mv, md, pct, dn = get_card_stats(raw_cmj_df, rsi_col)
+                render_compliance_card("RSI Modified", rv, rd, mv, md, pct, dn, threshold_days=7, unit="")
 
-                rv, rd, mv, md, pct, db, dn = get_card_stats(raw_ash_df, 'Peak Vertical Force [N] (R)')
-                render_compliance_card("ASH Shoulder Force (Right)", rv, rd, mv, md, pct, db, dn, " N")
+                rv, rd, mv, md, pct, dn = get_card_stats(raw_ash_df, 'Peak Vertical Force [N] (R)')
+                render_compliance_card("ASH Shoulder Force (Right)", rv, rd, mv, md, pct, dn, threshold_days=7, unit=" N")
 
-                rv, rd, mv, md, pct, db, dn = get_card_stats(raw_er_df, 'R Max ROM (°)')
-                render_compliance_card("External Rotation ROM (Right)", rv, rd, mv, md, pct, db, dn, "°")
-
-
+                rv, rd, mv, md, pct, dn = get_card_stats(raw_er_df, 'R Max ROM (°)')
+                render_compliance_card("External Rotation ROM (Right)", rv, rd, mv, md, pct, dn, threshold_days=7, unit="°")
         elif selected_season == "Testing":
             st.markdown('<div class="section-header">Testing Profile</div>', unsafe_allow_html=True)
             testing_season_tabs = st.tabs(["Spring Testing", "Summer Testing", "Pre-Season Testing", "Intake Testing", "Overall Testing Profile", "Season Comparison"])
