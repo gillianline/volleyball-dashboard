@@ -477,26 +477,26 @@ if check_password():
                 
                 pct_peak = (recent_val / max_val * 100) if max_val > 0 else 0.0
                 
-                # Ensure days_elapsed is explicitly an integer
-                days_elapsed = int((ref_date - recent_row['Test Date']).days)
-                return recent_val, recent_date, max_val, max_date, pct_peak, days_elapsed
+                # Calculate days elapsed since the ALL-TIME MAX date
+                days_since_max = int((ref_date - max_row['Test Date']).days)
+                return recent_val, recent_date, max_val, max_date, pct_peak, days_since_max
 
-            def render_compliance_card(title, recent_val, recent_date, max_val, max_date, pct_peak, days_num, threshold_days=7, unit=""):
-                # Explicitly cast to int defensively in case string slips through
+            def render_compliance_card(title, recent_val, recent_date, max_val, max_date, pct_peak, max_days_num, threshold_days=7, unit=""):
+                # Defensive int conversion
                 try:
-                    days_num = int(days_num)
+                    max_days_num = int(max_days_num)
                 except (ValueError, TypeError):
-                    days_num = 999
+                    max_days_num = 999
 
-                # Dynamic color status: Green if recent (<= threshold_days), Red if elapsed
-                if days_num <= threshold_days:
+                # Dynamic color status: Green if max was set within threshold_days, Pink/Red if older
+                if max_days_num <= threshold_days:
                     badge_bg = "#E6F4EA"
                     badge_color = "#137333"
-                    badge_text = f"{days_num} Day" if days_num == 1 else f"{days_num} Days"
+                    badge_text = f"{max_days_num} Day" if max_days_num == 1 else f"{max_days_num} Days"
                 else:
                     badge_bg = "#FCE8E6"
                     badge_color = "#D93025"
-                    badge_text = "N/A" if days_num == 999 else f"{days_num} Days"
+                    badge_text = "N/A" if max_days_num == 999 else f"{max_days_num} Days"
 
                 st.markdown(f'''
                 <div class="comp-card-outer">
@@ -551,6 +551,7 @@ if check_password():
 
                 rv, rd, mv, md, pct, dn = get_card_stats(raw_er_df, 'R Max ROM (°)')
                 render_compliance_card("External Rotation ROM (Right)", rv, rd, mv, md, pct, dn, threshold_days=7, unit="°")
+                
         elif selected_season == "Testing":
             st.markdown('<div class="section-header">Testing Profile</div>', unsafe_allow_html=True)
             testing_season_tabs = st.tabs(["Spring Testing", "Summer Testing", "Pre-Season Testing", "Intake Testing", "Overall Testing Profile", "Season Comparison"])
