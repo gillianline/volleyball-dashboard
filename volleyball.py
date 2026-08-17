@@ -420,7 +420,7 @@ if check_password():
         if selected_season == "ACWR":
             st.markdown('<div class="section-header">Acute:Chronic Workload Ratio (EWMA)</div>', unsafe_allow_html=True)
             
-            acwr_mode_tabs = st.tabs(["Team Workload Summary", "Individual Deep-Dive"])
+            acwr_mode_tabs = st.tabs(["Team Workload Summary", "Individual"])
             
             # --- TAB 1: TEAM SUMMARY ---
             with acwr_mode_tabs[0]:
