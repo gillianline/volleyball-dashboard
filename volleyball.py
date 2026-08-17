@@ -333,10 +333,6 @@ if check_password():
     if "is_printing" not in st.session_state:
         st.session_state.is_printing = False
 
-    # --- INITIALIZE TAB STATE GLOBALLY ---
-    if "active_tab_state" not in st.session_state:
-        st.session_state.active_tab_state = "Individual Profile"
-
     LOCKED_CONFIG = {'staticPlot': False, 'displayModeBar': False}
 
     try:
@@ -574,24 +570,22 @@ if check_password():
                 
         elif selected_season == "Testing":
             st.markdown('<div class="section-header">Testing Profile</div>', unsafe_allow_html=True)
-            
-            # --- UNIFIED TOP ATHLETE SELECTION ---
-            c_t_ath, _ = st.columns([2, 2])
-            with c_t_ath:
-                selected_athlete_test = st.selectbox("Select Athlete", master_athlete_list, key="global_testing_ath_select")
-            
-            meta_lookup = full_df_unfiltered[full_df_unfiltered['Name'] == selected_athlete_test]
-            photo_val = meta_lookup['PhotoURL'].iloc[0] if not meta_lookup.empty else "https://www.w3schools.com/howto/img_avatar.png"
-            pos_val = meta_lookup['Position'].iloc[0] if not meta_lookup.empty else "N/A"
-
-            # Top Header Card
-            st.markdown(f'<div style="display:flex; align-items:center; gap:20px; padding:15px; background:#f8f9fa; border-radius:15px; border-left:6px solid #FF8200; margin-bottom:20px;"><img src="{photo_val}" class="gallery-photo" style="width:80px; height:80px;"><div><h2 style="margin:0; color:#1D1D1F;">{selected_athlete_test}</h2><p style="margin:0; color:#4895DB; font-weight:700; font-size:16px;">{pos_val} | Athletic Testing Profile</p></div></div>', unsafe_allow_html=True)
-
             testing_season_tabs = st.tabs(["Spring Testing", "Summer Testing", "Pre-Season Testing", "Intake Testing", "Overall Testing Profile", "Season Comparison"])
             
             # --- TAB 1, 2, 3: INDIVIDUAL SEASONAL TESTING ---
             for tab_idx, s_label in enumerate(["Spring", "Summer", "Pre-Season"]):
                 with testing_season_tabs[tab_idx]:
+                    c_t_ath, _ = st.columns([2, 2])
+                    with c_t_ath:
+                        selected_athlete_test = st.selectbox(f"Select Athlete ({s_label})", master_athlete_list, key=f"nav_ath_test_{s_label}")
+                    
+                    meta_lookup = full_df_unfiltered[full_df_unfiltered['Name'] == selected_athlete_test]
+                    photo_val = meta_lookup['PhotoURL'].iloc[0] if not meta_lookup.empty else "https://www.w3schools.com/howto/img_avatar.png"
+                    pos_val = meta_lookup['Position'].iloc[0] if not meta_lookup.empty else "N/A"
+
+                    # Top Header Card
+                    st.markdown(f'<div style="display:flex; align-items:center; gap:20px; padding:15px; background:#f8f9fa; border-radius:15px; border-left:6px solid #FF8200; margin-bottom:20px;"><img src="{photo_val}" class="gallery-photo" style="width:80px; height:80px;"><div><h2 style="margin:0; color:#1D1D1F;">{selected_athlete_test}</h2><p style="margin:0; color:#4895DB; font-weight:700; font-size:16px;">{pos_val} | {s_label} Testing Profile</p></div></div>', unsafe_allow_html=True)
+
                     # --- SECTION 1: COUNTERMOVEMENT JUMP ---
                     st.markdown('<h4 style="color:#4895DB; font-weight:800; margin-bottom:5px;">COUNTERMOVEMENT JUMP</h4>', unsafe_allow_html=True)
                     cmj_t_data = raw_cmj_df[(raw_cmj_df['Name'] == selected_athlete_test) & (raw_cmj_df['Season'] == s_label)].sort_values('Test Date')
@@ -702,11 +696,14 @@ if check_password():
             # --- TAB 4: INTAKE TESTING TAB ---
             with testing_season_tabs[3]:
                 st.markdown("<h3 style='color:#1D1D1F; font-weight:900; text-transform:uppercase;'>Athlete Intake Assessment</h3>", unsafe_allow_html=True)
+                c_int_ath, _ = st.columns([2, 2])
+                with c_int_ath:
+                    selected_intake_athlete = st.selectbox("Select Athlete for Intake Assessment", master_athlete_list, key="intake_ath_select")
 
-                calf_ath = raw_calf_df[raw_calf_df['Name'] == selected_athlete_test].sort_values('Test Date')
-                hip_ath = raw_hip_df[raw_hip_df['Name'] == selected_athlete_test].sort_values('Test Date')
-                sh_ath = raw_shoulder_df[raw_shoulder_df['Name'] == selected_athlete_test].sort_values('Test Date')
-                isoy_ath = raw_ash_df[(raw_ash_df['Name'] == selected_athlete_test) & (raw_ash_df['Isometric Type'].str.contains('ISO-Y|Y', case=False, na=False))].sort_values('Test Date')
+                calf_ath = raw_calf_df[raw_calf_df['Name'] == selected_intake_athlete].sort_values('Test Date')
+                hip_ath = raw_hip_df[raw_hip_df['Name'] == selected_intake_athlete].sort_values('Test Date')
+                sh_ath = raw_shoulder_df[raw_shoulder_df['Name'] == selected_intake_athlete].sort_values('Test Date')
+                isoy_ath = raw_ash_df[(raw_ash_df['Name'] == selected_intake_athlete) & (raw_ash_df['Isometric Type'].str.contains('ISO-Y|Y', case=False, na=False))].sort_values('Test Date')
 
                 has_data = not (calf_ath.empty and hip_ath.empty and sh_ath.empty and isoy_ath.empty)
 
@@ -998,7 +995,7 @@ if check_password():
 
                             st.markdown(f"""
                                 <div class="hud-metric-row-light">
-                                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                                    <div style="display:flex; justify-space-between; align-items:center; margin-bottom:4px;">
                                         <span style="font-weight:800; font-size:12px; color:#1D1D1F;"><span class="node-badge-orange">1</span>SHOULDER IR / ER</span>
                                         <span style="font-size:10px; color:#6E6E73; font-weight:600;">Latest: {latest_date_str}</span>
                                     </div>
@@ -1017,7 +1014,7 @@ if check_password():
 
                             st.markdown(f"""
                                 <div class="hud-metric-row-light">
-                                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                                    <div style="display:flex; justify-space-between; align-items:center; margin-bottom:4px;">
                                         <span style="font-weight:800; font-size:12px; color:#1D1D1F;"><span class="node-badge-orange">2</span>ISO-Y STRENGTH</span>
                                         <span style="font-size:10px; color:#6E6E73; font-weight:600;">Latest: {l_y['Test Date'].strftime('%m/%d/%Y')}</span>
                                     </div>
@@ -1075,7 +1072,7 @@ if check_password():
 
                             st.markdown(f"""
                                 <div class="hud-metric-row-light-blue">
-                                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                                    <div style="display:flex; justify-space-between; align-items:center; margin-bottom:4px;">
                                         <span style="font-weight:800; font-size:12px; color:#1D1D1F;"><span class="node-badge-blue">5</span>SINGLE LEG CALF RAISE</span>
                                         <span style="font-size:10px; color:#6E6E73; font-weight:600;">Latest: {l_c['Test Date'].strftime('%m/%d/%Y')}</span>
                                     </div>
@@ -1088,19 +1085,29 @@ if check_password():
                         st.markdown('</div>', unsafe_allow_html=True)
 
                 else:
-                    st.info(f"No Intake Assessment records found for {selected_athlete_test}.")
+                    st.info(f"No Intake Assessment records found for {selected_intake_athlete}.")
 
             # --- TAB 5: OVERALL TESTING PROFILE ---
             with testing_season_tabs[4]:
                 st.markdown("<h3 style='color:#1D1D1F; font-weight:900; text-transform:uppercase;'>Overall Athletic Testing Profile</h3>", unsafe_allow_html=True)
+                c_ov_ath, _ = st.columns([2, 2])
+                with c_ov_ath:
+                    selected_overall_athlete = st.selectbox("Select Athlete for Overall Profile", master_athlete_list, key="overall_ath_select")
+
+                # Athlete Metadata Header Card
+                meta_lookup_ov = full_df_unfiltered[full_df_unfiltered['Name'] == selected_overall_athlete]
+                photo_val_ov = meta_lookup_ov['PhotoURL'].iloc[0] if not meta_lookup_ov.empty else "https://www.w3schools.com/howto/img_avatar.png"
+                pos_val_ov = meta_lookup_ov['Position'].iloc[0] if not meta_lookup_ov.empty else "N/A"
+
+                st.markdown(f'<div style="display:flex; align-items:center; gap:20px; padding:15px; background:#f8f9fa; border-radius:15px; border-left:6px solid #FF8200; margin-bottom:20px;"><img src="{photo_val_ov}" class="gallery-photo" style="width:80px; height:80px;"><div><h2 style="margin:0; color:#1D1D1F;">{selected_overall_athlete}</h2><p style="margin:0; color:#4895DB; font-weight:700; font-size:16px;">{pos_val_ov} | Overall All-Time Max Testing Baseline</p></div></div>', unsafe_allow_html=True)
 
                 # Extract Peak Performances across all datasets
-                cmj_p = raw_cmj_df[raw_cmj_df['Name'] == selected_athlete_test]
-                ash_p = raw_ash_df[raw_ash_df['Name'] == selected_athlete_test]
-                er_p = raw_er_df[raw_er_df['Name'] == selected_athlete_test]
-                calf_p = raw_calf_df[raw_calf_df['Name'] == selected_athlete_test]
-                hip_p = raw_hip_df[raw_hip_df['Name'] == selected_athlete_test]
-                sh_p = raw_shoulder_df[raw_shoulder_df['Name'] == selected_athlete_test]
+                cmj_p = raw_cmj_df[raw_cmj_df['Name'] == selected_overall_athlete]
+                ash_p = raw_ash_df[raw_ash_df['Name'] == selected_overall_athlete]
+                er_p = raw_er_df[raw_er_df['Name'] == selected_overall_athlete]
+                calf_p = raw_calf_df[raw_calf_df['Name'] == selected_overall_athlete]
+                hip_p = raw_hip_df[raw_hip_df['Name'] == selected_overall_athlete]
+                sh_p = raw_shoulder_df[raw_shoulder_df['Name'] == selected_overall_athlete]
 
                 max_cmj_h = cmj_p[cmj_col].max() if not cmj_p.empty and cmj_col in cmj_p.columns else 0.0
                 max_rsi_val = cmj_p[rsi_col].max() if not cmj_p.empty and rsi_col in cmj_p.columns else 0.0
@@ -1118,13 +1125,13 @@ if check_password():
                 hip_ab_p = hip_p[hip_p['Direction'].str.contains('AB', case=False, na=False)] if not hip_p.empty and 'Direction' in hip_p.columns else pd.DataFrame()
                 
                 max_hip_ad = max(hip_ad_p['L Max Force (N)'].max() if 'L Max Force (N)' in hip_ad_p.columns else 0.0, hip_ad_p['R Max Force (N)'].max() if 'R Max Force (N)' in hip_ad_p.columns else 0.0) if not hip_ad_p.empty else 0.0
-                max_hip_ab = max(hip_ab_p['L Max Force (N)'].max() if 'L Max Force (N)' in hip_ab_p.columns else 0.0, hip_ab_p['R Max Force (N)'].max() if 'R Max Force (N)' in hip_ab_p.columns else 0.0) if not hip_ad_p.empty else 0.0
+                max_hip_ab = max(hip_ab_p['L Max Force (N)'].max() if 'L Max Force (N)' in hip_ab_p.columns else 0.0, hip_ab_p['R Max Force (N)'].max() if 'R Max Force (N)' in hip_ab_p.columns else 0.0) if not hip_ab_p.empty else 0.0
 
                 sh_ir_p = sh_p[sh_p['Direction'].str.contains('Internal|IR', case=False, na=False)] if not sh_p.empty and 'Direction' in sh_p.columns else pd.DataFrame()
                 sh_er_p = sh_p[sh_p['Direction'].str.contains('External|ER', case=False, na=False)] if not sh_p.empty and 'Direction' in sh_p.columns else pd.DataFrame()
 
                 max_sh_ir = max(sh_ir_p['L Max Force (N)'].max() if 'L Max Force (N)' in sh_ir_p.columns else 0.0, sh_ir_p['R Max Force (N)'].max() if 'R Max Force (N)' in sh_ir_p.columns else 0.0) if not sh_ir_p.empty else 0.0
-                max_sh_er = max(sh_er_p['L Max Force (N)'].max() if 'L Max Force (N)' in sh_er_p.columns else 0.0, sh_er_p['R Max Force (N)'].max() if 'R Max Force (N)' in sh_er_p.columns else 0.0) if not sh_ir_p.empty else 0.0
+                max_sh_er = max(sh_er_p['L Max Force (N)'].max() if 'L Max Force (N)' in sh_er_p.columns else 0.0, sh_er_p['R Max Force (N)'].max() if 'R Max Force (N)' in sh_er_p.columns else 0.0) if not sh_er_p.empty else 0.0
 
                 # Metric Cards HUD
                 m_c1, m_c2, m_c3, m_c4, m_c5, m_c6 = st.columns(6)
@@ -1150,14 +1157,17 @@ if check_password():
                     {"Test Domain": "Shoulder Strength", "Key Metric": "External Rotation (ER)", "Peak Value": f"{max_sh_er:.1f} N"},
                 ]
                 st.dataframe(pd.DataFrame(ov_summary_data), use_container_width=True, hide_index=True)
-
+                    
             # --- TAB 6: CROSS-SEASON TESTING COMPARISON ---
             with testing_season_tabs[5]:
                 st.markdown("### Multi-Season Testing Performance Comparison")
+                c_comp_ath, _ = st.columns([2, 2])
+                with c_comp_ath:
+                    comp_athlete = st.selectbox("Select Athlete for Cross-Seasonal Comparison", master_athlete_list, key="comp_ath_testing_t4")
 
-                cmj_comp = raw_cmj_df[raw_cmj_df['Name'] == selected_athlete_test].sort_values('Test Date')
-                ash_comp = raw_ash_df[raw_ash_df['Name'] == selected_athlete_test].sort_values('Test Date')
-                er_comp = raw_er_df[raw_er_df['Name'] == selected_athlete_test].sort_values('Test Date')
+                cmj_comp = raw_cmj_df[raw_cmj_df['Name'] == comp_athlete].sort_values('Test Date')
+                ash_comp = raw_ash_df[raw_ash_df['Name'] == comp_athlete].sort_values('Test Date')
+                er_comp = raw_er_df[raw_er_df['Name'] == comp_athlete].sort_values('Test Date')
 
                 if not cmj_comp.empty or not ash_comp.empty or not er_comp.empty:
                     st.markdown("#### Countermovement Jump Trend Across Seasons")
@@ -1180,7 +1190,7 @@ if check_password():
                                 insidetextanchor="middle",
                                 textfont=dict(color='white', size=13),
                                 cliponaxis=False
-                            ), 
+                            ),
                             secondary_y=False
                         )
                         
@@ -1196,7 +1206,7 @@ if check_password():
                                 line=dict(color='#4895DB', width=3), 
                                 marker=dict(size=10, color='#4895DB'),
                                 cliponaxis=False
-                            ), 
+                            ),
                             secondary_y=True
                         )
                         
@@ -1240,7 +1250,49 @@ if check_password():
                     
                     st.dataframe(pd.DataFrame(summary_rows), use_container_width=True, hide_index=True)
                 else:
-                    st.info(f"No multi-season testing records logged for {selected_athlete_test}.")
+                    st.info(f"No multi-season testing records logged for {comp_athlete}.")
+        else:
+            # --- DYNAMIC SEASONAL TAB NAVIGATION SETUP ---
+            if selected_season == "Summer":
+                tab_titles = [
+                    "Individual Profile", 
+                    "Practice Scores", 
+                    "Daily Combined Scores", 
+                    "Spring Max vs Daily Combined", 
+                    "Practice History", 
+                    "Position Analysis", 
+                    "Spring v. Summer"
+                ]
+            elif selected_season == "Pre-Season":
+                tab_titles = [
+                    "Individual Profile", 
+                    "Practice Scores", 
+                    "Daily Combined Scores", 
+                    "Practice History", 
+                    "Match v. Practice", 
+                    "Match Summary", 
+                    "Position Analysis", 
+                    "Phase Analysis", 
+                    "Practice Planner"
+                ]
+            else: # Spring
+                tab_titles = [
+                    "Individual Profile", 
+                    "Practice Scores", 
+                    "Daily Combined Scores", 
+                    "Practice History", 
+                    "Match v. Practice", 
+                    "Match Summary", 
+                    "Position Analysis", 
+                    "Phase Analysis", 
+                    "Practice Planner"
+                ]
+
+            if "active_tab_state" not in st.session_state or st.session_state.active_tab_state not in tab_titles:
+                st.session_state.active_tab_state = tab_titles[0]
+
+            selected_tab_label = st.radio("Navigation View Menu Selection Control", tab_titles, label_visibility="collapsed", horizontal=True, key="master_app_structural_gate_radio")
+            st.session_state.active_tab_state = selected_tab_label
 
             # ==========================================
             # --- TAB CLAUSE 0: INDIVIDUAL PROFILE -----
