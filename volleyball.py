@@ -367,6 +367,9 @@ def compute_athlete_ewma_calendar(df_player, metrics_list):
 if check_password():
     if "is_printing" not in st.session_state:
         st.session_state.is_printing = False
+    
+    if "active_tab_state" not in st.session_state:
+        st.session_state.active_tab_state = "Individual Profile"
 
     LOCKED_CONFIG = {'staticPlot': False, 'displayModeBar': False}
 
