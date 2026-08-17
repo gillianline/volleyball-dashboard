@@ -980,13 +980,26 @@ if check_password():
                             st.markdown(full_table_html, unsafe_allow_html=True)
 
                         # Calibrated Gauge
+                        # Calibrated Gauge
                         with top_col3:
                             gauge_header = f"""<div style="background:#4895DB; color:white; font-weight:900; font-size:14px; text-align:center; padding:6px; border-radius:6px 6px 0 0;">Performance Readiness Score<br><span style="font-size:11px; font-weight:600;">{sel_test_date_str}</span></div>"""
                             st.markdown(gauge_header, unsafe_allow_html=True)
                             
-                            peak_h = ath_cmj_all[cmj_col].max() if cmj_col in ath_cmj_all else 1.0
-                            cur_h_val = float(cur_test_row.get(cmj_col, 0.0))
-                            gauge_score = min(100, max(0, int((cur_h_val / peak_h) * 100))) if peak_h > 0 else 94
+                            # Compare current test value to athlete's personal baseline
+                            base_h_val = float(base_test_row.get(cmj_col, 0.0)) if cmj_col in base_test_row and pd.notna(base_test_row.get(cmj_col)) else 0.0
+                            cur_h_val = float(cur_test_row.get(cmj_col, 0.0)) if cmj_col in cur_test_row and pd.notna(cur_test_row.get(cmj_col)) else 0.0
+
+                            # Readiness percentage relative to baseline (e.g., 49.6 / 45.0 = 110%)
+                            if base_h_val > 0:
+                                raw_readiness_pct = (cur_h_val / base_h_val) * 100.0
+                            else:
+                                raw_readiness_pct = 100.0
+
+                            display_score = int(round(raw_readiness_pct))
+
+                            # Map the ratio (80% to 120% baseline) smoothly across the 5 gauge segments (0 to 100)
+                            # 80% = Far Left (Red), 100% = Center-Right (Green), 120%+ = Far Right (Dark Green)
+                            gauge_normalized = min(100.0, max(0.0, ((raw_readiness_pct - 80.0) / (120.0 - 80.0)) * 100.0))
 
                             gauge_colors = ['#B91C1C', '#EA580C', '#FACC15', '#65A30D', '#15803D', 'rgba(0,0,0,0)']
                             values = [20, 20, 20, 20, 20, 100]
@@ -994,7 +1007,7 @@ if check_password():
                             center_x, center_y = 0.50, 0.50
                             needle_length = 0.38
                             
-                            angle_rad = math.pi * (1.0 - (gauge_score / 100.0))
+                            angle_rad = math.pi * (1.0 - (gauge_normalized / 100.0))
                             needle_x = center_x + needle_length * math.cos(angle_rad)
                             needle_y = center_y + needle_length * math.sin(angle_rad)
 
@@ -1029,7 +1042,7 @@ if check_password():
 
                             fig_gauge.add_annotation(
                                 x=center_x, y=center_y - 0.02,
-                                text=f"<b>{gauge_score}%</b>",
+                                text=f"<b>{display_score}%</b>",
                                 showarrow=False,
                                 font=dict(size=14, color="white", weight="bold"),
                                 bgcolor="#1E293B",
@@ -1046,8 +1059,7 @@ if check_password():
                                 paper_bgcolor="white"
                             )
                             st.plotly_chart(fig_gauge, use_container_width=True, config=LOCKED_CONFIG, key="cmj_readiness_gauge")
-
-                        st.markdown("<br>", unsafe_allow_html=True)
+                            
 
                         # Performance Standards Graph (T-Score for Individual / Team / Position)
                         st.markdown(f'<div class="section-header">Countermovement Jump Performance Standards ({comp_factor})</div>', unsafe_allow_html=True)
