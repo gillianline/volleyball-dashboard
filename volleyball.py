@@ -177,6 +177,22 @@ def get_flipped_gradient(score):
         return "#808080" 
     return "#2D5A27" if score <= 40 else "#D4A017" if score <= 70 else "#A52A2A"
 
+def get_acwr_badge(ratio):
+    try:
+        r = float(ratio)
+        if pd.isna(r) or r == 0:
+            return "#64748B", "#F1F5F9", "No Chronic Baseline"
+        elif r < 0.80:
+            return "#D97706", "#FEF3C7", "Under-training"
+        elif 0.80 <= r <= 1.30:
+            return "#137333", "#E6F4EA", "Optimal Sweet Spot"
+        elif 1.30 < r <= 1.50:
+            return "#D97706", "#FEF3C7", "Elevated Risk"
+        else:
+            return "#D93025", "#FCE8E6", "High Spike Danger"
+    except:
+        return "#64748B", "#F1F5F9", "N/A"
+
 phase_map = {}
 
 # --- 3. HARD DECOUPLED DATA FETCHING ENGINE ---
@@ -268,7 +284,6 @@ def load_all_data():
         er_df.rename(columns={'Athlete': 'Name', 'Date': 'Test Date'}, inplace=True)
         er_df['Test Date'] = pd.to_datetime(er_df['Test Date'], errors='coerce')
         
-        # Clean all numeric columns (removes "°", "%", "L", "R", etc.)
         for col in ['L Max ROM (°)', 'R Max ROM (°)', 'ROM Asymmetry (%)']:
             if col in er_df.columns:
                 er_df[col] = pd.to_numeric(
@@ -279,7 +294,6 @@ def load_all_data():
         er_df['Season'] = er_df['Test Date'].apply(assign_season)
     except:
         er_df = pd.DataFrame(columns=['Name', 'Test Date', 'L Max ROM (°)', 'R Max ROM (°)', 'ROM Asymmetry (%)', 'Season'])
-        
 
     # Calf Sheet
     try:
@@ -387,7 +401,6 @@ if check_password():
             
             comp_tabs = st.tabs(["Spring", "Summer", "Pre-Season", "All-Time Max"])
             
-            # Calculates max per session/practice instead of summing combined dates
             practice_raw = full_df_unfiltered[full_df_unfiltered['Session_Type'] == 'Practice'].copy()
             all_time_maxes = practice_raw.groupby('Name')[metrics_to_score].max().reset_index()
             
@@ -488,19 +501,15 @@ if check_password():
                 max_date = max_row['Test Date'].strftime('%Y-%m-%d')
                 
                 pct_peak = (recent_val / max_val * 100) if max_val > 0 else 0.0
-                
-                # Calculate days elapsed since the ALL-TIME MAX date
                 days_since_max = int((ref_date - max_row['Test Date']).days)
                 return recent_val, recent_date, max_val, max_date, pct_peak, days_since_max
 
             def render_compliance_card(title, recent_val, recent_date, max_val, max_date, pct_peak, max_days_num, threshold_days=7, unit="", decimals=1):
-                # Defensive int conversion
                 try:
                     max_days_num = int(max_days_num)
                 except (ValueError, TypeError):
                     max_days_num = 999
 
-                # Dynamic color status: Green if max was set within threshold_days, Pink/Red if older
                 if max_days_num <= threshold_days:
                     badge_bg = "#E6F4EA"
                     badge_color = "#137333"
@@ -510,7 +519,6 @@ if check_password():
                     badge_color = "#D93025"
                     badge_text = "N/A" if max_days_num == 999 else f"{max_days_num} Days"
 
-                # Dynamic decimal formatting based on metric type
                 fmt_str = f"{{:.{decimals}f}}"
 
                 st.markdown(f'''
@@ -544,7 +552,6 @@ if check_password():
                 </div>
                 ''', unsafe_allow_html=True)
 
-            # --- CARD GRID RENDER ---
             col_left, col_right = st.columns(2)
 
             with col_left:
@@ -559,7 +566,6 @@ if check_password():
 
             with col_right:
                 rv, rd, mv, md, pct, dn = get_card_stats(raw_cmj_df, rsi_col)
-                # Formatted specifically to 2 decimal places
                 render_compliance_card("RSI Modified", rv, rd, mv, md, pct, dn, threshold_days=7, unit="", decimals=2)
 
                 rv, rd, mv, md, pct, dn = get_card_stats(raw_ash_df, 'Peak Vertical Force [N] (R)')
@@ -572,7 +578,6 @@ if check_password():
             st.markdown('<div class="section-header">Testing Profile</div>', unsafe_allow_html=True)
             testing_season_tabs = st.tabs(["Spring Testing", "Summer Testing", "Pre-Season Testing", "Intake Testing", "Overall Testing Profile", "Season Comparison"])
             
-            # --- TAB 1, 2, 3: INDIVIDUAL SEASONAL TESTING ---
             for tab_idx, s_label in enumerate(["Spring", "Summer", "Pre-Season"]):
                 with testing_season_tabs[tab_idx]:
                     c_t_ath, _ = st.columns([2, 2])
@@ -583,10 +588,8 @@ if check_password():
                     photo_val = meta_lookup['PhotoURL'].iloc[0] if not meta_lookup.empty else "https://www.w3schools.com/howto/img_avatar.png"
                     pos_val = meta_lookup['Position'].iloc[0] if not meta_lookup.empty else "N/A"
 
-                    # Top Header Card
                     st.markdown(f'<div style="display:flex; align-items:center; gap:20px; padding:15px; background:#f8f9fa; border-radius:15px; border-left:6px solid #FF8200; margin-bottom:20px;"><img src="{photo_val}" class="gallery-photo" style="width:80px; height:80px;"><div><h2 style="margin:0; color:#1D1D1F;">{selected_athlete_test}</h2><p style="margin:0; color:#4895DB; font-weight:700; font-size:16px;">{pos_val} | {s_label} Testing Profile</p></div></div>', unsafe_allow_html=True)
 
-                    # --- SECTION 1: COUNTERMOVEMENT JUMP ---
                     st.markdown('<h4 style="color:#4895DB; font-weight:800; margin-bottom:5px;">COUNTERMOVEMENT JUMP</h4>', unsafe_allow_html=True)
                     cmj_t_data = raw_cmj_df[(raw_cmj_df['Name'] == selected_athlete_test) & (raw_cmj_df['Season'] == s_label)].sort_values('Test Date')
                     
@@ -620,7 +623,6 @@ if check_password():
 
                     st.markdown('<hr style="display:block !important; margin:15px 0; border:0; border-top:1px solid #E5E5E7;" />', unsafe_allow_html=True)
 
-                    # --- SECTION 2: ASH SHOULDER: ISO I ---
                     st.markdown('<h4 style="color:#4895DB; font-weight:800; margin-bottom:5px;">ASH SHOULDER: ISO I</h4>', unsafe_allow_html=True)
                     ash_t_data = raw_ash_df[(raw_ash_df['Name'] == selected_athlete_test) & (raw_ash_df['Season'] == s_label)].sort_values('Test Date')
                     
@@ -658,7 +660,6 @@ if check_password():
 
                     st.markdown('<hr style="display:block !important; margin:15px 0; border:0; border-top:1px solid #E5E5E7;" />', unsafe_allow_html=True)
 
-                    # --- SECTION 3: EXTERNAL ROTATION: ROM ---
                     st.markdown('<h4 style="color:#4895DB; font-weight:800; margin-bottom:5px;">EXTERNAL ROTATION: ROM</h4>', unsafe_allow_html=True)
                     
                     er_t_data = raw_er_df[(raw_er_df['Name'] == selected_athlete_test) & (raw_er_df['Season'] == s_label)].sort_values('Test Date')
@@ -719,52 +720,17 @@ if check_password():
 
                     hud_col1, hud_col2 = st.columns([1.2, 1.8])
 
-                    # --- LEFT PANEL: REALISTIC PROPORTIONAL ATHLETIC ANATOMY MAP ---
                     with hud_col1:
                         hud_html = """
                         <!DOCTYPE html>
                         <html>
                         <head>
                         <style>
-                            body {
-                                margin: 0;
-                                padding: 0;
-                                background-color: transparent;
-                                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-                            }
-                            .hud-dashboard-card {
-                                background: #FFFFFF;
-                                border-radius: 16px;
-                                padding: 16px;
-                                border: 1px solid #E5E5E7;
-                                box-shadow: 0 4px 12px rgba(0,0,0,0.03);
-                            }
-                            .hud-header-title {
-                                color: #1D1D1F;
-                                font-weight: 800;
-                                font-size: 13px;
-                                letter-spacing: 1px;
-                                text-transform: uppercase;
-                                border-bottom: 2px solid #FF8200;
-                                padding-bottom: 6px;
-                                margin-bottom: 12px;
-                            }
-                            .hud-body-viewport {
-                                position: relative;
-                                width: 100%;
-                                height: 380px;
-                                background: #FAFDFD;
-                                border-radius: 12px;
-                                border: 1px solid #D5E5E8;
-                                display: flex;
-                                align-items: center;
-                                justify-content: center;
-                                overflow: hidden;
-                            }
-                            svg {
-                                width: 100%;
-                                height: 100%;
-                            }
+                            body { margin: 0; padding: 0; background-color: transparent; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+                            .hud-dashboard-card { background: #FFFFFF; border-radius: 16px; padding: 16px; border: 1px solid #E5E5E7; box-shadow: 0 4px 12px rgba(0,0,0,0.03); }
+                            .hud-header-title { color: #1D1D1F; font-weight: 800; font-size: 13px; letter-spacing: 1px; text-transform: uppercase; border-bottom: 2px solid #FF8200; padding-bottom: 6px; margin-bottom: 12px; }
+                            .hud-body-viewport { position: relative; width: 100%; height: 380px; background: #FAFDFD; border-radius: 12px; border: 1px solid #D5E5E8; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+                            svg { width: 100%; height: 100%; }
                         </style>
                         </head>
                         <body>
@@ -781,114 +747,55 @@ if check_password():
                                                 <stop offset="100%" stop-color="#9AA0A6" />
                                             </linearGradient>
                                         </defs>
-
-                                        <!-- DROP SHADOW AT BASE -->
                                         <ellipse cx="68" cy="214" rx="20" ry="3.5" fill="#000000" opacity="0.12" />
-
-                                        <!-- REALISTIC PROPORTIONAL HUMAN MANNEQUIN (FULL VOLUME ARMS) -->
                                         <g stroke="#2C3036" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
-                                            
-                                            <!-- Head & Neck -->
                                             <ellipse cx="68" cy="17" rx="7" ry="9" fill="url(#anatomicalBodyGrad)" />
                                             <path d="M 65 25 L 63 33 M 71 25 L 73 33" stroke-width="1.2" />
-
-                                            <!-- Shoulders (Symmetrical Deltoid Caps) -->
                                             <path d="M 63 33 C 58 33, 48 36, 42 40 C 37 43, 36 50, 39 56 L 43 56 C 47 52, 49 46, 52 44 M 73 33 C 78 33, 88 36, 94 40 C 99 43, 100 50, 97 56 L 93 56 C 89 52, 87 46, 84 44" fill="url(#anatomicalBodyGrad)" />
-
-                                            <!-- Left Arm (Full Volume Bicep, Forearm, Hand & Fingers) -->
-                                            <path d="M 42 40 
-                                                     C 37 43, 35 52, 33 64 
-                                                     C 31 74, 29 82, 27 92 
-                                                     C 25 96, 23 100, 22 104
-                                                     C 21 106, 23 107, 25 106
-                                                     C 27 104, 28 98, 30 92
-                                                     C 33 82, 36 74, 38 64
-                                                     C 40 54, 42 48, 43 56 Z" 
-                                                  fill="url(#anatomicalBodyGrad)" />
+                                            <path d="M 42 40 C 37 43, 35 52, 33 64 C 31 74, 29 82, 27 92 C 25 96, 23 100, 22 104 C 21 106, 23 107, 25 106 C 27 104, 28 98, 30 92 C 33 82, 36 74, 38 64 C 40 54, 42 48, 43 56 Z" fill="url(#anatomicalBodyGrad)" />
                                             <path d="M 22 104 C 20 106, 18 108, 17 110 M 23 105 C 21 108, 20 110, 19 112 M 24 105 C 23 108, 22 110, 21 112 M 25 104 C 25 107, 24 109, 23 111" fill="none" stroke-width="0.8" />
-                                            
-                                            <!-- Right Arm (Full Volume Bicep, Forearm, Hand & Fingers) -->
-                                            <path d="M 94 40 
-                                                     C 99 43, 101 52, 103 64 
-                                                     C 105 74, 107 82, 109 92 
-                                                     C 111 96, 113 100, 114 104
-                                                     C 115 106, 113 107, 111 106
-                                                     C 109 104, 108 98, 106 92
-                                                     C 103 82, 100 74, 98 64
-                                                     C 96 54, 94 48, 93 56 Z" 
-                                                  fill="url(#anatomicalBodyGrad)" />
+                                            <path d="M 94 40 C 99 43, 101 52, 103 64 C 105 74, 107 82, 109 92 C 111 96, 113 100, 114 104 C 115 106, 113 107, 111 106 C 109 104, 108 98, 106 92 C 103 82, 100 74, 98 64 C 96 54, 94 48, 93 56 Z" fill="url(#anatomicalBodyGrad)" />
                                             <path d="M 114 104 C 116 106, 118 108, 119 110 M 113 105 C 115 108, 116 110, 117 112 M 112 105 C 113 108, 114 110, 115 112 M 111 104 C 111 107, 112 109, 113 111" fill="none" stroke-width="0.8" />
-
-                                            <!-- Torso & Waist -->
                                             <path d="M 52 44 L 54 75 L 52 92 L 68 106 L 84 92 L 82 75 L 84 44 Z" fill="url(#anatomicalBodyGrad)" />
-
-                                            <!-- Lower Body (Thighs, Knees, Calves, Feet) -->
-                                            <!-- Left Leg -->
                                             <path d="M 52 92 C 50 105, 49 122, 53 138 C 55 144, 55 152, 54 162 C 52 175, 52 192, 54 205 L 48 210 L 58 210 L 59 203 C 60 190, 60 175, 60 162 C 60 152, 60 144, 62 138 C 66 122, 66 105, 68 106 Z" fill="url(#anatomicalBodyGrad)" />
-                                            <!-- Right Leg -->
                                             <path d="M 84 92 C 86 105, 87 122, 83 138 C 81 144, 81 152, 82 162 C 84 175, 84 192, 82 205 L 88 210 L 78 210 L 77 203 C 76 190, 76 175, 76 162 C 76 152, 76 144, 74 138 C 70 122, 70 105, 68 106 Z" fill="url(#anatomicalBodyGrad)" />
-
-                                            <!-- ORANGE PLUMB LINE -->
                                             <line x1="68" y1="8" x2="68" y2="211" stroke="#FF8200" stroke-width="1.3" />
-
-                                            <!-- RED HORIZONTAL GUIDELINES -->
                                             <line x1="51" y1="116" x2="85" y2="116" stroke="#D32F2F" stroke-width="1.1" />
                                             <line x1="55" y1="168" x2="81" y2="168" stroke="#D32F2F" stroke-width="1.1" />
-
-                                            <!-- ANATOMICAL DEFINITION LINES -->
                                             <g stroke="#3A3F46" stroke-width="0.9" fill="none">
-                                                <!-- Collarbone -->
                                                 <path d="M 68 35 C 60 34, 52 37, 46 40 M 68 35 C 76 34, 84 37, 90 40" stroke-width="1" />
-                                                <!-- Chest / Pectorals -->
                                                 <path d="M 52 44 C 60 43, 67 47, 68 54 C 60 56, 52 52, 52 44 Z" fill="#E2E7EC" opacity="0.6" />
                                                 <path d="M 84 44 C 76 43, 69 47, 68 54 C 76 56, 84 52, 84 44 Z" fill="#E2E7EC" opacity="0.6" />
-                                                <!-- Abs (6-Pack Grid) -->
                                                 <path d="M 58 58 C 64 57, 72 57, 78 58" />
                                                 <path d="M 58 66 C 64 65, 72 65, 78 66" />
                                                 <path d="M 59 74 C 64 73, 72 73, 77 74" />
-                                                <!-- Arm Muscle Separation Creases -->
                                                 <path d="M 39 56 C 37 62, 35 70, 33 78" stroke-width="0.75" />
                                                 <path d="M 97 56 C 99 62, 101 70, 103 78" stroke-width="0.75" />
-                                                <!-- Inguinal Crease -->
                                                 <path d="M 52 92 C 58 98, 64 103, 68 106 M 84 92 C 78 98, 72 103, 68 106" stroke-width="1" />
-                                                <!-- Quads Definition -->
                                                 <path d="M 52 96 C 49 108, 50 125, 57 138" />
                                                 <path d="M 84 96 C 87 108, 86 125, 79 138" />
-                                                <!-- Knees -->
                                                 <ellipse cx="57" cy="142" rx="3" ry="3.5" stroke-width="0.9" fill="#E8EDF2" />
                                                 <ellipse cx="79" cy="142" rx="3" ry="3.5" stroke-width="0.9" fill="#E8EDF2" />
-                                                <!-- Calves Definition -->
                                                 <path d="M 54 150 C 51 160, 52 178, 56 195" />
                                                 <path d="M 82 150 C 85 160, 84 178, 80 195" />
                                             </g>
                                         </g>
-
-                                        <!-- NODES & CALLOUT LINES / BADGES -->
-                                        <!-- Node 1: Left Shoulder IR/ER (Orange) -->
                                         <circle cx="91" cy="46" r="3.5" fill="#FF8200" stroke="#FFFFFF" stroke-width="1" />
                                         <line x1="91" y1="46" x2="118" y2="46" stroke="#FF8200" stroke-width="1.8" stroke-dasharray="2,2" />
                                         <rect x="112" y="39" width="14" height="14" rx="3" fill="#FF8200" />
                                         <text x="119" y="50" font-size="9" font-weight="900" fill="#FFFFFF" text-anchor="middle">1</text>
-
-                                        <!-- Node 2: ISO-Y Spine/Thoracic (Orange) -->
                                         <circle cx="68" cy="54" r="3.5" fill="#FF8200" stroke="#FFFFFF" stroke-width="1" />
                                         <line x1="68" y1="54" x2="118" y2="68" stroke="#FF8200" stroke-width="1.8" stroke-dasharray="2,2" />
                                         <rect x="112" y="61" width="14" height="14" rx="3" fill="#FF8200" />
                                         <text x="119" y="72" font-size="9" font-weight="900" fill="#FFFFFF" text-anchor="middle">2</text>
-
-                                        <!-- Node 3: Hip Adduction (Blue) -->
                                         <circle cx="74" cy="122" r="3.5" fill="#4895DB" stroke="#FFFFFF" stroke-width="1" />
                                         <line x1="74" y1="122" x2="118" y2="122" stroke="#4895DB" stroke-width="1.8" stroke-dasharray="2,2" />
                                         <rect x="112" y="115" width="14" height="14" rx="3" fill="#4895DB" />
                                         <text x="119" y="126" font-size="9" font-weight="900" fill="#FFFFFF" text-anchor="middle">3</text>
-
-                                        <!-- Node 4: Hip Abduction (Blue) -->
                                         <circle cx="53" cy="116" r="3.5" fill="#4895DB" stroke="#FFFFFF" stroke-width="1" />
                                         <line x1="53" y1="116" x2="22" y2="116" stroke="#4895DB" stroke-width="1.8" stroke-dasharray="2,2" />
                                         <rect x="14" y="109" width="14" height="14" rx="3" fill="#4895DB" />
                                         <text x="21" y="120" font-size="9" font-weight="900" fill="#FFFFFF" text-anchor="middle">4</text>
-
-                                        <!-- Node 5: Single Leg Calf Raise (Blue) -->
                                         <circle cx="77" cy="172" r="3.5" fill="#4895DB" stroke="#FFFFFF" stroke-width="1" />
                                         <line x1="77" y1="172" x2="118" y2="172" stroke="#4895DB" stroke-width="1.8" stroke-dasharray="2,2" />
                                         <rect x="112" y="165" width="14" height="14" rx="3" fill="#4895DB" />
@@ -899,84 +806,22 @@ if check_password():
                         </body>
                         </html>
                         """
-                        import streamlit.components.v1 as components
                         components.html(hud_html, height=450)
 
-                    # --- RIGHT PANEL: LIGHT DETAILS CARDS ---
                     with hud_col2:
                         st.markdown("""
                             <style>
-                            .hud-details-card {
-                                background: #FFFFFF;
-                                border-radius: 16px;
-                                padding: 20px;
-                                border: 1px solid #E5E5E7;
-                                box-shadow: 0 4px 12px rgba(0,0,0,0.03);
-                            }
-                            .hud-header-title-light {
-                                color: #1D1D1F;
-                                font-weight: 800;
-                                font-size: 13px;
-                                letter-spacing: 1px;
-                                text-transform: uppercase;
-                                border-bottom: 2px solid #FF8200;
-                                padding-bottom: 6px;
-                                margin-bottom: 16px;
-                            }
-                            .hud-metric-row-light {
-                                background: #F8F9FA;
-                                border-left: 4px solid #FF8200;
-                                border-radius: 8px;
-                                padding: 10px 14px;
-                                margin-bottom: 10px;
-                                color: #1D1D1F;
-                                border-top: 1px solid #E5E5E7;
-                                border-right: 1px solid #E5E5E7;
-                                border-bottom: 1px solid #E5E5E7;
-                            }
-                            .hud-metric-row-light-blue {
-                                background: #F8F9FA;
-                                border-left: 4px solid #4895DB;
-                                border-radius: 8px;
-                                padding: 10px 14px;
-                                margin-bottom: 10px;
-                                color: #1D1D1F;
-                                border-top: 1px solid #E5E5E7;
-                                border-right: 1px solid #E5E5E7;
-                                border-bottom: 1px solid #E5E5E7;
-                            }
-                            .node-badge-orange {
-                                display: inline-block;
-                                width: 20px;
-                                height: 20px;
-                                background: #FF8200;
-                                color: #FFFFFF;
-                                font-weight: 900;
-                                font-size: 11px;
-                                border-radius: 4px;
-                                text-align: center;
-                                line-height: 20px;
-                                margin-right: 8px;
-                            }
-                            .node-badge-blue {
-                                display: inline-block;
-                                width: 20px;
-                                height: 20px;
-                                background: #4895DB;
-                                color: #FFFFFF;
-                                font-weight: 900;
-                                font-size: 11px;
-                                border-radius: 4px;
-                                text-align: center;
-                                line-height: 20px;
-                                margin-right: 8px;
-                            }
+                            .hud-details-card { background: #FFFFFF; border-radius: 16px; padding: 20px; border: 1px solid #E5E5E7; box-shadow: 0 4px 12px rgba(0,0,0,0.03); }
+                            .hud-header-title-light { color: #1D1D1F; font-weight: 800; font-size: 13px; letter-spacing: 1px; text-transform: uppercase; border-bottom: 2px solid #FF8200; padding-bottom: 6px; margin-bottom: 16px; }
+                            .hud-metric-row-light { background: #F8F9FA; border-left: 4px solid #FF8200; border-radius: 8px; padding: 10px 14px; margin-bottom: 10px; color: #1D1D1F; border-top: 1px solid #E5E5E7; border-right: 1px solid #E5E5E7; border-bottom: 1px solid #E5E5E7; }
+                            .hud-metric-row-light-blue { background: #F8F9FA; border-left: 4px solid #4895DB; border-radius: 8px; padding: 10px 14px; margin-bottom: 10px; color: #1D1D1F; border-top: 1px solid #E5E5E7; border-right: 1px solid #E5E5E7; border-bottom: 1px solid #E5E5E7; }
+                            .node-badge-orange { display: inline-block; width: 20px; height: 20px; background: #FF8200; color: #FFFFFF; font-weight: 900; font-size: 11px; border-radius: 4px; text-align: center; line-height: 20px; margin-right: 8px; }
+                            .node-badge-blue { display: inline-block; width: 20px; height: 20px; background: #4895DB; color: #FFFFFF; font-weight: 900; font-size: 11px; border-radius: 4px; text-align: center; line-height: 20px; margin-right: 8px; }
                             </style>
                             <div class="hud-details-card">
                                 <div class="hud-header-title-light">Anatomy Location Assessment Details</div>
                         """, unsafe_allow_html=True)
 
-                        # NODE 1: SHOULDER IR/ER
                         if not sh_ath.empty:
                             sh_ir = sh_ath[sh_ath['Direction'].str.contains('Internal|IR', case=False, na=False)] if 'Direction' in sh_ath.columns else sh_ath
                             sh_er = sh_ath[sh_ath['Direction'].str.contains('External|ER', case=False, na=False)] if 'Direction' in sh_ath.columns else sh_ath
@@ -995,7 +840,7 @@ if check_password():
 
                             st.markdown(f"""
                                 <div class="hud-metric-row-light">
-                                    <div style="display:flex; justify-space-between; align-items:center; margin-bottom:4px;">
+                                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
                                         <span style="font-weight:800; font-size:12px; color:#1D1D1F;"><span class="node-badge-orange">1</span>SHOULDER IR / ER</span>
                                         <span style="font-size:10px; color:#6E6E73; font-weight:600;">Latest: {latest_date_str}</span>
                                     </div>
@@ -1006,7 +851,6 @@ if check_password():
                                 </div>
                             """, unsafe_allow_html=True)
 
-                        # NODE 2: ISO-Y STRENGTH
                         if not isoy_ath.empty:
                             b_y, l_y = isoy_ath.iloc[0], isoy_ath.iloc[-1]
                             byL, byR = b_y.get('Peak Vertical Force [N] (L)', 0.0), b_y.get('Peak Vertical Force [N] (R)', 0.0)
@@ -1014,7 +858,7 @@ if check_password():
 
                             st.markdown(f"""
                                 <div class="hud-metric-row-light">
-                                    <div style="display:flex; justify-space-between; align-items:center; margin-bottom:4px;">
+                                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
                                         <span style="font-weight:800; font-size:12px; color:#1D1D1F;"><span class="node-badge-orange">2</span>ISO-Y STRENGTH</span>
                                         <span style="font-size:10px; color:#6E6E73; font-weight:600;">Latest: {l_y['Test Date'].strftime('%m/%d/%Y')}</span>
                                     </div>
@@ -1024,7 +868,6 @@ if check_password():
                                 </div>
                             """, unsafe_allow_html=True)
 
-                        # NODE 3 & 4: HIP AD/AB
                         if not hip_ath.empty:
                             hip_ad = hip_ath[hip_ath['Direction'].str.contains('AD', case=False, na=False)] if 'Direction' in hip_ath.columns else hip_ath
                             hip_ab = hip_ath[hip_ath['Direction'].str.contains('AB', case=False, na=False)] if 'Direction' in hip_ath.columns else hip_ath
@@ -1063,7 +906,6 @@ if check_password():
                                     </div>
                                 """, unsafe_allow_html=True)
 
-                        # NODE 5: SINGLE LEG CALF RAISE
                         if not calf_ath.empty:
                             b_c, l_c = calf_ath.iloc[0], calf_ath.iloc[-1]
                             bcL, bcR = b_c.get('Peak Vertical Force [N] (L)', 0.0), b_c.get('Peak Vertical Force [N] (R)', 0.0)
@@ -1072,7 +914,7 @@ if check_password():
 
                             st.markdown(f"""
                                 <div class="hud-metric-row-light-blue">
-                                    <div style="display:flex; justify-space-between; align-items:center; margin-bottom:4px;">
+                                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
                                         <span style="font-weight:800; font-size:12px; color:#1D1D1F;"><span class="node-badge-blue">5</span>SINGLE LEG CALF RAISE</span>
                                         <span style="font-size:10px; color:#6E6E73; font-weight:600;">Latest: {l_c['Test Date'].strftime('%m/%d/%Y')}</span>
                                     </div>
@@ -1094,14 +936,12 @@ if check_password():
                 with c_ov_ath:
                     selected_overall_athlete = st.selectbox("Select Athlete for Overall Profile", master_athlete_list, key="overall_ath_select")
 
-                # Athlete Metadata Header Card
                 meta_lookup_ov = full_df_unfiltered[full_df_unfiltered['Name'] == selected_overall_athlete]
                 photo_val_ov = meta_lookup_ov['PhotoURL'].iloc[0] if not meta_lookup_ov.empty else "https://www.w3schools.com/howto/img_avatar.png"
                 pos_val_ov = meta_lookup_ov['Position'].iloc[0] if not meta_lookup_ov.empty else "N/A"
 
                 st.markdown(f'<div style="display:flex; align-items:center; gap:20px; padding:15px; background:#f8f9fa; border-radius:15px; border-left:6px solid #FF8200; margin-bottom:20px;"><img src="{photo_val_ov}" class="gallery-photo" style="width:80px; height:80px;"><div><h2 style="margin:0; color:#1D1D1F;">{selected_overall_athlete}</h2><p style="margin:0; color:#4895DB; font-weight:700; font-size:16px;">{pos_val_ov} | Overall All-Time Max Testing Baseline</p></div></div>', unsafe_allow_html=True)
 
-                # Extract Peak Performances across all datasets
                 cmj_p = raw_cmj_df[raw_cmj_df['Name'] == selected_overall_athlete]
                 ash_p = raw_ash_df[raw_ash_df['Name'] == selected_overall_athlete]
                 er_p = raw_er_df[raw_er_df['Name'] == selected_overall_athlete]
@@ -1131,9 +971,8 @@ if check_password():
                 sh_er_p = sh_p[sh_p['Direction'].str.contains('External|ER', case=False, na=False)] if not sh_p.empty and 'Direction' in sh_p.columns else pd.DataFrame()
 
                 max_sh_ir = max(sh_ir_p['L Max Force (N)'].max() if 'L Max Force (N)' in sh_ir_p.columns else 0.0, sh_ir_p['R Max Force (N)'].max() if 'R Max Force (N)' in sh_ir_p.columns else 0.0) if not sh_ir_p.empty else 0.0
-                max_sh_er = max(sh_er_p['L Max Force (N)'].max() if 'L Max Force (N)' in sh_er_p.columns else 0.0, sh_er_p['R Max Force (N)'].max() if 'R Max Force (N)' in sh_er_p.columns else 0.0) if not sh_er_p.empty else 0.0
+                max_sh_er = max(sh_er_p['L Max Force (N)'].max() if 'L Max Force (N)' in sh_ir_p.columns else 0.0, sh_er_p['R Max Force (N)'].max() if 'R Max Force (N)' in sh_er_p.columns else 0.0) if not sh_er_p.empty else 0.0
 
-                # Metric Cards HUD
                 m_c1, m_c2, m_c3, m_c4, m_c5, m_c6 = st.columns(6)
                 m_c1.metric("Peak CMJ", f"{max_cmj_h:.1f} cm")
                 m_c2.metric("Peak RSI", f"{max_rsi_val:.2f}")
@@ -1261,7 +1100,8 @@ if check_password():
                     "Spring Max vs Daily Combined", 
                     "Practice History", 
                     "Position Analysis", 
-                    "Spring v. Summer"
+                    "Spring v. Summer",
+                    "ACWR"
                 ]
             elif selected_season == "Pre-Season":
                 tab_titles = [
@@ -1273,7 +1113,8 @@ if check_password():
                     "Match Summary", 
                     "Position Analysis", 
                     "Phase Analysis", 
-                    "Practice Planner"
+                    "Practice Planner",
+                    "ACWR"
                 ]
             else: # Spring
                 tab_titles = [
@@ -1285,7 +1126,8 @@ if check_password():
                     "Match Summary", 
                     "Position Analysis", 
                     "Phase Analysis", 
-                    "Practice Planner"
+                    "Practice Planner",
+                    "ACWR"
                 ]
 
             if "active_tab_state" not in st.session_state or st.session_state.active_tab_state not in tab_titles:
@@ -1852,7 +1694,7 @@ if check_password():
                                 try:
                                     prev_matches = df_t4[(df_t4['Name'] == sel_ath_hist) & (df_t4['Date'] < jump_date) & ((df_t4['Session_Name'].str.contains('Match|Game', case=False, na=False)) | (df_t4['Session_Type'].str.contains('Match|Game', case=False, na=False)))]
                                     prev_match_name = prev_matches.sort_values('Date', ascending=False).iloc[0]['Session_Name']
-                                except: prev_match_name = "N/A"
+                                } except: prev_match_name = "N/A"
                                 raw_diff = float(row[cmj_col]) - float(base_row[cmj_col])
                                 comparison_list.append({"Date": jump_date.strftime('%m/%d/%Y'), "Prev Match": prev_match_name, "Jump Height": f"{row[cmj_col]:.1f} cm", "Raw Diff": raw_diff, "Display Diff": f"{raw_diff:+.1f} cm", "RSI": f"{row[rsi_col]:.2f}"})
                             
@@ -1953,7 +1795,7 @@ if check_password():
                     st.markdown(overall_html + "</table>", unsafe_allow_html=True)
 
             # ==========================================
-            # --- TAB CLAUSE 5: MATCH SUMMARY ----------
+            # --- TAB CLAUSE 6: MATCH SUMMARY ----------
             # ==========================================
             elif st.session_state.active_tab_state == "Match Summary":
                 match_t6 = match_master.copy()
@@ -2008,7 +1850,7 @@ if check_password():
                         st.markdown('</div>', unsafe_allow_html=True)
 
             # ==========================================
-            # --- TAB CLAUSE 6: POSITION ANALYSIS ------
+            # --- TAB CLAUSE 7: POSITION ANALYSIS ------
             # ==========================================
             elif st.session_state.active_tab_state == "Position Analysis":
                 df_t7 = df_master.copy()
@@ -2059,7 +1901,7 @@ if check_password():
                         st.write("<div style='height: 30px;'></div>", unsafe_allow_html=True)
 
             # ==========================================
-            # --- TAB CLAUSE 7: PHASE ANALYSIS ---------
+            # --- TAB CLAUSE 8: PHASE ANALYSIS ---------
             # ==========================================
             elif st.session_state.active_tab_state == "Phase Analysis":
                 st.markdown('<div class="section-header">Work Index Matrix & Drill Utilization</div>', unsafe_allow_html=True)
@@ -2122,7 +1964,7 @@ if check_password():
                     st.markdown(freq_html + "</table>", unsafe_allow_html=True)
 
             # ==========================================
-            # --- TAB CLAUSE 8: PRACTICE PLANNER -------
+            # --- TAB CLAUSE 9: PRACTICE PLANNER -------
             # ==========================================
             elif st.session_state.active_tab_state == "Practice Planner":
                 st.markdown('<div class="section-header">Practice Phase Analysis & Planner</div>', unsafe_allow_html=True)
@@ -2201,7 +2043,7 @@ if check_password():
                             st.plotly_chart(fig_flow, use_container_width=True, config=LOCKED_CONFIG, key="planner_flow_chart_t9")
 
             # ==========================================
-            # --- TAB CLAUSE 9: SPRING V. SUMMER -------
+            # --- TAB CLAUSE 10: SPRING V. SUMMER ------
             # ==========================================
             elif st.session_state.active_tab_state == "Spring v. Summer":
                 st.markdown('<div class="section-header">Spring Max vs. Summer Open Gym</div>', unsafe_allow_html=True)
@@ -2272,6 +2114,176 @@ if check_password():
                                     total_session_score = math.ceil((g_load + g_jumps + g_efforts + g_dist + g_jload) / 5)
                                     
                                     with card_cols[col_offset]: st.markdown(f"""<div style="border:1px solid #E5E5E7; border-radius:15px; padding:15px; margin-bottom:20px; background-color:white;"><div style="display:flex; align-items:center; gap:12px; margin-bottom:10px; padding-bottom:8px; border-bottom:2px solid #FF8200;"><img src="{correct_photo}" class="gallery-photo" style="width:55px; height:55px;"><div><p style="margin:0; font-weight:900; color:#1D1D1F; font-size:15px;">{row_day['Session_Name']}</p><p style="margin:0; color:#4895DB; font-weight:700; font-size:12px;">{row_day['Date'].strftime('%m/%d/%Y')} | {pos_label}</p></div></div><div style="display:flex; align-items:center; gap:10px;"><div style="flex:3;"><table class="scout-table"><thead><tr><th>Metric</th><th>Summer</th><th>Spring Max</th></tr></thead><tbody><tr><td>Player Load</td><td>{row_day['Player Load']:.1f}</td><td>{b_load:.1f}</td></tr><tr><td>Total Jumps</td><td>{int(row_day['Total Jumps'])}</td><td>{int(b_jumps)}</td></tr><tr><td>Explosive Efforts</td><td>{int(row_day['Explosive Efforts'])}</td><td>{int(b_efforts)}</td></tr><tr><td>Jump Load</td><td>{row_day['Jump Load']:.1f}</td><td>{b_jload:.1f}</td></tr><tr><td>Est. Distance (y)</td><td>{row_day['Estimated Distance (y)']:.1f}</td><td>{b_dist:.1f}</td></tr></tbody></table></div><div style="flex:1; text-align:center;"><div class="score-box" style="background-color:{get_flipped_gradient(total_session_score)}; font-size:26px; padding:10px 5px; min-width:70px; margin:0 auto;">{total_session_score}</div></div></div></div>""", unsafe_allow_html=True)
+
+            # ==========================================
+            # --- TAB CLAUSE 11: ACWR (EWMA WEIGHTED) --
+            # ==========================================
+            elif st.session_state.active_tab_state == "ACWR":
+                df_acwr_source = df_master.copy()
+                st.markdown('<div class="section-header">Exponentially Weighted ACWR Dashboard</div>', unsafe_allow_html=True)
+                
+                c_acwr1, c_acwr2 = st.columns([1.5, 1.5])
+                with c_acwr1:
+                    sel_acwr_ath = st.selectbox("Select Athlete", sorted(df_acwr_source['Name'].unique()), key="acwr_ath_select_tab")
+                with c_acwr2:
+                    sel_acwr_metric = st.selectbox("Select Practice Score Metric", metrics_to_score, index=0, key="acwr_metric_select_tab")
+
+                ath_data = df_acwr_source[df_acwr_source['Name'] == sel_acwr_ath].copy()
+                meta_lookup = full_df_unfiltered[full_df_unfiltered['Name'] == sel_acwr_ath]
+                photo_url = meta_lookup['PhotoURL'].iloc[0] if not meta_lookup.empty else "https://www.w3schools.com/howto/img_avatar.png"
+                pos_str = meta_lookup['Position'].iloc[0] if not meta_lookup.empty else "N/A"
+
+                if ath_data.empty or ath_data['Date'].dropna().empty:
+                    st.info(f"No practice workload data logged for {sel_acwr_ath} in {selected_season}.")
+                else:
+                    # Daily summation of the selected metric
+                    ath_daily = ath_data.groupby('Date')[metrics_to_score].sum().reset_index().sort_values('Date')
+                    
+                    # Create full date range calendar to ensure off-days properly decay the rolling EWMA
+                    min_date = ath_daily['Date'].min()
+                    max_date = ath_daily['Date'].max()
+                    full_date_idx = pd.date_range(start=min_date, end=max_date, freq='D')
+                    
+                    ath_calendar = ath_daily.set_index('Date').reindex(full_date_idx).fillna(0.0).reset_index()
+                    ath_calendar.rename(columns={'index': 'Date'}, inplace=True)
+
+                    # EWMA Lambda Formula: alpha = 2 / (span + 1)
+                    # Acute: 7-day span (alpha = 2/8 = 0.25)
+                    # Chronic: 28-day span (alpha = 2/29 ~= 0.068965)
+                    ath_calendar['Acute_EWMA'] = ath_calendar[sel_acwr_metric].ewm(span=7, adjust=False).mean()
+                    ath_calendar['Chronic_EWMA'] = ath_calendar[sel_acwr_metric].ewm(span=28, adjust=False).mean()
+                    
+                    ath_calendar['ACWR'] = ath_calendar.apply(
+                        lambda r: (r['Acute_EWMA'] / r['Chronic_EWMA']) if r['Chronic_EWMA'] > 0 else 0.0, 
+                        axis=1
+                    )
+
+                    latest_row = ath_calendar.iloc[-1]
+                    latest_date_str = latest_row['Date'].strftime('%m/%d/%Y')
+                    latest_acute = latest_row['Acute_EWMA']
+                    latest_chronic = latest_row['Chronic_EWMA']
+                    latest_acwr = latest_row['ACWR']
+                    badge_color, badge_bg, status_text = get_acwr_badge(latest_acwr)
+
+                    st.markdown(f'''
+                        <div class="comp-athlete-header" style="margin-top: 10px;">
+                            <img src="{photo_url}" class="comp-athlete-photo">
+                            <div>
+                                <div style="font-size:22px; font-weight:900; color:#111827;">{sel_acwr_ath}</div>
+                                <div style="font-size:14px; font-weight:600; color:#64748B;">{pos_str} | Metric: {sel_acwr_metric}</div>
+                            </div>
+                        </div>
+                    ''', unsafe_allow_html=True)
+
+                    # Top KPI Metric Cards
+                    kpi1, kpi2, kpi3, kpi4 = st.columns(4)
+                    kpi1.metric("Daily Raw Metric", f"{latest_row[sel_acwr_metric]:.1f}", help=f"Recorded on {latest_date_str}")
+                    kpi2.metric("Acute Load (7d EWMA)", f"{latest_acute:.1f}")
+                    kpi3.metric("Chronic Load (28d EWMA)", f"{latest_chronic:.1f}")
+                    with kpi4:
+                        st.markdown(f'''
+                            <div style="background:{badge_bg}; border:1px solid #E2E8F0; border-radius:10px; padding:10px; text-align:center;">
+                                <div style="font-size:10px; font-weight:800; color:{badge_color}; text-transform:uppercase;">ACWR RATIO</div>
+                                <div style="font-size:24px; font-weight:900; color:{badge_color}; line-height:1.1;">{latest_acwr:.2f}</div>
+                                <div style="font-size:11px; font-weight:700; color:{badge_color}; margin-top:3px;">{status_text}</div>
+                            </div>
+                        ''', unsafe_allow_html=True)
+
+                    st.write("<br>", unsafe_allow_html=True)
+
+                    # Longitudinal Dual-Axis Plotly Chart
+                    fig_acwr = make_subplots(specs=[[{"secondary_y": True}]])
+
+                    # Sweet spot visual band (0.80 to 1.30)
+                    fig_acwr.add_hrect(
+                        y0=0.80, y1=1.30, 
+                        fillcolor="#28a745", opacity=0.10, 
+                        line_width=0, secondary_y=False,
+                        annotation_text="Optimal Sweet Spot (0.80 - 1.30)", 
+                        annotation_position="top left",
+                        annotation_font_size=10,
+                        annotation_font_color="#137333"
+                    )
+
+                    # Elevated danger band (>= 1.50)
+                    fig_acwr.add_hline(
+                        y=1.50, line_dash="dash", line_color="#D93025", 
+                        line_width=1.5, secondary_y=False,
+                        annotation_text="High Spike Threshold (1.50)", 
+                        annotation_position="bottom right",
+                        annotation_font_size=10,
+                        annotation_font_color="#D93025"
+                    )
+
+                    # ACWR Ratio Trace
+                    fig_acwr.add_trace(
+                        go.Scatter(
+                            x=ath_calendar['Date'], 
+                            y=ath_calendar['ACWR'], 
+                            name="ACWR Ratio (EWMA)", 
+                            mode='lines+markers',
+                            line=dict(color='#FF8200', width=3.5),
+                            marker=dict(size=6, color='#FF8200')
+                        ), 
+                        secondary_y=False
+                    )
+
+                    # Acute Load Trace (Right Axis)
+                    fig_acwr.add_trace(
+                        go.Scatter(
+                            x=ath_calendar['Date'], 
+                            y=ath_calendar['Acute_EWMA'], 
+                            name="Acute Load (7d)", 
+                            mode='lines',
+                            line=dict(color='#4895DB', width=2, dash='dot')
+                        ), 
+                        secondary_y=True
+                    )
+
+                    # Chronic Load Trace (Right Axis)
+                    fig_acwr.add_trace(
+                        go.Scatter(
+                            x=ath_calendar['Date'], 
+                            y=ath_calendar['Chronic_EWMA'], 
+                            name="Chronic Load (28d)", 
+                            mode='lines',
+                            line=dict(color='#515154', width=1.8, dash='dash')
+                        ), 
+                        secondary_y=True
+                    )
+
+                    fig_acwr.update_layout(
+                        height=440,
+                        template="simple_white",
+                        title=dict(text=f"<b>{sel_acwr_ath} — {sel_acwr_metric} ACWR Longitudinal Profile</b>", font=dict(size=14), x=0, y=0.97),
+                        margin=dict(l=20, r=20, t=50, b=30),
+                        legend=dict(orientation="h", yanchor="bottom", y=1.03, xanchor="right", x=1),
+                        xaxis=dict(title="Date", tickformat="%m/%d", showgrid=False)
+                    )
+                    fig_acwr.update_yaxes(title_text="ACWR (Acute:Chronic)", secondary_y=False, rangemode='tozero', range=[0, max(2.0, ath_calendar['ACWR'].max() * 1.15)])
+                    fig_acwr.update_yaxes(title_text=f"Absolute {sel_acwr_metric} Workload", secondary_y=True, showgrid=False)
+
+                    st.plotly_chart(fig_acwr, use_container_width=True, config=LOCKED_CONFIG, key=f"acwr_chart_{sel_acwr_ath}_{sel_acwr_metric}")
+
+                    # Multi-Metric Practice Score Snapshot Table
+                    st.markdown("#### Practice Score Metrics: Multi-Metric EWMA Breakdown")
+                    acwr_rows = []
+                    for m in metrics_to_score:
+                        a_ewma = ath_calendar[m].ewm(span=7, adjust=False).mean().iloc[-1]
+                        c_ewma = ath_calendar[m].ewm(span=28, adjust=False).mean().iloc[-1]
+                        r_val = (a_ewma / c_ewma) if c_ewma > 0 else 0.0
+                        _, _, status_lbl = get_acwr_badge(r_val)
+                        
+                        acwr_rows.append({
+                            "Metric": m,
+                            "Today Total": f"{latest_row.get(m, 0.0):.1f}",
+                            "Acute (7d EWMA)": f"{a_ewma:.1f}",
+                            "Chronic (28d EWMA)": f"{c_ewma:.1f}",
+                            "ACWR Ratio": f"{r_val:.2f}",
+                            "Workload Status": status_lbl
+                        })
+
+                    st.dataframe(pd.DataFrame(acwr_rows), use_container_width=True, hide_index=True)
 
     except Exception as e:
         st.error(f"Sync Error: {e}")
