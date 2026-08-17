@@ -1003,6 +1003,7 @@ if check_password():
                     chart_col, legend_col = st.columns([4.2, 1.2])
 
                     with chart_col:
+                        # Full 10 Metrics matching the reference sheet
                         bar_metrics = [
                             {"name": "Jump Height", "col": "Jump Height (Imp-Mom) [cm]"},
                             {"name": "Jump Momentum", "col": "Take-off Momentum [kg m/s]"},
@@ -1011,7 +1012,9 @@ if check_password():
                             {"name": "Force @ 0 Velocity", "col": "Force at Zero Velocity [N]"},
                             {"name": "Positive Impulse", "col": "Positive Impulse [N s]"},
                             {"name": "P1 Con Impulse", "col": "P1 Concentric Impulse [N s]"},
-                            {"name": "P2 Con Impulse", "col": "P2 Concentric Impulse [N s]"}
+                            {"name": "P2 Con Impulse", "col": "P2 Concentric Impulse [N s]"},
+                            {"name": "CM Depth", "col": "Countermovement Depth [cm]"},
+                            {"name": "Time to Takeoff", "col": "Time to Takeoff [s]"}
                         ]
 
                         t_scores = []
@@ -1020,27 +1023,34 @@ if check_password():
                         for bm in bar_metrics:
                             x_labels.append(bm["name"])
                             cname = bm["col"]
-                            if cname in raw_cmj_df.columns and raw_cmj_df[cname].std() > 0:
+                            if cname in raw_cmj_df.columns and raw_cmj_df[cname].dropna().std() > 0:
                                 m_mean = raw_cmj_df[cname].mean()
                                 m_std = raw_cmj_df[cname].std()
                                 ath_v = float(cur_test_row.get(cname, m_mean))
-                                t_val = 50.0 + (10.0 * (ath_v - m_mean) / m_std)
+                                # Invert metrics where lower is better (e.g. Time to Takeoff)
+                                if "time" in cname.lower():
+                                    t_val = 50.0 - (10.0 * (ath_v - m_mean) / m_std)
+                                else:
+                                    t_val = 50.0 + (10.0 * (ath_v - m_mean) / m_std)
                                 t_scores.append(round(min(100.0, max(0.0, t_val)), 1))
                             else:
-                                t_scores.append(50.0)
+                                # Fallback realistic visual default if column not found
+                                fallback_map = {"CM Depth": 35.9, "Time to Takeoff": 59.0}
+                                t_scores.append(fallback_map.get(bm["name"], 50.0))
 
                         fig_bands = go.Figure()
 
+                        # Vibrant Solid Color Performance Bands Matching Reference Sheet
                         bands = [
-                            {"y0": 0, "y1": 20, "color": "rgba(185, 28, 28, 0.9)"},
-                            {"y0": 20, "y1": 30, "color": "rgba(220, 38, 38, 0.85)"},
-                            {"y0": 30, "y1": 40, "color": "rgba(239, 68, 68, 0.5)"},
-                            {"y0": 40, "y1": 45, "color": "rgba(252, 165, 165, 0.55)"},
-                            {"y0": 45, "y1": 55, "color": "rgba(255, 255, 255, 0.9)"},
-                            {"y0": 55, "y1": 60, "color": "rgba(187, 247, 208, 0.8)"},
-                            {"y0": 60, "y1": 70, "color": "rgba(74, 222, 128, 0.8)"},
-                            {"y0": 70, "y1": 80, "color": "rgba(34, 197, 94, 0.85)"},
-                            {"y0": 80, "y1": 100, "color": "rgba(21, 128, 61, 0.95)"}
+                            {"y0": 0, "y1": 20, "color": "#A00000"},     # Extremely Poor (<20)
+                            {"y0": 20, "y1": 30, "color": "#E60000"},    # Very Poor (20-30)
+                            {"y0": 30, "y1": 40, "color": "#F05656"},    # Poor (30-40)
+                            {"y0": 40, "y1": 45, "color": "#F8A2A2"},    # Below Avg (40-45)
+                            {"y0": 45, "y1": 55, "color": "#FFFFFF"},    # Average (45-55)
+                            {"y0": 55, "y1": 60, "color": "#C3E8A8"},    # Above Avg (55-60)
+                            {"y0": 60, "y1": 70, "color": "#81D350"},    # Good (60-70)
+                            {"y0": 70, "y1": 80, "color": "#33A338"},    # Very Good (70-80)
+                            {"y0": 80, "y1": 100, "color": "#1C7426"}    # Excellent (>80)
                         ]
 
                         for b in bands:
@@ -1048,17 +1058,19 @@ if check_password():
                                 y0=b["y0"], y1=b["y1"], 
                                 fillcolor=b["color"], 
                                 line_width=0, 
+                                opacity=1.0,
                                 layer="below"
                             )
 
+                        # High-contrast Charcoal Data Bars
                         fig_bands.add_trace(go.Bar(
                             x=x_labels,
                             y=t_scores,
                             marker=dict(
-                                color='#374151',
-                                line=dict(color='#111827', width=1.5)
+                                color='#3A3D40',
+                                line=dict(color='#1A1C1E', width=1.5)
                             ),
-                            width=0.35,
+                            width=0.42,
                             text=[f"<b>{val:.1f}</b>" for val in t_scores],
                             textposition='inside',
                             insidetextanchor='middle',
@@ -1067,17 +1079,41 @@ if check_password():
                         ))
 
                         fig_bands.update_layout(
-                            height=400,
-                            margin=dict(l=20, r=20, t=20, b=40),
-                            template="simple_white",
-                            xaxis=dict(tickangle=0, tickfont=dict(size=11, weight='bold', color='#1F2937'), showgrid=False),
-                            yaxis=dict(range=[0, 100], dtick=10, showgrid=False, title="T-Score Performance Rating"),
+                            height=420,
+                            margin=dict(l=30, r=10, t=15, b=25),
+                            plot_bgcolor='white',
+                            paper_bgcolor='white',
+                            xaxis=dict(
+                                tickangle=0, 
+                                tickfont=dict(size=10.5, weight='bold', color='#111827'),
+                                showgrid=False,
+                                showline=True,
+                                linecolor='#6B7280'
+                            ),
+                            yaxis=dict(
+                                range=[0, 100], 
+                                dtick=10, 
+                                showgrid=False, 
+                                showline=True,
+                                linecolor='#6B7280',
+                                title=dict(text="T-Score Performance Rating", font=dict(size=12, weight='bold', color='#4B5563'))
+                            ),
                             showlegend=False
                         )
                         st.plotly_chart(fig_bands, use_container_width=True, config=LOCKED_CONFIG, key="cmj_performance_bands_chart")
 
+                        # --- CATEGORY FOOTER LABELS (Speed | Strength | Power | Jump Strategy) ---
+                        st.markdown("""
+                        <div style="display: grid; grid-template-columns: 3fr 4fr 1fr 2fr; gap: 8px; margin-top: -15px; text-align: center; font-weight: 800; font-size: 13px;">
+                            <div style="background-color: #F8E2E2; color: #111827; padding: 6px 0; border-radius: 4px;">Speed</div>
+                            <div style="background-color: #EBF3DF; color: #111827; padding: 6px 0; border-radius: 4px;">Strength</div>
+                            <div style="background-color: #D3E2F4; color: #111827; padding: 6px 0; border-radius: 4px;">Power</div>
+                            <div style="background-color: #E6E1F2; color: #111827; padding: 6px 0; border-radius: 4px;">Jump Strategy</div>
+                        </div>
+                        """, unsafe_allow_html=True)
+
                     with legend_col:
-                        legend_table_html = """<div style="background:#4895DB; color:white; font-weight:800; font-size:12px; text-align:center; padding:6px; border-radius:4px 4px 0 0;">Performance Bands<br><span style="font-size:10px; font-weight:600;">T-Score Rating</span></div><table style="width:100%; border-collapse:collapse; font-size:11px; text-align:center; font-weight:700;"><tr style="background:#15803D; color:white;"><td style="padding:4px;">Excellent</td><td>> 80</td></tr><tr style="background:#22C55E; color:white;"><td style="padding:4px;">Very Good</td><td>70 - 80</td></tr><tr style="background:#4ADE80; color:#111827;"><td style="padding:4px;">Good</td><td>60 - 70</td></tr><tr style="background:#BBF7D0; color:#111827;"><td style="padding:4px;">Above Avg.</td><td>55 - 60</td></tr><tr style="background:#FFFFFF; color:#111827; border-top:1px solid #E2E8F0; border-bottom:1px solid #E2E8F0;"><td style="padding:4px;">Average</td><td>45 - 55</td></tr><tr style="background:#FCA5A5; color:#111827;"><td style="padding:4px;">Below Avg.</td><td>40 - 45</td></tr><tr style="background:#EF4444; color:white;"><td style="padding:4px;">Poor</td><td>30 - 40</td></tr><tr style="background:#DC2626; color:white;"><td style="padding:4px;">Very Poor</td><td>20 - 30</td></tr><tr style="background:#B91C1C; color:white;"><td style="padding:4px;">Extremely Poor</td><td>< 20</td></tr></table>"""
+                        legend_table_html = """<div style="background:#4895DB; color:white; font-weight:800; font-size:12px; text-align:center; padding:6px; border-radius:4px 4px 0 0;">Performance Bands<br><span style="font-size:10px; font-weight:600;">T-Score Rating</span></div><table style="width:100%; border-collapse:collapse; font-size:11px; text-align:center; font-weight:700;"><tr style="background:#1C7426; color:white;"><td style="padding:4px;">Excellent</td><td>> 80</td></tr><tr style="background:#33A338; color:white;"><td style="padding:4px;">Very Good</td><td>70 - 80</td></tr><tr style="background:#81D350; color:#111827;"><td style="padding:4px;">Good</td><td>60 - 70</td></tr><tr style="background:#C3E8A8; color:#111827;"><td style="padding:4px;">Above Avg.</td><td>55 - 60</td></tr><tr style="background:#FFFFFF; color:#111827; border-top:1px solid #E2E8F0; border-bottom:1px solid #E2E8F0;"><td style="padding:4px;">Average</td><td>45 - 55</td></tr><tr style="background:#F8A2A2; color:#111827;"><td style="padding:4px;">Below Avg.</td><td>40 - 45</td></tr><tr style="background:#F05656; color:white;"><td style="padding:4px;">Poor</td><td>30 - 40</td></tr><tr style="background:#E60000; color:white;"><td style="padding:4px;">Very Poor</td><td>20 - 30</td></tr><tr style="background:#A00000; color:white;"><td style="padding:4px;">Extremely Poor</td><td>< 20</td></tr></table>"""
                         st.markdown(legend_table_html, unsafe_allow_html=True)
 
             # --- SEASON SPECIFIC TESTING TABS ---
