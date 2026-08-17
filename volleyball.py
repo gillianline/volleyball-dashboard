@@ -368,6 +368,10 @@ if check_password():
     if "is_printing" not in st.session_state:
         st.session_state.is_printing = False
 
+    # INITIALIZE SESSION STATE TO PREVENT ATTRIBUTE ERRORS
+    if "active_tab_state" not in st.session_state:
+        st.session_state.active_tab_state = "Individual Profile"
+
     LOCKED_CONFIG = {'staticPlot': False, 'displayModeBar': False}
 
     try:
@@ -997,7 +1001,7 @@ if check_password():
                             sc1, sc2 = st.columns(2)
                             with sc1: st.markdown(f'<div style="text-align:center;"><div class="score-box" style="background-color:{color_er_l}; line-height:1.2; padding-top:15px; height:80px; width:100%;"><span style="font-size:18px;">{cur_l_rom:.1f}°</span><span style="font-size:10px; display:block; font-weight:bold; margin-top:2px;">LEFT</span></div></div>', unsafe_allow_html=True)
                             with sc2: st.markdown(f'<div style="text-align:center;"><div class="score-box" style="background-color:{color_er_r}; line-height:1.2; padding-top:15px; height:80px; width:100%;"><span style="font-size:18px;">{cur_r_rom:.1f}°</span><span style="font-size:10px; display:block; font-weight:bold; margin-top:2px;">RIGHT</span></div></div>', unsafe_allow_html=True)
-                            st.markdown(f'<div class="info-box" style="text-align:center; margin-top:10px;"><p style="margin:0; font-size:11px; color:grey;"><b>Asymmetry:</b> {cur_asym_rom:+.1f}%</p><p style="margin:0; font-size:11px; color:grey;"><b>% Change from Base:</b> L: {pct_l:+.1f}% | R: {pct_r:+.1f}%</p><p style="margin:0; font-size:11px; color:grey;"><b>Base ROM:</b> L: {base_l_rom:.1f}° | R: {base_r_rom:.1f}°</p></div>', unsafe_allow_html=True)
+                            st.markdown(f'<div class="info-box" style="text-align:center; margin-top:10px;"><p style="margin:0; font-size:11px; color:grey;"><b>Asymmetry:</b> {cur_asym_rom:+.1f}%</p><p style="margin:0; font-size:11px; color:grey;"><b>% Change from Base:</b> L: {rom_pct_l:+.1f}% | R: {pct_r:+.1f}%</p><p style="margin:0; font-size:11px; color:grey;"><b>Base ROM:</b> L: {base_l_rom:.1f}° | R: {base_r_rom:.1f}°</p></div>', unsafe_allow_html=True)
                         with ec2:
                             fig_er_t = go.Figure()
                             fig_er_t.add_trace(go.Scatter(x=er_t_data['Test Date'], y=er_t_data['L Max ROM (°)'], name="Left Max ROM", mode='lines+markers', line=dict(color='#4895DB', width=2.5)))
@@ -1284,7 +1288,7 @@ if check_password():
                 sh_er_p = sh_p[sh_p['Direction'].str.contains('External|ER', case=False, na=False)] if not sh_p.empty and 'Direction' in sh_p.columns else pd.DataFrame()
 
                 max_sh_ir = max(sh_ir_p['L Max Force (N)'].max() if 'L Max Force (N)' in sh_ir_p.columns else 0.0, sh_ir_p['R Max Force (N)'].max() if 'R Max Force (N)' in sh_ir_p.columns else 0.0) if not sh_ir_p.empty else 0.0
-                max_sh_er = max(sh_er_p['L Max Force (N)'].max() if 'L Max Force (N)' in sh_er_p.columns else 0.0, sh_er_p['R Max Force (N)'].max() if 'R Max Force (N)' in sh_ir_p.columns else 0.0) if not sh_er_p.empty else 0.0
+                max_sh_er = max(sh_er_p['L Max Force (N)'].max() if 'L Max Force (N)' in sh_ir_p.columns else 0.0, sh_er_p['R Max Force (N)'].max() if 'R Max Force (N)' in sh_ir_p.columns else 0.0) if not sh_er_p.empty else 0.0
 
                 m_c1, m_c2, m_c3, m_c4, m_c5, m_c6 = st.columns(6)
                 m_c1.metric("Peak CMJ", f"{max_cmj_h:.1f} cm")
@@ -1383,6 +1387,85 @@ if check_password():
                         fig_comp_cmj.update_yaxes(title_text="RSI Modified", range=[0, max_r * 1.45], secondary_y=True, showgrid=False)
             
                         st.plotly_chart(fig_comp_cmj, use_container_width=True, config=LOCKED_CONFIG, key="cmj_cross_season_bar")
+                    
+                    st.markdown("#### Season-by-Season Best")
+                    summary_rows = []
+                    for season_period in ['Spring', 'Summer', 'Pre-Season']:
+                        s_cmj = cmj_comp[cmj_comp['Season'] == season_period]
+                        s_ash = ash_comp[ash_comp['Season'] == season_period]
+                        s_er = er_comp[er_comp['Season'] == season_period]
+                        
+                        max_cmj = s_cmj[cmj_col].max() if not s_cmj.empty else 0.0
+                        max_rsi = s_cmj[rsi_col].max() if not s_cmj.empty else 0.0
+                        
+                        max_ash_l = s_ash['Peak Vertical Force [N] (L)'].max() if not s_ash.empty and 'Peak Vertical Force [N] (L)' in s_ash.columns else 0.0
+                        max_ash_r = s_ash['Peak Vertical Force [N] (R)'].max() if not s_ash.empty and 'Peak Vertical Force [N] (R)' in s_ash.columns else 0.0
+                        
+                        max_er_l = s_er['L Max ROM (°)'].max() if not s_er.empty and 'L Max ROM (°)' in s_er.columns else 0.0
+                        max_er_r = s_er['R Max ROM (°)'].max() if not s_er.empty and 'R Max ROM (°)' in s_er.columns else 0.0
+                        
+                        summary_rows.append({
+                            'Season': season_period,
+                            'Max CMJ (cm)': round(max_cmj, 1),
+                            'Max RSI': round(max_rsi, 2),
+                            'Max ASH L (N)': round(max_ash_l, 0),
+                            'Max ASH R (N)': round(max_ash_r, 0),
+                            'Max ER ROM L (°)': round(max_er_l, 1),
+                            'Max ER ROM R (°)': round(max_er_r, 1)
+                        })
+                    
+                    st.dataframe(pd.DataFrame(summary_rows), use_container_width=True, hide_index=True)
+                else:
+                    st.info(f"No multi-season testing records logged for {comp_athlete}.")
+        else:
+            # --- DYNAMIC SEASONAL TAB NAVIGATION SETUP ---
+            if selected_season == "Summer":
+                tab_titles = [
+                    "Individual Profile", 
+                    "Practice Scores", 
+                    "Daily Combined Scores", 
+                    "Spring Max vs Daily Combined", 
+                    "Practice History", 
+                    "Position Analysis", 
+                    "Spring v. Summer"
+                ]
+            elif selected_season == "Pre-Season":
+                tab_titles = [
+                    "Individual Profile", 
+                    "Practice Scores", 
+                    "Daily Combined Scores", 
+                    "Practice History", 
+                    "Match v. Practice", 
+                    "Match Summary", 
+                    "Position Analysis", 
+                    "Phase Analysis", 
+                    "Practice Planner"
+                ]
+            else: # Spring
+                tab_titles = [
+                    "Individual Profile", 
+                    "Practice Scores", 
+                    "Daily Combined Scores", 
+                    "Practice History", 
+                    "Match v. Practice", 
+                    "Match Summary", 
+                    "Position Analysis", 
+                    "Phase Analysis", 
+                    "Practice Planner"
+                ]
+
+            if st.session_state.active_tab_state not in tab_titles:
+                st.session_state.active_tab_state = tab_titles[0]
+
+            selected_tab_label = st.radio(
+                "Navigation View Menu Selection Control", 
+                tab_titles, 
+                index=tab_titles.index(st.session_state.active_tab_state),
+                label_visibility="collapsed", 
+                horizontal=True, 
+                key=f"master_radio_{selected_season}"
+            )
+            st.session_state.active_tab_state = selected_tab_label
 
             # ==========================================
             # --- TAB CLAUSE 0: INDIVIDUAL PROFILE -----
