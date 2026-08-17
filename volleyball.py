@@ -500,7 +500,7 @@ if check_password():
                         sc3.metric("Under-training (<0.80)", under_count)
                         sc4.metric("High Spikes (>1.50)", spike_count)
                         
-                        st.markdown(f"#### Squad ACWR Grid on {eval_date_obj.strftime('%m/%d/%Y')}")
+                        st.markdown(f"#### Team ACWR Grid on {eval_date_obj.strftime('%m/%d/%Y')}")
                         
                         table_html = """<table class="scout-table"><thead><tr>
                             <th style="text-align:left !important; padding-left:10px;">Athlete</th>
