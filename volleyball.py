@@ -496,7 +496,7 @@ if check_password():
                         
                         sc1, sc2, sc3, sc4 = st.columns(4)
                         sc1.metric("Athletes Evaluated", len(team_summary_rows))
-                        sc2.metric("In Sweet Spot (0.80-1.30)", sweet_count)
+                        sc2.metric("Optimal (0.80-1.30)", sweet_count)
                         sc3.metric("Under-training (<0.80)", under_count)
                         sc4.metric("High Spikes (>1.50)", spike_count)
                         
@@ -594,7 +594,7 @@ if check_password():
                         y0=0.80, y1=1.30, 
                         fillcolor="#28a745", opacity=0.10, 
                         line_width=0, secondary_y=False,
-                        annotation_text="Optimal Sweet Spot (0.80 - 1.30)", 
+                        annotation_text="Optimal (0.80 - 1.30)", 
                         annotation_position="top left",
                         annotation_font_size=10,
                         annotation_font_color="#137333"
