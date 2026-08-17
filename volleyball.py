@@ -368,7 +368,6 @@ if check_password():
     if "is_printing" not in st.session_state:
         st.session_state.is_printing = False
 
-    # INITIALIZE SESSION STATE TO PREVENT ATTRIBUTE ERRORS
     if "active_tab_state" not in st.session_state:
         st.session_state.active_tab_state = "Individual Profile"
 
@@ -558,7 +557,6 @@ if check_password():
                 sel_ind_date = pd.to_datetime(sel_ind_date_str)
                 week_start_ind = sel_ind_date - timedelta(days=6)
                 
-                # Filter individual athlete options to those with data in the last 7 days of the selected snapshot
                 active_athletes_for_date = []
                 for ath_name in sorted(raw_df['Name'].unique()):
                     ath_sub = raw_df[(raw_df['Name'] == ath_name) & (raw_df['Date'] >= week_start_ind) & (raw_df['Date'] <= sel_ind_date)]
@@ -891,12 +889,255 @@ if check_password():
                 rv, rd, mv, md, pct, dn = get_card_stats(raw_er_df, 'R Max ROM (°)')
                 render_compliance_card("External Rotation ROM (Right)", rv, rd, mv, md, pct, dn, threshold_days=7, unit="°", decimals=1)
                 
+        # ==========================================
+        # --- TESTING TAB --------------------------
+        # ==========================================
         elif selected_season == "Testing":
             st.markdown('<div class="section-header">Testing Profile</div>', unsafe_allow_html=True)
-            testing_season_tabs = st.tabs(["Spring Testing", "Summer Testing", "Pre-Season Testing", "Intake Testing", "Overall Testing Profile", "Season Comparison"])
+            testing_season_tabs = st.tabs([
+                "CMJ Dashboard",
+                "Spring Testing", 
+                "Summer Testing", 
+                "Pre-Season Testing", 
+                "Intake Testing", 
+                "Overall Testing Profile", 
+                "Season Comparison"
+            ])
             
+            # --- TAB 0: CMJ DASHBOARD ---
+            with testing_season_tabs[0]:
+                c_cmj_ath, c_cmj_date, c_cmj_comp = st.columns([2, 1.5, 1.5])
+                with c_cmj_ath:
+                    sel_cmj_ath = st.selectbox("Select Athlete", master_athlete_list, key="cmj_dash_ath_sel")
+                
+                ath_cmj_all = raw_cmj_df[raw_cmj_df['Name'] == sel_cmj_ath].sort_values('Test Date')
+                
+                if ath_cmj_all.empty:
+                    st.info(f"No CMJ records found for {sel_cmj_ath}.")
+                else:
+                    valid_dates = ath_cmj_all['Test Date'].dropna().dt.strftime('%m/%d/%y').tolist()
+                    with c_cmj_date:
+                        sel_test_date_str = st.selectbox("Test Date", valid_dates, index=len(valid_dates)-1, key="cmj_dash_date_sel")
+                    with c_cmj_comp:
+                        comp_factor = st.selectbox("Comparison Factor", ["Individual (vs. Baseline)", "Team Benchmark (T-Score)"], key="cmj_dash_comp_sel")
+
+                    cur_test_row = ath_cmj_all[ath_cmj_all['Test Date'].dt.strftime('%m/%d/%y') == sel_test_date_str].iloc[-1]
+                    base_test_row = ath_cmj_all.iloc[0]
+
+                    meta_lookup = full_df_unfiltered[full_df_unfiltered['Name'] == sel_cmj_ath]
+                    photo_val = meta_lookup['PhotoURL'].iloc[0] if not meta_lookup.empty else "https://www.w3schools.com/howto/img_avatar.png"
+                    pos_val = meta_lookup['Position'].iloc[0] if not meta_lookup.empty else "N/A"
+
+                    cmj_metric_defs = [
+                        {"label": "Jump Height", "col": "Jump Height (Imp-Mom) [cm]", "unit": "cm", "fmt": "{:.1f}"},
+                        {"label": "Jump Momentum", "col": "Take-off Momentum [kg m/s]", "unit": "kg·m/s", "fmt": "{:.1f}"},
+                        {"label": "Peak Velocity", "col": "Concentric Peak Velocity [m/s]", "unit": "m/s", "fmt": "{:.2f}"},
+                        {"label": "Mean Con Force", "col": "Concentric Mean Force [N]", "unit": "N", "fmt": "{:.0f}"},
+                        {"label": "Force @ 0 Velocity", "col": "Force at Zero Velocity [N]", "unit": "N", "fmt": "{:.0f}"},
+                        {"label": "Positive Impulse", "col": "Positive Impulse [N s]", "unit": "N·s", "fmt": "{:.1f}"},
+                        {"label": "P1 Con Impulse", "col": "P1 Concentric Impulse [N s]", "unit": "N·s", "fmt": "{:.1f}"},
+                        {"label": "P2 Con Impulse", "col": "P2 Concentric Impulse [N s]", "unit": "N·s", "fmt": "{:.1f}"},
+                        {"label": "P2:P1 Impulse Ratio", "col": "P2 Concentric Impulse:P1 Concentric Impulse", "unit": "", "fmt": "{:.2f}"}
+                    ]
+
+                    # --- TOP SECTION: ATHLETE BANNER | DATA TABLE | GAUGE ---
+                    top_col1, top_col2, top_col3 = st.columns([1.2, 2.2, 1.6])
+
+                    with top_col1:
+                        st.markdown(f"""
+                        <div style="background:#4895DB; color:white; font-weight:900; font-size:18px; text-align:center; padding:8px 10px; border-radius:6px 6px 0 0;">
+                            {sel_cmj_ath}
+                        </div>
+                        <div style="border:1px solid #E2E8F0; border-top:none; border-radius:0 0 6px 6px; padding:12px; background:white; display:flex; align-items:center; gap:12px;">
+                            <img src="{photo_val}" style="width:90px; height:90px; border-radius:8px; object-fit:contain; border:2px solid #FF8200;">
+                            <div style="font-size:12px; line-height:1.6; color:#1D1D1F;">
+                                <b>Position:</b> {pos_val}<br>
+                                <b>Body Weight:</b> {cur_test_row.get('BW [KG]', 0.0):.1f} kg<br>
+                                <b>RSI-Mod:</b> {cur_test_row.get('RSI-modified [m/s]', 0.0):.2f}
+                            </div>
+                        </div>
+                        <div style="background:#4895DB; color:white; font-weight:800; font-size:13px; text-align:center; padding:6px; margin-top:10px; border-radius:4px;">
+                            Comparison Factor: Individual
+                        </div>
+                        """, unsafe_allow_html=True)
+
+                    with top_col2:
+                        st.markdown("""
+                        <div style="background:#4895DB; color:white; font-weight:900; font-size:14px; text-align:center; padding:6px; border-radius:6px 6px 0 0;">
+                            Countermovement Jump Performance
+                        </div>
+                        """, unsafe_allow_html=True)
+                        
+                        tbl_html = """
+                        <table class="scout-table" style="width:100%; border:1px solid #E2E8F0; border-top:none; background:white;">
+                            <thead>
+                                <tr style="background:#F8FAFC; color:#64748B; font-size:11px;">
+                                    <th style="text-align:left !important; padding-left:12px;">Metric</th>
+                                    <th>Baseline</th>
+                                    <th style="background:#EBF5FF; color:#1E40AF;">Current</th>
+                                    <th>% Change</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                        """
+                        for m_info in cmj_metric_defs:
+                            lbl = m_info["label"]
+                            col_name = m_info["col"]
+                            fmt = m_info["fmt"]
+                            
+                            c_val = float(cur_test_row.get(col_name, 0.0)) if col_name in cur_test_row else 0.0
+                            b_val = float(base_test_row.get(col_name, 0.0)) if col_name in base_test_row else 0.0
+                            
+                            diff = ((c_val - b_val) / b_val * 100) if b_val > 0 else 0.0
+                            pct_color = "#137333" if diff >= 0 else "#D93025"
+                            
+                            tbl_html += f"""
+                            <tr>
+                                <td style="text-align:left !important; padding-left:12px; font-weight:600;">{lbl}</td>
+                                <td style="color:#64748B;">{fmt.format(b_val)}</td>
+                                <td style="font-weight:800; background:#F0F7FF; border: 1px solid #3B82F6;">{fmt.format(c_val)}</td>
+                                <td style="font-weight:800; color:{pct_color};">{diff:+.0f}%</td>
+                            </tr>
+                            """
+                        tbl_html += "</tbody></table>"
+                        st.markdown(tbl_html, unsafe_allow_html=True)
+
+                    with top_col3:
+                        st.markdown(f"""
+                        <div style="background:#4895DB; color:white; font-weight:900; font-size:14px; text-align:center; padding:6px; border-radius:6px 6px 0 0;">
+                            Performance Readiness Score
+                        </div>
+                        """, unsafe_allow_html=True)
+                        
+                        peak_h = ath_cmj_all[cmj_col].max() if cmj_col in ath_cmj_all else 1.0
+                        cur_h_val = float(cur_test_row.get(cmj_col, 0.0))
+                        gauge_score = min(120, max(0, int((cur_h_val / peak_h) * 100))) if peak_h > 0 else 94
+
+                        fig_gauge = go.Figure(go.Indicator(
+                            mode="gauge+number",
+                            value=gauge_score,
+                            number={'suffix': "%", 'font': {'size': 26, 'color': '#FFFFFF', 'weight': 'bold'}},
+                            gauge={
+                                'axis': {'range': [0, 100], 'tickwidth': 1, 'tickcolor': "#94A3B8"},
+                                'bar': {'color': "#111827", 'thickness': 0.15},
+                                'steps': [
+                                    {'range': [0, 30], 'color': '#D93025'},
+                                    {'range': [30, 55], 'color': '#EA580C'},
+                                    {'range': [55, 75], 'color': '#FACC15'},
+                                    {'range': [75, 90], 'color': '#84CC16'},
+                                    {'range': [90, 100], 'color': '#16A34A'}
+                                ],
+                            }
+                        ))
+                        fig_gauge.update_layout(
+                            height=250, 
+                            margin=dict(l=15, r=15, t=30, b=10),
+                            paper_bgcolor="white"
+                        )
+                        st.plotly_chart(fig_gauge, use_container_width=True, config=LOCKED_CONFIG, key="cmj_readiness_gauge")
+
+                    st.markdown("<br>", unsafe_allow_html=True)
+
+                    # --- BOTTOM SECTION: PERFORMANCE BANDS & T-SCORE GRAPH ---
+                    st.markdown('<div class="section-header">Countermovement Jump Performance Standards</div>', unsafe_allow_html=True)
+                    
+                    chart_col, legend_col = st.columns([4.2, 1.2])
+
+                    with chart_col:
+                        bar_metrics = [
+                            {"name": "Jump Height", "col": "Jump Height (Imp-Mom) [cm]"},
+                            {"name": "Jump Momentum", "col": "Take-off Momentum [kg m/s]"},
+                            {"name": "Peak Velocity", "col": "Concentric Peak Velocity [m/s]"},
+                            {"name": "Mean Con Force", "col": "Concentric Mean Force [N]"},
+                            {"name": "Force @ 0 Velocity", "col": "Force at Zero Velocity [N]"},
+                            {"name": "Positive Impulse", "col": "Positive Impulse [N s]"},
+                            {"name": "P1 Con Impulse", "col": "P1 Concentric Impulse [N s]"},
+                            {"name": "P2 Con Impulse", "col": "P2 Concentric Impulse [N s]"}
+                        ]
+
+                        t_scores = []
+                        x_labels = []
+
+                        for bm in bar_metrics:
+                            x_labels.append(bm["name"])
+                            cname = bm["col"]
+                            if cname in raw_cmj_df.columns and raw_cmj_df[cname].std() > 0:
+                                m_mean = raw_cmj_df[cname].mean()
+                                m_std = raw_cmj_df[cname].std()
+                                ath_v = float(cur_test_row.get(cname, m_mean))
+                                t_val = 50.0 + (10.0 * (ath_v - m_mean) / m_std)
+                                t_scores.append(round(min(100.0, max(0.0, t_val)), 1))
+                            else:
+                                t_scores.append(50.0)
+
+                        fig_bands = go.Figure()
+
+                        bands = [
+                            {"y0": 0, "y1": 20, "color": "rgba(185, 28, 28, 0.9)"},
+                            {"y0": 20, "y1": 30, "color": "rgba(220, 38, 38, 0.85)"},
+                            {"y0": 30, "y1": 40, "color": "rgba(239, 68, 68, 0.5)"},
+                            {"y0": 40, "y1": 45, "color": "rgba(252, 165, 165, 0.55)"},
+                            {"y0": 45, "y1": 55, "color": "rgba(255, 255, 255, 0.9)"},
+                            {"y0": 55, "y1": 60, "color": "rgba(187, 247, 208, 0.8)"},
+                            {"y0": 60, "y1": 70, "color": "rgba(74, 222, 128, 0.8)"},
+                            {"y0": 70, "y1": 80, "color": "rgba(34, 197, 94, 0.85)"},
+                            {"y0": 80, "y1": 100, "color": "rgba(21, 128, 61, 0.95)"}
+                        ]
+
+                        for b in bands:
+                            fig_bands.add_hrect(
+                                y0=b["y0"], y1=b["y1"], 
+                                fillcolor=b["color"], 
+                                line_width=0, 
+                                layer="below"
+                            )
+
+                        fig_bands.add_trace(go.Bar(
+                            x=x_labels,
+                            y=t_scores,
+                            marker=dict(
+                                color='#374151',
+                                line=dict(color='#111827', width=1.5)
+                            ),
+                            width=0.35,
+                            text=[f"<b>{val:.1f}</b>" for val in t_scores],
+                            textposition='inside',
+                            insidetextanchor='middle',
+                            textfont=dict(color='white', size=12),
+                            cliponaxis=False
+                        ))
+
+                        fig_bands.update_layout(
+                            height=400,
+                            margin=dict(l=20, r=20, t=20, b=40),
+                            template="simple_white",
+                            xaxis=dict(tickangle=0, tickfont=dict(size=11, weight='bold', color='#1F2937'), showgrid=False),
+                            yaxis=dict(range=[0, 100], dtick=10, showgrid=False, title="T-Score Performance Rating"),
+                            showlegend=False
+                        )
+                        st.plotly_chart(fig_bands, use_container_width=True, config=LOCKED_CONFIG, key="cmj_performance_bands_chart")
+
+                    with legend_col:
+                        st.markdown("""
+                        <div style="background:#4895DB; color:white; font-weight:800; font-size:12px; text-align:center; padding:6px; border-radius:4px 4px 0 0;">
+                            Performance Bands<br><span style="font-size:10px; font-weight:600;">T-Score Rating</span>
+                        </div>
+                        <table style="width:100%; border-collapse:collapse; font-size:11px; text-align:center; font-weight:700;">
+                            <tr style="background:#15803D; color:white;"><td style="padding:4px;">Excellent</td><td>> 80</td></tr>
+                            <tr style="background:#22C55E; color:white;"><td style="padding:4px;">Very Good</td><td>70 - 80</td></tr>
+                            <tr style="background:#4ADE80; color:#111827;"><td style="padding:4px;">Good</td><td>60 - 70</td></tr>
+                            <tr style="background:#BBF7D0; color:#111827;"><td style="padding:4px;">Above Avg.</td><td>55 - 60</td></tr>
+                            <tr style="background:#FFFFFF; color:#111827; border-top:1px solid #E2E8F0; border-bottom:1px solid #E2E8F0;"><td style="padding:4px;">Average</td><td>45 - 55</td></tr>
+                            <tr style="background:#FCA5A5; color:#111827;"><td style="padding:4px;">Below Avg.</td><td>40 - 45</td></tr>
+                            <tr style="background:#EF4444; color:white;"><td style="padding:4px;">Poor</td><td>30 - 40</td></tr>
+                            <tr style="background:#DC2626; color:white;"><td style="padding:4px;">Very Poor</td><td>20 - 30</td></tr>
+                            <tr style="background:#B91C1C; color:white;"><td style="padding:4px;">Extremely Poor</td><td>< 20</td></tr>
+                        </table>
+                        """, unsafe_allow_html=True)
+
+            # --- SEASON SPECIFIC TESTING TABS ---
             for tab_idx, s_label in enumerate(["Spring", "Summer", "Pre-Season"]):
-                with testing_season_tabs[tab_idx]:
+                with testing_season_tabs[tab_idx + 1]:
                     c_t_ath, _ = st.columns([2, 2])
                     with c_t_ath:
                         selected_athlete_test = st.selectbox(f"Select Athlete ({s_label})", master_athlete_list, key=f"nav_ath_test_{s_label}")
@@ -1012,7 +1253,7 @@ if check_password():
                         st.info(f"No External Rotation testing records logged for {selected_athlete_test} in {s_label}.")
 
             # --- TAB 4: INTAKE TESTING TAB ---
-            with testing_season_tabs[3]:
+            with testing_season_tabs[4]:
                 st.markdown("<h3 style='color:#1D1D1F; font-weight:900; text-transform:uppercase;'>Athlete Intake Assessment</h3>", unsafe_allow_html=True)
                 c_int_ath, _ = st.columns([2, 2])
                 with c_int_ath:
@@ -1247,7 +1488,7 @@ if check_password():
                     st.info(f"No Intake Assessment records found for {selected_intake_athlete}.")
 
             # --- TAB 5: OVERALL TESTING PROFILE ---
-            with testing_season_tabs[4]:
+            with testing_season_tabs[5]:
                 st.markdown("<h3 style='color:#1D1D1F; font-weight:900; text-transform:uppercase;'>Overall Athletic Testing Profile</h3>", unsafe_allow_html=True)
                 c_ov_ath, _ = st.columns([2, 2])
                 with c_ov_ath:
@@ -1288,7 +1529,7 @@ if check_password():
                 sh_er_p = sh_p[sh_p['Direction'].str.contains('External|ER', case=False, na=False)] if not sh_p.empty and 'Direction' in sh_p.columns else pd.DataFrame()
 
                 max_sh_ir = max(sh_ir_p['L Max Force (N)'].max() if 'L Max Force (N)' in sh_ir_p.columns else 0.0, sh_ir_p['R Max Force (N)'].max() if 'R Max Force (N)' in sh_ir_p.columns else 0.0) if not sh_ir_p.empty else 0.0
-                max_sh_er = max(sh_er_p['L Max Force (N)'].max() if 'L Max Force (N)' in sh_ir_p.columns else 0.0, sh_er_p['R Max Force (N)'].max() if 'R Max Force (N)' in sh_ir_p.columns else 0.0) if not sh_er_p.empty else 0.0
+                max_sh_er = max(sh_er_p['L Max Force (N)'].max() if 'L Max Force (N)' in sh_ir_p.columns else 0.0, sh_er_p['R Max Force (N)'].max() if 'R Max Force (N)' in sh_ir_p.columns else 0.0) if not sh_ir_p.empty else 0.0
 
                 m_c1, m_c2, m_c3, m_c4, m_c5, m_c6 = st.columns(6)
                 m_c1.metric("Peak CMJ", f"{max_cmj_h:.1f} cm")
@@ -1315,7 +1556,7 @@ if check_password():
                 st.dataframe(pd.DataFrame(ov_summary_data), use_container_width=True, hide_index=True)
                     
             # --- TAB 6: CROSS-SEASON TESTING COMPARISON ---
-            with testing_season_tabs[5]:
+            with testing_season_tabs[6]:
                 st.markdown("### Multi-Season Testing Performance Comparison")
                 c_comp_ath, _ = st.columns([2, 2])
                 with c_comp_ath:
