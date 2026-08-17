@@ -333,6 +333,10 @@ if check_password():
     if "is_printing" not in st.session_state:
         st.session_state.is_printing = False
 
+    # --- INITIALIZE TAB STATE GLOBALLY ---
+    if "active_tab_state" not in st.session_state:
+        st.session_state.active_tab_state = "Individual Profile"
+
     LOCKED_CONFIG = {'staticPlot': False, 'displayModeBar': False}
 
     try:
