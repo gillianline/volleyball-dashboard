@@ -181,11 +181,11 @@ def get_acwr_badge(ratio):
     try:
         r = float(ratio)
         if pd.isna(r) or r == 0:
-            return "#64748B", "#F1F5F9", "No Chronic Baseline"
+            return "#64748B", "#F1F5F9", "No Baseline"
         elif r < 0.80:
             return "#D97706", "#FEF3C7", "Under-training"
         elif 0.80 <= r <= 1.30:
-            return "#137333", "#E6F4EA", "Optimal"
+            return "#137333", "#E6F4EA", "Sweet Spot"
         elif 1.30 < r <= 1.50:
             return "#D97706", "#FEF3C7", "Elevated Risk"
         else:
@@ -342,6 +342,27 @@ def load_all_data():
     return df.dropna(subset=['Date']), match_df.dropna(subset=['Date']), cmj_df, phase_df, thresh_df, ash_df, er_df, calf_df, hip_df, shoulder_df
 
 
+# --- 4. EWMA ACWR COMPUTATION ENGINE ---
+def compute_athlete_ewma_calendar(df_player, metrics_list):
+    if df_player.empty or df_player['Date'].dropna().empty:
+        return pd.DataFrame()
+    daily = df_player.groupby('Date')[metrics_list].sum().reset_index().sort_values('Date')
+    min_date = daily['Date'].min()
+    max_date = daily['Date'].max()
+    full_idx = pd.date_range(start=min_date, end=max_date, freq='D')
+    cal = daily.set_index('Date').reindex(full_idx).fillna(0.0).reset_index()
+    cal.rename(columns={'index': 'Date'}, inplace=True)
+    
+    for m in metrics_list:
+        cal[f'{m}_Acute'] = cal[m].ewm(span=7, adjust=False).mean()
+        cal[f'{m}_Chronic'] = cal[m].ewm(span=28, adjust=False).mean()
+        cal[f'{m}_ACWR'] = cal.apply(
+            lambda r: (r[f'{m}_Acute'] / r[f'{m}_Chronic']) if r[f'{m}_Chronic'] > 0 else 0.0,
+            axis=1
+        )
+    return cal
+
+
 # --- 5. EXECUTION BLOCK CONTEXT ---
 if check_password():
     if "is_printing" not in st.session_state:
@@ -354,9 +375,14 @@ if check_password():
 
         # --- GLOBAL SIDEBAR ---
         st.sidebar.markdown("### View Selection")
-        selected_season = st.sidebar.radio("Select View Mode", ["Spring", "Summer", "Pre-Season", "Testing", "Comparison"], index=2, key="global_season_toggle")
+        selected_season = st.sidebar.radio(
+            "Select View Mode", 
+            ["Spring", "Summer", "Pre-Season", "Testing", "Comparison", "ACWR"], 
+            index=2, 
+            key="global_season_toggle"
+        )
         
-        if selected_season not in ["Testing", "Comparison", "Compliance"]:
+        if selected_season not in ["Testing", "Comparison", "Compliance", "ACWR"]:
             st.sidebar.info(f"Currently displaying: {selected_season} Season Performance Data.")
             df_master = raw_df[raw_df['Season'] == selected_season].copy()
             match_master = raw_match_df[raw_match_df['Season'] == selected_season].copy()
@@ -389,9 +415,272 @@ if check_password():
         st.markdown('<div class="main-logo-container" style="text-align: center; margin-top: 10px; margin-bottom: 15px;"><img src="https://upload.wikimedia.org/wikipedia/commons/thumb/f/fc/Tennessee_Lady_Volunteers_logo.svg/1280px-Tennessee_Lady_Volunteers_logo.svg.png" width="120"><div style="color: #FF8200; font-size: 2rem; font-weight: 900; margin-top: 10px;">LADY VOLS VOLLEYBALL PERFORMANCE</div></div>', unsafe_allow_html=True)
         
         # ==========================================
+        # --- ACWR STANDALONE SIDEBAR TAB ----------
+        # ==========================================
+        if selected_season == "ACWR":
+            st.markdown('<div class="section-header">Acute:Chronic Workload Ratio (EWMA)</div>', unsafe_allow_html=True)
+            
+            acwr_mode_tabs = st.tabs(["Team Workload Summary", "Individual Deep-Dive"])
+            
+            # --- TAB 1: TEAM SUMMARY ---
+            with acwr_mode_tabs[0]:
+                valid_acwr_dates = sorted(raw_df['Date'].dropna().unique(), reverse=True)
+                valid_acwr_dates_str = [d.strftime('%Y-%m-%d') for d in valid_acwr_dates] if valid_acwr_dates else []
+
+                col_top1, col_top2, col_top3 = st.columns([1.5, 1.5, 1.5])
+                with col_top1:
+                    sel_team_date_str = st.selectbox(
+                        "Evaluation Date", 
+                        valid_acwr_dates_str, 
+                        index=0, 
+                        key="acwr_team_eval_date"
+                    ) if valid_acwr_dates_str else None
+                with col_top2:
+                    team_pos_filter = st.selectbox(
+                        "Position Filter", 
+                        ["All Positions"] + sorted([p for p in raw_df['Position'].unique() if p != "N/A"]), 
+                        key="acwr_team_pos_filt"
+                    )
+                with col_top3:
+                    sel_view_metric_header = st.selectbox(
+                        "Featured Table Metric", 
+                        metrics_to_score, 
+                        index=0, 
+                        key="acwr_featured_metric_sel"
+                    )
+
+                if sel_team_date_str:
+                    eval_date_obj = pd.to_datetime(sel_team_date_str)
+                    team_summary_rows = []
+                    
+                    for ath in sorted(raw_df['Name'].unique()):
+                        ath_all = raw_df[raw_df['Name'] == ath]
+                        pos_str = ath_all['Position'].iloc[0] if not ath_all.empty else "N/A"
+                        
+                        if team_pos_filter != "All Positions" and pos_str != team_pos_filter:
+                            continue
+                            
+                        ath_cal = compute_athlete_ewma_calendar(ath_all, metrics_to_score)
+                        if ath_cal.empty:
+                            continue
+                            
+                        cal_point = ath_cal[ath_cal['Date'] <= eval_date_obj]
+                        if cal_point.empty:
+                            continue
+                            
+                        target_row = cal_point.iloc[-1]
+                        
+                        # Overall Practice Score composite ACWR (Average across all 5 metrics)
+                        comp_acwr = sum([target_row.get(f'{m}_ACWR', 0.0) for m in metrics_to_score]) / len(metrics_to_score)
+                        b_color, b_bg, b_status = get_acwr_badge(comp_acwr)
+                        
+                        row_dict = {
+                            "Athlete": ath,
+                            "Position": pos_str,
+                            "Overall ACWR": comp_acwr,
+                            "Status": b_status,
+                            f"Featured ({sel_view_metric_header})": target_row.get(f'{sel_view_metric_header}_ACWR', 0.0)
+                        }
+                        
+                        for m in metrics_to_score:
+                            row_dict[m] = target_row.get(f'{m}_ACWR', 0.0)
+                            
+                        team_summary_rows.append(row_dict)
+                        
+                    if team_summary_rows:
+                        team_summary_df = pd.DataFrame(team_summary_rows).sort_values("Overall ACWR", ascending=False)
+                        
+                        sweet_count = sum(1 for r in team_summary_rows if 0.80 <= r['Overall ACWR'] <= 1.30)
+                        spike_count = sum(1 for r in team_summary_rows if r['Overall ACWR'] > 1.50)
+                        under_count = sum(1 for r in team_summary_rows if 0 < r['Overall ACWR'] < 0.80)
+                        
+                        sc1, sc2, sc3, sc4 = st.columns(4)
+                        sc1.metric("Athletes Evaluated", len(team_summary_rows))
+                        sc2.metric("In Sweet Spot (0.80-1.30)", sweet_count)
+                        sc3.metric("Under-training (<0.80)", under_count)
+                        sc4.metric("High Spikes (>1.50)", spike_count)
+                        
+                        st.markdown(f"#### Squad ACWR Grid on {eval_date_obj.strftime('%m/%d/%Y')}")
+                        
+                        table_html = """<table class="scout-table"><thead><tr>
+                            <th style="text-align:left !important; padding-left:10px;">Athlete</th>
+                            <th>Position</th>
+                            <th>Practice Score ACWR</th>
+                            <th>Workload Zone</th>"""
+                        for m in metrics_to_score:
+                            table_html += f"<th>{m}</th>"
+                        table_html += "</tr></thead><tbody>"
+                        
+                        for _, r in team_summary_df.iterrows():
+                            c_acwr = r['Overall ACWR']
+                            c_color, c_bg, c_status = get_acwr_badge(c_acwr)
+                            
+                            table_html += f"""<tr>
+                                <td style="font-weight:800; text-align:left !important; padding-left:10px;">{r['Athlete']}</td>
+                                <td>{r['Position']}</td>
+                                <td style="font-weight:900; font-size:13px; color:{c_color};">{c_acwr:.2f}</td>
+                                <td><span style="background-color:{c_bg}; color:{c_color}; padding:3px 8px; border-radius:10px; font-weight:700; font-size:11px;">{c_status}</span></td>"""
+                            
+                            for m in metrics_to_score:
+                                m_val = r[m]
+                                m_col, _, _ = get_acwr_badge(m_val)
+                                table_html += f"<td style='color:{m_col}; font-weight:700;'>{m_val:.2f}</td>"
+                                
+                            table_html += "</tr>"
+                            
+                        table_html += "</tbody></table>"
+                        st.markdown(table_html, unsafe_allow_html=True)
+                    else:
+                        st.info(f"No records available for the selected filters on {eval_date_obj.strftime('%m/%d/%Y')}.")
+
+            # --- TAB 2: INDIVIDUAL DEEP-DIVE ---
+            with acwr_mode_tabs[1]:
+                c_ind1, c_ind2, c_ind3 = st.columns([1.5, 1.5, 1.5])
+                with c_ind1:
+                    sel_ind_ath = st.selectbox("Select Athlete", sorted(raw_df['Name'].unique()), key="acwr_ind_ath_sel")
+                with c_ind2:
+                    sel_ind_metric = st.selectbox("Select Practice Score Metric", metrics_to_score, index=0, key="acwr_ind_metric_sel")
+                
+                ath_all_ind = raw_df[raw_df['Name'] == sel_ind_ath].copy()
+                meta_lookup = full_df_unfiltered[full_df_unfiltered['Name'] == sel_ind_ath]
+                photo_url = meta_lookup['PhotoURL'].iloc[0] if not meta_lookup.empty else "https://www.w3schools.com/howto/img_avatar.png"
+                pos_str = meta_lookup['Position'].iloc[0] if not meta_lookup.empty else "N/A"
+                
+                ath_cal_ind = compute_athlete_ewma_calendar(ath_all_ind, metrics_to_score)
+                
+                if ath_cal_ind.empty:
+                    st.info(f"No training data found for {sel_ind_ath}.")
+                else:
+                    ath_dates_str = [d.strftime('%Y-%m-%d') for d in sorted(ath_cal_ind['Date'].unique(), reverse=True)]
+                    with c_ind3:
+                        sel_ind_date_str = st.selectbox("Select Snapshot Date", ath_dates_str, index=0, key="acwr_ind_date_sel")
+                    
+                    sel_ind_date = pd.to_datetime(sel_ind_date_str)
+                    target_row = ath_cal_ind[ath_cal_ind['Date'] == sel_ind_date].iloc[0]
+                    
+                    cur_acute = target_row[f'{sel_ind_metric}_Acute']
+                    cur_chronic = target_row[f'{sel_ind_metric}_Chronic']
+                    cur_acwr = target_row[f'{sel_ind_metric}_ACWR']
+                    badge_color, badge_bg, status_text = get_acwr_badge(cur_acwr)
+
+                    st.markdown(f'''
+                        <div class="comp-athlete-header" style="margin-top: 10px;">
+                            <img src="{photo_url}" class="comp-athlete-photo">
+                            <div>
+                                <div style="font-size:22px; font-weight:900; color:#111827;">{sel_ind_ath}</div>
+                                <div style="font-size:14px; font-weight:600; color:#64748B;">{pos_str} | Metric: {sel_ind_metric}</div>
+                            </div>
+                        </div>
+                    ''', unsafe_allow_html=True)
+
+                    k1, k2, k3, k4 = st.columns(4)
+                    k1.metric("Daily Raw Workload", f"{target_row[sel_ind_metric]:.1f}", help=f"Recorded on {sel_ind_date.strftime('%m/%d/%Y')}")
+                    k2.metric("Acute Load (7d EWMA)", f"{cur_acute:.1f}")
+                    k3.metric("Chronic Load (28d EWMA)", f"{cur_chronic:.1f}")
+                    with k4:
+                        st.markdown(f'''
+                            <div style="background:{badge_bg}; border:1px solid #E2E8F0; border-radius:10px; padding:10px; text-align:center;">
+                                <div style="font-size:10px; font-weight:800; color:{badge_color}; text-transform:uppercase;">ACWR RATIO</div>
+                                <div style="font-size:24px; font-weight:900; color:{badge_color}; line-height:1.1;">{cur_acwr:.2f}</div>
+                                <div style="font-size:11px; font-weight:700; color:{badge_color}; margin-top:3px;">{status_text}</div>
+                            </div>
+                        ''', unsafe_allow_html=True)
+
+                    st.write("<br>", unsafe_allow_html=True)
+
+                    fig_acwr = make_subplots(specs=[[{"secondary_y": True}]])
+                    
+                    fig_acwr.add_hrect(
+                        y0=0.80, y1=1.30, 
+                        fillcolor="#28a745", opacity=0.10, 
+                        line_width=0, secondary_y=False,
+                        annotation_text="Optimal Sweet Spot (0.80 - 1.30)", 
+                        annotation_position="top left",
+                        annotation_font_size=10,
+                        annotation_font_color="#137333"
+                    )
+
+                    fig_acwr.add_hline(
+                        y=1.50, line_dash="dash", line_color="#D93025", 
+                        line_width=1.5, secondary_y=False,
+                        annotation_text="Spike Threshold (1.50)", 
+                        annotation_position="bottom right",
+                        annotation_font_size=10,
+                        annotation_font_color="#D93025"
+                    )
+
+                    fig_acwr.add_trace(
+                        go.Scatter(
+                            x=ath_cal_ind['Date'], 
+                            y=ath_cal_ind[f'{sel_ind_metric}_ACWR'], 
+                            name="ACWR Ratio (EWMA)", 
+                            mode='lines+markers',
+                            line=dict(color='#FF8200', width=3.5),
+                            marker=dict(size=5, color='#FF8200')
+                        ), 
+                        secondary_y=False
+                    )
+
+                    fig_acwr.add_trace(
+                        go.Scatter(
+                            x=ath_cal_ind['Date'], 
+                            y=ath_cal_ind[f'{sel_ind_metric}_Acute'], 
+                            name="Acute Load (7d)", 
+                            mode='lines',
+                            line=dict(color='#4895DB', width=2, dash='dot')
+                        ), 
+                        secondary_y=True
+                    )
+
+                    fig_acwr.add_trace(
+                        go.Scatter(
+                            x=ath_cal_ind['Date'], 
+                            y=ath_cal_ind[f'{sel_ind_metric}_Chronic'], 
+                            name="Chronic Load (28d)", 
+                            mode='lines',
+                            line=dict(color='#515154', width=1.8, dash='dash')
+                        ), 
+                        secondary_y=True
+                    )
+
+                    fig_acwr.add_vline(x=sel_ind_date, line_dash="dash", line_color="#111827", opacity=0.4)
+
+                    fig_acwr.update_layout(
+                        height=440,
+                        template="simple_white",
+                        title=dict(text=f"<b>{sel_ind_ath} — {sel_ind_metric} ACWR Longitudinal Profile</b>", font=dict(size=14), x=0, y=0.97),
+                        margin=dict(l=20, r=20, t=50, b=30),
+                        legend=dict(orientation="h", yanchor="bottom", y=1.03, xanchor="right", x=1),
+                        xaxis=dict(title="Date", tickformat="%m/%d", showgrid=False)
+                    )
+                    fig_acwr.update_yaxes(title_text="ACWR (Acute:Chronic)", secondary_y=False, rangemode='tozero', range=[0, max(2.0, ath_cal_ind[f'{sel_ind_metric}_ACWR'].max() * 1.15)])
+                    fig_acwr.update_yaxes(title_text=f"Absolute {sel_ind_metric} Workload", secondary_y=True, showgrid=False)
+
+                    st.plotly_chart(fig_acwr, use_container_width=True, config=LOCKED_CONFIG, key=f"acwr_chart_{sel_ind_ath}_{sel_ind_metric}")
+
+                    st.markdown(f"#### Practice Score Metrics Breakdown on {sel_ind_date.strftime('%m/%d/%Y')}")
+                    ind_metric_rows = []
+                    for m in metrics_to_score:
+                        a_ewma = target_row[f'{m}_Acute']
+                        c_ewma = target_row[f'{m}_Chronic']
+                        r_val = target_row[f'{m}_ACWR']
+                        _, _, status_lbl = get_acwr_badge(r_val)
+                        
+                        ind_metric_rows.append({
+                            "Metric": m,
+                            "Day Total": f"{target_row.get(m, 0.0):.1f}",
+                            "Acute (7d EWMA)": f"{a_ewma:.1f}",
+                            "Chronic (28d EWMA)": f"{c_ewma:.1f}",
+                            "ACWR Ratio": f"{r_val:.2f}",
+                            "Workload Zone": status_lbl
+                        })
+
+                    st.dataframe(pd.DataFrame(ind_metric_rows), use_container_width=True, hide_index=True)
+
+        # ==========================================
         # --- COMPARISON TAB ------------------------
         # ==========================================
-        if selected_season == "Comparison":
+        elif selected_season == "Comparison":
             st.markdown('<div class="section-header">Athlete Practice Peak Volume Baseline</div>', unsafe_allow_html=True)
             
             c_pos_filter = st.selectbox(
@@ -685,7 +974,7 @@ if check_password():
                             sc1, sc2 = st.columns(2)
                             with sc1: st.markdown(f'<div style="text-align:center;"><div class="score-box" style="background-color:{color_er_l}; line-height:1.2; padding-top:15px; height:80px; width:100%;"><span style="font-size:18px;">{cur_l_rom:.1f}°</span><span style="font-size:10px; display:block; font-weight:bold; margin-top:2px;">LEFT</span></div></div>', unsafe_allow_html=True)
                             with sc2: st.markdown(f'<div style="text-align:center;"><div class="score-box" style="background-color:{color_er_r}; line-height:1.2; padding-top:15px; height:80px; width:100%;"><span style="font-size:18px;">{cur_r_rom:.1f}°</span><span style="font-size:10px; display:block; font-weight:bold; margin-top:2px;">RIGHT</span></div></div>', unsafe_allow_html=True)
-                            st.markdown(f'<div class="info-box" style="text-align:center; margin-top:10px;"><p style="margin:0; font-size:11px; color:grey;"><b>Asymmetry:</b> {cur_asym_rom:+.1f}%</p><p style="margin:0; font-size:11px; color:grey;"><b>% Change from Base:</b> L: {rom_pct_l:+.1f}% | R: {rom_pct_r:+.1f}%</p><p style="margin:0; font-size:11px; color:grey;"><b>Base ROM:</b> L: {base_l_rom:.1f}° | R: {base_r_rom:.1f}°</p></div>', unsafe_allow_html=True)
+                            st.markdown(f'<div class="info-box" style="text-align:center; margin-top:10px;"><p style="margin:0; font-size:11px; color:grey;"><b>Asymmetry:</b> {cur_asym_rom:+.1f}%</p><p style="margin:0; font-size:11px; color:grey;"><b>% Change from Base:</b> L: {rom_pct_l:+.1f}% | R: {pct_r:+.1f}%</p><p style="margin:0; font-size:11px; color:grey;"><b>Base ROM:</b> L: {base_l_rom:.1f}° | R: {base_r_rom:.1f}°</p></div>', unsafe_allow_html=True)
                         with ec2:
                             fig_er_t = go.Figure()
                             fig_er_t.add_trace(go.Scatter(x=er_t_data['Test Date'], y=er_t_data['L Max ROM (°)'], name="Left Max ROM", mode='lines+markers', line=dict(color='#4895DB', width=2.5)))
@@ -1101,8 +1390,7 @@ if check_password():
                     "Spring Max vs Daily Combined", 
                     "Practice History", 
                     "Position Analysis", 
-                    "Spring v. Summer",
-                    "ACWR"
+                    "Spring v. Summer"
                 ]
             elif selected_season == "Pre-Season":
                 tab_titles = [
@@ -1114,8 +1402,7 @@ if check_password():
                     "Match Summary", 
                     "Position Analysis", 
                     "Phase Analysis", 
-                    "Practice Planner",
-                    "ACWR"
+                    "Practice Planner"
                 ]
             else: # Spring
                 tab_titles = [
@@ -1127,8 +1414,7 @@ if check_password():
                     "Match Summary", 
                     "Position Analysis", 
                     "Phase Analysis", 
-                    "Practice Planner",
-                    "ACWR"
+                    "Practice Planner"
                 ]
 
             if "active_tab_state" not in st.session_state or st.session_state.active_tab_state not in tab_titles:
@@ -1316,7 +1602,7 @@ if check_password():
                             sc1, sc2 = st.columns(2)
                             with sc1: st.markdown(f'<div style="text-align:center;"><div class="score-box" style="background-color:{color_er_l}; line-height:1.2; padding-top:15px; height:80px; width:100%;"><span style="font-size:18px;">{cur_l_rom:.1f}°</span><span style="font-size:10px; display:block; font-weight:bold; margin-top:2px;">LEFT</span></div></div>', unsafe_allow_html=True)
                             with sc2: st.markdown(f'<div style="text-align:center;"><div class="score-box" style="background-color:{color_er_r}; line-height:1.2; padding-top:15px; height:80px; width:100%;"><span style="font-size:18px;">{cur_r_rom:.1f}°</span><span style="font-size:10px; display:block; font-weight:bold; margin-top:2px;">RIGHT</span></div></div>', unsafe_allow_html=True)
-                            st.markdown(f'<div class="info-box" style="text-align:center; margin-top:10px;"><p style="margin:0; font-size:11px; color:grey;"><b>Asymmetry:</b> {cur_asym_rom:+.1f}%</p><p style="margin:0; font-size:11px; color:grey;"><b>% Change from Base:</b> L: {rom_pct_l:+.1f}% | R: {rom_pct_r:+.1f}%</p><p style="margin:0; font-size:11px; color:grey;"><b>Base ROM:</b> L: {base_l_rom:.1f}° | R: {base_r_rom:.1f}°</p></div>', unsafe_allow_html=True)
+                            st.markdown(f'<div class="info-box" style="text-align:center; margin-top:10px;"><p style="margin:0; font-size:11px; color:grey;"><b>Asymmetry:</b> {cur_asym_rom:+.1f}%</p><p style="margin:0; font-size:11px; color:grey;"><b>% Change from Base:</b> L: {rom_pct_l:+.1f}% | R: {pct_r:+.1f}%</p><p style="margin:0; font-size:11px; color:grey;"><b>Base ROM:</b> L: {base_l_rom:.1f}° | R: {base_r_rom:.1f}°</p></div>', unsafe_allow_html=True)
                     with ec2:
                         fig_er = go.Figure()
                         fig_er.add_trace(go.Scatter(x=p_er_hist['Test Date'], y=p_er_hist['L Max ROM (°)'], name="Left Max ROM", mode='lines+markers', line=dict(color='#4895DB', width=2.5)))
@@ -2116,163 +2402,6 @@ if check_password():
                                     total_session_score = math.ceil((g_load + g_jumps + g_efforts + g_dist + g_jload) / 5)
                                     
                                     with card_cols[col_offset]: st.markdown(f"""<div style="border:1px solid #E5E5E7; border-radius:15px; padding:15px; margin-bottom:20px; background-color:white;"><div style="display:flex; align-items:center; gap:12px; margin-bottom:10px; padding-bottom:8px; border-bottom:2px solid #FF8200;"><img src="{correct_photo}" class="gallery-photo" style="width:55px; height:55px;"><div><p style="margin:0; font-weight:900; color:#1D1D1F; font-size:15px;">{row_day['Session_Name']}</p><p style="margin:0; color:#4895DB; font-weight:700; font-size:12px;">{row_day['Date'].strftime('%m/%d/%Y')} | {pos_label}</p></div></div><div style="display:flex; align-items:center; gap:10px;"><div style="flex:3;"><table class="scout-table"><thead><tr><th>Metric</th><th>Summer</th><th>Spring Max</th></tr></thead><tbody><tr><td>Player Load</td><td>{row_day['Player Load']:.1f}</td><td>{b_load:.1f}</td></tr><tr><td>Total Jumps</td><td>{int(row_day['Total Jumps'])}</td><td>{int(b_jumps)}</td></tr><tr><td>Explosive Efforts</td><td>{int(row_day['Explosive Efforts'])}</td><td>{int(b_efforts)}</td></tr><tr><td>Jump Load</td><td>{row_day['Jump Load']:.1f}</td><td>{b_jload:.1f}</td></tr><tr><td>Est. Distance (y)</td><td>{row_day['Estimated Distance (y)']:.1f}</td><td>{b_dist:.1f}</td></tr></tbody></table></div><div style="flex:1; text-align:center;"><div class="score-box" style="background-color:{get_flipped_gradient(total_session_score)}; font-size:26px; padding:10px 5px; min-width:70px; margin:0 auto;">{total_session_score}</div></div></div></div>""", unsafe_allow_html=True)
-
-            # ==========================================
-            # --- TAB CLAUSE 11: ACWR (EWMA WEIGHTED) --
-            # ==========================================
-            elif st.session_state.active_tab_state == "ACWR":
-                df_acwr_source = df_master.copy()
-                st.markdown('<div class="section-header">Exponentially Weighted ACWR Dashboard</div>', unsafe_allow_html=True)
-                
-                c_acwr1, c_acwr2 = st.columns([1.5, 1.5])
-                with c_acwr1:
-                    sel_acwr_ath = st.selectbox("Select Athlete", sorted(df_acwr_source['Name'].unique()), key="acwr_ath_select_tab")
-                with c_acwr2:
-                    sel_acwr_metric = st.selectbox("Select Practice Score Metric", metrics_to_score, index=0, key="acwr_metric_select_tab")
-
-                ath_data = df_acwr_source[df_acwr_source['Name'] == sel_acwr_ath].copy()
-                meta_lookup = full_df_unfiltered[full_df_unfiltered['Name'] == sel_acwr_ath]
-                photo_url = meta_lookup['PhotoURL'].iloc[0] if not meta_lookup.empty else "https://www.w3schools.com/howto/img_avatar.png"
-                pos_str = meta_lookup['Position'].iloc[0] if not meta_lookup.empty else "N/A"
-
-                if ath_data.empty or ath_data['Date'].dropna().empty:
-                    st.info(f"No practice workload data logged for {sel_acwr_ath} in {selected_season}.")
-                else:
-                    ath_daily = ath_data.groupby('Date')[metrics_to_score].sum().reset_index().sort_values('Date')
-                    
-                    min_date = ath_daily['Date'].min()
-                    max_date = ath_daily['Date'].max()
-                    full_date_idx = pd.date_range(start=min_date, end=max_date, freq='D')
-                    
-                    ath_calendar = ath_daily.set_index('Date').reindex(full_date_idx).fillna(0.0).reset_index()
-                    ath_calendar.rename(columns={'index': 'Date'}, inplace=True)
-
-                    ath_calendar['Acute_EWMA'] = ath_calendar[sel_acwr_metric].ewm(span=7, adjust=False).mean()
-                    ath_calendar['Chronic_EWMA'] = ath_calendar[sel_acwr_metric].ewm(span=28, adjust=False).mean()
-                    
-                    ath_calendar['ACWR'] = ath_calendar.apply(
-                        lambda r: (r['Acute_EWMA'] / r['Chronic_EWMA']) if r['Chronic_EWMA'] > 0 else 0.0, 
-                        axis=1
-                    )
-
-                    latest_row = ath_calendar.iloc[-1]
-                    latest_date_str = latest_row['Date'].strftime('%m/%d/%Y')
-                    latest_acute = latest_row['Acute_EWMA']
-                    latest_chronic = latest_row['Chronic_EWMA']
-                    latest_acwr = latest_row['ACWR']
-                    badge_color, badge_bg, status_text = get_acwr_badge(latest_acwr)
-
-                    st.markdown(f'''
-                        <div class="comp-athlete-header" style="margin-top: 10px;">
-                            <img src="{photo_url}" class="comp-athlete-photo">
-                            <div>
-                                <div style="font-size:22px; font-weight:900; color:#111827;">{sel_acwr_ath}</div>
-                                <div style="font-size:14px; font-weight:600; color:#64748B;">{pos_str} | Metric: {sel_acwr_metric}</div>
-                            </div>
-                        </div>
-                    ''', unsafe_allow_html=True)
-
-                    kpi1, kpi2, kpi3, kpi4 = st.columns(4)
-                    kpi1.metric("Daily Raw Metric", f"{latest_row[sel_acwr_metric]:.1f}", help=f"Recorded on {latest_date_str}")
-                    kpi2.metric("Acute Load (7d EWMA)", f"{latest_acute:.1f}")
-                    kpi3.metric("Chronic Load (28d EWMA)", f"{latest_chronic:.1f}")
-                    with kpi4:
-                        st.markdown(f'''
-                            <div style="background:{badge_bg}; border:1px solid #E2E8F0; border-radius:10px; padding:10px; text-align:center;">
-                                <div style="font-size:10px; font-weight:800; color:{badge_color}; text-transform:uppercase;">ACWR RATIO</div>
-                                <div style="font-size:24px; font-weight:900; color:{badge_color}; line-height:1.1;">{latest_acwr:.2f}</div>
-                                <div style="font-size:11px; font-weight:700; color:{badge_color}; margin-top:3px;">{status_text}</div>
-                            </div>
-                        ''', unsafe_allow_html=True)
-
-                    st.write("<br>", unsafe_allow_html=True)
-
-                    fig_acwr = make_subplots(specs=[[{"secondary_y": True}]])
-
-                    fig_acwr.add_hrect(
-                        y0=0.80, y1=1.30, 
-                        fillcolor="#28a745", opacity=0.10, 
-                        line_width=0, secondary_y=False,
-                        annotation_text="Optimal Sweet Spot (0.80 - 1.30)", 
-                        annotation_position="top left",
-                        annotation_font_size=10,
-                        annotation_font_color="#137333"
-                    )
-
-                    fig_acwr.add_hline(
-                        y=1.50, line_dash="dash", line_color="#D93025", 
-                        line_width=1.5, secondary_y=False,
-                        annotation_text="High Spike Threshold (1.50)", 
-                        annotation_position="bottom right",
-                        annotation_font_size=10,
-                        annotation_font_color="#D93025"
-                    )
-
-                    fig_acwr.add_trace(
-                        go.Scatter(
-                            x=ath_calendar['Date'], 
-                            y=ath_calendar['ACWR'], 
-                            name="ACWR Ratio (EWMA)", 
-                            mode='lines+markers',
-                            line=dict(color='#FF8200', width=3.5),
-                            marker=dict(size=6, color='#FF8200')
-                        ), 
-                        secondary_y=False
-                    )
-
-                    fig_acwr.add_trace(
-                        go.Scatter(
-                            x=ath_calendar['Date'], 
-                            y=ath_calendar['Acute_EWMA'], 
-                            name="Acute Load (7d)", 
-                            mode='lines',
-                            line=dict(color='#4895DB', width=2, dash='dot')
-                        ), 
-                        secondary_y=True
-                    )
-
-                    fig_acwr.add_trace(
-                        go.Scatter(
-                            x=ath_calendar['Date'], 
-                            y=ath_calendar['Chronic_EWMA'], 
-                            name="Chronic Load (28d)", 
-                            mode='lines',
-                            line=dict(color='#515154', width=1.8, dash='dash')
-                        ), 
-                        secondary_y=True
-                    )
-
-                    fig_acwr.update_layout(
-                        height=440,
-                        template="simple_white",
-                        title=dict(text=f"<b>{sel_acwr_ath} — {sel_acwr_metric} ACWR Longitudinal Profile</b>", font=dict(size=14), x=0, y=0.97),
-                        margin=dict(l=20, r=20, t=50, b=30),
-                        legend=dict(orientation="h", yanchor="bottom", y=1.03, xanchor="right", x=1),
-                        xaxis=dict(title="Date", tickformat="%m/%d", showgrid=False)
-                    )
-                    fig_acwr.update_yaxes(title_text="ACWR (Acute:Chronic)", secondary_y=False, rangemode='tozero', range=[0, max(2.0, ath_calendar['ACWR'].max() * 1.15)])
-                    fig_acwr.update_yaxes(title_text=f"Absolute {sel_acwr_metric} Workload", secondary_y=True, showgrid=False)
-
-                    st.plotly_chart(fig_acwr, use_container_width=True, config=LOCKED_CONFIG, key=f"acwr_chart_{sel_acwr_ath}_{sel_acwr_metric}")
-
-                    st.markdown("#### Practice Score Metrics: Multi-Metric EWMA Breakdown")
-                    acwr_rows = []
-                    for m in metrics_to_score:
-                        a_ewma = ath_calendar[m].ewm(span=7, adjust=False).mean().iloc[-1]
-                        c_ewma = ath_calendar[m].ewm(span=28, adjust=False).mean().iloc[-1]
-                        r_val = (a_ewma / c_ewma) if c_ewma > 0 else 0.0
-                        _, _, status_lbl = get_acwr_badge(r_val)
-                        
-                        acwr_rows.append({
-                            "Metric": m,
-                            "Today Total": f"{latest_row.get(m, 0.0):.1f}",
-                            "Acute (7d EWMA)": f"{a_ewma:.1f}",
-                            "Chronic (28d EWMA)": f"{c_ewma:.1f}",
-                            "ACWR Ratio": f"{r_val:.2f}",
-                            "Workload Status": status_lbl
-                        })
-
-                    st.dataframe(pd.DataFrame(acwr_rows), use_container_width=True, hide_index=True)
 
     except Exception as e:
         st.error(f"Sync Error: {e}")
