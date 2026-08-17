@@ -919,7 +919,12 @@ if check_password():
                 
                 # --- SUB-TAB 1: INDIVIDUAL ATHLETE DEEP DIVE ---
                 with cmj_view_modes[0]:
-                    c_cmj_ath, c_cmj_date, c_cmj_comp = st.columns([2, 1.5, 1.5])
+                    c_cmj_season, c_cmj_ath, c_cmj_date, c_cmj_comp = st.columns([1.5, 1.8, 1.3, 1.4])
+                    
+                    available_seasons = ["All Seasons", "Spring", "Summer", "Pre-Season"]
+                    with c_cmj_season:
+                        sel_cmj_season = st.selectbox("Baseline Season Filter", available_seasons, index=0, key="cmj_dash_season_sel")
+                    
                     with c_cmj_ath:
                         sel_cmj_ath = st.selectbox("Select Athlete", master_athlete_list, key="cmj_dash_ath_sel")
                     
@@ -935,7 +940,13 @@ if check_password():
                             comp_factor = st.selectbox("Comparison Factor", ["Individual (vs. Baseline)", "Team Benchmark (T-Score)"], key="cmj_dash_comp_sel")
 
                         cur_test_row = ath_cmj_all[ath_cmj_all['Test Date'].dt.strftime('%m/%d/%y') == sel_test_date_str].iloc[-1]
-                        base_test_row = ath_cmj_all.iloc[0]
+                        
+                        # Apply seasonal baseline filter logic
+                        if sel_cmj_season != "All Seasons":
+                            season_cmj = ath_cmj_all[ath_cmj_all['Season'] == sel_cmj_season]
+                            base_test_row = season_cmj.iloc[0] if not season_cmj.empty else ath_cmj_all.iloc[0]
+                        else:
+                            base_test_row = ath_cmj_all.iloc[0]
 
                         meta_lookup = full_df_unfiltered[full_df_unfiltered['Name'] == sel_cmj_ath]
                         photo_val = meta_lookup['PhotoURL'].iloc[0] if not meta_lookup.empty else "https://www.w3schools.com/howto/img_avatar.png"
@@ -957,7 +968,7 @@ if check_password():
 
                         # Athlete Card
                         with top_col1:
-                            ath_card_html = f"""<div style="background:#4895DB; color:white; font-weight:900; font-size:18px; text-align:center; padding:8px 10px; border-radius:6px 6px 0 0;">{sel_cmj_ath}</div><div style="border:1px solid #E2E8F0; border-top:none; border-radius:0 0 6px 6px; padding:16px; background:white; display:flex; align-items:center; gap:16px;"><img src="{photo_val}" style="width:95px; height:95px; border-radius:8px; object-fit:contain; border:2px solid #FF8200;"><div style="font-size:14px; line-height:1.8; color:#1D1D1F;"><b>Position:</b> {pos_val}</div></div><div style="background:#4895DB; color:white; font-weight:800; font-size:13px; text-align:center; padding:6px; margin-top:10px; border-radius:4px;">Comparison Factor: Individual</div>"""
+                            ath_card_html = f"""<div style="background:#4895DB; color:white; font-weight:900; font-size:18px; text-align:center; padding:8px 10px; border-radius:6px 6px 0 0;">{sel_cmj_ath}</div><div style="border:1px solid #E2E8F0; border-top:none; border-radius:0 0 6px 6px; padding:16px; background:white; display:flex; align-items:center; gap:16px;"><img src="{photo_val}" style="width:95px; height:95px; border-radius:8px; object-fit:contain; border:2px solid #FF8200;"><div style="font-size:14px; line-height:1.8; color:#1D1D1F;"><b>Position:</b> {pos_val}</div></div><div style="background:#4895DB; color:white; font-weight:800; font-size:13px; text-align:center; padding:6px; margin-top:10px; border-radius:4px;">Comparison Factor: Individual ({sel_cmj_season})</div>"""
                             st.markdown(ath_card_html, unsafe_allow_html=True)
 
                         # Data Table
@@ -979,12 +990,18 @@ if check_password():
                             full_table_html = f"""<div style="background:#4895DB; color:white; font-weight:900; font-size:14px; text-align:center; padding:6px; border-radius:6px 6px 0 0;">Countermovement Jump Performance</div><table class="scout-table" style="width:100%; border:1px solid #E2E8F0; border-top:none; background:white; border-collapse:collapse; margin-bottom:0;"><thead><tr style="background:#F8FAFC; color:#64748B; font-size:11px;"><th style="text-align:left !important; padding:6px 12px;">Metric</th><th style="padding:6px;">Baseline</th><th style="padding:6px; background:#EBF5FF; color:#1E40AF;">Current</th><th style="padding:6px;">% Change</th></tr></thead><tbody>{table_rows_str}</tbody></table>"""
                             st.markdown(full_table_html, unsafe_allow_html=True)
 
-                        # Calibrated Gauge
+                        # Calibrated Individual Readiness Gauge
                         with top_col3:
                             gauge_header = f"""<div style="background:#4895DB; color:white; font-weight:900; font-size:14px; text-align:center; padding:6px; border-radius:6px 6px 0 0;">Performance Readiness Score<br><span style="font-size:11px; font-weight:600;">{sel_test_date_str}</span></div>"""
                             st.markdown(gauge_header, unsafe_allow_html=True)
                             
-                            peak_h = ath_cmj_all[cmj_col].max() if cmj_col in ath_cmj_all else 1.0
+                            # Individual Peak baseline selection
+                            if sel_cmj_season != "All Seasons":
+                                season_cmj = ath_cmj_all[ath_cmj_all['Season'] == sel_cmj_season]
+                                peak_h = season_cmj[cmj_col].max() if (not season_cmj.empty and cmj_col in season_cmj) else (ath_cmj_all[cmj_col].max() if cmj_col in ath_cmj_all else 1.0)
+                            else:
+                                peak_h = ath_cmj_all[cmj_col].max() if cmj_col in ath_cmj_all else 1.0
+                                
                             cur_h_val = float(cur_test_row.get(cmj_col, 0.0))
                             gauge_score = min(100, max(0, int((cur_h_val / peak_h) * 100))) if peak_h > 0 else 94
 
@@ -1049,8 +1066,8 @@ if check_password():
 
                         st.markdown("<br>", unsafe_allow_html=True)
 
-                        # Performance Standards Graph
-                        st.markdown('<div class="section-header">Countermovement Jump Performance Standards</div>', unsafe_allow_html=True)
+                        # Individual Baseline Standardized Graph
+                        st.markdown('<div class="section-header">Individual Countermovement Jump Performance Standards</div>', unsafe_allow_html=True)
                         
                         chart_col, legend_col = st.columns([4.2, 1.1])
 
@@ -1071,12 +1088,16 @@ if check_password():
                             t_scores = []
                             x_labels = []
 
+                            # Scope standard baseline reference to selected season for the athlete
+                            eval_ref_df = ath_cmj_all if sel_cmj_season == "All Seasons" else ath_cmj_all[ath_cmj_all['Season'] == sel_cmj_season]
+                            if eval_ref_df.empty: eval_ref_df = ath_cmj_all
+
                             for bm in bar_metrics:
                                 x_labels.append(bm["name"])
                                 cname = bm["col"]
-                                if cname in raw_cmj_df.columns and raw_cmj_df[cname].dropna().std() > 0:
-                                    m_mean = raw_cmj_df[cname].mean()
-                                    m_std = raw_cmj_df[cname].std()
+                                if cname in eval_ref_df.columns and eval_ref_df[cname].dropna().std() > 0:
+                                    m_mean = eval_ref_df[cname].mean()
+                                    m_std = eval_ref_df[cname].std()
                                     ath_v = float(cur_test_row.get(cname, m_mean))
                                     if "time" in cname.lower():
                                         t_val = 50.0 - (10.0 * (ath_v - m_mean) / m_std)
@@ -1084,8 +1105,15 @@ if check_password():
                                         t_val = 50.0 + (10.0 * (ath_v - m_mean) / m_std)
                                     t_scores.append(round(min(100.0, max(0.0, t_val)), 1))
                                 else:
-                                    fallback_map = {"CM Depth": 35.9, "Time to Takeoff": 59.0}
-                                    t_scores.append(fallback_map.get(bm["name"], 50.0))
+                                    # Direct individual fallback percentage relative to athlete's own baseline
+                                    c_val = float(cur_test_row.get(cname, 0.0))
+                                    b_val = float(base_test_row.get(cname, 0.0))
+                                    if b_val > 0:
+                                        diff = (c_val - b_val) / b_val
+                                        t_val = 50.0 + (diff * 50.0)
+                                        t_scores.append(round(min(100.0, max(0.0, t_val)), 1))
+                                    else:
+                                        t_scores.append(50.0)
 
                             fig_bands = go.Figure()
 
@@ -1170,14 +1198,14 @@ if check_password():
                                     showgrid=False, 
                                     showline=True,
                                     linecolor='#6B7280',
-                                    title=dict(text="T-Score Performance Rating", font=dict(size=12, weight='bold', color='#4B5563'))
+                                    title=dict(text="Standardized Performance Score", font=dict(size=12, weight='bold', color='#4B5563'))
                                 ),
                                 showlegend=False
                             )
                             st.plotly_chart(fig_bands, use_container_width=True, config=LOCKED_CONFIG, key="cmj_performance_bands_chart")
 
                         with legend_col:
-                            legend_table_html = """<div style="background:#4895DB; color:white; font-weight:800; font-size:12px; text-align:center; padding:6px; border-radius:4px 4px 0 0;">Performance Bands<br><span style="font-size:10px; font-weight:600;">T-Score Rating</span></div><table style="width:100%; border-collapse:collapse; font-size:11px; text-align:center; font-weight:700;"><tr style="background:#1C7426; color:white;"><td style="padding:4px;">Excellent</td><td>> 80</td></tr><tr style="background:#33A338; color:white;"><td style="padding:4px;">Very Good</td><td>70 - 80</td></tr><tr style="background:#81D350; color:#111827;"><td style="padding:4px;">Good</td><td>60 - 70</td></tr><tr style="background:#C3E8A8; color:#111827;"><td style="padding:4px;">Above Avg.</td><td>55 - 60</td></tr><tr style="background:#FFFFFF; color:#111827; border-top:1px solid #E2E8F0; border-bottom:1px solid #E2E8F0;"><td style="padding:4px;">Average</td><td>45 - 55</td></tr><tr style="background:#F8A2A2; color:#111827;"><td style="padding:4px;">Below Avg.</td><td>40 - 45</td></tr><tr style="background:#F05656; color:white;"><td style="padding:4px;">Poor</td><td>30 - 40</td></tr><tr style="background:#E60000; color:white;"><td style="padding:4px;">Very Poor</td><td>20 - 30</td></tr><tr style="background:#A00000; color:white;"><td style="padding:4px;">Extremely Poor</td><td>< 20</td></tr></table>"""
+                            legend_table_html = """<div style="background:#4895DB; color:white; font-weight:800; font-size:12px; text-align:center; padding:6px; border-radius:4px 4px 0 0;">Performance Bands<br><span style="font-size:10px; font-weight:600;">Standard Score</span></div><table style="width:100%; border-collapse:collapse; font-size:11px; text-align:center; font-weight:700;"><tr style="background:#1C7426; color:white;"><td style="padding:4px;">Excellent</td><td>> 80</td></tr><tr style="background:#33A338; color:white;"><td style="padding:4px;">Very Good</td><td>70 - 80</td></tr><tr style="background:#81D350; color:#111827;"><td style="padding:4px;">Good</td><td>60 - 70</td></tr><tr style="background:#C3E8A8; color:#111827;"><td style="padding:4px;">Above Avg.</td><td>55 - 60</td></tr><tr style="background:#FFFFFF; color:#111827; border-top:1px solid #E2E8F0; border-bottom:1px solid #E2E8F0;"><td style="padding:4px;">Average</td><td>45 - 55</td></tr><tr style="background:#F8A2A2; color:#111827;"><td style="padding:4px;">Below Avg.</td><td>40 - 45</td></tr><tr style="background:#F05656; color:white;"><td style="padding:4px;">Poor</td><td>30 - 40</td></tr><tr style="background:#E60000; color:white;"><td style="padding:4px;">Very Poor</td><td>20 - 30</td></tr><tr style="background:#A00000; color:white;"><td style="padding:4px;">Extremely Poor</td><td>< 20</td></tr></table>"""
                             st.markdown(legend_table_html, unsafe_allow_html=True)
 
                 # --- SUB-TAB 2: TEAM CMJ SUMMARY & READINESS DASHBOARD ---
@@ -1186,7 +1214,9 @@ if check_password():
                     
                     team_cmj_dates = sorted(raw_cmj_df['Test Date'].dropna().dt.strftime('%m/%d/%y').unique().tolist(), reverse=True)
                     
-                    c_sum_d1, c_sum_d2 = st.columns([1.5, 2])
+                    c_sum_s1, c_sum_d1, c_sum_d2 = st.columns([1.2, 1.5, 1.8])
+                    with c_sum_s1:
+                        sel_team_season = st.selectbox("Baseline Season", ["All Seasons", "Spring", "Summer", "Pre-Season"], index=0, key="team_cmj_season_filter")
                     with c_sum_d1:
                         sel_team_cmj_date = st.selectbox("Evaluation Test Date", team_cmj_dates, index=0, key="team_cmj_eval_date")
                     with c_sum_d2:
@@ -1211,7 +1241,14 @@ if check_password():
                             continue
                             
                         target_row = ath_date_point.iloc[-1]
-                        peak_h = ath_sub_cmj[cmj_col].max() if cmj_col in ath_sub_cmj else 1.0
+                        
+                        # Apply seasonal baseline for peak score
+                        if sel_team_season != "All Seasons":
+                            season_cmj = ath_sub_cmj[ath_sub_cmj['Season'] == sel_team_season]
+                            peak_h = season_cmj[cmj_col].max() if (not season_cmj.empty and cmj_col in season_cmj) else (ath_sub_cmj[cmj_col].max() if cmj_col in ath_sub_cmj else 1.0)
+                        else:
+                            peak_h = ath_sub_cmj[cmj_col].max() if cmj_col in ath_sub_cmj else 1.0
+                            
                         cur_h = float(target_row.get(cmj_col, 0.0))
                         
                         readiness_pct = min(120, max(0, int((cur_h / peak_h) * 100))) if peak_h > 0 else 0
@@ -2434,7 +2471,7 @@ if check_password():
                                         fig_p = px.line(pd.DataFrame(card_scores), x='Display', y='Score', markers=True, text='Score', range_y=[0, 140])
                                         fig_p.update_traces(textposition="top center", line=dict(color='#FF8200', width=3), marker=dict(size=8, color='#4895DB', line=dict(width=1, color='white')))
                                         fig_p.update_layout(height=200, margin=dict(l=15, r=15, t=30, b=10), template="simple_white", xaxis=dict(type='category', title=None), yaxis=dict(visible=False))
-                                        st.plotly_chart(fig_p, use_container_width=True, key=f"team_card_{name}_{sel_week}_t4")
+                                        st.plotly_chart(fig_p, use_container_width=True, config=LOCKED_CONFIG, key=f"team_card_{name}_{sel_week}_t4")
                                         
             # ==========================================
             # --- TAB CLAUSE 5: MATCH V. PRACTICE ------
