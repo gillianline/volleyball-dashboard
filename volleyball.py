@@ -189,7 +189,7 @@ def get_acwr_badge(ratio):
         elif 1.30 < r <= 1.50:
             return "#D97706", "#FEF3C7", "Elevated Risk"
         else:
-            return "#D93025", "#FCE8E6", "High Spike Danger"
+            return "#D93025", "#FCE8E6", "High Spike"
     except:
         return "#64748B", "#F1F5F9", "N/A"
 
