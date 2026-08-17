@@ -193,17 +193,17 @@ def get_acwr_badge(ratio):
     except:
         return "#64748B", "#F1F5F9", "N/A"
 
-def get_readiness_zone_info(pct_score):
+def get_readiness_color(pct_score):
     if pct_score >= 95:
-        return "#15803D", "#E6F4EA", "Peak Readiness"
+        return "#15803D"
     elif pct_score >= 90:
-        return "#65A30D", "#F0FDF4", "High Readiness"
+        return "#65A30D"
     elif pct_score >= 80:
-        return "#D97706", "#FEF3C7", "Moderate Readiness"
+        return "#D97706"
     elif pct_score >= 70:
-        return "#EA580C", "#FFEDD5", "Elevated Fatigue"
+        return "#EA580C"
     else:
-        return "#B91C1C", "#FEE2E2", "High Fatigue"
+        return "#B91C1C"
 
 phase_map = {}
 
@@ -988,7 +988,6 @@ if check_password():
                             cur_h_val = float(cur_test_row.get(cmj_col, 0.0))
                             gauge_score = min(100, max(0, int((cur_h_val / peak_h) * 100))) if peak_h > 0 else 94
 
-                            # Gauge setup
                             gauge_colors = ['#B91C1C', '#EA580C', '#FACC15', '#65A30D', '#15803D', 'rgba(0,0,0,0)']
                             values = [20, 20, 20, 20, 20, 100]
 
@@ -1212,30 +1211,18 @@ if check_password():
                             continue
                             
                         target_row = ath_date_point.iloc[-1]
-                        baseline_row = ath_sub_cmj.iloc[0]
                         peak_h = ath_sub_cmj[cmj_col].max() if cmj_col in ath_sub_cmj else 1.0
-                        
                         cur_h = float(target_row.get(cmj_col, 0.0))
-                        base_h = float(baseline_row.get(cmj_col, 0.0))
-                        cur_rsi = float(target_row.get(rsi_col, 0.0))
                         
                         readiness_pct = min(120, max(0, int((cur_h / peak_h) * 100))) if peak_h > 0 else 0
-                        pct_change = ((cur_h - base_h) / base_h * 100) if base_h > 0 else 0.0
-                        
-                        z_color, z_bg, z_status = get_readiness_zone_info(readiness_pct)
+                        z_color = get_readiness_color(readiness_pct)
                         
                         team_cmj_rows.append({
                             "Athlete": ath_name,
                             "PhotoURL": photo_url,
                             "Position": pos_str,
                             "Readiness %": readiness_pct,
-                            "Status": z_status,
-                            "Status_Color": z_color,
-                            "Status_BG": z_bg,
-                            "Current Height": cur_h,
-                            "Baseline Height": base_h,
-                            "% Change": pct_change,
-                            "RSI Modified": cur_rsi
+                            "Status_Color": z_color
                         })
 
                     if team_cmj_rows:
@@ -1251,22 +1238,14 @@ if check_password():
                         c_kpi3.metric("Optimal (>=90%)", peak_count)
                         c_kpi4.metric("Fatigued (<80%)", fatigue_count)
 
-                        team_tbl_html = """<table class="scout-table" style="width:100%; border:1px solid #E2E8F0; background:white; margin-top:15px;"><thead><tr style="background:#4895DB; color:white;"><th style="width:60px;">Athlete</th><th style="text-align:left !important; padding-left:10px;">Name</th><th>Position</th><th>Readiness Score</th><th>Performance Zone</th><th>Jump Height</th><th>Baseline</th><th>% Shift</th><th>RSI-mod</th></tr></thead><tbody>"""
+                        team_tbl_html = """<table class="scout-table" style="width:100%; border:1px solid #E2E8F0; background:white; margin-top:15px;"><thead><tr style="background:#4895DB; color:white;"><th style="width:60px;">Athlete</th><th style="text-align:left !important; padding-left:15px;">Name</th><th>Position</th><th>Readiness Score</th></tr></thead><tbody>"""
                         
                         for _, row in cmj_team_df.iterrows():
-                            c_pct = row['% Change']
-                            diff_color = "#137333" if c_pct >= 0 else "#D93025"
-                            
                             team_tbl_html += f"""<tr>
-                                <td style="padding:4px;"><img src="{row['PhotoURL']}" style="width:36px; height:36px; border-radius:50%; object-fit:contain; border:2px solid #FF8200;"></td>
-                                <td style="text-align:left !important; font-weight:800; padding-left:10px;">{row['Athlete']}</td>
-                                <td>{row['Position']}</td>
-                                <td style="font-weight:900; font-size:14px; color:{row['Status_Color']};">{row['Readiness %']}%</td>
-                                <td><span style="background-color:{row['Status_BG']}; color:{row['Status_Color']}; padding:3px 8px; border-radius:10px; font-weight:700; font-size:11px;">{row['Status']}</span></td>
-                                <td style="font-weight:800;">{row['Current Height']:.1f} cm</td>
-                                <td style="color:#64748B;">{row['Baseline Height']:.1f} cm</td>
-                                <td style="font-weight:800; color:{diff_color};">{c_pct:+.1f}%</td>
-                                <td style="font-weight:700;">{row['RSI Modified']:.2f}</td>
+                                <td style="padding:6px;"><img src="{row['PhotoURL']}" style="width:38px; height:38px; border-radius:50%; object-fit:contain; border:2px solid #FF8200;"></td>
+                                <td style="text-align:left !important; font-weight:800; padding-left:15px; font-size:13px;">{row['Athlete']}</td>
+                                <td style="font-weight:600; color:#4B5563;">{row['Position']}</td>
+                                <td style="font-weight:900; font-size:15px; color:{row['Status_Color']};">{row['Readiness %']}%</td>
                             </tr>"""
                         
                         team_tbl_html += "</tbody></table>"
@@ -1668,7 +1647,7 @@ if check_password():
                 sh_er_p = sh_p[sh_p['Direction'].str.contains('External|ER', case=False, na=False)] if not sh_p.empty and 'Direction' in sh_p.columns else pd.DataFrame()
 
                 max_sh_ir = max(sh_ir_p['L Max Force (N)'].max() if 'L Max Force (N)' in sh_ir_p.columns else 0.0, sh_ir_p['R Max Force (N)'].max() if 'R Max Force (N)' in sh_ir_p.columns else 0.0) if not sh_ir_p.empty else 0.0
-                max_sh_er = max(sh_er_p['L Max Force (N)'].max() if 'L Max Force (N)' in sh_ir_p.columns else 0.0, sh_ir_p['R Max Force (N)'].max() if 'R Max Force (N)' in sh_ir_p.columns else 0.0) if not sh_ir_p.empty else 0.0
+                max_sh_er = max(sh_er_p['L Max Force (N)'].max() if 'L Max Force (N)' in sh_ir_p.columns else 0.0, sh_er_p['R Max Force (N)'].max() if 'R Max Force (N)' in sh_ir_p.columns else 0.0) if not sh_ir_p.empty else 0.0
 
                 m_c1, m_c2, m_c3, m_c4, m_c5, m_c6 = st.columns(6)
                 m_c1.metric("Peak CMJ", f"{max_cmj_h:.1f} cm")
