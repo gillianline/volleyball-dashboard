@@ -932,7 +932,7 @@ if check_password():
                         with c_cmj_date:
                             sel_test_date_str = st.selectbox("Test Date", valid_dates, index=len(valid_dates)-1, key="cmj_dash_date_sel")
                         with c_cmj_comp:
-                            comp_factor = st.selectbox("Comparison Factor", ["Individual (Personal History T-Score)", "Team Benchmark (T-Score)", "Position Benchmark (T-Score)"], key="cmj_dash_comp_sel")
+                            comp_factor = st.selectbox("Comparison Factor", ["Individual", "Team", "Position"], key="cmj_dash_comp_sel")
 
                         cur_test_row = ath_cmj_all[ath_cmj_all['Test Date'].dt.strftime('%m/%d/%y') == sel_test_date_str].iloc[-1]
                         base_test_row = ath_cmj_all.iloc[0]
