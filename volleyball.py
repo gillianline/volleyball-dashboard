@@ -942,10 +942,12 @@ if check_password():
                     # --- TOP SECTION: ATHLETE BANNER | DATA TABLE | GAUGE ---
                     top_col1, top_col2, top_col3 = st.columns([1.2, 2.2, 1.6])
 
+                    # 1. Cleaned Athlete Card (Without BW and RSI-Mod)
                     with top_col1:
-                        ath_card_html = f"""<div style="background:#4895DB; color:white; font-weight:900; font-size:18px; text-align:center; padding:8px 10px; border-radius:6px 6px 0 0;">{sel_cmj_ath}</div><div style="border:1px solid #E2E8F0; border-top:none; border-radius:0 0 6px 6px; padding:12px; background:white; display:flex; align-items:center; gap:12px;"><img src="{photo_val}" style="width:90px; height:90px; border-radius:8px; object-fit:contain; border:2px solid #FF8200;"><div style="font-size:12px; line-height:1.6; color:#1D1D1F;"><b>Position:</b> {pos_val}<br><b>Body Weight:</b> {cur_test_row.get('BW [KG]', 0.0):.1f} kg<br><b>RSI-Mod:</b> {cur_test_row.get('RSI-modified [m/s]', 0.0):.2f}</div></div><div style="background:#4895DB; color:white; font-weight:800; font-size:13px; text-align:center; padding:6px; margin-top:10px; border-radius:4px;">Comparison Factor: Individual</div>"""
+                        ath_card_html = f"""<div style="background:#4895DB; color:white; font-weight:900; font-size:18px; text-align:center; padding:8px 10px; border-radius:6px 6px 0 0;">{sel_cmj_ath}</div><div style="border:1px solid #E2E8F0; border-top:none; border-radius:0 0 6px 6px; padding:16px; background:white; display:flex; align-items:center; gap:16px;"><img src="{photo_val}" style="width:95px; height:95px; border-radius:8px; object-fit:contain; border:2px solid #FF8200;"><div style="font-size:14px; line-height:1.8; color:#1D1D1F;"><b>Position:</b> {pos_val}</div></div><div style="background:#4895DB; color:white; font-weight:800; font-size:13px; text-align:center; padding:6px; margin-top:10px; border-radius:4px;">Comparison Factor: Individual</div>"""
                         st.markdown(ath_card_html, unsafe_allow_html=True)
 
+                    # 2. Performance Comparison Table
                     with top_col2:
                         table_rows_str = ""
                         for m_info in cmj_metric_defs:
@@ -964,6 +966,7 @@ if check_password():
                         full_table_html = f"""<div style="background:#4895DB; color:white; font-weight:900; font-size:14px; text-align:center; padding:6px; border-radius:6px 6px 0 0;">Countermovement Jump Performance</div><table class="scout-table" style="width:100%; border:1px solid #E2E8F0; border-top:none; background:white; border-collapse:collapse; margin-bottom:0;"><thead><tr style="background:#F8FAFC; color:#64748B; font-size:11px;"><th style="text-align:left !important; padding:6px 12px;">Metric</th><th style="padding:6px;">Baseline</th><th style="padding:6px; background:#EBF5FF; color:#1E40AF;">Current</th><th style="padding:6px;">% Change</th></tr></thead><tbody>{table_rows_str}</tbody></table>"""
                         st.markdown(full_table_html, unsafe_allow_html=True)
 
+                    # 3. Fixed Performance Readiness Gauge
                     with top_col3:
                         gauge_header = f"""<div style="background:#4895DB; color:white; font-weight:900; font-size:14px; text-align:center; padding:6px; border-radius:6px 6px 0 0;">Performance Readiness Score<br><span style="font-size:11px; font-weight:600;">{sel_test_date_str}</span></div>"""
                         st.markdown(gauge_header, unsafe_allow_html=True)
@@ -972,50 +975,52 @@ if check_password():
                         cur_h_val = float(cur_test_row.get(cmj_col, 0.0))
                         gauge_score = min(100, max(0, int((cur_h_val / peak_h) * 100))) if peak_h > 0 else 94
 
-                        # Semicircular Solid Gauge matching reference
+                        # Semicircle wedge breakdown (180 degrees total on top)
+                        # Red -> Orange -> Yellow -> Light Green -> Dark Green
                         gauge_colors = ['#B91C1C', '#EA580C', '#FACC15', '#65A30D', '#15803D', 'rgba(0,0,0,0)']
-                        values = [20, 20, 20, 20, 20, 100]  # Semicircle wedge breakdown
+                        values = [20, 20, 20, 20, 20, 100]
 
-                        # Calculate needle rotation angle (0 = 180 deg, 100 = 0 deg)
+                        # Calculate needle angle (0% = 180 deg / Left, 100% = 0 deg / Right)
                         angle_rad = math.pi * (1.0 - (gauge_score / 100.0))
-                        needle_r = 0.42
-                        needle_x = 0.5 + needle_r * math.cos(angle_rad)
-                        needle_y = 0.5 + needle_r * math.sin(angle_rad)
+                        needle_length = 0.38
+                        needle_x = 0.5 + needle_length * math.cos(angle_rad)
+                        needle_y = 0.28 + needle_length * math.sin(angle_rad)
 
                         fig_gauge = go.Figure()
 
-                        # Semicircular Base Donut
+                        # Upward-curving gauge arch (rotation=270)
                         fig_gauge.add_trace(go.Pie(
                             values=values,
-                            rotation=90,
+                            rotation=270,
                             direction='clockwise',
-                            hole=0.45,
+                            hole=0.48,
                             marker=dict(colors=gauge_colors, line=dict(color='white', width=1.5)),
                             textinfo='none',
                             hoverinfo='none',
-                            sort=False
+                            sort=False,
+                            domain=dict(x=[0, 1], y=[0, 0.85])
                         ))
 
-                        # Needle line
+                        # Needle line pointing from bottom center upwards
                         fig_gauge.add_shape(
                             type='line',
-                            x0=0.5, y0=0.5,
+                            x0=0.5, y0=0.28,
                             x1=needle_x, y1=needle_y,
                             line=dict(color='#111827', width=4)
                         )
 
-                        # Center Needle Pivot Point
+                        # Center Pivot Point
                         fig_gauge.add_shape(
                             type='circle',
-                            x0=0.47, y0=0.47,
-                            x1=0.53, y1=0.53,
+                            x0=0.475, y0=0.255,
+                            x1=0.525, y1=0.305,
                             fillcolor='#111827',
                             line_color='#111827'
                         )
 
-                        # Badge Overlay Text
+                        # Centered Badge
                         fig_gauge.add_annotation(
-                            x=0.5, y=0.48,
+                            x=0.5, y=0.18,
                             text=f"<b>{gauge_score}%</b>",
                             showarrow=False,
                             font=dict(size=14, color="white", weight="bold"),
