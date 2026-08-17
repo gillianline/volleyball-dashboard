@@ -569,9 +569,8 @@ if check_password():
                 render_compliance_card("External Rotation ROM (Right)", rv, rd, mv, md, pct, dn, threshold_days=7, unit="°", decimals=1)
                 
         elif selected_season == "Testing":
-
             st.markdown('<div class="section-header">Testing Profile</div>', unsafe_allow_html=True)
-
+            
             test_tab_titles = [
                 "Spring Testing", 
                 "Summer Testing", 
@@ -592,130 +591,131 @@ if check_password():
                 key="testing_tab_radio_state"
             )
             st.session_state.active_testing_tab = selected_test_tab
-            
-            # --- TAB 1, 2, 3: INDIVIDUAL SEASONAL TESTING ---
-            for tab_idx, s_label in enumerate(["Spring", "Summer", "Pre-Season"]):
-                with testing_season_tabs[tab_idx]:
-                    c_t_ath, _ = st.columns([2, 2])
-                    with c_t_ath:
-                        selected_athlete_test = st.selectbox(f"Select Athlete ({s_label})", master_athlete_list, key=f"nav_ath_test_{s_label}")
-                    
-                    meta_lookup = full_df_unfiltered[full_df_unfiltered['Name'] == selected_athlete_test]
-                    photo_val = meta_lookup['PhotoURL'].iloc[0] if not meta_lookup.empty else "https://www.w3schools.com/howto/img_avatar.png"
-                    pos_val = meta_lookup['Position'].iloc[0] if not meta_lookup.empty else "N/A"
 
-                    # Top Header Card
-                    st.markdown(f'<div style="display:flex; align-items:center; gap:20px; padding:15px; background:#f8f9fa; border-radius:15px; border-left:6px solid #FF8200; margin-bottom:20px;"><img src="{photo_val}" class="gallery-photo" style="width:80px; height:80px;"><div><h2 style="margin:0; color:#1D1D1F;">{selected_athlete_test}</h2><p style="margin:0; color:#4895DB; font-weight:700; font-size:16px;">{pos_val} | {s_label} Testing Profile</p></div></div>', unsafe_allow_html=True)
+            # --- TABS 1, 2, 3: INDIVIDUAL SEASONAL TESTING ---
+            if selected_test_tab in ["Spring Testing", "Summer Testing", "Pre-Season Testing"]:
+                s_label = selected_test_tab.replace(" Testing", "")
+                
+                c_t_ath, _ = st.columns([2, 2])
+                with c_t_ath:
+                    selected_athlete_test = st.selectbox(f"Select Athlete ({s_label})", master_athlete_list, key=f"nav_ath_test_{s_label}")
+                
+                meta_lookup = full_df_unfiltered[full_df_unfiltered['Name'] == selected_athlete_test]
+                photo_val = meta_lookup['PhotoURL'].iloc[0] if not meta_lookup.empty else "https://www.w3schools.com/howto/img_avatar.png"
+                pos_val = meta_lookup['Position'].iloc[0] if not meta_lookup.empty else "N/A"
 
-                    # --- SECTION 1: COUNTERMOVEMENT JUMP ---
-                    st.markdown('<h4 style="color:#4895DB; font-weight:800; margin-bottom:5px;">COUNTERMOVEMENT JUMP</h4>', unsafe_allow_html=True)
-                    cmj_t_data = raw_cmj_df[(raw_cmj_df['Name'] == selected_athlete_test) & (raw_cmj_df['Season'] == s_label)].sort_values('Test Date')
-                    
-                    if not cmj_t_data.empty:
-                        jc1, jc2 = st.columns([1.5, 3.5])
-                        with jc1:
-                            baseline_cmj = cmj_t_data.head(1)
-                            base_h = baseline_cmj.iloc[-1][cmj_col] if not baseline_cmj.empty else 0.0
-                            base_rsi = baseline_cmj.iloc[-1][rsi_col] if not baseline_cmj.empty else 0.0
-                            latest_cmj = cmj_t_data.iloc[-1]
-                            cur_h, cur_rsi = latest_cmj[cmj_col], latest_cmj[rsi_col]
-                            
-                            p_diff_h = ((cur_h - base_h) / base_h * 100) if base_h > 0 else 0
-                            p_diff_rsi = ((cur_rsi - base_rsi) / base_rsi * 100) if base_rsi > 0 else 0
-                            color_h = "#28a745" if cur_h >= base_h else "#dc3545"
-                            color_rsi = "#28a745" if cur_rsi >= base_rsi else "#dc3545"
+                # Top Header Card
+                st.markdown(f'<div style="display:flex; align-items:center; gap:20px; padding:15px; background:#f8f9fa; border-radius:15px; border-left:6px solid #FF8200; margin-bottom:20px;"><img src="{photo_val}" class="gallery-photo" style="width:80px; height:80px;"><div><h2 style="margin:0; color:#1D1D1F;">{selected_athlete_test}</h2><p style="margin:0; color:#4895DB; font-weight:700; font-size:16px;">{pos_val} | {s_label} Testing Profile</p></div></div>', unsafe_allow_html=True)
 
-                            sc1, sc2 = st.columns(2)
-                            with sc1: st.markdown(f'<div style="text-align:center;"><div class="score-box" style="background-color:{color_h}; line-height:1.2; padding-top:15px; height:80px; width:100%;"><span style="font-size:18px;">{cur_h:.1f} cm</span><span style="font-size:10px; display:block; font-weight:bold; margin-top:2px;">CMJ HEIGHT</span></div></div>', unsafe_allow_html=True)
-                            with sc2: st.markdown(f'<div style="text-align:center;"><div class="score-box" style="background-color:{color_rsi}; line-height:1.2; padding-top:15px; height:80px; width:100%;"><span style="font-size:18px;">{cur_rsi:.2f}</span><span style="font-size:10px; display:block; font-weight:bold; margin-top:2px;">RSI MOD</span></div></div>', unsafe_allow_html=True)
-                            st.markdown(f'<div class="info-box" style="text-align:center; margin-top:10px;"><p style="margin:0; font-size:11px; color:grey;"><b>% Change from Base:</b> CMJ: {p_diff_h:+.1f}% | RSI: {p_diff_rsi:+.1f}%</p><p style="margin:0; font-size:11px; color:grey;"><b>Base Values:</b> CMJ: {base_h:.1f} cm | RSI: {base_rsi:.2f}</p></div>', unsafe_allow_html=True)
-
-                        with jc2:
-                            fig_cmj_t = make_subplots(specs=[[{"secondary_y": True}]])
-                            fig_cmj_t.add_trace(go.Scatter(x=cmj_t_data['Test Date'], y=cmj_t_data[cmj_col], name="Jump Height", mode='lines+markers', line=dict(color='#FF8200', width=3)), secondary_y=False)
-                            fig_cmj_t.add_trace(go.Scatter(x=cmj_t_data['Test Date'], y=cmj_t_data[rsi_col], name="RSI Modified", mode='lines+markers', line=dict(color='#4895DB', dash='dot', width=2)), secondary_y=True)
-                            fig_cmj_t.update_layout(height=160, margin=dict(l=0, r=0, t=10, b=0), showlegend=True, legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0), template="simple_white")
-                            st.plotly_chart(fig_cmj_t, use_container_width=True, config=LOCKED_CONFIG, key=f"cmj_chart_test_{s_label}")
-                    else:
-                        st.info(f"No Countermovement Jump testing records logged for {selected_athlete_test} in {s_label}.")
-
-                    st.markdown('<hr style="display:block !important; margin:15px 0; border:0; border-top:1px solid #E5E5E7;" />', unsafe_allow_html=True)
-
-                    # --- SECTION 2: ASH SHOULDER: ISO I ---
-                    st.markdown('<h4 style="color:#4895DB; font-weight:800; margin-bottom:5px;">ASH SHOULDER: ISO I</h4>', unsafe_allow_html=True)
-                    ash_t_data = raw_ash_df[(raw_ash_df['Name'] == selected_athlete_test) & (raw_ash_df['Season'] == s_label)].sort_values('Test Date')
-                    
-                    if not ash_t_data.empty:
-                        ac1, ac2 = st.columns([1.5, 3.5])
-                        with ac1:
-                            latest_date_ash = ash_t_data['Test Date'].iloc[-1]
-                            today_ash_rows = ash_t_data[ash_t_data['Test Date'] == latest_date_ash]
-                            row_i = today_ash_rows[today_ash_rows['Isometric Type'].str.contains('I', case=False, na=False)] if 'Isometric Type' in today_ash_rows.columns else today_ash_rows
-                            li = row_i.iloc[-1]['Peak Vertical Force [N] (L)'] if not row_i.empty else 0.0
-                            ri = row_i.iloc[-1]['Peak Vertical Force [N] (R)'] if not row_i.empty else 0.0
-                            asym_i = row_i.iloc[-1]['Peak Vertical Force [N] (Asym)(%)'] if not row_i.empty else 0.0
-                            
-                            baseline_ash = ash_t_data.head(1)
-                            base_li = baseline_ash.iloc[-1]['Peak Vertical Force [N] (L)'] if not baseline_ash.empty else 0.0
-                            base_ri = baseline_ash.iloc[-1]['Peak Vertical Force [N] (R)'] if not baseline_ash.empty else 0.0
-                            pct_l = ((li - base_li) / base_li * 100) if base_li > 0 else 0
-                            pct_r = ((ri - base_ri) / base_ri * 100) if base_ri > 0 else 0
-                            color_ash_l = "#28a745" if li >= 100 else "#dc3545"
-                            color_ash_r = "#28a745" if ri >= 100 else "#dc3545"
-
-                            sc1, sc2 = st.columns(2)
-                            with sc1: st.markdown(f'<div style="text-align:center;"><div class="score-box" style="background-color:{color_ash_l}; line-height:1.2; padding-top:15px; height:80px; width:100%;"><span style="font-size:18px;">{li:.0f} N</span><span style="font-size:10px; display:block; font-weight:bold; margin-top:2px;">LEFT</span></div></div>', unsafe_allow_html=True)
-                            with sc2: st.markdown(f'<div style="text-align:center;"><div class="score-box" style="background-color:{color_ash_r}; line-height:1.2; padding-top:15px; height:80px; width:100%;"><span style="font-size:18px;">{ri:.0f} N</span><span style="font-size:10px; display:block; font-weight:bold; margin-top:2px;">RIGHT</span></div></div>', unsafe_allow_html=True)
-                            st.markdown(f'<div class="info-box" style="text-align:center; margin-top:10px;"><p style="margin:0; font-size:11px; color:grey;"><b>Asymmetry:</b> {asym_i:+.1f}%</p><p style="margin:0; font-size:11px; color:grey;"><b>% Change from Base:</b> L: {pct_l:+.1f}% | R: {pct_r:+.1f}%</p><p style="margin:0; font-size:11px; color:grey;"><b>Base Force:</b> L: {base_li:.0f} N | R: {base_ri:.0f} N</p></div>', unsafe_allow_html=True)
+                # --- SECTION 1: COUNTERMOVEMENT JUMP ---
+                st.markdown('<h4 style="color:#4895DB; font-weight:800; margin-bottom:5px;">COUNTERMOVEMENT JUMP</h4>', unsafe_allow_html=True)
+                cmj_t_data = raw_cmj_df[(raw_cmj_df['Name'] == selected_athlete_test) & (raw_cmj_df['Season'] == s_label)].sort_values('Test Date')
+                
+                if not cmj_t_data.empty:
+                    jc1, jc2 = st.columns([1.5, 3.5])
+                    with jc1:
+                        baseline_cmj = cmj_t_data.head(1)
+                        base_h = baseline_cmj.iloc[-1][cmj_col] if not baseline_cmj.empty else 0.0
+                        base_rsi = baseline_cmj.iloc[-1][rsi_col] if not baseline_cmj.empty else 0.0
+                        latest_cmj = cmj_t_data.iloc[-1]
+                        cur_h, cur_rsi = latest_cmj[cmj_col], latest_cmj[rsi_col]
                         
-                        with ac2:
-                            fig_ash_t = go.Figure()
-                            fig_ash_t.add_trace(go.Scatter(x=ash_t_data['Test Date'], y=ash_t_data['Peak Vertical Force [N] (L)'], name="Left Peak Force", mode='lines+markers', line=dict(color='#4895DB', width=2.5)))
-                            fig_ash_t.add_trace(go.Scatter(x=ash_t_data['Test Date'], y=ash_t_data['Peak Vertical Force [N] (R)'], name="Right Peak Force", mode='lines+markers', line=dict(color='#FF8200', width=2.5, dash='dash')))
-                            fig_ash_t.update_layout(height=160, margin=dict(l=0, r=0, t=10, b=0), showlegend=True, legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0), template="simple_white")
-                            st.plotly_chart(fig_ash_t, use_container_width=True, config=LOCKED_CONFIG, key=f"ash_chart_test_{s_label}")
-                    else:
-                        st.info(f"No ASH Shoulder testing records logged for {selected_athlete_test} in {s_label}.")
+                        p_diff_h = ((cur_h - base_h) / base_h * 100) if base_h > 0 else 0
+                        p_diff_rsi = ((cur_rsi - base_rsi) / base_rsi * 100) if base_rsi > 0 else 0
+                        color_h = "#28a745" if cur_h >= base_h else "#dc3545"
+                        color_rsi = "#28a745" if cur_rsi >= base_rsi else "#dc3545"
 
-                    st.markdown('<hr style="display:block !important; margin:15px 0; border:0; border-top:1px solid #E5E5E7;" />', unsafe_allow_html=True)
+                        sc1, sc2 = st.columns(2)
+                        with sc1: st.markdown(f'<div style="text-align:center;"><div class="score-box" style="background-color:{color_h}; line-height:1.2; padding-top:15px; height:80px; width:100%;"><span style="font-size:18px;">{cur_h:.1f} cm</span><span style="font-size:10px; display:block; font-weight:bold; margin-top:2px;">CMJ HEIGHT</span></div></div>', unsafe_allow_html=True)
+                        with sc2: st.markdown(f'<div style="text-align:center;"><div class="score-box" style="background-color:{color_rsi}; line-height:1.2; padding-top:15px; height:80px; width:100%;"><span style="font-size:18px;">{cur_rsi:.2f}</span><span style="font-size:10px; display:block; font-weight:bold; margin-top:2px;">RSI MOD</span></div></div>', unsafe_allow_html=True)
+                        st.markdown(f'<div class="info-box" style="text-align:center; margin-top:10px;"><p style="margin:0; font-size:11px; color:grey;"><b>% Change from Base:</b> CMJ: {p_diff_h:+.1f}% | RSI: {p_diff_rsi:+.1f}%</p><p style="margin:0; font-size:11px; color:grey;"><b>Base Values:</b> CMJ: {base_h:.1f} cm | RSI: {base_rsi:.2f}</p></div>', unsafe_allow_html=True)
 
-                    # --- SECTION 3: EXTERNAL ROTATION: ROM ---
-                    st.markdown('<h4 style="color:#4895DB; font-weight:800; margin-bottom:5px;">EXTERNAL ROTATION: ROM</h4>', unsafe_allow_html=True)
+                    with jc2:
+                        fig_cmj_t = make_subplots(specs=[[{"secondary_y": True}]])
+                        fig_cmj_t.add_trace(go.Scatter(x=cmj_t_data['Test Date'], y=cmj_t_data[cmj_col], name="Jump Height", mode='lines+markers', line=dict(color='#FF8200', width=3)), secondary_y=False)
+                        fig_cmj_t.add_trace(go.Scatter(x=cmj_t_data['Test Date'], y=cmj_t_data[rsi_col], name="RSI Modified", mode='lines+markers', line=dict(color='#4895DB', dash='dot', width=2)), secondary_y=True)
+                        fig_cmj_t.update_layout(height=160, margin=dict(l=0, r=0, t=10, b=0), showlegend=True, legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0), template="simple_white")
+                        st.plotly_chart(fig_cmj_t, use_container_width=True, config=LOCKED_CONFIG, key=f"cmj_chart_test_{s_label}")
+                else:
+                    st.info(f"No Countermovement Jump testing records logged for {selected_athlete_test} in {s_label}.")
+
+                st.markdown('<hr style="display:block !important; margin:15px 0; border:0; border-top:1px solid #E5E5E7;" />', unsafe_allow_html=True)
+
+                # --- SECTION 2: ASH SHOULDER: ISO I ---
+                st.markdown('<h4 style="color:#4895DB; font-weight:800; margin-bottom:5px;">ASH SHOULDER: ISO I</h4>', unsafe_allow_html=True)
+                ash_t_data = raw_ash_df[(raw_ash_df['Name'] == selected_athlete_test) & (raw_ash_df['Season'] == s_label)].sort_values('Test Date')
+                
+                if not ash_t_data.empty:
+                    ac1, ac2 = st.columns([1.5, 3.5])
+                    with ac1:
+                        latest_date_ash = ash_t_data['Test Date'].iloc[-1]
+                        today_ash_rows = ash_t_data[ash_t_data['Test Date'] == latest_date_ash]
+                        row_i = today_ash_rows[today_ash_rows['Isometric Type'].str.contains('I', case=False, na=False)] if 'Isometric Type' in today_ash_rows.columns else today_ash_rows
+                        li = row_i.iloc[-1]['Peak Vertical Force [N] (L)'] if not row_i.empty else 0.0
+                        ri = row_i.iloc[-1]['Peak Vertical Force [N] (R)'] if not row_i.empty else 0.0
+                        asym_i = row_i.iloc[-1]['Peak Vertical Force [N] (Asym)(%)'] if not row_i.empty else 0.0
+                        
+                        baseline_ash = ash_t_data.head(1)
+                        base_li = baseline_ash.iloc[-1]['Peak Vertical Force [N] (L)'] if not baseline_ash.empty else 0.0
+                        base_ri = baseline_ash.iloc[-1]['Peak Vertical Force [N] (R)'] if not baseline_ash.empty else 0.0
+                        pct_l = ((li - base_li) / base_li * 100) if base_li > 0 else 0
+                        pct_r = ((ri - base_ri) / base_ri * 100) if base_ri > 0 else 0
+                        color_ash_l = "#28a745" if li >= 100 else "#dc3545"
+                        color_ash_r = "#28a745" if ri >= 100 else "#dc3545"
+
+                        sc1, sc2 = st.columns(2)
+                        with sc1: st.markdown(f'<div style="text-align:center;"><div class="score-box" style="background-color:{color_ash_l}; line-height:1.2; padding-top:15px; height:80px; width:100%;"><span style="font-size:18px;">{li:.0f} N</span><span style="font-size:10px; display:block; font-weight:bold; margin-top:2px;">LEFT</span></div></div>', unsafe_allow_html=True)
+                        with sc2: st.markdown(f'<div style="text-align:center;"><div class="score-box" style="background-color:{color_ash_r}; line-height:1.2; padding-top:15px; height:80px; width:100%;"><span style="font-size:18px;">{ri:.0f} N</span><span style="font-size:10px; display:block; font-weight:bold; margin-top:2px;">RIGHT</span></div></div>', unsafe_allow_html=True)
+                        st.markdown(f'<div class="info-box" style="text-align:center; margin-top:10px;"><p style="margin:0; font-size:11px; color:grey;"><b>Asymmetry:</b> {asym_i:+.1f}%</p><p style="margin:0; font-size:11px; color:grey;"><b>% Change from Base:</b> L: {pct_l:+.1f}% | R: {pct_r:+.1f}%</p><p style="margin:0; font-size:11px; color:grey;"><b>Base Force:</b> L: {base_li:.0f} N | R: {base_ri:.0f} N</p></div>', unsafe_allow_html=True)
                     
-                    er_t_data = raw_er_df[(raw_er_df['Name'] == selected_athlete_test) & (raw_er_df['Season'] == s_label)].sort_values('Test Date')
-                    if not er_t_data.empty:
-                        ec1, ec2 = st.columns([1.5, 3.5])
-                        with ec1:
-                            baseline_er = er_t_data.head(1)
-                            base_l_rom = float(baseline_er.iloc[-1].get('L Max ROM (°)', 0.0)) if not baseline_er.empty else 0.0
-                            base_r_rom = float(baseline_er.iloc[-1].get('R Max ROM (°)', 0.0)) if not baseline_er.empty else 0.0
-                            
-                            latest_er = er_t_data.iloc[-1]
-                            cur_l_rom = float(latest_er.get('L Max ROM (°)', 0.0))
-                            cur_r_rom = float(latest_er.get('R Max ROM (°)', 0.0))
-                            cur_asym_rom = float(latest_er.get('ROM Asymmetry (%)', 0.0))
+                    with ac2:
+                        fig_ash_t = go.Figure()
+                        fig_ash_t.add_trace(go.Scatter(x=ash_t_data['Test Date'], y=ash_t_data['Peak Vertical Force [N] (L)'], name="Left Peak Force", mode='lines+markers', line=dict(color='#4895DB', width=2.5)))
+                        fig_ash_t.add_trace(go.Scatter(x=ash_t_data['Test Date'], y=ash_t_data['Peak Vertical Force [N] (R)'], name="Right Peak Force", mode='lines+markers', line=dict(color='#FF8200', width=2.5, dash='dash')))
+                        fig_ash_t.update_layout(height=160, margin=dict(l=0, r=0, t=10, b=0), showlegend=True, legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0), template="simple_white")
+                        st.plotly_chart(fig_ash_t, use_container_width=True, config=LOCKED_CONFIG, key=f"ash_chart_test_{s_label}")
+                else:
+                    st.info(f"No ASH Shoulder testing records logged for {selected_athlete_test} in {s_label}.")
 
-                            rom_pct_l = ((cur_l_rom - base_l_rom) / base_l_rom * 100) if base_l_rom > 0 else 0.0
-                            rom_pct_r = ((cur_r_rom - base_r_rom) / base_r_rom * 100) if base_r_rom > 0 else 0.0
-                            
-                            color_er_l = "#28a745" if cur_l_rom >= 110 else "#ffc107" if 90 <= cur_l_rom <= 109 else "#dc3545"
-                            color_er_r = "#28a745" if cur_r_rom >= 110 else "#ffc107" if 90 <= cur_r_rom <= 109 else "#dc3545"
+                st.markdown('<hr style="display:block !important; margin:15px 0; border:0; border-top:1px solid #E5E5E7;" />', unsafe_allow_html=True)
 
-                            sc1, sc2 = st.columns(2)
-                            with sc1: st.markdown(f'<div style="text-align:center;"><div class="score-box" style="background-color:{color_er_l}; line-height:1.2; padding-top:15px; height:80px; width:100%;"><span style="font-size:18px;">{cur_l_rom:.1f}°</span><span style="font-size:10px; display:block; font-weight:bold; margin-top:2px;">LEFT</span></div></div>', unsafe_allow_html=True)
-                            with sc2: st.markdown(f'<div style="text-align:center;"><div class="score-box" style="background-color:{color_er_r}; line-height:1.2; padding-top:15px; height:80px; width:100%;"><span style="font-size:18px;">{cur_r_rom:.1f}°</span><span style="font-size:10px; display:block; font-weight:bold; margin-top:2px;">RIGHT</span></div></div>', unsafe_allow_html=True)
-                            st.markdown(f'<div class="info-box" style="text-align:center; margin-top:10px;"><p style="margin:0; font-size:11px; color:grey;"><b>Asymmetry:</b> {cur_asym_rom:+.1f}%</p><p style="margin:0; font-size:11px; color:grey;"><b>% Change from Base:</b> L: {rom_pct_l:+.1f}% | R: {rom_pct_r:+.1f}%</p><p style="margin:0; font-size:11px; color:grey;"><b>Base ROM:</b> L: {base_l_rom:.1f}° | R: {base_r_rom:.1f}°</p></div>', unsafe_allow_html=True)
-                        with ec2:
-                            fig_er_t = go.Figure()
-                            fig_er_t.add_trace(go.Scatter(x=er_t_data['Test Date'], y=er_t_data['L Max ROM (°)'], name="Left Max ROM", mode='lines+markers', line=dict(color='#4895DB', width=2.5)))
-                            fig_er_t.add_trace(go.Scatter(x=er_t_data['Test Date'], y=er_t_data['R Max ROM (°)'], name="Right Max ROM", mode='lines+markers', line=dict(color='#FF8200', width=2.5, dash='dash')))
-                            fig_er_t.update_layout(height=160, margin=dict(l=0, r=0, t=10, b=0), showlegend=True, legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0), template="simple_white")
-                            st.plotly_chart(fig_er_t, use_container_width=True, config=LOCKED_CONFIG, key=f"er_chart_test_{s_label}")
-                    else:
-                        st.info(f"No External Rotation testing records logged for {selected_athlete_test} in {s_label}.")
+                # --- SECTION 3: EXTERNAL ROTATION: ROM ---
+                st.markdown('<h4 style="color:#4895DB; font-weight:800; margin-bottom:5px;">EXTERNAL ROTATION: ROM</h4>', unsafe_allow_html=True)
+                
+                er_t_data = raw_er_df[(raw_er_df['Name'] == selected_athlete_test) & (raw_er_df['Season'] == s_label)].sort_values('Test Date')
+                if not er_t_data.empty:
+                    ec1, ec2 = st.columns([1.5, 3.5])
+                    with ec1:
+                        baseline_er = er_t_data.head(1)
+                        base_l_rom = float(baseline_er.iloc[-1].get('L Max ROM (°)', 0.0)) if not baseline_er.empty else 0.0
+                        base_r_rom = float(baseline_er.iloc[-1].get('R Max ROM (°)', 0.0)) if not baseline_er.empty else 0.0
+                        
+                        latest_er = er_t_data.iloc[-1]
+                        cur_l_rom = float(latest_er.get('L Max ROM (°)', 0.0))
+                        cur_r_rom = float(latest_er.get('R Max ROM (°)', 0.0))
+                        cur_asym_rom = float(latest_er.get('ROM Asymmetry (%)', 0.0))
 
-            # --- TAB 4: INTAKE TESTING TAB ---
-            with testing_season_tabs[3]:
+                        rom_pct_l = ((cur_l_rom - base_l_rom) / base_l_rom * 100) if base_l_rom > 0 else 0.0
+                        rom_pct_r = ((cur_r_rom - base_r_rom) / base_r_rom * 100) if base_r_rom > 0 else 0.0
+                        
+                        color_er_l = "#28a745" if cur_l_rom >= 110 else "#ffc107" if 90 <= cur_l_rom <= 109 else "#dc3545"
+                        color_er_r = "#28a745" if cur_r_rom >= 110 else "#ffc107" if 90 <= cur_r_rom <= 109 else "#dc3545"
+
+                        sc1, sc2 = st.columns(2)
+                        with sc1: st.markdown(f'<div style="text-align:center;"><div class="score-box" style="background-color:{color_er_l}; line-height:1.2; padding-top:15px; height:80px; width:100%;"><span style="font-size:18px;">{cur_l_rom:.1f}°</span><span style="font-size:10px; display:block; font-weight:bold; margin-top:2px;">LEFT</span></div></div>', unsafe_allow_html=True)
+                        with sc2: st.markdown(f'<div style="text-align:center;"><div class="score-box" style="background-color:{color_er_r}; line-height:1.2; padding-top:15px; height:80px; width:100%;"><span style="font-size:18px;">{cur_r_rom:.1f}°</span><span style="font-size:10px; display:block; font-weight:bold; margin-top:2px;">RIGHT</span></div></div>', unsafe_allow_html=True)
+                        st.markdown(f'<div class="info-box" style="text-align:center; margin-top:10px;"><p style="margin:0; font-size:11px; color:grey;"><b>Asymmetry:</b> {cur_asym_rom:+.1f}%</p><p style="margin:0; font-size:11px; color:grey;"><b>% Change from Base:</b> L: {rom_pct_l:+.1f}% | R: {rom_pct_r:+.1f}%</p><p style="margin:0; font-size:11px; color:grey;"><b>Base ROM:</b> L: {base_l_rom:.1f}° | R: {base_r_rom:.1f}°</p></div>', unsafe_allow_html=True)
+                    with ec2:
+                        fig_er_t = go.Figure()
+                        fig_er_t.add_trace(go.Scatter(x=er_t_data['Test Date'], y=er_t_data['L Max ROM (°)'], name="Left Max ROM", mode='lines+markers', line=dict(color='#4895DB', width=2.5)))
+                        fig_er_t.add_trace(go.Scatter(x=er_t_data['Test Date'], y=er_t_data['R Max ROM (°)'], name="Right Max ROM", mode='lines+markers', line=dict(color='#FF8200', width=2.5, dash='dash')))
+                        fig_er_t.update_layout(height=160, margin=dict(l=0, r=0, t=10, b=0), showlegend=True, legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0), template="simple_white")
+                        st.plotly_chart(fig_er_t, use_container_width=True, config=LOCKED_CONFIG, key=f"er_chart_test_{s_label}")
+                else:
+                    st.info(f"No External Rotation testing records logged for {selected_athlete_test} in {s_label}.")
+
+            # --- TAB 4: INTAKE ASSESSMENT ---
+            elif selected_test_tab == "Intake Testing":
                 st.markdown("<h3 style='color:#1D1D1F; font-weight:900; text-transform:uppercase;'>Athlete Intake Assessment</h3>", unsafe_allow_html=True)
                 c_int_ath, _ = st.columns([2, 2])
                 with c_int_ath:
@@ -806,44 +806,27 @@ if check_password():
                                         <!-- DROP SHADOW AT BASE -->
                                         <ellipse cx="68" cy="214" rx="20" ry="3.5" fill="#000000" opacity="0.12" />
 
-                                        <!-- REALISTIC PROPORTIONAL HUMAN MANNEQUIN (FULL VOLUME ARMS) -->
+                                        <!-- REALISTIC PROPORTIONAL HUMAN MANNEQUIN -->
                                         <g stroke="#2C3036" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
                                             
                                             <!-- Head & Neck -->
                                             <ellipse cx="68" cy="17" rx="7" ry="9" fill="url(#anatomicalBodyGrad)" />
                                             <path d="M 65 25 L 63 33 M 71 25 L 73 33" stroke-width="1.2" />
 
-                                            <!-- Shoulders (Symmetrical Deltoid Caps) -->
+                                            <!-- Shoulders -->
                                             <path d="M 63 33 C 58 33, 48 36, 42 40 C 37 43, 36 50, 39 56 L 43 56 C 47 52, 49 46, 52 44 M 73 33 C 78 33, 88 36, 94 40 C 99 43, 100 50, 97 56 L 93 56 C 89 52, 87 46, 84 44" fill="url(#anatomicalBodyGrad)" />
 
-                                            <!-- Left Arm (Full Volume Bicep, Forearm, Hand & Fingers) -->
-                                            <path d="M 42 40 
-                                                     C 37 43, 35 52, 33 64 
-                                                     C 31 74, 29 82, 27 92 
-                                                     C 25 96, 23 100, 22 104
-                                                     C 21 106, 23 107, 25 106
-                                                     C 27 104, 28 98, 30 92
-                                                     C 33 82, 36 74, 38 64
-                                                     C 40 54, 42 48, 43 56 Z" 
-                                                  fill="url(#anatomicalBodyGrad)" />
+                                            <!-- Left Arm -->
+                                            <path d="M 42 40 C 37 43, 35 52, 33 64 C 31 74, 29 82, 27 92 C 25 96, 23 100, 22 104 C 21 106, 23 107, 25 106 C 27 104, 28 98, 30 92 C 33 82, 36 74, 38 64 C 40 54, 42 48, 43 56 Z" fill="url(#anatomicalBodyGrad)" />
                                             <path d="M 22 104 C 20 106, 18 108, 17 110 M 23 105 C 21 108, 20 110, 19 112 M 24 105 C 23 108, 22 110, 21 112 M 25 104 C 25 107, 24 109, 23 111" fill="none" stroke-width="0.8" />
                                             
-                                            <!-- Right Arm (Full Volume Bicep, Forearm, Hand & Fingers) -->
-                                            <path d="M 94 40 
-                                                     C 99 43, 101 52, 103 64 
-                                                     C 105 74, 107 82, 109 92 
-                                                     C 111 96, 113 100, 114 104
-                                                     C 115 106, 113 107, 111 106
-                                                     C 109 104, 108 98, 106 92
-                                                     C 103 82, 100 74, 98 64
-                                                     C 96 54, 94 48, 93 56 Z" 
-                                                  fill="url(#anatomicalBodyGrad)" />
+                                            <!-- Right Arm -->
+                                            <path d="M 94 40 C 99 43, 101 52, 103 64 C 105 74, 107 82, 109 92 C 111 96, 113 100, 114 104 C 115 106, 113 107, 111 106 C 109 104, 108 98, 106 92 C 103 82, 100 74, 98 64 C 96 54, 94 48, 93 56 Z" fill="url(#anatomicalBodyGrad)" />
                                             <path d="M 114 104 C 116 106, 118 108, 119 110 M 113 105 C 115 108, 116 110, 117 112 M 112 105 C 113 108, 114 110, 115 112 M 111 104 C 111 107, 112 109, 113 111" fill="none" stroke-width="0.8" />
 
                                             <!-- Torso & Waist -->
                                             <path d="M 52 44 L 54 75 L 52 92 L 68 106 L 84 92 L 82 75 L 84 44 Z" fill="url(#anatomicalBodyGrad)" />
 
-                                            <!-- Lower Body (Thighs, Knees, Calves, Feet) -->
                                             <!-- Left Leg -->
                                             <path d="M 52 92 C 50 105, 49 122, 53 138 C 55 144, 55 152, 54 162 C 52 175, 52 192, 54 205 L 48 210 L 58 210 L 59 203 C 60 190, 60 175, 60 162 C 60 152, 60 144, 62 138 C 66 122, 66 105, 68 106 Z" fill="url(#anatomicalBodyGrad)" />
                                             <!-- Right Leg -->
@@ -858,58 +841,45 @@ if check_password():
 
                                             <!-- ANATOMICAL DEFINITION LINES -->
                                             <g stroke="#3A3F46" stroke-width="0.9" fill="none">
-                                                <!-- Collarbone -->
                                                 <path d="M 68 35 C 60 34, 52 37, 46 40 M 68 35 C 76 34, 84 37, 90 40" stroke-width="1" />
-                                                <!-- Chest / Pectorals -->
                                                 <path d="M 52 44 C 60 43, 67 47, 68 54 C 60 56, 52 52, 52 44 Z" fill="#E2E7EC" opacity="0.6" />
                                                 <path d="M 84 44 C 76 43, 69 47, 68 54 C 76 56, 84 52, 84 44 Z" fill="#E2E7EC" opacity="0.6" />
-                                                <!-- Abs (6-Pack Grid) -->
                                                 <path d="M 58 58 C 64 57, 72 57, 78 58" />
                                                 <path d="M 58 66 C 64 65, 72 65, 78 66" />
                                                 <path d="M 59 74 C 64 73, 72 73, 77 74" />
-                                                <!-- Arm Muscle Separation Creases -->
                                                 <path d="M 39 56 C 37 62, 35 70, 33 78" stroke-width="0.75" />
                                                 <path d="M 97 56 C 99 62, 101 70, 103 78" stroke-width="0.75" />
-                                                <!-- Inguinal Crease -->
                                                 <path d="M 52 92 C 58 98, 64 103, 68 106 M 84 92 C 78 98, 72 103, 68 106" stroke-width="1" />
-                                                <!-- Quads Definition -->
                                                 <path d="M 52 96 C 49 108, 50 125, 57 138" />
                                                 <path d="M 84 96 C 87 108, 86 125, 79 138" />
-                                                <!-- Knees -->
                                                 <ellipse cx="57" cy="142" rx="3" ry="3.5" stroke-width="0.9" fill="#E8EDF2" />
                                                 <ellipse cx="79" cy="142" rx="3" ry="3.5" stroke-width="0.9" fill="#E8EDF2" />
-                                                <!-- Calves Definition -->
                                                 <path d="M 54 150 C 51 160, 52 178, 56 195" />
                                                 <path d="M 82 150 C 85 160, 84 178, 80 195" />
                                             </g>
                                         </g>
 
-                                        <!-- NODES & CALLOUT LINES / BADGES -->
-                                        <!-- Node 1: Left Shoulder IR/ER (Orange) -->
+                                        <!-- NODES & CALLOUT LINES -->
                                         <circle cx="91" cy="46" r="3.5" fill="#FF8200" stroke="#FFFFFF" stroke-width="1" />
                                         <line x1="91" y1="46" x2="118" y2="46" stroke="#FF8200" stroke-width="1.8" stroke-dasharray="2,2" />
                                         <rect x="112" y="39" width="14" height="14" rx="3" fill="#FF8200" />
                                         <text x="119" y="50" font-size="9" font-weight="900" fill="#FFFFFF" text-anchor="middle">1</text>
 
-                                        <!-- Node 2: ISO-Y Spine/Thoracic (Orange) -->
                                         <circle cx="68" cy="54" r="3.5" fill="#FF8200" stroke="#FFFFFF" stroke-width="1" />
                                         <line x1="68" y1="54" x2="118" y2="68" stroke="#FF8200" stroke-width="1.8" stroke-dasharray="2,2" />
                                         <rect x="112" y="61" width="14" height="14" rx="3" fill="#FF8200" />
                                         <text x="119" y="72" font-size="9" font-weight="900" fill="#FFFFFF" text-anchor="middle">2</text>
 
-                                        <!-- Node 3: Hip Adduction (Blue) -->
                                         <circle cx="74" cy="122" r="3.5" fill="#4895DB" stroke="#FFFFFF" stroke-width="1" />
                                         <line x1="74" y1="122" x2="118" y2="122" stroke="#4895DB" stroke-width="1.8" stroke-dasharray="2,2" />
                                         <rect x="112" y="115" width="14" height="14" rx="3" fill="#4895DB" />
                                         <text x="119" y="126" font-size="9" font-weight="900" fill="#FFFFFF" text-anchor="middle">3</text>
 
-                                        <!-- Node 4: Hip Abduction (Blue) -->
                                         <circle cx="53" cy="116" r="3.5" fill="#4895DB" stroke="#FFFFFF" stroke-width="1" />
                                         <line x1="53" y1="116" x2="22" y2="116" stroke="#4895DB" stroke-width="1.8" stroke-dasharray="2,2" />
                                         <rect x="14" y="109" width="14" height="14" rx="3" fill="#4895DB" />
                                         <text x="21" y="120" font-size="9" font-weight="900" fill="#FFFFFF" text-anchor="middle">4</text>
 
-                                        <!-- Node 5: Single Leg Calf Raise (Blue) -->
                                         <circle cx="77" cy="172" r="3.5" fill="#4895DB" stroke="#FFFFFF" stroke-width="1" />
                                         <line x1="77" y1="172" x2="118" y2="172" stroke="#4895DB" stroke-width="1.8" stroke-dasharray="2,2" />
                                         <rect x="112" y="165" width="14" height="14" rx="3" fill="#4895DB" />
@@ -920,7 +890,6 @@ if check_password():
                         </body>
                         </html>
                         """
-                        import streamlit.components.v1 as components
                         components.html(hud_html, height=450)
 
                     # --- RIGHT PANEL: LIGHT DETAILS CARDS ---
@@ -1016,7 +985,7 @@ if check_password():
 
                             st.markdown(f"""
                                 <div class="hud-metric-row-light">
-                                    <div style="display:flex; justify-space-between; align-items:center; margin-bottom:4px;">
+                                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
                                         <span style="font-weight:800; font-size:12px; color:#1D1D1F;"><span class="node-badge-orange">1</span>SHOULDER IR / ER</span>
                                         <span style="font-size:10px; color:#6E6E73; font-weight:600;">Latest: {latest_date_str}</span>
                                     </div>
@@ -1035,7 +1004,7 @@ if check_password():
 
                             st.markdown(f"""
                                 <div class="hud-metric-row-light">
-                                    <div style="display:flex; justify-space-between; align-items:center; margin-bottom:4px;">
+                                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
                                         <span style="font-weight:800; font-size:12px; color:#1D1D1F;"><span class="node-badge-orange">2</span>ISO-Y STRENGTH</span>
                                         <span style="font-size:10px; color:#6E6E73; font-weight:600;">Latest: {l_y['Test Date'].strftime('%m/%d/%Y')}</span>
                                     </div>
@@ -1093,7 +1062,7 @@ if check_password():
 
                             st.markdown(f"""
                                 <div class="hud-metric-row-light-blue">
-                                    <div style="display:flex; justify-space-between; align-items:center; margin-bottom:4px;">
+                                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
                                         <span style="font-weight:800; font-size:12px; color:#1D1D1F;"><span class="node-badge-blue">5</span>SINGLE LEG CALF RAISE</span>
                                         <span style="font-size:10px; color:#6E6E73; font-weight:600;">Latest: {l_c['Test Date'].strftime('%m/%d/%Y')}</span>
                                     </div>
@@ -1104,12 +1073,11 @@ if check_password():
                             """, unsafe_allow_html=True)
 
                         st.markdown('</div>', unsafe_allow_html=True)
-
                 else:
                     st.info(f"No Intake Assessment records found for {selected_intake_athlete}.")
 
             # --- TAB 5: OVERALL TESTING PROFILE ---
-            with testing_season_tabs[4]:
+            elif selected_test_tab == "Overall Testing Profile":
                 st.markdown("<h3 style='color:#1D1D1F; font-weight:900; text-transform:uppercase;'>Overall Athletic Testing Profile</h3>", unsafe_allow_html=True)
                 c_ov_ath, _ = st.columns([2, 2])
                 with c_ov_ath:
@@ -1152,7 +1120,7 @@ if check_password():
                 sh_er_p = sh_p[sh_p['Direction'].str.contains('External|ER', case=False, na=False)] if not sh_p.empty and 'Direction' in sh_p.columns else pd.DataFrame()
 
                 max_sh_ir = max(sh_ir_p['L Max Force (N)'].max() if 'L Max Force (N)' in sh_ir_p.columns else 0.0, sh_ir_p['R Max Force (N)'].max() if 'R Max Force (N)' in sh_ir_p.columns else 0.0) if not sh_ir_p.empty else 0.0
-                max_sh_er = max(sh_er_p['L Max Force (N)'].max() if 'L Max Force (N)' in sh_er_p.columns else 0.0, sh_er_p['R Max Force (N)'].max() if 'R Max Force (N)' in sh_er_p.columns else 0.0) if not sh_er_p.empty else 0.0
+                max_sh_er = max(sh_er_p['L Max Force (N)'].max() if 'L Max Force (N)' in sh_er_p.columns else 0.0, sh_er_p['R Max Force (N)'].max() if 'R Max Force (N)' in sh_er_p.columns else 0.0) if not sh_ir_p.empty else 0.0
 
                 # Metric Cards HUD
                 m_c1, m_c2, m_c3, m_c4, m_c5, m_c6 = st.columns(6)
@@ -1178,9 +1146,9 @@ if check_password():
                     {"Test Domain": "Shoulder Strength", "Key Metric": "External Rotation (ER)", "Peak Value": f"{max_sh_er:.1f} N"},
                 ]
                 st.dataframe(pd.DataFrame(ov_summary_data), use_container_width=True, hide_index=True)
-                    
+
             # --- TAB 6: CROSS-SEASON TESTING COMPARISON ---
-            with testing_season_tabs[5]:
+            elif selected_test_tab == "Season Comparison":
                 st.markdown("### Multi-Season Testing Performance Comparison")
                 c_comp_ath, _ = st.columns([2, 2])
                 with c_comp_ath:
@@ -1211,7 +1179,7 @@ if check_password():
                                 insidetextanchor="middle",
                                 textfont=dict(color='white', size=13),
                                 cliponaxis=False
-                            ),
+                            ), 
                             secondary_y=False
                         )
                         
@@ -1227,7 +1195,7 @@ if check_password():
                                 line=dict(color='#4895DB', width=3), 
                                 marker=dict(size=10, color='#4895DB'),
                                 cliponaxis=False
-                            ),
+                            ), 
                             secondary_y=True
                         )
                         
@@ -1272,49 +1240,7 @@ if check_password():
                     st.dataframe(pd.DataFrame(summary_rows), use_container_width=True, hide_index=True)
                 else:
                     st.info(f"No multi-season testing records logged for {comp_athlete}.")
-        else:
-            # --- DYNAMIC SEASONAL TAB NAVIGATION SETUP ---
-            if selected_season == "Summer":
-                tab_titles = [
-                    "Individual Profile", 
-                    "Practice Scores", 
-                    "Daily Combined Scores", 
-                    "Spring Max vs Daily Combined", 
-                    "Practice History", 
-                    "Position Analysis", 
-                    "Spring v. Summer"
-                ]
-            elif selected_season == "Pre-Season":
-                tab_titles = [
-                    "Individual Profile", 
-                    "Practice Scores", 
-                    "Daily Combined Scores", 
-                    "Practice History", 
-                    "Match v. Practice", 
-                    "Match Summary", 
-                    "Position Analysis", 
-                    "Phase Analysis", 
-                    "Practice Planner"
-                ]
-            else: # Spring
-                tab_titles = [
-                    "Individual Profile", 
-                    "Practice Scores", 
-                    "Daily Combined Scores", 
-                    "Practice History", 
-                    "Match v. Practice", 
-                    "Match Summary", 
-                    "Position Analysis", 
-                    "Phase Analysis", 
-                    "Practice Planner"
-                ]
-
-            if "active_tab_state" not in st.session_state or st.session_state.active_tab_state not in tab_titles:
-                st.session_state.active_tab_state = tab_titles[0]
-
-            selected_tab_label = st.radio("Navigation View Menu Selection Control", tab_titles, label_visibility="collapsed", horizontal=True, key="master_app_structural_gate_radio")
-            st.session_state.active_tab_state = selected_tab_label
-
+                    
             # ==========================================
             # --- TAB CLAUSE 0: INDIVIDUAL PROFILE -----
             # ==========================================
