@@ -387,6 +387,7 @@ if check_password():
         ))
 
         st.markdown('<div class="main-logo-container" style="text-align: center; margin-top: 10px; margin-bottom: 15px;"><img src="https://upload.wikimedia.org/wikipedia/commons/thumb/f/fc/Tennessee_Lady_Volunteers_logo.svg/1280px-Tennessee_Lady_Volunteers_logo.svg.png" width="120"><div style="color: #FF8200; font-size: 2rem; font-weight: 900; margin-top: 10px;">LADY VOLS VOLLEYBALL PERFORMANCE</div></div>', unsafe_allow_html=True)
+        
         # ==========================================
         # --- COMPARISON TAB ------------------------
         # ==========================================
@@ -971,7 +972,7 @@ if check_password():
                 sh_er_p = sh_p[sh_p['Direction'].str.contains('External|ER', case=False, na=False)] if not sh_p.empty and 'Direction' in sh_p.columns else pd.DataFrame()
 
                 max_sh_ir = max(sh_ir_p['L Max Force (N)'].max() if 'L Max Force (N)' in sh_ir_p.columns else 0.0, sh_ir_p['R Max Force (N)'].max() if 'R Max Force (N)' in sh_ir_p.columns else 0.0) if not sh_ir_p.empty else 0.0
-                max_sh_er = max(sh_er_p['L Max Force (N)'].max() if 'L Max Force (N)' in sh_ir_p.columns else 0.0, sh_er_p['R Max Force (N)'].max() if 'R Max Force (N)' in sh_er_p.columns else 0.0) if not sh_er_p.empty else 0.0
+                max_sh_er = max(sh_er_p['L Max Force (N)'].max() if 'L Max Force (N)' in sh_er_p.columns else 0.0, sh_er_p['R Max Force (N)'].max() if 'R Max Force (N)' in sh_er_p.columns else 0.0) if not sh_er_p.empty else 0.0
 
                 m_c1, m_c2, m_c3, m_c4, m_c5, m_c6 = st.columns(6)
                 m_c1.metric("Peak CMJ", f"{max_cmj_h:.1f} cm")
@@ -1694,7 +1695,8 @@ if check_password():
                                 try:
                                     prev_matches = df_t4[(df_t4['Name'] == sel_ath_hist) & (df_t4['Date'] < jump_date) & ((df_t4['Session_Name'].str.contains('Match|Game', case=False, na=False)) | (df_t4['Session_Type'].str.contains('Match|Game', case=False, na=False)))]
                                     prev_match_name = prev_matches.sort_values('Date', ascending=False).iloc[0]['Session_Name']
-                                } except: prev_match_name = "N/A"
+                                except:
+                                    prev_match_name = "N/A"
                                 raw_diff = float(row[cmj_col]) - float(base_row[cmj_col])
                                 comparison_list.append({"Date": jump_date.strftime('%m/%d/%Y'), "Prev Match": prev_match_name, "Jump Height": f"{row[cmj_col]:.1f} cm", "Raw Diff": raw_diff, "Display Diff": f"{raw_diff:+.1f} cm", "RSI": f"{row[rsi_col]:.2f}"})
                             
@@ -2136,10 +2138,8 @@ if check_password():
                 if ath_data.empty or ath_data['Date'].dropna().empty:
                     st.info(f"No practice workload data logged for {sel_acwr_ath} in {selected_season}.")
                 else:
-                    # Daily summation of the selected metric
                     ath_daily = ath_data.groupby('Date')[metrics_to_score].sum().reset_index().sort_values('Date')
                     
-                    # Create full date range calendar to ensure off-days properly decay the rolling EWMA
                     min_date = ath_daily['Date'].min()
                     max_date = ath_daily['Date'].max()
                     full_date_idx = pd.date_range(start=min_date, end=max_date, freq='D')
@@ -2147,9 +2147,6 @@ if check_password():
                     ath_calendar = ath_daily.set_index('Date').reindex(full_date_idx).fillna(0.0).reset_index()
                     ath_calendar.rename(columns={'index': 'Date'}, inplace=True)
 
-                    # EWMA Lambda Formula: alpha = 2 / (span + 1)
-                    # Acute: 7-day span (alpha = 2/8 = 0.25)
-                    # Chronic: 28-day span (alpha = 2/29 ~= 0.068965)
                     ath_calendar['Acute_EWMA'] = ath_calendar[sel_acwr_metric].ewm(span=7, adjust=False).mean()
                     ath_calendar['Chronic_EWMA'] = ath_calendar[sel_acwr_metric].ewm(span=28, adjust=False).mean()
                     
@@ -2175,7 +2172,6 @@ if check_password():
                         </div>
                     ''', unsafe_allow_html=True)
 
-                    # Top KPI Metric Cards
                     kpi1, kpi2, kpi3, kpi4 = st.columns(4)
                     kpi1.metric("Daily Raw Metric", f"{latest_row[sel_acwr_metric]:.1f}", help=f"Recorded on {latest_date_str}")
                     kpi2.metric("Acute Load (7d EWMA)", f"{latest_acute:.1f}")
@@ -2191,10 +2187,8 @@ if check_password():
 
                     st.write("<br>", unsafe_allow_html=True)
 
-                    # Longitudinal Dual-Axis Plotly Chart
                     fig_acwr = make_subplots(specs=[[{"secondary_y": True}]])
 
-                    # Sweet spot visual band (0.80 to 1.30)
                     fig_acwr.add_hrect(
                         y0=0.80, y1=1.30, 
                         fillcolor="#28a745", opacity=0.10, 
@@ -2205,7 +2199,6 @@ if check_password():
                         annotation_font_color="#137333"
                     )
 
-                    # Elevated danger band (>= 1.50)
                     fig_acwr.add_hline(
                         y=1.50, line_dash="dash", line_color="#D93025", 
                         line_width=1.5, secondary_y=False,
@@ -2215,7 +2208,6 @@ if check_password():
                         annotation_font_color="#D93025"
                     )
 
-                    # ACWR Ratio Trace
                     fig_acwr.add_trace(
                         go.Scatter(
                             x=ath_calendar['Date'], 
@@ -2228,7 +2220,6 @@ if check_password():
                         secondary_y=False
                     )
 
-                    # Acute Load Trace (Right Axis)
                     fig_acwr.add_trace(
                         go.Scatter(
                             x=ath_calendar['Date'], 
@@ -2240,7 +2231,6 @@ if check_password():
                         secondary_y=True
                     )
 
-                    # Chronic Load Trace (Right Axis)
                     fig_acwr.add_trace(
                         go.Scatter(
                             x=ath_calendar['Date'], 
@@ -2265,7 +2255,6 @@ if check_password():
 
                     st.plotly_chart(fig_acwr, use_container_width=True, config=LOCKED_CONFIG, key=f"acwr_chart_{sel_acwr_ath}_{sel_acwr_metric}")
 
-                    # Multi-Metric Practice Score Snapshot Table
                     st.markdown("#### Practice Score Metrics: Multi-Metric EWMA Breakdown")
                     acwr_rows = []
                     for m in metrics_to_score:
