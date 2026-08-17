@@ -932,7 +932,7 @@ if check_password():
                         with c_cmj_date:
                             sel_test_date_str = st.selectbox("Test Date", valid_dates, index=len(valid_dates)-1, key="cmj_dash_date_sel")
                         with c_cmj_comp:
-                            comp_factor = st.selectbox("Comparison Factor", ["Individual (vs. Baseline)", "Team Benchmark (T-Score)"], key="cmj_dash_comp_sel")
+                            comp_factor = st.selectbox("Comparison Factor", ["Individual (vs. Baseline)", "Team Benchmark (T-Score)", "Position Benchmark (T-Score)"], key="cmj_dash_comp_sel")
 
                         cur_test_row = ath_cmj_all[ath_cmj_all['Test Date'].dt.strftime('%m/%d/%y') == sel_test_date_str].iloc[-1]
                         base_test_row = ath_cmj_all.iloc[0]
@@ -957,15 +957,12 @@ if check_password():
 
                         # Athlete Card
                         with top_col1:
-                            comp_badge_label = "Individual Baseline" if "Individual" in comp_factor else "Team Benchmark (T-Score)"
-                            ath_card_html = f"""<div style="background:#4895DB; color:white; font-weight:900; font-size:18px; text-align:center; padding:8px 10px; border-radius:6px 6px 0 0;">{sel_cmj_ath}</div><div style="border:1px solid #E2E8F0; border-top:none; border-radius:0 0 6px 6px; padding:16px; background:white; display:flex; align-items:center; gap:16px;"><img src="{photo_val}" style="width:95px; height:95px; border-radius:8px; object-fit:contain; border:2px solid #FF8200;"><div style="font-size:14px; line-height:1.8; color:#1D1D1F;"><b>Position:</b> {pos_val}</div></div><div style="background:#4895DB; color:white; font-weight:800; font-size:13px; text-align:center; padding:6px; margin-top:10px; border-radius:4px;">Comparison: {comp_badge_label}</div>"""
+                            ath_card_html = f"""<div style="background:#4895DB; color:white; font-weight:900; font-size:18px; text-align:center; padding:8px 10px; border-radius:6px 6px 0 0;">{sel_cmj_ath}</div><div style="border:1px solid #E2E8F0; border-top:none; border-radius:0 0 6px 6px; padding:16px; background:white; display:flex; align-items:center; gap:16px;"><img src="{photo_val}" style="width:95px; height:95px; border-radius:8px; object-fit:contain; border:2px solid #FF8200;"><div style="font-size:14px; line-height:1.8; color:#1D1D1F;"><b>Position:</b> {pos_val}</div></div><div style="background:#4895DB; color:white; font-weight:800; font-size:13px; text-align:center; padding:6px; margin-top:10px; border-radius:4px;">Comparison: {comp_factor}</div>"""
                             st.markdown(ath_card_html, unsafe_allow_html=True)
 
-                        # Data Table
+                        # Data Table (Fixed % Change)
                         with top_col2:
                             table_rows_str = ""
-                            col_header_3 = "% Change" if "Individual" in comp_factor else "T-Score"
-                            
                             for m_info in cmj_metric_defs:
                                 lbl = m_info["label"]
                                 col_name = m_info["col"]
@@ -974,26 +971,12 @@ if check_password():
                                 c_val = float(cur_test_row.get(col_name, 0.0)) if col_name in cur_test_row and pd.notna(cur_test_row.get(col_name)) else 0.0
                                 b_val = float(base_test_row.get(col_name, 0.0)) if col_name in base_test_row and pd.notna(base_test_row.get(col_name)) else 0.0
                                 
-                                if "Individual" in comp_factor:
-                                    diff = ((c_val - b_val) / b_val * 100) if b_val > 0 else 0.0
-                                    pct_color = "#137333" if diff >= 0 else "#D93025"
-                                    disp_comp = f"{diff:+.0f}%"
-                                else:
-                                    m_mean = raw_cmj_df[col_name].mean() if (col_name in raw_cmj_df.columns and raw_cmj_df[col_name].dropna().std() > 0) else c_val
-                                    m_std = raw_cmj_df[col_name].std() if (col_name in raw_cmj_df.columns and raw_cmj_df[col_name].dropna().std() > 0) else 1.0
-                                    
-                                    if "time" in col_name.lower():
-                                        t_score = 50.0 - (10.0 * (c_val - m_mean) / m_std)
-                                    else:
-                                        t_score = 50.0 + (10.0 * (c_val - m_mean) / m_std)
-                                        
-                                    t_score = round(min(100.0, max(0.0, t_score)), 1)
-                                    pct_color = "#137333" if t_score >= 55 else ("#D97706" if 45 <= t_score < 55 else "#D93025")
-                                    disp_comp = f"{t_score:.1f}"
+                                diff = ((c_val - b_val) / b_val * 100) if b_val > 0 else 0.0
+                                pct_color = "#137333" if diff >= 0 else "#D93025"
                                 
-                                table_rows_str += f"""<tr><td style="text-align:left !important; padding-left:12px; font-weight:600;">{lbl}</td><td style="color:#64748B;">{fmt.format(b_val)}</td><td style="font-weight:800; background:#F0F7FF; border: 1px solid #3B82F6;">{fmt.format(c_val)}</td><td style="font-weight:800; color:{pct_color};">{disp_comp}</td></tr>"""
+                                table_rows_str += f"""<tr><td style="text-align:left !important; padding-left:12px; font-weight:600;">{lbl}</td><td style="color:#64748B;">{fmt.format(b_val)}</td><td style="font-weight:800; background:#F0F7FF; border: 1px solid #3B82F6;">{fmt.format(c_val)}</td><td style="font-weight:800; color:{pct_color};">{diff:+.0f}%</td></tr>"""
                             
-                            full_table_html = f"""<div style="background:#4895DB; color:white; font-weight:900; font-size:14px; text-align:center; padding:6px; border-radius:6px 6px 0 0;">Countermovement Jump Performance</div><table class="scout-table" style="width:100%; border:1px solid #E2E8F0; border-top:none; background:white; border-collapse:collapse; margin-bottom:0;"><thead><tr style="background:#F8FAFC; color:#64748B; font-size:11px;"><th style="text-align:left !important; padding:6px 12px;">Metric</th><th style="padding:6px;">Baseline</th><th style="padding:6px; background:#EBF5FF; color:#1E40AF;">Current</th><th style="padding:6px;">{col_header_3}</th></tr></thead><tbody>{table_rows_str}</tbody></table>"""
+                            full_table_html = f"""<div style="background:#4895DB; color:white; font-weight:900; font-size:14px; text-align:center; padding:6px; border-radius:6px 6px 0 0;">Countermovement Jump Performance</div><table class="scout-table" style="width:100%; border:1px solid #E2E8F0; border-top:none; background:white; border-collapse:collapse; margin-bottom:0;"><thead><tr style="background:#F8FAFC; color:#64748B; font-size:11px;"><th style="text-align:left !important; padding:6px 12px;">Metric</th><th style="padding:6px;">Baseline</th><th style="padding:6px; background:#EBF5FF; color:#1E40AF;">Current</th><th style="padding:6px;">% Change</th></tr></thead><tbody>{table_rows_str}</tbody></table>"""
                             st.markdown(full_table_html, unsafe_allow_html=True)
 
                         # Calibrated Gauge
@@ -1066,8 +1049,8 @@ if check_password():
 
                         st.markdown("<br>", unsafe_allow_html=True)
 
-                        # Performance Standards Graph
-                        st.markdown('<div class="section-header">Countermovement Jump Performance Standards</div>', unsafe_allow_html=True)
+                        # Performance Standards Graph (Dynamically toggles Individual / Team / Position)
+                        st.markdown(f'<div class="section-header">Countermovement Jump Performance Standards ({comp_factor})</div>', unsafe_allow_html=True)
                         
                         chart_col, legend_col = st.columns([4.2, 1.1])
 
@@ -1085,38 +1068,76 @@ if check_password():
                                 {"name": "Time to Takeoff", "col": "Time to Takeoff [s]"}
                             ]
 
-                            t_scores = []
+                            # Determine comparison population pool
+                            if "Position" in comp_factor:
+                                pos_athletes = full_df_unfiltered[full_df_unfiltered['Position'] == pos_val]['Name'].unique()
+                                ref_pool_df = raw_cmj_df[raw_cmj_df['Name'].isin(pos_athletes)]
+                                if ref_pool_df.empty:
+                                    ref_pool_df = raw_cmj_df
+                            else:
+                                ref_pool_df = raw_cmj_df
+
+                            plot_scores = []
                             x_labels = []
 
                             for bm in bar_metrics:
                                 x_labels.append(bm["name"])
                                 cname = bm["col"]
-                                if cname in raw_cmj_df.columns and raw_cmj_df[cname].dropna().std() > 0:
-                                    m_mean = raw_cmj_df[cname].mean()
-                                    m_std = raw_cmj_df[cname].std()
-                                    ath_v = float(cur_test_row.get(cname, m_mean))
+                                ath_v = float(cur_test_row.get(cname, 0.0)) if cname in cur_test_row and pd.notna(cur_test_row.get(cname)) else 0.0
+
+                                if "Individual" in comp_factor:
+                                    base_v = float(base_test_row.get(cname, 0.0)) if cname in base_test_row and pd.notna(base_test_row.get(cname)) else 0.0
                                     if "time" in cname.lower():
-                                        t_val = 50.0 - (10.0 * (ath_v - m_mean) / m_std)
+                                        # For time to takeoff, faster/lower is better
+                                        score_val = (base_v / ath_v * 100.0) if ath_v > 0 else 100.0
                                     else:
-                                        t_val = 50.0 + (10.0 * (ath_v - m_mean) / m_std)
-                                    t_scores.append(round(min(100.0, max(0.0, t_val)), 1))
+                                        score_val = (ath_v / base_v * 100.0) if base_v > 0 else 100.0
+                                    plot_scores.append(round(min(140.0, max(0.0, score_val)), 1))
                                 else:
-                                    fallback_map = {"CM Depth": 35.9, "Time to Takeoff": 59.0}
-                                    t_scores.append(fallback_map.get(bm["name"], 50.0))
+                                    # Team or Position T-Score calculation
+                                    if cname in ref_pool_df.columns and ref_pool_df[cname].dropna().std() > 0:
+                                        m_mean = ref_pool_df[cname].mean()
+                                        m_std = ref_pool_df[cname].std()
+                                        if "time" in cname.lower():
+                                            t_val = 50.0 - (10.0 * (ath_v - m_mean) / m_std)
+                                        else:
+                                            t_val = 50.0 + (10.0 * (ath_v - m_mean) / m_std)
+                                        plot_scores.append(round(min(100.0, max(0.0, t_val)), 1))
+                                    else:
+                                        plot_scores.append(50.0)
 
                             fig_bands = go.Figure()
 
-                            bands = [
-                                {"y0": 0, "y1": 20, "color": "#A00000"},
-                                {"y0": 20, "y1": 30, "color": "#E60000"},
-                                {"y0": 30, "y1": 40, "color": "#F05656"},
-                                {"y0": 40, "y1": 45, "color": "#F8A2A2"},
-                                {"y0": 45, "y1": 55, "color": "#FFFFFF"},
-                                {"y0": 55, "y1": 60, "color": "#C3E8A8"},
-                                {"y0": 60, "y1": 70, "color": "#81D350"},
-                                {"y0": 70, "y1": 80, "color": "#33A338"},
-                                {"y0": 80, "y1": 100, "color": "#1C7426"}
-                            ]
+                            if "Individual" in comp_factor:
+                                y_range = [50, 150]
+                                y_axis_title = "% of Baseline Performance"
+                                bands = [
+                                    {"y0": 0, "y1": 70, "color": "#A00000"},
+                                    {"y0": 70, "y1": 80, "color": "#E60000"},
+                                    {"y0": 80, "y1": 90, "color": "#F05656"},
+                                    {"y0": 90, "y1": 95, "color": "#F8A2A2"},
+                                    {"y0": 95, "y1": 105, "color": "#FFFFFF"},
+                                    {"y0": 105, "y1": 110, "color": "#C3E8A8"},
+                                    {"y0": 110, "y1": 120, "color": "#81D350"},
+                                    {"y0": 120, "y1": 130, "color": "#33A338"},
+                                    {"y0": 130, "y1": 160, "color": "#1C7426"}
+                                ]
+                                val_labels = [f"<b>{val:.0f}%</b>" for val in plot_scores]
+                            else:
+                                y_range = [0, 100]
+                                y_axis_title = f"{'Position' if 'Position' in comp_factor else 'Team'} T-Score Rating"
+                                bands = [
+                                    {"y0": 0, "y1": 20, "color": "#A00000"},
+                                    {"y0": 20, "y1": 30, "color": "#E60000"},
+                                    {"y0": 30, "y1": 40, "color": "#F05656"},
+                                    {"y0": 40, "y1": 45, "color": "#F8A2A2"},
+                                    {"y0": 45, "y1": 55, "color": "#FFFFFF"},
+                                    {"y0": 55, "y1": 60, "color": "#C3E8A8"},
+                                    {"y0": 60, "y1": 70, "color": "#81D350"},
+                                    {"y0": 70, "y1": 80, "color": "#33A338"},
+                                    {"y0": 80, "y1": 100, "color": "#1C7426"}
+                                ]
+                                val_labels = [f"<b>{val:.1f}</b>" for val in plot_scores]
 
                             for b in bands:
                                 fig_bands.add_hrect(
@@ -1129,13 +1150,13 @@ if check_password():
 
                             fig_bands.add_trace(go.Bar(
                                 x=x_labels,
-                                y=t_scores,
+                                y=plot_scores,
                                 marker=dict(
                                     color='#3A3D40',
                                     line=dict(color='#1A1C1E', width=1.5)
                                 ),
                                 width=0.42,
-                                text=[f"<b>{val:.1f}</b>" for val in t_scores],
+                                text=val_labels,
                                 textposition='inside',
                                 insidetextanchor='middle',
                                 textfont=dict(color='white', size=12),
@@ -1182,20 +1203,23 @@ if check_password():
                                     linecolor='#6B7280'
                                 ),
                                 yaxis=dict(
-                                    range=[0, 100], 
-                                    dtick=10, 
+                                    range=y_range, 
                                     showgrid=False, 
                                     showline=True, 
                                     linecolor='#6B7280',
-                                    title=dict(text="T-Score Performance Rating", font=dict(size=12, weight='bold', color='#4B5563'))
+                                    title=dict(text=y_axis_title, font=dict(size=12, weight='bold', color='#4B5563'))
                                 ),
                                 showlegend=False
                             )
-                            st.plotly_chart(fig_bands, use_container_width=True, config=LOCKED_CONFIG, key="cmj_performance_bands_chart")
+                            st.plotly_chart(fig_bands, use_container_width=True, config=LOCKED_CONFIG, key=f"cmj_standards_chart_{comp_factor}")
 
                         with legend_col:
-                            legend_table_html = """<div style="background:#4895DB; color:white; font-weight:800; font-size:12px; text-align:center; padding:6px; border-radius:4px 4px 0 0;">Performance Bands<br><span style="font-size:10px; font-weight:600;">T-Score Rating</span></div><table style="width:100%; border-collapse:collapse; font-size:11px; text-align:center; font-weight:700;"><tr style="background:#1C7426; color:white;"><td style="padding:4px;">Excellent</td><td>> 80</td></tr><tr style="background:#33A338; color:white;"><td style="padding:4px;">Very Good</td><td>70 - 80</td></tr><tr style="background:#81D350; color:#111827;"><td style="padding:4px;">Good</td><td>60 - 70</td></tr><tr style="background:#C3E8A8; color:#111827;"><td style="padding:4px;">Above Avg.</td><td>55 - 60</td></tr><tr style="background:#FFFFFF; color:#111827; border-top:1px solid #E2E8F0; border-bottom:1px solid #E2E8F0;"><td style="padding:4px;">Average</td><td>45 - 55</td></tr><tr style="background:#F8A2A2; color:#111827;"><td style="padding:4px;">Below Avg.</td><td>40 - 45</td></tr><tr style="background:#F05656; color:white;"><td style="padding:4px;">Poor</td><td>30 - 40</td></tr><tr style="background:#E60000; color:white;"><td style="padding:4px;">Very Poor</td><td>20 - 30</td></tr><tr style="background:#A00000; color:white;"><td style="padding:4px;">Extremely Poor</td><td>< 20</td></tr></table>"""
+                            if "Individual" in comp_factor:
+                                legend_table_html = """<div style="background:#4895DB; color:white; font-weight:800; font-size:12px; text-align:center; padding:6px; border-radius:4px 4px 0 0;">Performance Bands<br><span style="font-size:10px; font-weight:600;">% of Baseline</span></div><table style="width:100%; border-collapse:collapse; font-size:11px; text-align:center; font-weight:700;"><tr style="background:#1C7426; color:white;"><td style="padding:4px;">Peak</td><td>> 130%</td></tr><tr style="background:#33A338; color:white;"><td style="padding:4px;">Optimal</td><td>120 - 130%</td></tr><tr style="background:#81D350; color:#111827;"><td style="padding:4px;">Elevated</td><td>110 - 120%</td></tr><tr style="background:#C3E8A8; color:#111827;"><td style="padding:4px;">Above Base</td><td>105 - 110%</td></tr><tr style="background:#FFFFFF; color:#111827; border-top:1px solid #E2E8F0; border-bottom:1px solid #E2E8F0;"><td style="padding:4px;">Baseline</td><td>95 - 105%</td></tr><tr style="background:#F8A2A2; color:#111827;"><td style="padding:4px;">Below Base</td><td>90 - 95%</td></tr><tr style="background:#F05656; color:white;"><td style="padding:4px;">Fatigued</td><td>80 - 90%</td></tr><tr style="background:#E60000; color:white;"><td style="padding:4px;">High Fatigue</td><td>70 - 80%</td></tr><tr style="background:#A00000; color:white;"><td style="padding:4px;">Critical</td><td>< 70%</td></tr></table>"""
+                            else:
+                                legend_table_html = """<div style="background:#4895DB; color:white; font-weight:800; font-size:12px; text-align:center; padding:6px; border-radius:4px 4px 0 0;">Performance Bands<br><span style="font-size:10px; font-weight:600;">T-Score Rating</span></div><table style="width:100%; border-collapse:collapse; font-size:11px; text-align:center; font-weight:700;"><tr style="background:#1C7426; color:white;"><td style="padding:4px;">Excellent</td><td>> 80</td></tr><tr style="background:#33A338; color:white;"><td style="padding:4px;">Very Good</td><td>70 - 80</td></tr><tr style="background:#81D350; color:#111827;"><td style="padding:4px;">Good</td><td>60 - 70</td></tr><tr style="background:#C3E8A8; color:#111827;"><td style="padding:4px;">Above Avg.</td><td>55 - 60</td></tr><tr style="background:#FFFFFF; color:#111827; border-top:1px solid #E2E8F0; border-bottom:1px solid #E2E8F0;"><td style="padding:4px;">Average</td><td>45 - 55</td></tr><tr style="background:#F8A2A2; color:#111827;"><td style="padding:4px;">Below Avg.</td><td>40 - 45</td></tr><tr style="background:#F05656; color:white;"><td style="padding:4px;">Poor</td><td>30 - 40</td></tr><tr style="background:#E60000; color:white;"><td style="padding:4px;">Very Poor</td><td>20 - 30</td></tr><tr style="background:#A00000; color:white;"><td style="padding:4px;">Extremely Poor</td><td>< 20</td></tr></table>"""
                             st.markdown(legend_table_html, unsafe_allow_html=True)
+                            
                             
 
                 # --- SUB-TAB 2: TEAM CMJ SUMMARY & READINESS DASHBOARD ---
