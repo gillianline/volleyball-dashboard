@@ -961,32 +961,32 @@ if check_password():
                         </div>
                         """, unsafe_allow_html=True)
 
+                    # 2. Table: Baseline vs Current vs % Change
                     with top_col2:
-                        st.markdown("""
+                        # Build the full HTML table string
+                        tbl_html = """
                         <div style="background:#4895DB; color:white; font-weight:900; font-size:14px; text-align:center; padding:6px; border-radius:6px 6px 0 0;">
                             Countermovement Jump Performance
                         </div>
-                        """, unsafe_allow_html=True)
-                        
-                        tbl_html = """
-                        <table class="scout-table" style="width:100%; border:1px solid #E2E8F0; border-top:none; background:white;">
+                        <table class="scout-table" style="width:100%; border:1px solid #E2E8F0; border-top:none; background:white; border-collapse:collapse; margin-bottom:0;">
                             <thead>
                                 <tr style="background:#F8FAFC; color:#64748B; font-size:11px;">
-                                    <th style="text-align:left !important; padding-left:12px;">Metric</th>
-                                    <th>Baseline</th>
-                                    <th style="background:#EBF5FF; color:#1E40AF;">Current</th>
-                                    <th>% Change</th>
+                                    <th style="text-align:left !important; padding:8px 12px;">Metric</th>
+                                    <th style="padding:8px;">Baseline</th>
+                                    <th style="padding:8px; background:#EBF5FF; color:#1E40AF;">Current</th>
+                                    <th style="padding:8px;">% Change</th>
                                 </tr>
                             </thead>
                             <tbody>
                         """
+                        
                         for m_info in cmj_metric_defs:
                             lbl = m_info["label"]
                             col_name = m_info["col"]
                             fmt = m_info["fmt"]
                             
-                            c_val = float(cur_test_row.get(col_name, 0.0)) if col_name in cur_test_row else 0.0
-                            b_val = float(base_test_row.get(col_name, 0.0)) if col_name in base_test_row else 0.0
+                            c_val = float(cur_test_row.get(col_name, 0.0)) if col_name in cur_test_row and pd.notna(cur_test_row.get(col_name)) else 0.0
+                            b_val = float(base_test_row.get(col_name, 0.0)) if col_name in base_test_row and pd.notna(base_test_row.get(col_name)) else 0.0
                             
                             diff = ((c_val - b_val) / b_val * 100) if b_val > 0 else 0.0
                             pct_color = "#137333" if diff >= 0 else "#D93025"
@@ -999,6 +999,7 @@ if check_password():
                                 <td style="font-weight:800; color:{pct_color};">{diff:+.0f}%</td>
                             </tr>
                             """
+                        
                         tbl_html += "</tbody></table>"
                         st.markdown(tbl_html, unsafe_allow_html=True)
 
