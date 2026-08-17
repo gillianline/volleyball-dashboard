@@ -917,6 +917,40 @@ if check_password():
             with testing_season_tabs[0]:
                 cmj_view_modes = st.tabs(["Individual Athlete", "Team CMJ Summary"])
                 
+                # Metric definitions matching Excel calculations
+                readiness_metrics = [
+                    {"key": "mRSI", "col": rsi_col, "invert": False},
+                    {"key": "ECC RFD", "col": "Eccentric RFD [N/s]", "invert": False},
+                    {"key": "Force @ 0 Velo", "col": "Force at Zero Velocity [N]", "invert": False},
+                    {"key": "TTO", "col": "Time to Takeoff [s]", "invert": True},
+                    {"key": "ECC Peak Velo", "col": "Eccentric Peak Velocity [m/s]", "invert": False},
+                    {"key": "Ecc Peak Power", "col": "Eccentric Peak Power [W]", "invert": False},
+                    {"key": "P2:P1 Con Impulse", "col": "P2 Concentric Impulse:P1 Concentric Impulse", "invert": False}
+                ]
+
+                def compute_excel_readiness(c_row, b_row):
+                    sub_scores = []
+                    for rm in readiness_metrics:
+                        c_col = rm["col"]
+                        if c_col in c_row and c_col in b_row:
+                            c_val = abs(float(c_row.get(c_col, 0.0)))
+                            b_val = abs(float(b_row.get(c_col, 0.0)))
+                            if b_val > 0 and c_val > 0:
+                                if rm["invert"]:
+                                    pct_diff = ((c_val - b_val) / b_val) * 100.0
+                                    score = 100.0 - pct_diff
+                                else:
+                                    pct_diff = ((c_val - b_val) / b_val) * 100.0
+                                    score = 100.0 + pct_diff
+                                sub_scores.append(min(100.0, max(0.0, score)))
+
+                    if sub_scores:
+                        return sum(sub_scores) / len(sub_scores)
+                    
+                    c_h = float(c_row.get(cmj_col, 0.0))
+                    b_h = float(b_row.get(cmj_col, 0.0))
+                    return min(100.0, (c_h / b_h * 100.0)) if b_h > 0 else 100.0
+
                 # --- SUB-TAB 1: INDIVIDUAL ATHLETE DEEP DIVE ---
                 with cmj_view_modes[0]:
                     c_cmj_ath, c_cmj_date, c_cmj_comp = st.columns([2, 1.5, 1.5])
@@ -941,7 +975,6 @@ if check_password():
                         photo_val = meta_lookup['PhotoURL'].iloc[0] if not meta_lookup.empty else "https://www.w3schools.com/howto/img_avatar.png"
                         pos_val = meta_lookup['Position'].iloc[0] if not meta_lookup.empty else "N/A"
 
-                        # 1. Main Display Table Metric Definitions
                         cmj_metric_defs = [
                             {"label": "Jump Height", "col": "Jump Height (Imp-Mom) [cm]", "fmt": "{:.1f}"},
                             {"label": "Jump Momentum", "col": "Take-off Momentum [kg m/s]", "fmt": "{:.1f}"},
@@ -954,53 +987,19 @@ if check_password():
                             {"label": "P2:P1 Impulse Ratio", "col": "P2 Concentric Impulse:P1 Concentric Impulse", "fmt": "{:.2f}"}
                         ]
 
-                        # 2. Reference Sheet Multi-Metric Readiness Calculation
-                        readiness_metrics = [
-                            {"key": "mRSI", "col": rsi_col, "invert": False, "cap100": True},
-                            {"key": "ECC RFD", "col": "Eccentric RFD [N/s]", "invert": False, "cap100": False},
-                            {"key": "Force @ 0 Velo", "col": "Force at Zero Velocity [N]", "invert": False, "cap100": False},
-                            {"key": "TTO", "col": "Time to Takeoff [s]", "invert": True, "cap100": False},
-                            {"key": "Ecc Peak Velo", "col": "Eccentric Peak Velocity [m/s]", "invert": False, "cap100": False},
-                            {"key": "Ecc Peak Power", "col": "Eccentric Peak Power [W]", "invert": False, "cap100": False},
-                            {"key": "P2:P1 Con Impulse", "col": "P2 Concentric Impulse:P1 Concentric Impulse", "invert": False, "cap100": False}
-                        ]
-
-                        readiness_scores = []
-                        for rm in readiness_metrics:
-                            c_col = rm["col"]
-                            if c_col in cur_test_row and c_col in base_test_row:
-                                c_v = abs(float(cur_test_row.get(c_col, 0.0)))
-                                b_v = abs(float(base_test_row.get(c_col, 0.0)))
-                                if b_v > 0 and c_v > 0:
-                                    if rm["invert"]:
-                                        score = (b_v / c_v) * 100.0
-                                    else:
-                                        score = (c_v / b_v) * 100.0
-                                    
-                                    if rm["cap100"]:
-                                        score = min(100.0, score)
-                                    readiness_scores.append(score)
-
-                        # Compound Mean Readiness Score
-                        if readiness_scores:
-                            comp_readiness_val = sum(readiness_scores) / len(readiness_scores)
-                        else:
-                            # Fallback if specific sub-metrics are missing from sheet
-                            c_h = float(cur_test_row.get(cmj_col, 0.0))
-                            b_h = float(base_test_row.get(cmj_col, 0.0))
-                            comp_readiness_val = (c_h / b_h * 100.0) if b_h > 0 else 100.0
-
-                        display_score = int(round(comp_readiness_val))
+                        # Calculate final score
+                        raw_readiness_avg = compute_excel_readiness(cur_test_row, base_test_row)
+                        display_score = int(round(raw_readiness_avg))
                         gauge_normalized = float(min(100, max(0, display_score)))
 
                         top_col1, top_col2, top_col3 = st.columns([1.2, 2.2, 1.6])
 
-                        # Athlete Header Box
+                        # Athlete Card
                         with top_col1:
                             ath_card_html = f"""<div style="background:#4895DB; color:white; font-weight:900; font-size:18px; text-align:center; padding:8px 10px; border-radius:6px 6px 0 0;">{sel_cmj_ath}</div><div style="border:1px solid #E2E8F0; border-top:none; border-radius:0 0 6px 6px; padding:16px; background:white; display:flex; align-items:center; gap:16px;"><img src="{photo_val}" style="width:95px; height:95px; border-radius:8px; object-fit:contain; border:2px solid #FF8200;"><div style="font-size:14px; line-height:1.8; color:#1D1D1F;"><b>Position:</b> {pos_val}</div></div><div style="background:#4895DB; color:white; font-weight:800; font-size:13px; text-align:center; padding:6px; margin-top:10px; border-radius:4px;">Comparison: {comp_factor}</div>"""
                             st.markdown(ath_card_html, unsafe_allow_html=True)
 
-                        # Data Table (% Change vs Baseline)
+                        # Data Table
                         with top_col2:
                             table_rows_str = ""
                             for m_info in cmj_metric_defs:
@@ -1019,11 +1018,11 @@ if check_password():
                             full_table_html = f"""<div style="background:#4895DB; color:white; font-weight:900; font-size:14px; text-align:center; padding:6px; border-radius:6px 6px 0 0;">Countermovement Jump Performance</div><table class="scout-table" style="width:100%; border:1px solid #E2E8F0; border-top:none; background:white; border-collapse:collapse; margin-bottom:0;"><thead><tr style="background:#F8FAFC; color:#64748B; font-size:11px;"><th style="text-align:left !important; padding:6px 12px;">Metric</th><th style="padding:6px;">Baseline</th><th style="padding:6px; background:#EBF5FF; color:#1E40AF;">Current</th><th style="padding:6px;">% Change</th></tr></thead><tbody>{table_rows_str}</tbody></table>"""
                             st.markdown(full_table_html, unsafe_allow_html=True)
 
-                        # Compound Performance Readiness Gauge
+                        # Calibrated Gauge
                         with top_col3:
                             gauge_header = f"""<div style="background:#4895DB; color:white; font-weight:900; font-size:14px; text-align:center; padding:6px; border-radius:6px 6px 0 0;">Performance Readiness Score<br><span style="font-size:11px; font-weight:600;">{sel_test_date_str}</span></div>"""
                             st.markdown(gauge_header, unsafe_allow_html=True)
-                            
+
                             gauge_colors = ['#B91C1C', '#EA580C', '#FACC15', '#65A30D', '#15803D', 'rgba(0,0,0,0)']
                             values = [20, 20, 20, 20, 20, 100]
 
@@ -1081,7 +1080,7 @@ if check_password():
 
                         st.markdown("<br>", unsafe_allow_html=True)
 
-                        # Performance Standards Graph (T-Score for Individual / Team / Position)
+                        # Performance Standards Graph
                         st.markdown(f'<div class="section-header">Countermovement Jump Performance Standards ({comp_factor})</div>', unsafe_allow_html=True)
                         
                         chart_col, legend_col = st.columns([4.2, 1.1])
@@ -1100,7 +1099,6 @@ if check_password():
                                 {"name": "Time to Takeoff", "col": "Time to Takeoff [s]"}
                             ]
 
-                            # Reference Dataset based on selection
                             if comp_factor == "Individual":
                                 ref_pool_df = ath_cmj_all
                                 title_prefix = "Individual"
@@ -1221,7 +1219,6 @@ if check_password():
                         with legend_col:
                             legend_table_html = """<div style="background:#4895DB; color:white; font-weight:800; font-size:12px; text-align:center; padding:6px; border-radius:4px 4px 0 0;">Performance Bands<br><span style="font-size:10px; font-weight:600;">T-Score Rating</span></div><table style="width:100%; border-collapse:collapse; font-size:11px; text-align:center; font-weight:700;"><tr style="background:#1C7426; color:white;"><td style="padding:4px;">Excellent</td><td>> 80</td></tr><tr style="background:#33A338; color:white;"><td style="padding:4px;">Very Good</td><td>70 - 80</td></tr><tr style="background:#81D350; color:#111827;"><td style="padding:4px;">Good</td><td>60 - 70</td></tr><tr style="background:#C3E8A8; color:#111827;"><td style="padding:4px;">Above Avg.</td><td>55 - 60</td></tr><tr style="background:#FFFFFF; color:#111827; border-top:1px solid #E2E8F0; border-bottom:1px solid #E2E8F0;"><td style="padding:4px;">Average</td><td>45 - 55</td></tr><tr style="background:#F8A2A2; color:#111827;"><td style="padding:4px;">Below Avg.</td><td>40 - 45</td></tr><tr style="background:#F05656; color:white;"><td style="padding:4px;">Poor</td><td>30 - 40</td></tr><tr style="background:#E60000; color:white;"><td style="padding:4px;">Very Poor</td><td>20 - 30</td></tr><tr style="background:#A00000; color:white;"><td style="padding:4px;">Extremely Poor</td><td>< 20</td></tr></table>"""
                             st.markdown(legend_table_html, unsafe_allow_html=True)
-                            
 
                 # --- SUB-TAB 2: TEAM CMJ SUMMARY & READINESS DASHBOARD ---
                 with cmj_view_modes[1]:
@@ -1256,29 +1253,7 @@ if check_password():
                         target_row = ath_date_point.iloc[-1]
                         base_row = ath_sub_cmj.iloc[0]
                         
-                        # Match identical multi-metric compound readiness score
-                        ath_readiness_scores = []
-                        for rm in readiness_metrics:
-                            c_col = rm["col"]
-                            if c_col in target_row and c_col in base_row:
-                                c_v = abs(float(target_row.get(c_col, 0.0)))
-                                b_v = abs(float(base_row.get(c_col, 0.0)))
-                                if b_v > 0 and c_v > 0:
-                                    if rm["invert"]:
-                                        score = (b_v / c_v) * 100.0
-                                    else:
-                                        score = (c_v / b_v) * 100.0
-                                    if rm["cap100"]:
-                                        score = min(100.0, score)
-                                    ath_readiness_scores.append(score)
-
-                        if ath_readiness_scores:
-                            readiness_pct = int(round(sum(ath_readiness_scores) / len(ath_readiness_scores)))
-                        else:
-                            c_h = float(target_row.get(cmj_col, 0.0))
-                            b_h = float(base_row.get(cmj_col, 0.0))
-                            readiness_pct = int(round((c_h / b_h * 100.0))) if b_h > 0 else 100
-
+                        readiness_pct = int(round(compute_excel_readiness(target_row, base_row)))
                         z_color = get_readiness_color(readiness_pct)
                         
                         team_cmj_rows.append({
