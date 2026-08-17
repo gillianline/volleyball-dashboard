@@ -185,7 +185,7 @@ def get_acwr_badge(ratio):
         elif r < 0.80:
             return "#D97706", "#FEF3C7", "Under-training"
         elif 0.80 <= r <= 1.30:
-            return "#137333", "#E6F4EA", "Optimal Sweet Spot"
+            return "#137333", "#E6F4EA", "Optimal"
         elif 1.30 < r <= 1.50:
             return "#D97706", "#FEF3C7", "Elevated Risk"
         else:
