@@ -1815,7 +1815,7 @@ if check_password():
                 else:
                     st.info(f"No multi-season testing records logged for {comp_athlete}.")
         else:
-            # --- DYNAMIC SEASONAL TAB NAVIGATION SETUP ---
+            # --- PERSISTENT DYNAMIC TAB NAVIGATION ---
             if selected_season == "Summer":
                 tab_titles = [
                     "Individual Profile", 
@@ -1851,19 +1851,28 @@ if check_password():
                     "Practice Planner"
                 ]
 
-            if st.session_state.active_tab_state not in tab_titles:
-                st.session_state.active_tab_state = tab_titles[0]
+            radio_key = f"nav_tab_radio_{selected_season}"
+
+            # Preserve the active tab across sub-filter changes
+            if radio_key not in st.session_state or st.session_state[radio_key] not in tab_titles:
+                if st.session_state.get("active_tab_state") in tab_titles:
+                    st.session_state[radio_key] = st.session_state.active_tab_state
+                else:
+                    st.session_state[radio_key] = tab_titles[0]
+
+            def on_tab_change():
+                st.session_state.active_tab_state = st.session_state[radio_key]
 
             selected_tab_label = st.radio(
                 "Navigation View Menu Selection Control", 
                 tab_titles, 
-                index=tab_titles.index(st.session_state.active_tab_state),
+                key=radio_key,
+                on_change=on_tab_change,
                 label_visibility="collapsed", 
-                horizontal=True, 
-                key=f"master_radio_{selected_season}"
+                horizontal=True
             )
             st.session_state.active_tab_state = selected_tab_label
-
+            
             # ==========================================
             # --- TAB CLAUSE 0: INDIVIDUAL PROFILE -----
             # ==========================================
