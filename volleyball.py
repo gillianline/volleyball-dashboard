@@ -572,27 +572,12 @@ if check_password():
             st.markdown('<div class="section-header">Testing Profile</div>', unsafe_allow_html=True)
             testing_season_tabs = st.tabs(["Spring Testing", "Summer Testing", "Pre-Season Testing", "Intake Testing", "Overall Testing Profile", "Season Comparison"])
             
-            # --- GLOBAL ATHLETE SYNC FOR TESTING TABS ---
-            if "synced_test_athlete" not in st.session_state or st.session_state.synced_test_athlete not in master_athlete_list:
-                st.session_state.synced_test_athlete = master_athlete_list[0] if master_athlete_list else ""
-
-            def sync_ath_change(key_name):
-                st.session_state.synced_test_athlete = st.session_state[key_name]
-            
             # --- TAB 1, 2, 3: INDIVIDUAL SEASONAL TESTING ---
             for tab_idx, s_label in enumerate(["Spring", "Summer", "Pre-Season"]):
                 with testing_season_tabs[tab_idx]:
                     c_t_ath, _ = st.columns([2, 2])
                     with c_t_ath:
-                        cur_idx = master_athlete_list.index(st.session_state.synced_test_athlete) if st.session_state.synced_test_athlete in master_athlete_list else 0
-                        selected_athlete_test = st.selectbox(
-                            f"Select Athlete ({s_label})", 
-                            master_athlete_list, 
-                            index=cur_idx,
-                            key=f"nav_ath_test_{s_label}",
-                            on_change=sync_ath_change,
-                            args=(f"nav_ath_test_{s_label}",)
-                        )
+                        selected_athlete_test = st.selectbox(f"Select Athlete ({s_label})", master_athlete_list, key=f"nav_ath_test_{s_label}")
                     
                     meta_lookup = full_df_unfiltered[full_df_unfiltered['Name'] == selected_athlete_test]
                     photo_val = meta_lookup['PhotoURL'].iloc[0] if not meta_lookup.empty else "https://www.w3schools.com/howto/img_avatar.png"
@@ -713,15 +698,7 @@ if check_password():
                 st.markdown("<h3 style='color:#1D1D1F; font-weight:900; text-transform:uppercase;'>Athlete Intake Assessment</h3>", unsafe_allow_html=True)
                 c_int_ath, _ = st.columns([2, 2])
                 with c_int_ath:
-                    cur_int_idx = master_athlete_list.index(st.session_state.synced_test_athlete) if st.session_state.synced_test_athlete in master_athlete_list else 0
-                    selected_intake_athlete = st.selectbox(
-                        "Select Athlete for Intake Assessment", 
-                        master_athlete_list, 
-                        index=cur_int_idx,
-                        key="intake_ath_select",
-                        on_change=sync_ath_change,
-                        args=("intake_ath_select",)
-                    )
+                    selected_intake_athlete = st.selectbox("Select Athlete for Intake Assessment", master_athlete_list, key="intake_ath_select")
 
                 calf_ath = raw_calf_df[raw_calf_df['Name'] == selected_intake_athlete].sort_values('Test Date')
                 hip_ath = raw_hip_df[raw_hip_df['Name'] == selected_intake_athlete].sort_values('Test Date')
@@ -808,27 +785,44 @@ if check_password():
                                         <!-- DROP SHADOW AT BASE -->
                                         <ellipse cx="68" cy="214" rx="20" ry="3.5" fill="#000000" opacity="0.12" />
 
-                                        <!-- REALISTIC PROPORTIONAL HUMAN MANNEQUIN -->
+                                        <!-- REALISTIC PROPORTIONAL HUMAN MANNEQUIN (FULL VOLUME ARMS) -->
                                         <g stroke="#2C3036" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
                                             
                                             <!-- Head & Neck -->
                                             <ellipse cx="68" cy="17" rx="7" ry="9" fill="url(#anatomicalBodyGrad)" />
                                             <path d="M 65 25 L 63 33 M 71 25 L 73 33" stroke-width="1.2" />
 
-                                            <!-- Shoulders -->
+                                            <!-- Shoulders (Symmetrical Deltoid Caps) -->
                                             <path d="M 63 33 C 58 33, 48 36, 42 40 C 37 43, 36 50, 39 56 L 43 56 C 47 52, 49 46, 52 44 M 73 33 C 78 33, 88 36, 94 40 C 99 43, 100 50, 97 56 L 93 56 C 89 52, 87 46, 84 44" fill="url(#anatomicalBodyGrad)" />
 
-                                            <!-- Left Arm -->
-                                            <path d="M 42 40 C 37 43, 35 52, 33 64 C 31 74, 29 82, 27 92 C 25 96, 23 100, 22 104 C 21 106, 23 107, 25 106 C 27 104, 28 98, 30 92 C 33 82, 36 74, 38 64 C 40 54, 42 48, 43 56 Z" fill="url(#anatomicalBodyGrad)" />
+                                            <!-- Left Arm (Full Volume Bicep, Forearm, Hand & Fingers) -->
+                                            <path d="M 42 40 
+                                                     C 37 43, 35 52, 33 64 
+                                                     C 31 74, 29 82, 27 92 
+                                                     C 25 96, 23 100, 22 104
+                                                     C 21 106, 23 107, 25 106
+                                                     C 27 104, 28 98, 30 92
+                                                     C 33 82, 36 74, 38 64
+                                                     C 40 54, 42 48, 43 56 Z" 
+                                                  fill="url(#anatomicalBodyGrad)" />
                                             <path d="M 22 104 C 20 106, 18 108, 17 110 M 23 105 C 21 108, 20 110, 19 112 M 24 105 C 23 108, 22 110, 21 112 M 25 104 C 25 107, 24 109, 23 111" fill="none" stroke-width="0.8" />
                                             
-                                            <!-- Right Arm -->
-                                            <path d="M 94 40 C 99 43, 101 52, 103 64 C 105 74, 107 82, 109 92 C 111 96, 113 100, 114 104 C 115 106, 113 107, 111 106 C 109 104, 108 98, 106 92 C 103 82, 100 74, 98 64 C 96 54, 94 48, 93 56 Z" fill="url(#anatomicalBodyGrad)" />
+                                            <!-- Right Arm (Full Volume Bicep, Forearm, Hand & Fingers) -->
+                                            <path d="M 94 40 
+                                                     C 99 43, 101 52, 103 64 
+                                                     C 105 74, 107 82, 109 92 
+                                                     C 111 96, 113 100, 114 104
+                                                     C 115 106, 113 107, 111 106
+                                                     C 109 104, 108 98, 106 92
+                                                     C 103 82, 100 74, 98 64
+                                                     C 96 54, 94 48, 93 56 Z" 
+                                                  fill="url(#anatomicalBodyGrad)" />
                                             <path d="M 114 104 C 116 106, 118 108, 119 110 M 113 105 C 115 108, 116 110, 117 112 M 112 105 C 113 108, 114 110, 115 112 M 111 104 C 111 107, 112 109, 113 111" fill="none" stroke-width="0.8" />
 
                                             <!-- Torso & Waist -->
                                             <path d="M 52 44 L 54 75 L 52 92 L 68 106 L 84 92 L 82 75 L 84 44 Z" fill="url(#anatomicalBodyGrad)" />
 
+                                            <!-- Lower Body (Thighs, Knees, Calves, Feet) -->
                                             <!-- Left Leg -->
                                             <path d="M 52 92 C 50 105, 49 122, 53 138 C 55 144, 55 152, 54 162 C 52 175, 52 192, 54 205 L 48 210 L 58 210 L 59 203 C 60 190, 60 175, 60 162 C 60 152, 60 144, 62 138 C 66 122, 66 105, 68 106 Z" fill="url(#anatomicalBodyGrad)" />
                                             <!-- Right Leg -->
@@ -843,45 +837,58 @@ if check_password():
 
                                             <!-- ANATOMICAL DEFINITION LINES -->
                                             <g stroke="#3A3F46" stroke-width="0.9" fill="none">
+                                                <!-- Collarbone -->
                                                 <path d="M 68 35 C 60 34, 52 37, 46 40 M 68 35 C 76 34, 84 37, 90 40" stroke-width="1" />
+                                                <!-- Chest / Pectorals -->
                                                 <path d="M 52 44 C 60 43, 67 47, 68 54 C 60 56, 52 52, 52 44 Z" fill="#E2E7EC" opacity="0.6" />
                                                 <path d="M 84 44 C 76 43, 69 47, 68 54 C 76 56, 84 52, 84 44 Z" fill="#E2E7EC" opacity="0.6" />
+                                                <!-- Abs (6-Pack Grid) -->
                                                 <path d="M 58 58 C 64 57, 72 57, 78 58" />
                                                 <path d="M 58 66 C 64 65, 72 65, 78 66" />
                                                 <path d="M 59 74 C 64 73, 72 73, 77 74" />
+                                                <!-- Arm Muscle Separation Creases -->
                                                 <path d="M 39 56 C 37 62, 35 70, 33 78" stroke-width="0.75" />
                                                 <path d="M 97 56 C 99 62, 101 70, 103 78" stroke-width="0.75" />
+                                                <!-- Inguinal Crease -->
                                                 <path d="M 52 92 C 58 98, 64 103, 68 106 M 84 92 C 78 98, 72 103, 68 106" stroke-width="1" />
+                                                <!-- Quads Definition -->
                                                 <path d="M 52 96 C 49 108, 50 125, 57 138" />
                                                 <path d="M 84 96 C 87 108, 86 125, 79 138" />
+                                                <!-- Knees -->
                                                 <ellipse cx="57" cy="142" rx="3" ry="3.5" stroke-width="0.9" fill="#E8EDF2" />
                                                 <ellipse cx="79" cy="142" rx="3" ry="3.5" stroke-width="0.9" fill="#E8EDF2" />
+                                                <!-- Calves Definition -->
                                                 <path d="M 54 150 C 51 160, 52 178, 56 195" />
                                                 <path d="M 82 150 C 85 160, 84 178, 80 195" />
                                             </g>
                                         </g>
 
-                                        <!-- NODES & CALLOUT LINES -->
+                                        <!-- NODES & CALLOUT LINES / BADGES -->
+                                        <!-- Node 1: Left Shoulder IR/ER (Orange) -->
                                         <circle cx="91" cy="46" r="3.5" fill="#FF8200" stroke="#FFFFFF" stroke-width="1" />
                                         <line x1="91" y1="46" x2="118" y2="46" stroke="#FF8200" stroke-width="1.8" stroke-dasharray="2,2" />
                                         <rect x="112" y="39" width="14" height="14" rx="3" fill="#FF8200" />
                                         <text x="119" y="50" font-size="9" font-weight="900" fill="#FFFFFF" text-anchor="middle">1</text>
 
+                                        <!-- Node 2: ISO-Y Spine/Thoracic (Orange) -->
                                         <circle cx="68" cy="54" r="3.5" fill="#FF8200" stroke="#FFFFFF" stroke-width="1" />
                                         <line x1="68" y1="54" x2="118" y2="68" stroke="#FF8200" stroke-width="1.8" stroke-dasharray="2,2" />
                                         <rect x="112" y="61" width="14" height="14" rx="3" fill="#FF8200" />
                                         <text x="119" y="72" font-size="9" font-weight="900" fill="#FFFFFF" text-anchor="middle">2</text>
 
+                                        <!-- Node 3: Hip Adduction (Blue) -->
                                         <circle cx="74" cy="122" r="3.5" fill="#4895DB" stroke="#FFFFFF" stroke-width="1" />
                                         <line x1="74" y1="122" x2="118" y2="122" stroke="#4895DB" stroke-width="1.8" stroke-dasharray="2,2" />
                                         <rect x="112" y="115" width="14" height="14" rx="3" fill="#4895DB" />
                                         <text x="119" y="126" font-size="9" font-weight="900" fill="#FFFFFF" text-anchor="middle">3</text>
 
+                                        <!-- Node 4: Hip Abduction (Blue) -->
                                         <circle cx="53" cy="116" r="3.5" fill="#4895DB" stroke="#FFFFFF" stroke-width="1" />
                                         <line x1="53" y1="116" x2="22" y2="116" stroke="#4895DB" stroke-width="1.8" stroke-dasharray="2,2" />
                                         <rect x="14" y="109" width="14" height="14" rx="3" fill="#4895DB" />
                                         <text x="21" y="120" font-size="9" font-weight="900" fill="#FFFFFF" text-anchor="middle">4</text>
 
+                                        <!-- Node 5: Single Leg Calf Raise (Blue) -->
                                         <circle cx="77" cy="172" r="3.5" fill="#4895DB" stroke="#FFFFFF" stroke-width="1" />
                                         <line x1="77" y1="172" x2="118" y2="172" stroke="#4895DB" stroke-width="1.8" stroke-dasharray="2,2" />
                                         <rect x="112" y="165" width="14" height="14" rx="3" fill="#4895DB" />
@@ -892,6 +899,7 @@ if check_password():
                         </body>
                         </html>
                         """
+                        import streamlit.components.v1 as components
                         components.html(hud_html, height=450)
 
                     # --- RIGHT PANEL: LIGHT DETAILS CARDS ---
@@ -987,7 +995,7 @@ if check_password():
 
                             st.markdown(f"""
                                 <div class="hud-metric-row-light">
-                                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                                    <div style="display:flex; justify-space-between; align-items:center; margin-bottom:4px;">
                                         <span style="font-weight:800; font-size:12px; color:#1D1D1F;"><span class="node-badge-orange">1</span>SHOULDER IR / ER</span>
                                         <span style="font-size:10px; color:#6E6E73; font-weight:600;">Latest: {latest_date_str}</span>
                                     </div>
@@ -1006,7 +1014,7 @@ if check_password():
 
                             st.markdown(f"""
                                 <div class="hud-metric-row-light">
-                                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                                    <div style="display:flex; justify-space-between; align-items:center; margin-bottom:4px;">
                                         <span style="font-weight:800; font-size:12px; color:#1D1D1F;"><span class="node-badge-orange">2</span>ISO-Y STRENGTH</span>
                                         <span style="font-size:10px; color:#6E6E73; font-weight:600;">Latest: {l_y['Test Date'].strftime('%m/%d/%Y')}</span>
                                     </div>
@@ -1064,7 +1072,7 @@ if check_password():
 
                             st.markdown(f"""
                                 <div class="hud-metric-row-light-blue">
-                                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                                    <div style="display:flex; justify-space-between; align-items:center; margin-bottom:4px;">
                                         <span style="font-weight:800; font-size:12px; color:#1D1D1F;"><span class="node-badge-blue">5</span>SINGLE LEG CALF RAISE</span>
                                         <span style="font-size:10px; color:#6E6E73; font-weight:600;">Latest: {l_c['Test Date'].strftime('%m/%d/%Y')}</span>
                                     </div>
@@ -1075,6 +1083,7 @@ if check_password():
                             """, unsafe_allow_html=True)
 
                         st.markdown('</div>', unsafe_allow_html=True)
+
                 else:
                     st.info(f"No Intake Assessment records found for {selected_intake_athlete}.")
 
@@ -1083,15 +1092,7 @@ if check_password():
                 st.markdown("<h3 style='color:#1D1D1F; font-weight:900; text-transform:uppercase;'>Overall Athletic Testing Profile</h3>", unsafe_allow_html=True)
                 c_ov_ath, _ = st.columns([2, 2])
                 with c_ov_ath:
-                    cur_ov_idx = master_athlete_list.index(st.session_state.synced_test_athlete) if st.session_state.synced_test_athlete in master_athlete_list else 0
-                    selected_overall_athlete = st.selectbox(
-                        "Select Athlete for Overall Profile", 
-                        master_athlete_list, 
-                        index=cur_ov_idx,
-                        key="overall_ath_select",
-                        on_change=sync_ath_change,
-                        args=("overall_ath_select",)
-                    )
+                    selected_overall_athlete = st.selectbox("Select Athlete for Overall Profile", master_athlete_list, key="overall_ath_select")
 
                 # Athlete Metadata Header Card
                 meta_lookup_ov = full_df_unfiltered[full_df_unfiltered['Name'] == selected_overall_athlete]
@@ -1130,7 +1131,7 @@ if check_password():
                 sh_er_p = sh_p[sh_p['Direction'].str.contains('External|ER', case=False, na=False)] if not sh_p.empty and 'Direction' in sh_p.columns else pd.DataFrame()
 
                 max_sh_ir = max(sh_ir_p['L Max Force (N)'].max() if 'L Max Force (N)' in sh_ir_p.columns else 0.0, sh_ir_p['R Max Force (N)'].max() if 'R Max Force (N)' in sh_ir_p.columns else 0.0) if not sh_ir_p.empty else 0.0
-                max_sh_er = max(sh_er_p['L Max Force (N)'].max() if 'L Max Force (N)' in sh_er_p.columns else 0.0, sh_er_p['R Max Force (N)'].max() if 'R Max Force (N)' in sh_er_p.columns else 0.0) if not sh_ir_p.empty else 0.0
+                max_sh_er = max(sh_er_p['L Max Force (N)'].max() if 'L Max Force (N)' in sh_er_p.columns else 0.0, sh_er_p['R Max Force (N)'].max() if 'R Max Force (N)' in sh_er_p.columns else 0.0) if not sh_er_p.empty else 0.0
 
                 # Metric Cards HUD
                 m_c1, m_c2, m_c3, m_c4, m_c5, m_c6 = st.columns(6)
@@ -1156,21 +1157,13 @@ if check_password():
                     {"Test Domain": "Shoulder Strength", "Key Metric": "External Rotation (ER)", "Peak Value": f"{max_sh_er:.1f} N"},
                 ]
                 st.dataframe(pd.DataFrame(ov_summary_data), use_container_width=True, hide_index=True)
-
+                    
             # --- TAB 6: CROSS-SEASON TESTING COMPARISON ---
             with testing_season_tabs[5]:
                 st.markdown("### Multi-Season Testing Performance Comparison")
                 c_comp_ath, _ = st.columns([2, 2])
                 with c_comp_ath:
-                    cur_cmp_idx = master_athlete_list.index(st.session_state.synced_test_athlete) if st.session_state.synced_test_athlete in master_athlete_list else 0
-                    comp_athlete = st.selectbox(
-                        "Select Athlete for Cross-Seasonal Comparison", 
-                        master_athlete_list, 
-                        index=cur_cmp_idx,
-                        key="comp_ath_testing_t4",
-                        on_change=sync_ath_change,
-                        args=("comp_ath_testing_t4",)
-                    )
+                    comp_athlete = st.selectbox("Select Athlete for Cross-Seasonal Comparison", master_athlete_list, key="comp_ath_testing_t4")
 
                 cmj_comp = raw_cmj_df[raw_cmj_df['Name'] == comp_athlete].sort_values('Test Date')
                 ash_comp = raw_ash_df[raw_ash_df['Name'] == comp_athlete].sort_values('Test Date')
@@ -1197,7 +1190,7 @@ if check_password():
                                 insidetextanchor="middle",
                                 textfont=dict(color='white', size=13),
                                 cliponaxis=False
-                            ), 
+                            ),
                             secondary_y=False
                         )
                         
@@ -1213,7 +1206,7 @@ if check_password():
                                 line=dict(color='#4895DB', width=3), 
                                 marker=dict(size=10, color='#4895DB'),
                                 cliponaxis=False
-                            ), 
+                            ),
                             secondary_y=True
                         )
                         
@@ -1258,7 +1251,49 @@ if check_password():
                     st.dataframe(pd.DataFrame(summary_rows), use_container_width=True, hide_index=True)
                 else:
                     st.info(f"No multi-season testing records logged for {comp_athlete}.")
-                    
+        else:
+            # --- DYNAMIC SEASONAL TAB NAVIGATION SETUP ---
+            if selected_season == "Summer":
+                tab_titles = [
+                    "Individual Profile", 
+                    "Practice Scores", 
+                    "Daily Combined Scores", 
+                    "Spring Max vs Daily Combined", 
+                    "Practice History", 
+                    "Position Analysis", 
+                    "Spring v. Summer"
+                ]
+            elif selected_season == "Pre-Season":
+                tab_titles = [
+                    "Individual Profile", 
+                    "Practice Scores", 
+                    "Daily Combined Scores", 
+                    "Practice History", 
+                    "Match v. Practice", 
+                    "Match Summary", 
+                    "Position Analysis", 
+                    "Phase Analysis", 
+                    "Practice Planner"
+                ]
+            else: # Spring
+                tab_titles = [
+                    "Individual Profile", 
+                    "Practice Scores", 
+                    "Daily Combined Scores", 
+                    "Practice History", 
+                    "Match v. Practice", 
+                    "Match Summary", 
+                    "Position Analysis", 
+                    "Phase Analysis", 
+                    "Practice Planner"
+                ]
+
+            if "active_tab_state" not in st.session_state or st.session_state.active_tab_state not in tab_titles:
+                st.session_state.active_tab_state = tab_titles[0]
+
+            selected_tab_label = st.radio("Navigation View Menu Selection Control", tab_titles, label_visibility="collapsed", horizontal=True, key="master_app_structural_gate_radio")
+            st.session_state.active_tab_state = selected_tab_label
+
             # ==========================================
             # --- TAB CLAUSE 0: INDIVIDUAL PROFILE -----
             # ==========================================
