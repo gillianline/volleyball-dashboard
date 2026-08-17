@@ -659,44 +659,129 @@ if check_password():
                     st.markdown('<hr style="display:block !important; margin:15px 0; border:0; border-top:1px solid #E5E5E7;" />', unsafe_allow_html=True)
 
                     # --- SECTION 3: EXTERNAL ROTATION: ROM ---
-                st.markdown('<h4 style="color:#4895DB; font-weight:800; margin-bottom:5px;">EXTERNAL ROTATION: ROM</h4>', unsafe_allow_html=True)
-                
-                p_er_hist = er_t0[(er_t0['Name'] == selected_athlete_prof) & (er_t0['Test Date'] <= curr_date_prof)].sort_values('Test Date')
-                if not p_er_hist.empty:
-                    ec1, ec2 = st.columns([1.5, 3.5])
-                    with ec1:
-                        baseline_er = p_er_hist[p_er_hist['Season'] == selected_season].head(1)
-                        if not baseline_er.empty:
-                            base_l_rom = float(pd.to_numeric(str(baseline_er.iloc[-1].get('L Max ROM (°)', 0)).replace('°', '').strip(), errors='coerce') or 0.0)
-                            base_r_rom = float(pd.to_numeric(str(baseline_er.iloc[-1].get('R Max ROM (°)', 0)).replace('°', '').strip(), errors='coerce') or 0.0)
-                            
-                            latest_er = p_er_hist.iloc[-1]
-                            cur_l_rom = float(pd.to_numeric(str(latest_er.get('L Max ROM (°)', 0)).replace('°', '').strip(), errors='coerce') or 0.0)
-                            cur_r_rom = float(pd.to_numeric(str(latest_er.get('R Max ROM (°)', 0)).replace('°', '').strip(), errors='coerce') or 0.0)
-                            
-                            # Parse raw strings like "10% L" -> 10.0
-                            raw_asym_val = str(latest_er.get('ROM Asymmetry (%)', 0))
-                            clean_asym_num = pd.to_numeric(re.sub(r'[^0-9.-]', '', raw_asym_val), errors='coerce') if 're' in globals() else pd.to_numeric(raw_asym_val.replace('%', '').replace('L', '').replace('R', '').strip(), errors='coerce')
-                            cur_asym_rom = float(clean_asym_num) if pd.notna(clean_asym_num) else 0.0
+                    st.markdown(
+                        '<h4 style="color:#4895DB; font-weight:800; margin-bottom:5px;">EXTERNAL'
+                        ' ROTATION: ROM</h4>',
+                        unsafe_allow_html=True,
+                    )
 
-                            rom_pct_l = ((cur_l_rom - base_l_rom) / base_l_rom * 100) if base_l_rom > 0 else 0.0
-                            rom_pct_r = ((cur_r_rom - base_r_rom) / base_r_rom * 100) if base_r_rom > 0 else 0.0
-                            
-                            color_er_l = "#28a745" if cur_l_rom >= 110 else "#ffc107" if 90 <= cur_l_rom <= 109 else "#dc3545"
-                            color_er_r = "#28a745" if cur_r_rom >= 110 else "#ffc107" if 90 <= cur_r_rom <= 109 else "#dc3545"
+                    er_t_data = raw_er_df[
+                        (raw_er_df['Name'] == selected_athlete_test)
+                        & (raw_er_df['Season'] == s_label)
+                    ].sort_values('Test Date')
+                    if not er_t_data.empty:
+                      ec1, ec2 = st.columns([1.5, 3.5])
+                      with ec1:
+                        baseline_er = er_t_data.head(1)
+                        base_l_rom = (
+                            float(baseline_er.iloc[-1].get('L Max ROM (°)', 0.0))
+                            if not baseline_er.empty
+                            else 0.0
+                        )
+                        base_r_rom = (
+                            float(baseline_er.iloc[-1].get('R Max ROM (°)', 0.0))
+                            if not baseline_er.empty
+                            else 0.0
+                        )
 
-                            sc1, sc2 = st.columns(2)
-                            with sc1: st.markdown(f'<div style="text-align:center;"><div class="score-box" style="background-color:{color_er_l}; line-height:1.2; padding-top:15px; height:80px; width:100%;"><span style="font-size:18px;">{cur_l_rom:.1f}°</span><span style="font-size:10px; display:block; font-weight:bold; margin-top:2px;">LEFT</span></div></div>', unsafe_allow_html=True)
-                            with sc2: st.markdown(f'<div style="text-align:center;"><div class="score-box" style="background-color:{color_er_r}; line-height:1.2; padding-top:15px; height:80px; width:100%;"><span style="font-size:18px;">{cur_r_rom:.1f}°</span><span style="font-size:10px; display:block; font-weight:bold; margin-top:2px;">RIGHT</span></div></div>', unsafe_allow_html=True)
-                            st.markdown(f'<div class="info-box" style="text-align:center; margin-top:10px;"><p style="margin:0; font-size:11px; color:grey;"><b>Asymmetry:</b> {cur_asym_rom:+.1f}%</p><p style="margin:0; font-size:11px; color:grey;"><b>% Change from Base:</b> L: {rom_pct_l:+.1f}% | R: {rom_pct_r:+.1f}%</p><p style="margin:0; font-size:11px; color:grey;"><b>Base ROM:</b> L: {base_l_rom:.1f}° | R: {base_r_rom:.1f}°</p></div>', unsafe_allow_html=True)
-                    with ec2:
-                        fig_er = go.Figure()
-                        fig_er.add_trace(go.Scatter(x=p_er_hist['Test Date'], y=pd.to_numeric(p_er_hist['L Max ROM (°)'].astype(str).str.replace(r'[^0-9.-]', '', regex=True), errors='coerce'), name="Left Max ROM", mode='lines+markers', line=dict(color='#4895DB', width=2.5)))
-                        fig_er.add_trace(go.Scatter(x=p_er_hist['Test Date'], y=pd.to_numeric(p_er_hist['R Max ROM (°)'].astype(str).str.replace(r'[^0-9.-]', '', regex=True), errors='coerce'), name="Right Max ROM", mode='lines+markers', line=dict(color='#FF8200', width=2.5, dash='dash')))
-                        fig_er.update_layout(height=160, margin=dict(l=0, r=0, t=10, b=0), showlegend=True, legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0), template="simple_white")
-                        st.plotly_chart(fig_er, use_container_width=True, config=LOCKED_CONFIG, key="er_profile_chart_t0")
-                else:
-                    st.info("No External Rotation data recorded.")
+                        latest_er = er_t_data.iloc[-1]
+                        cur_l_rom = float(latest_er.get('L Max ROM (°)', 0.0))
+                        cur_r_rom = float(latest_er.get('R Max ROM (°)', 0.0))
+                        cur_asym_rom = float(latest_er.get('ROM Asymmetry (%)', 0.0))
+
+                        rom_pct_l = (
+                            ((cur_l_rom - base_l_rom) / base_l_rom * 100) if base_l_rom > 0 else 0.0
+                        )
+                            rom_pct_r = (
+                            ((cur_r_rom - base_r_rom) / base_r_rom * 100) if base_r_rom > 0 else 0.0
+                        )
+
+                        color_er_l = (
+                            '#28a745'
+                            if cur_l_rom >= 110
+                            else '#ffc107'
+                            if 90 <= cur_l_rom <= 109
+                            else '#dc3545'
+                        )
+                        color_er_r = (
+                            '#28a745'
+                            if cur_r_rom >= 110
+                            else '#ffc107'
+                            if 90 <= cur_r_rom <= 109
+                            else '#dc3545'
+                        )
+
+                        sc1, sc2 = st.columns(2)
+                        with sc1:
+                          st.markdown(
+                              f'<div style="text-align:center;"><div class="score-box"'
+                              f' style="background-color:{color_er_l}; line-height:1.2;'
+                              ' padding-top:15px; height:80px; width:100%;"><span'
+                              f' style="font-size:18px;">{cur_l_rom:.1f}°</span><span'
+                              ' style="font-size:10px; display:block; font-weight:bold;'
+                              ' margin-top:2px;">LEFT</span></div></div>',
+                                unsafe_allow_html=True,
+                          )
+                        with sc2:
+                          st.markdown(
+                              f'<div style="text-align:center;"><div class="score-box"'
+                              f' style="background-color:{color_er_r}; line-height:1.2;'
+                              ' padding-top:15px; height:80px; width:100%;"><span'
+                              f' style="font-size:18px;">{cur_r_rom:.1f}°</span><span'
+                              ' style="font-size:10px; display:block; font-weight:bold;'
+                              ' margin-top:2px;">RIGHT</span></div></div>',
+                              unsafe_allow_html=True,
+                          )
+                            st.markdown(
+                                f'<div class="info-box" style="text-align:center; margin-top:10px;"><p'
+                                f' style="margin:0; font-size:11px; color:grey;"><b>Asymmetry:</b>'
+                                f' {cur_asym_rom:+.1f}%</p><p style="margin:0; font-size:11px;'
+                                ' color:grey;"><b>% Change from Base:</b> L: {rom_pct_l:+.1f}% | R:'
+                                f' {rom_pct_r:+.1f}%</p><p style="margin:0; font-size:11px;'
+                                f' color:grey;"><b>Base ROM:</b> L: {base_l_rom:.1f}° | R:'
+                                f' {base_r_rom:.1f}°</p></div>',
+                                unsafe_allow_html=True,
+                            )
+                      with ec2:
+                            fig_er_t = go.Figure()
+                            fig_er_t.add_trace(
+                            go.Scatter(
+                                x=er_t_data['Test Date'],
+                                y=er_t_data['L Max ROM (°)'],
+                                name='Left Max ROM',
+                                mode='lines+markers',
+                                line=dict(color='#4895DB', width=2.5),
+                            )
+                        )
+                        fig_er_t.add_trace(
+                            go.Scatter(
+                                x=er_t_data['Test Date'],
+                                y=er_t_data['R Max ROM (°)'],
+                                name='Right Max ROM',
+                                mode='lines+markers',
+                                line=dict(color='#FF8200', width=2.5, dash='dash'),
+                            )
+                        )
+                        fig_er_t.update_layout(
+                            height=160,
+                            margin=dict(l=0, r=0, t=10, b=0),
+                            showlegend=True,
+                            legend=dict(
+                                orientation='h', yanchor='bottom', y=1.02, xanchor='left', x=0
+                            ),
+                            template='simple_white',
+                        )
+                        st.plotly_chart(
+                            fig_er_t,
+                            use_container_width=True,
+                            config=LOCKED_CONFIG,
+                            key=f'er_chart_test_{s_label}',
+                        )
+                    else:
+                      st.info(
+                          f'No External Rotation testing records logged for'
+                          f' {selected_athlete_test} in {s_label}.'
+                      )
 
             # --- TAB 4: INTAKE TESTING TAB ---
             with testing_season_tabs[3]:
