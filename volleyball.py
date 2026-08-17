@@ -919,7 +919,12 @@ if check_password():
                 
                 # --- SUB-TAB 1: INDIVIDUAL ATHLETE DEEP DIVE ---
                 with cmj_view_modes[0]:
-                    c_cmj_ath, c_cmj_date, c_cmj_comp = st.columns([2, 1.5, 1.5])
+                    c_cmj_season, c_cmj_ath, c_cmj_date, c_cmj_comp = st.columns([1.5, 1.8, 1.3, 1.4])
+                    
+                    available_seasons = ["All Seasons", "Spring", "Summer", "Pre-Season"]
+                    with c_cmj_season:
+                        sel_cmj_season = st.selectbox("Baseline Season Filter", available_seasons, index=0, key="cmj_dash_season_sel")
+                    
                     with c_cmj_ath:
                         sel_cmj_ath = st.selectbox("Select Athlete", master_athlete_list, key="cmj_dash_ath_sel")
                     
@@ -935,7 +940,13 @@ if check_password():
                             comp_factor = st.selectbox("Comparison Factor", ["Individual (vs. Baseline)", "Team Benchmark (T-Score)"], key="cmj_dash_comp_sel")
 
                         cur_test_row = ath_cmj_all[ath_cmj_all['Test Date'].dt.strftime('%m/%d/%y') == sel_test_date_str].iloc[-1]
-                        base_test_row = ath_cmj_all.iloc[0]
+                        
+                        # Apply seasonal baseline filter logic
+                        if sel_cmj_season != "All Seasons":
+                            season_cmj = ath_cmj_all[ath_cmj_all['Season'] == sel_cmj_season]
+                            base_test_row = season_cmj.iloc[0] if not season_cmj.empty else ath_cmj_all.iloc[0]
+                        else:
+                            base_test_row = ath_cmj_all.iloc[0]
 
                         meta_lookup = full_df_unfiltered[full_df_unfiltered['Name'] == sel_cmj_ath]
                         photo_val = meta_lookup['PhotoURL'].iloc[0] if not meta_lookup.empty else "https://www.w3schools.com/howto/img_avatar.png"
@@ -957,7 +968,7 @@ if check_password():
 
                         # Athlete Card
                         with top_col1:
-                            ath_card_html = f"""<div style="background:#4895DB; color:white; font-weight:900; font-size:18px; text-align:center; padding:8px 10px; border-radius:6px 6px 0 0;">{sel_cmj_ath}</div><div style="border:1px solid #E2E8F0; border-top:none; border-radius:0 0 6px 6px; padding:16px; background:white; display:flex; align-items:center; gap:16px;"><img src="{photo_val}" style="width:95px; height:95px; border-radius:8px; object-fit:contain; border:2px solid #FF8200;"><div style="font-size:14px; line-height:1.8; color:#1D1D1F;"><b>Position:</b> {pos_val}</div></div><div style="background:#4895DB; color:white; font-weight:800; font-size:13px; text-align:center; padding:6px; margin-top:10px; border-radius:4px;">Comparison Factor: Individual</div>"""
+                            ath_card_html = f"""<div style="background:#4895DB; color:white; font-weight:900; font-size:18px; text-align:center; padding:8px 10px; border-radius:6px 6px 0 0;">{sel_cmj_ath}</div><div style="border:1px solid #E2E8F0; border-top:none; border-radius:0 0 6px 6px; padding:16px; background:white; display:flex; align-items:center; gap:16px;"><img src="{photo_val}" style="width:95px; height:95px; border-radius:8px; object-fit:contain; border:2px solid #FF8200;"><div style="font-size:14px; line-height:1.8; color:#1D1D1F;"><b>Position:</b> {pos_val}</div></div><div style="background:#4895DB; color:white; font-weight:800; font-size:13px; text-align:center; padding:6px; margin-top:10px; border-radius:4px;">Comparison Factor: Individual ({sel_cmj_season})</div>"""
                             st.markdown(ath_card_html, unsafe_allow_html=True)
 
                         # Data Table
@@ -984,7 +995,12 @@ if check_password():
                             gauge_header = f"""<div style="background:#4895DB; color:white; font-weight:900; font-size:14px; text-align:center; padding:6px; border-radius:6px 6px 0 0;">Performance Readiness Score<br><span style="font-size:11px; font-weight:600;">{sel_test_date_str}</span></div>"""
                             st.markdown(gauge_header, unsafe_allow_html=True)
                             
-                            peak_h = ath_cmj_all[cmj_col].max() if cmj_col in ath_cmj_all else 1.0
+                            if sel_cmj_season != "All Seasons":
+                                season_cmj = ath_cmj_all[ath_cmj_all['Season'] == sel_cmj_season]
+                                peak_h = season_cmj[cmj_col].max() if (not season_cmj.empty and cmj_col in season_cmj) else (ath_cmj_all[cmj_col].max() if cmj_col in ath_cmj_all else 1.0)
+                            else:
+                                peak_h = ath_cmj_all[cmj_col].max() if cmj_col in ath_cmj_all else 1.0
+                                
                             cur_h_val = float(cur_test_row.get(cmj_col, 0.0))
                             gauge_score = min(100, max(0, int((cur_h_val / peak_h) * 100))) if peak_h > 0 else 94
 
@@ -1186,7 +1202,9 @@ if check_password():
                     
                     team_cmj_dates = sorted(raw_cmj_df['Test Date'].dropna().dt.strftime('%m/%d/%y').unique().tolist(), reverse=True)
                     
-                    c_sum_d1, c_sum_d2 = st.columns([1.5, 2])
+                    c_sum_s1, c_sum_d1, c_sum_d2 = st.columns([1.2, 1.5, 1.8])
+                    with c_sum_s1:
+                        sel_team_season = st.selectbox("Baseline Season", ["All Seasons", "Spring", "Summer", "Pre-Season"], index=0, key="team_cmj_season_filter")
                     with c_sum_d1:
                         sel_team_cmj_date = st.selectbox("Evaluation Test Date", team_cmj_dates, index=0, key="team_cmj_eval_date")
                     with c_sum_d2:
@@ -1211,7 +1229,14 @@ if check_password():
                             continue
                             
                         target_row = ath_date_point.iloc[-1]
-                        peak_h = ath_sub_cmj[cmj_col].max() if cmj_col in ath_sub_cmj else 1.0
+                        
+                        # Apply seasonal baseline for peak score
+                        if sel_team_season != "All Seasons":
+                            season_cmj = ath_sub_cmj[ath_sub_cmj['Season'] == sel_team_season]
+                            peak_h = season_cmj[cmj_col].max() if (not season_cmj.empty and cmj_col in season_cmj) else (ath_sub_cmj[cmj_col].max() if cmj_col in ath_sub_cmj else 1.0)
+                        else:
+                            peak_h = ath_sub_cmj[cmj_col].max() if cmj_col in ath_sub_cmj else 1.0
+                            
                         cur_h = float(target_row.get(cmj_col, 0.0))
                         
                         readiness_pct = min(120, max(0, int((cur_h / peak_h) * 100))) if peak_h > 0 else 0
