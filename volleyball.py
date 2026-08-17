@@ -6,6 +6,7 @@ from plotly.subplots import make_subplots
 import math 
 from datetime import timedelta, datetime
 import streamlit.components.v1 as components
+import textwrap
 
 # --- 1. PAGE CONFIG & SYSTEM GLOBAL CSS ---
 st.set_page_config(page_title="Lady Vols VB Performance", layout="wide")
@@ -41,8 +42,8 @@ st.markdown("""
     .viewerBadge_link__1S137, .main_heading_anchor__m6v0K, a.header-anchor { display: none !important; }
     header a { display: none !important; }
     .scout-table { width: 100%; border-collapse: collapse; text-align: center; table-layout: auto; }
-    .scout-table th { background-color: #4895DB; color: white; padding: 4px; border-bottom: 2px solid #FF8200; font-weight: 700; font-size: 11px; text-transform: uppercase; }
-    .scout-table td { padding: 4px; border-bottom: 1px solid #F5F5F7; font-size: 11px; color: #1D1D1F; }
+    .scout-table th { background-color: #4895DB; color: white; padding: 6px 4px; border-bottom: 2px solid #FF8200; font-weight: 700; font-size: 11px; text-transform: uppercase; }
+    .scout-table td { padding: 6px 4px; border-bottom: 1px solid #F5F5F7; font-size: 11px; color: #1D1D1F; }
     .bg-highlight-red { background-color: #ffcccc !important; font-weight: 900; }
     .arrow-red { color: #b30000 !important; font-weight: 900; margin-left: 4px; }
     .player-photo-large { border-radius: 50%; width: 220px; height: 220px; object-fit: contain; border: 6px solid #FF8200; }
@@ -467,7 +468,6 @@ if check_password():
                         if team_pos_filter != "All Positions" and pos_str != team_pos_filter:
                             continue
                             
-                        # Check activity in the 7-day trailing window
                         if hide_inactive_last_week:
                             ath_recent_7d = ath_all[(ath_all['Date'] >= week_start_window) & (ath_all['Date'] <= eval_date_obj)]
                             if ath_recent_7d.empty or (ath_recent_7d[metrics_to_score].sum().sum() == 0):
@@ -483,7 +483,6 @@ if check_password():
                             
                         target_row = cal_point.iloc[-1]
                         
-                        # Overall Practice Score composite ACWR (Average across all 5 metrics)
                         comp_acwr = sum([target_row.get(f'{m}_ACWR', 0.0) for m in metrics_to_score]) / len(metrics_to_score)
                         b_color, b_bg, b_status = get_acwr_badge(comp_acwr)
                         
@@ -944,42 +943,11 @@ if check_password():
                     top_col1, top_col2, top_col3 = st.columns([1.2, 2.2, 1.6])
 
                     with top_col1:
-                        st.markdown(f"""
-                        <div style="background:#4895DB; color:white; font-weight:900; font-size:18px; text-align:center; padding:8px 10px; border-radius:6px 6px 0 0;">
-                            {sel_cmj_ath}
-                        </div>
-                        <div style="border:1px solid #E2E8F0; border-top:none; border-radius:0 0 6px 6px; padding:12px; background:white; display:flex; align-items:center; gap:12px;">
-                            <img src="{photo_val}" style="width:90px; height:90px; border-radius:8px; object-fit:contain; border:2px solid #FF8200;">
-                            <div style="font-size:12px; line-height:1.6; color:#1D1D1F;">
-                                <b>Position:</b> {pos_val}<br>
-                                <b>Body Weight:</b> {cur_test_row.get('BW [KG]', 0.0):.1f} kg<br>
-                                <b>RSI-Mod:</b> {cur_test_row.get('RSI-modified [m/s]', 0.0):.2f}
-                            </div>
-                        </div>
-                        <div style="background:#4895DB; color:white; font-weight:800; font-size:13px; text-align:center; padding:6px; margin-top:10px; border-radius:4px;">
-                            Comparison Factor: Individual
-                        </div>
-                        """, unsafe_allow_html=True)
+                        ath_card_html = f"""<div style="background:#4895DB; color:white; font-weight:900; font-size:18px; text-align:center; padding:8px 10px; border-radius:6px 6px 0 0;">{sel_cmj_ath}</div><div style="border:1px solid #E2E8F0; border-top:none; border-radius:0 0 6px 6px; padding:12px; background:white; display:flex; align-items:center; gap:12px;"><img src="{photo_val}" style="width:90px; height:90px; border-radius:8px; object-fit:contain; border:2px solid #FF8200;"><div style="font-size:12px; line-height:1.6; color:#1D1D1F;"><b>Position:</b> {pos_val}<br><b>Body Weight:</b> {cur_test_row.get('BW [KG]', 0.0):.1f} kg<br><b>RSI-Mod:</b> {cur_test_row.get('RSI-modified [m/s]', 0.0):.2f}</div></div><div style="background:#4895DB; color:white; font-weight:800; font-size:13px; text-align:center; padding:6px; margin-top:10px; border-radius:4px;">Comparison Factor: Individual</div>"""
+                        st.markdown(ath_card_html, unsafe_allow_html=True)
 
-                    # 2. Table: Baseline vs Current vs % Change
                     with top_col2:
-                        # Build the full HTML table string
-                        tbl_html = """
-                        <div style="background:#4895DB; color:white; font-weight:900; font-size:14px; text-align:center; padding:6px; border-radius:6px 6px 0 0;">
-                            Countermovement Jump Performance
-                        </div>
-                        <table class="scout-table" style="width:100%; border:1px solid #E2E8F0; border-top:none; background:white; border-collapse:collapse; margin-bottom:0;">
-                            <thead>
-                                <tr style="background:#F8FAFC; color:#64748B; font-size:11px;">
-                                    <th style="text-align:left !important; padding:8px 12px;">Metric</th>
-                                    <th style="padding:8px;">Baseline</th>
-                                    <th style="padding:8px; background:#EBF5FF; color:#1E40AF;">Current</th>
-                                    <th style="padding:8px;">% Change</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                        """
-                        
+                        table_rows_str = ""
                         for m_info in cmj_metric_defs:
                             lbl = m_info["label"]
                             col_name = m_info["col"]
@@ -991,24 +959,14 @@ if check_password():
                             diff = ((c_val - b_val) / b_val * 100) if b_val > 0 else 0.0
                             pct_color = "#137333" if diff >= 0 else "#D93025"
                             
-                            tbl_html += f"""
-                            <tr>
-                                <td style="text-align:left !important; padding-left:12px; font-weight:600;">{lbl}</td>
-                                <td style="color:#64748B;">{fmt.format(b_val)}</td>
-                                <td style="font-weight:800; background:#F0F7FF; border: 1px solid #3B82F6;">{fmt.format(c_val)}</td>
-                                <td style="font-weight:800; color:{pct_color};">{diff:+.0f}%</td>
-                            </tr>
-                            """
+                            table_rows_str += f"""<tr><td style="text-align:left !important; padding-left:12px; font-weight:600;">{lbl}</td><td style="color:#64748B;">{fmt.format(b_val)}</td><td style="font-weight:800; background:#F0F7FF; border: 1px solid #3B82F6;">{fmt.format(c_val)}</td><td style="font-weight:800; color:{pct_color};">{diff:+.0f}%</td></tr>"""
                         
-                        tbl_html += "</tbody></table>"
-                        st.markdown(tbl_html, unsafe_allow_html=True)
+                        full_table_html = f"""<div style="background:#4895DB; color:white; font-weight:900; font-size:14px; text-align:center; padding:6px; border-radius:6px 6px 0 0;">Countermovement Jump Performance</div><table class="scout-table" style="width:100%; border:1px solid #E2E8F0; border-top:none; background:white; border-collapse:collapse; margin-bottom:0;"><thead><tr style="background:#F8FAFC; color:#64748B; font-size:11px;"><th style="text-align:left !important; padding:6px 12px;">Metric</th><th style="padding:6px;">Baseline</th><th style="padding:6px; background:#EBF5FF; color:#1E40AF;">Current</th><th style="padding:6px;">% Change</th></tr></thead><tbody>{table_rows_str}</tbody></table>"""
+                        st.markdown(full_table_html, unsafe_allow_html=True)
 
                     with top_col3:
-                        st.markdown(f"""
-                        <div style="background:#4895DB; color:white; font-weight:900; font-size:14px; text-align:center; padding:6px; border-radius:6px 6px 0 0;">
-                            Performance Readiness Score
-                        </div>
-                        """, unsafe_allow_html=True)
+                        gauge_header = """<div style="background:#4895DB; color:white; font-weight:900; font-size:14px; text-align:center; padding:6px; border-radius:6px 6px 0 0;">Performance Readiness Score</div>"""
+                        st.markdown(gauge_header, unsafe_allow_html=True)
                         
                         peak_h = ath_cmj_all[cmj_col].max() if cmj_col in ath_cmj_all else 1.0
                         cur_h_val = float(cur_test_row.get(cmj_col, 0.0))
@@ -1119,22 +1077,8 @@ if check_password():
                         st.plotly_chart(fig_bands, use_container_width=True, config=LOCKED_CONFIG, key="cmj_performance_bands_chart")
 
                     with legend_col:
-                        st.markdown("""
-                        <div style="background:#4895DB; color:white; font-weight:800; font-size:12px; text-align:center; padding:6px; border-radius:4px 4px 0 0;">
-                            Performance Bands<br><span style="font-size:10px; font-weight:600;">T-Score Rating</span>
-                        </div>
-                        <table style="width:100%; border-collapse:collapse; font-size:11px; text-align:center; font-weight:700;">
-                            <tr style="background:#15803D; color:white;"><td style="padding:4px;">Excellent</td><td>> 80</td></tr>
-                            <tr style="background:#22C55E; color:white;"><td style="padding:4px;">Very Good</td><td>70 - 80</td></tr>
-                            <tr style="background:#4ADE80; color:#111827;"><td style="padding:4px;">Good</td><td>60 - 70</td></tr>
-                            <tr style="background:#BBF7D0; color:#111827;"><td style="padding:4px;">Above Avg.</td><td>55 - 60</td></tr>
-                            <tr style="background:#FFFFFF; color:#111827; border-top:1px solid #E2E8F0; border-bottom:1px solid #E2E8F0;"><td style="padding:4px;">Average</td><td>45 - 55</td></tr>
-                            <tr style="background:#FCA5A5; color:#111827;"><td style="padding:4px;">Below Avg.</td><td>40 - 45</td></tr>
-                            <tr style="background:#EF4444; color:white;"><td style="padding:4px;">Poor</td><td>30 - 40</td></tr>
-                            <tr style="background:#DC2626; color:white;"><td style="padding:4px;">Very Poor</td><td>20 - 30</td></tr>
-                            <tr style="background:#B91C1C; color:white;"><td style="padding:4px;">Extremely Poor</td><td>< 20</td></tr>
-                        </table>
-                        """, unsafe_allow_html=True)
+                        legend_table_html = """<div style="background:#4895DB; color:white; font-weight:800; font-size:12px; text-align:center; padding:6px; border-radius:4px 4px 0 0;">Performance Bands<br><span style="font-size:10px; font-weight:600;">T-Score Rating</span></div><table style="width:100%; border-collapse:collapse; font-size:11px; text-align:center; font-weight:700;"><tr style="background:#15803D; color:white;"><td style="padding:4px;">Excellent</td><td>> 80</td></tr><tr style="background:#22C55E; color:white;"><td style="padding:4px;">Very Good</td><td>70 - 80</td></tr><tr style="background:#4ADE80; color:#111827;"><td style="padding:4px;">Good</td><td>60 - 70</td></tr><tr style="background:#BBF7D0; color:#111827;"><td style="padding:4px;">Above Avg.</td><td>55 - 60</td></tr><tr style="background:#FFFFFF; color:#111827; border-top:1px solid #E2E8F0; border-bottom:1px solid #E2E8F0;"><td style="padding:4px;">Average</td><td>45 - 55</td></tr><tr style="background:#FCA5A5; color:#111827;"><td style="padding:4px;">Below Avg.</td><td>40 - 45</td></tr><tr style="background:#EF4444; color:white;"><td style="padding:4px;">Poor</td><td>30 - 40</td></tr><tr style="background:#DC2626; color:white;"><td style="padding:4px;">Very Poor</td><td>20 - 30</td></tr><tr style="background:#B91C1C; color:white;"><td style="padding:4px;">Extremely Poor</td><td>< 20</td></tr></table>"""
+                        st.markdown(legend_table_html, unsafe_allow_html=True)
 
             # --- SEASON SPECIFIC TESTING TABS ---
             for tab_idx, s_label in enumerate(["Spring", "Summer", "Pre-Season"]):
@@ -1570,7 +1514,6 @@ if check_password():
                 if not cmj_comp.empty or not ash_comp.empty or not er_comp.empty:
                     st.markdown("#### Countermovement Jump Trend Across Seasons")
                     if not cmj_comp.empty:
-                        # Enforce explicit seasonal order: Spring -> Summer -> Pre-Season
                         season_order = ["Spring", "Summer", "Pre-Season"]
                         cmj_comp_ordered = cmj_comp.copy()
                         cmj_comp_ordered['Season'] = pd.Categorical(cmj_comp_ordered['Season'], categories=season_order, ordered=True)
@@ -2282,7 +2225,7 @@ if check_password():
                             fig_cmj.add_trace(go.Scatter(x=ath_cmj_data['Test Date'], y=ath_cmj_data[rsi_col], name="RSI-mod", mode='lines+markers', line=dict(color='#FF8200', width=2, dash='dot')), secondary_y=True)
                             fig_cmj.add_hline(y=base_row[cmj_col], line_dash="dash", line_color="red")
                             fig_cmj.update_layout(height=400, template="simple_white", margin=dict(l=10, r=10, t=30, b=10), legend=dict(orientation="h", yanchor="bottom", y=-0.3, x=0.5, xanchor="center"), xaxis=dict(title="Date", tickformat="%m/%d"))
-                            st.plotly_chart(fig_cmj, use_container_width=True, key=f"integrated_cmj_final_{sel_ath_hist}_t4")
+                            st.plotly_chart(fig_cmj, use_container_width=True, config=LOCKED_CONFIG, key=f"integrated_cmj_final_{sel_ath_hist}_t4")
 
                 with sub_tabs[1]:
                     sel_week = st.selectbox("Select Review Week", sorted(df_t4['Week'].unique(), reverse=True), key="team_week_sel_t4")
