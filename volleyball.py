@@ -185,7 +185,7 @@ def get_acwr_badge(ratio):
         elif r < 0.80:
             return "#D97706", "#FEF3C7", "Under-training"
         elif 0.80 <= r <= 1.30:
-            return "#137333", "#E6F4EA", "Optimal"
+            return "#137333", "#E6F4EA", "Optimal Spot"
         elif 1.30 < r <= 1.50:
             return "#D97706", "#FEF3C7", "Elevated Risk"
         else:
@@ -449,8 +449,12 @@ if check_password():
                         key="acwr_featured_metric_sel"
                     )
 
+                hide_inactive_last_week = st.checkbox("Hide athletes inactive in the past 7 days", value=True, key="acwr_hide_inactive_chk")
+
                 if sel_team_date_str:
                     eval_date_obj = pd.to_datetime(sel_team_date_str)
+                    week_start_window = eval_date_obj - timedelta(days=6)
+                    
                     team_summary_rows = []
                     
                     for ath in sorted(raw_df['Name'].unique()):
@@ -459,6 +463,12 @@ if check_password():
                         
                         if team_pos_filter != "All Positions" and pos_str != team_pos_filter:
                             continue
+                            
+                        # Check activity in the 7-day trailing window
+                        if hide_inactive_last_week:
+                            ath_recent_7d = ath_all[(ath_all['Date'] >= week_start_window) & (ath_all['Date'] <= eval_date_obj)]
+                            if ath_recent_7d.empty or (ath_recent_7d[metrics_to_score].sum().sum() == 0):
+                                continue
                             
                         ath_cal = compute_athlete_ewma_calendar(ath_all, metrics_to_score)
                         if ath_cal.empty:
@@ -495,12 +505,12 @@ if check_password():
                         under_count = sum(1 for r in team_summary_rows if 0 < r['Overall ACWR'] < 0.80)
                         
                         sc1, sc2, sc3, sc4 = st.columns(4)
-                        sc1.metric("Athletes Evaluated", len(team_summary_rows))
+                        sc1.metric("Active Athletes Evaluated", len(team_summary_rows))
                         sc2.metric("Optimal (0.80-1.30)", sweet_count)
                         sc3.metric("Under-training (<0.80)", under_count)
                         sc4.metric("High Spikes (>1.50)", spike_count)
                         
-                        st.markdown(f"#### Team ACWR Grid on {eval_date_obj.strftime('%m/%d/%Y')}")
+                        st.markdown(f"#### ACWR Grid on {eval_date_obj.strftime('%m/%d/%Y')} (Active 7-Day Window)")
                         
                         table_html = """<table class="scout-table"><thead><tr>
                             <th style="text-align:left !important; padding-left:10px;">Athlete</th>
@@ -531,13 +541,31 @@ if check_password():
                         table_html += "</tbody></table>"
                         st.markdown(table_html, unsafe_allow_html=True)
                     else:
-                        st.info(f"No records available for the selected filters on {eval_date_obj.strftime('%m/%d/%Y')}.")
+                        st.info(f"No active athletes with recorded practice data found in the 7 days leading up to {eval_date_obj.strftime('%m/%d/%Y')}.")
 
             # --- TAB 2: INDIVIDUAL DEEP-DIVE ---
             with acwr_mode_tabs[1]:
                 c_ind1, c_ind2, c_ind3 = st.columns([1.5, 1.5, 1.5])
+                
+                valid_all_dates_str = [d.strftime('%Y-%m-%d') for d in sorted(raw_df['Date'].dropna().unique(), reverse=True)]
+                with c_ind3:
+                    sel_ind_date_str = st.selectbox("Select Snapshot Date", valid_all_dates_str, index=0, key="acwr_ind_date_sel")
+                
+                sel_ind_date = pd.to_datetime(sel_ind_date_str)
+                week_start_ind = sel_ind_date - timedelta(days=6)
+                
+                # Filter individual athlete options to those with data in the last 7 days of the selected snapshot
+                active_athletes_for_date = []
+                for ath_name in sorted(raw_df['Name'].unique()):
+                    ath_sub = raw_df[(raw_df['Name'] == ath_name) & (raw_df['Date'] >= week_start_ind) & (raw_df['Date'] <= sel_ind_date)]
+                    if not ath_sub.empty and ath_sub[metrics_to_score].sum().sum() > 0:
+                        active_athletes_for_date.append(ath_name)
+                
+                if not active_athletes_for_date:
+                    active_athletes_for_date = sorted(raw_df['Name'].unique())
+
                 with c_ind1:
-                    sel_ind_ath = st.selectbox("Select Athlete", sorted(raw_df['Name'].unique()), key="acwr_ind_ath_sel")
+                    sel_ind_ath = st.selectbox("Select Active Athlete", active_athletes_for_date, key="acwr_ind_ath_sel")
                 with c_ind2:
                     sel_ind_metric = st.selectbox("Select Practice Score Metric", metrics_to_score, index=0, key="acwr_ind_metric_sel")
                 
@@ -548,14 +576,9 @@ if check_password():
                 
                 ath_cal_ind = compute_athlete_ewma_calendar(ath_all_ind, metrics_to_score)
                 
-                if ath_cal_ind.empty:
-                    st.info(f"No training data found for {sel_ind_ath}.")
+                if ath_cal_ind.empty or ath_cal_ind[ath_cal_ind['Date'] == sel_ind_date].empty:
+                    st.info(f"No training history found for {sel_ind_ath} around {sel_ind_date.strftime('%m/%d/%Y')}.")
                 else:
-                    ath_dates_str = [d.strftime('%Y-%m-%d') for d in sorted(ath_cal_ind['Date'].unique(), reverse=True)]
-                    with c_ind3:
-                        sel_ind_date_str = st.selectbox("Select Snapshot Date", ath_dates_str, index=0, key="acwr_ind_date_sel")
-                    
-                    sel_ind_date = pd.to_datetime(sel_ind_date_str)
                     target_row = ath_cal_ind[ath_cal_ind['Date'] == sel_ind_date].iloc[0]
                     
                     cur_acute = target_row[f'{sel_ind_metric}_Acute']
@@ -974,7 +997,7 @@ if check_password():
                             sc1, sc2 = st.columns(2)
                             with sc1: st.markdown(f'<div style="text-align:center;"><div class="score-box" style="background-color:{color_er_l}; line-height:1.2; padding-top:15px; height:80px; width:100%;"><span style="font-size:18px;">{cur_l_rom:.1f}°</span><span style="font-size:10px; display:block; font-weight:bold; margin-top:2px;">LEFT</span></div></div>', unsafe_allow_html=True)
                             with sc2: st.markdown(f'<div style="text-align:center;"><div class="score-box" style="background-color:{color_er_r}; line-height:1.2; padding-top:15px; height:80px; width:100%;"><span style="font-size:18px;">{cur_r_rom:.1f}°</span><span style="font-size:10px; display:block; font-weight:bold; margin-top:2px;">RIGHT</span></div></div>', unsafe_allow_html=True)
-                            st.markdown(f'<div class="info-box" style="text-align:center; margin-top:10px;"><p style="margin:0; font-size:11px; color:grey;"><b>Asymmetry:</b> {cur_asym_rom:+.1f}%</p><p style="margin:0; font-size:11px; color:grey;"><b>% Change from Base:</b> L: {rom_pct_l:+.1f}% | R: {pct_r:+.1f}%</p><p style="margin:0; font-size:11px; color:grey;"><b>Base ROM:</b> L: {base_l_rom:.1f}° | R: {base_r_rom:.1f}°</p></div>', unsafe_allow_html=True)
+                            st.markdown(f'<div class="info-box" style="text-align:center; margin-top:10px;"><p style="margin:0; font-size:11px; color:grey;"><b>Asymmetry:</b> {cur_asym_rom:+.1f}%</p><p style="margin:0; font-size:11px; color:grey;"><b>% Change from Base:</b> L: {pct_l:+.1f}% | R: {pct_r:+.1f}%</p><p style="margin:0; font-size:11px; color:grey;"><b>Base ROM:</b> L: {base_l_rom:.1f}° | R: {base_r_rom:.1f}°</p></div>', unsafe_allow_html=True)
                         with ec2:
                             fig_er_t = go.Figure()
                             fig_er_t.add_trace(go.Scatter(x=er_t_data['Test Date'], y=er_t_data['L Max ROM (°)'], name="Left Max ROM", mode='lines+markers', line=dict(color='#4895DB', width=2.5)))
@@ -1261,7 +1284,7 @@ if check_password():
                 sh_er_p = sh_p[sh_p['Direction'].str.contains('External|ER', case=False, na=False)] if not sh_p.empty and 'Direction' in sh_p.columns else pd.DataFrame()
 
                 max_sh_ir = max(sh_ir_p['L Max Force (N)'].max() if 'L Max Force (N)' in sh_ir_p.columns else 0.0, sh_ir_p['R Max Force (N)'].max() if 'R Max Force (N)' in sh_ir_p.columns else 0.0) if not sh_ir_p.empty else 0.0
-                max_sh_er = max(sh_er_p['L Max Force (N)'].max() if 'L Max Force (N)' in sh_er_p.columns else 0.0, sh_er_p['R Max Force (N)'].max() if 'R Max Force (N)' in sh_er_p.columns else 0.0) if not sh_er_p.empty else 0.0
+                max_sh_er = max(sh_er_p['L Max Force (N)'].max() if 'L Max Force (N)' in sh_er_p.columns else 0.0, sh_er_p['R Max Force (N)'].max() if 'R Max Force (N)' in sh_ir_p.columns else 0.0) if not sh_er_p.empty else 0.0
 
                 m_c1, m_c2, m_c3, m_c4, m_c5, m_c6 = st.columns(6)
                 m_c1.metric("Peak CMJ", f"{max_cmj_h:.1f} cm")
