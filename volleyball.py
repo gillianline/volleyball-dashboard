@@ -1311,140 +1311,78 @@ if check_password():
                 st.dataframe(pd.DataFrame(ov_summary_data), use_container_width=True, hide_index=True)
                     
             # --- TAB 6: CROSS-SEASON TESTING COMPARISON ---
-            with testing_season_tabs[5]:
-                st.markdown("### Multi-Season Testing Performance Comparison")
-                c_comp_ath, _ = st.columns([2, 2])
-                with c_comp_ath:
-                    comp_athlete = st.selectbox("Select Athlete for Cross-Seasonal Comparison", master_athlete_list, key="comp_ath_testing_t4")
+with testing_season_tabs[5]:
+    st.markdown("### Multi-Season Testing Performance Comparison")
+    c_comp_ath, _ = st.columns([2, 2])
+    with c_comp_ath:
+        comp_athlete = st.selectbox("Select Athlete for Cross-Seasonal Comparison", master_athlete_list, key="comp_ath_testing_t4")
 
-                cmj_comp = raw_cmj_df[raw_cmj_df['Name'] == comp_athlete].sort_values('Test Date')
-                ash_comp = raw_ash_df[raw_ash_df['Name'] == comp_athlete].sort_values('Test Date')
-                er_comp = raw_er_df[raw_er_df['Name'] == comp_athlete].sort_values('Test Date')
+    cmj_comp = raw_cmj_df[raw_cmj_df['Name'] == comp_athlete].sort_values('Test Date')
+    ash_comp = raw_ash_df[raw_ash_df['Name'] == comp_athlete].sort_values('Test Date')
+    er_comp = raw_er_df[raw_er_df['Name'] == comp_athlete].sort_values('Test Date')
 
-                if not cmj_comp.empty or not ash_comp.empty or not er_comp.empty:
-                    st.markdown("#### Countermovement Jump Trend Across Seasons")
-                    if not cmj_comp.empty:
-                        cmj_avg_season = cmj_comp.groupby('Season')[[cmj_col, rsi_col]].mean().reset_index()
-                        
-                        max_h = cmj_avg_season[cmj_col].max() if not cmj_avg_season.empty else 50.0
-                        max_r = cmj_avg_season[rsi_col].max() if not cmj_avg_season.empty else 1.0
+    if not cmj_comp.empty or not ash_comp.empty or not er_comp.empty:
+        st.markdown("#### Countermovement Jump Trend Across Seasons")
+        if not cmj_comp.empty:
+            # Enforce explicit seasonal order: Spring -> Summer -> Pre-Season
+            season_order = ["Spring", "Summer", "Pre-Season"]
+            cmj_comp_ordered = cmj_comp.copy()
+            cmj_comp_ordered['Season'] = pd.Categorical(cmj_comp_ordered['Season'], categories=season_order, ordered=True)
+            
+            cmj_avg_season = cmj_comp_ordered.groupby('Season', observed=False)[[cmj_col, rsi_col]].mean().reset_index()
+            cmj_avg_season = cmj_avg_season.sort_values('Season')
 
-                        fig_comp_cmj = make_subplots(specs=[[{"secondary_y": True}]])
-                        
-                        fig_comp_cmj.add_trace(
-                            go.Bar(
-                                x=cmj_avg_season['Season'], 
-                                y=cmj_avg_season[cmj_col], 
-                                name="Avg CMJ Height (cm)", 
-                                marker_color='#FF8200', 
-                                text=[f"<b>{val:.1f} cm</b>" for val in cmj_avg_season[cmj_col]], 
-                                textposition="inside",
-                                insidetextanchor="middle",
-                                textfont=dict(color='white', size=13),
-                                cliponaxis=False
-                            ),
-                            secondary_y=False
-                        )
-                        
-                        fig_comp_cmj.add_trace(
-                            go.Scatter(
-                                x=cmj_avg_season['Season'], 
-                                y=cmj_avg_season[rsi_col], 
-                                name="Avg RSI-mod", 
-                                mode='lines+markers+text', 
-                                text=[f"<b>RSI: {val:.2f}</b>" for val in cmj_avg_season[rsi_col]], 
-                                textposition="top center", 
-                                textfont=dict(color='#1D1D1F', size=12),
-                                line=dict(color='#4895DB', width=3), 
-                                marker=dict(size=10, color='#4895DB'),
-                                cliponaxis=False
-                            ),
-                            secondary_y=True
-                        )
-                        
-                        fig_comp_cmj.update_layout(
-                            template="simple_white", 
-                            height=420, 
-                            margin=dict(l=20, r=20, t=70, b=20),
-                            showlegend=True, 
-                            legend=dict(orientation="h", yanchor="bottom", y=1.05, xanchor="right", x=1)
-                        )
-                        fig_comp_cmj.update_yaxes(title_text="CMJ Height (cm)", range=[0, max_h * 1.30], secondary_y=False)
-                        fig_comp_cmj.update_yaxes(title_text="RSI Modified", range=[0, max_r * 1.45], secondary_y=True, showgrid=False)
-                        
-                        st.plotly_chart(fig_comp_cmj, use_container_width=True, config=LOCKED_CONFIG, key="cmj_cross_season_bar")
-                    
-                    st.markdown("#### Season-by-Season Best")
-                    summary_rows = []
-                    for season_period in ['Spring', 'Summer', 'Pre-Season']:
-                        s_cmj = cmj_comp[cmj_comp['Season'] == season_period]
-                        s_ash = ash_comp[ash_comp['Season'] == season_period]
-                        s_er = er_comp[er_comp['Season'] == season_period]
-                        
-                        max_cmj = s_cmj[cmj_col].max() if not s_cmj.empty else 0.0
-                        max_rsi = s_cmj[rsi_col].max() if not s_cmj.empty else 0.0
-                        
-                        max_ash_l = s_ash['Peak Vertical Force [N] (L)'].max() if not s_ash.empty and 'Peak Vertical Force [N] (L)' in s_ash.columns else 0.0
-                        max_ash_r = s_ash['Peak Vertical Force [N] (R)'].max() if not s_ash.empty and 'Peak Vertical Force [N] (R)' in s_ash.columns else 0.0
-                        
-                        max_er_l = s_er['L Max ROM (°)'].max() if not s_er.empty and 'L Max ROM (°)' in s_er.columns else 0.0
-                        max_er_r = s_er['R Max ROM (°)'].max() if not s_er.empty and 'R Max ROM (°)' in s_er.columns else 0.0
-                        
-                        summary_rows.append({
-                            'Season': season_period,
-                            'Max CMJ (cm)': round(max_cmj, 1),
-                            'Max RSI': round(max_rsi, 2),
-                            'Max ASH L (N)': round(max_ash_l, 0),
-                            'Max ASH R (N)': round(max_ash_r, 0),
-                            'Max ER ROM L (°)': round(max_er_l, 1),
-                            'Max ER ROM R (°)': round(max_er_r, 1)
-                        })
-                    
-                    st.dataframe(pd.DataFrame(summary_rows), use_container_width=True, hide_index=True)
-                else:
-                    st.info(f"No multi-season testing records logged for {comp_athlete}.")
-        else:
-            # --- DYNAMIC SEASONAL TAB NAVIGATION SETUP ---
-            if selected_season == "Summer":
-                tab_titles = [
-                    "Individual Profile", 
-                    "Practice Scores", 
-                    "Daily Combined Scores", 
-                    "Spring Max vs Daily Combined", 
-                    "Practice History", 
-                    "Position Analysis", 
-                    "Spring v. Summer"
-                ]
-            elif selected_season == "Pre-Season":
-                tab_titles = [
-                    "Individual Profile", 
-                    "Practice Scores", 
-                    "Daily Combined Scores", 
-                    "Practice History", 
-                    "Match v. Practice", 
-                    "Match Summary", 
-                    "Position Analysis", 
-                    "Phase Analysis", 
-                    "Practice Planner"
-                ]
-            else: # Spring
-                tab_titles = [
-                    "Individual Profile", 
-                    "Practice Scores", 
-                    "Daily Combined Scores", 
-                    "Practice History", 
-                    "Match v. Practice", 
-                    "Match Summary", 
-                    "Position Analysis", 
-                    "Phase Analysis", 
-                    "Practice Planner"
-                ]
+            max_h = cmj_avg_season[cmj_col].max() if not cmj_avg_season.empty and not pd.isna(cmj_avg_season[cmj_col].max()) else 50.0
+            max_r = cmj_avg_season[rsi_col].max() if not cmj_avg_season.empty and not pd.isna(cmj_avg_season[rsi_col].max()) else 1.0
 
-            if "active_tab_state" not in st.session_state or st.session_state.active_tab_state not in tab_titles:
-                st.session_state.active_tab_state = tab_titles[0]
-
-            selected_tab_label = st.radio("Navigation View Menu Selection Control", tab_titles, label_visibility="collapsed", horizontal=True, key="master_app_structural_gate_radio")
-            st.session_state.active_tab_state = selected_tab_label
+            fig_comp_cmj = make_subplots(specs=[[{"secondary_y": True}]])
+            
+            fig_comp_cmj.add_trace(
+                go.Bar(
+                    x=cmj_avg_season['Season'], 
+                    y=cmj_avg_season[cmj_col], 
+                    name="Avg CMJ Height (cm)", 
+                    marker_color='#FF8200', 
+                    text=[f"<b>{val:.1f} cm</b>" if pd.notna(val) else "" for val in cmj_avg_season[cmj_col]], 
+                    textposition="inside",
+                    insidetextanchor="middle",
+                    textfont=dict(color='white', size=13),
+                    cliponaxis=False
+                ),
+                secondary_y=False
+            )
+            
+            fig_comp_cmj.add_trace(
+                go.Scatter(
+                    x=cmj_avg_season['Season'], 
+                    y=cmj_avg_season[rsi_col], 
+                    name="Avg RSI-mod", 
+                    mode='lines+markers+text', 
+                    text=[f"<b>RSI: {val:.2f}</b>" if pd.notna(val) else "" for val in cmj_avg_season[rsi_col]], 
+                    textposition="top center", 
+                    textfont=dict(color='#1D1D1F', size=12),
+                    line=dict(color='#4895DB', width=3), 
+                    marker=dict(size=10, color='#4895DB'),
+                    cliponaxis=False
+                ),
+                secondary_y=True
+            )
+            
+            fig_comp_cmj.update_layout(
+                template="simple_white", 
+                height=420, 
+                margin=dict(l=20, r=20, t=70, b=20),
+                showlegend=True, 
+                legend=dict(orientation="h", yanchor="bottom", y=1.05, xanchor="right", x=1),
+                xaxis=dict(
+                    categoryorder="array",
+                    categoryarray=season_order
+                )
+            )
+            fig_comp_cmj.update_yaxes(title_text="CMJ Height (cm)", range=[0, max_h * 1.30], secondary_y=False)
+            fig_comp_cmj.update_yaxes(title_text="RSI Modified", range=[0, max_r * 1.45], secondary_y=True, showgrid=False)
+            
+            st.plotly_chart(fig_comp_cmj, use_container_width=True, config=LOCKED_CONFIG, key="cmj_cross_season_bar")
 
             # ==========================================
             # --- TAB CLAUSE 0: INDIVIDUAL PROFILE -----
