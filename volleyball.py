@@ -569,8 +569,29 @@ if check_password():
                 render_compliance_card("External Rotation ROM (Right)", rv, rd, mv, md, pct, dn, threshold_days=7, unit="°", decimals=1)
                 
         elif selected_season == "Testing":
+
             st.markdown('<div class="section-header">Testing Profile</div>', unsafe_allow_html=True)
-            testing_season_tabs = st.tabs(["Spring Testing", "Summer Testing", "Pre-Season Testing", "Intake Testing", "Overall Testing Profile", "Season Comparison"])
+
+            test_tab_titles = [
+                "Spring Testing", 
+                "Summer Testing", 
+                "Pre-Season Testing", 
+                "Intake Testing", 
+                "Overall Testing Profile", 
+                "Season Comparison"
+            ]
+
+            if "active_testing_tab" not in st.session_state or st.session_state.active_testing_tab not in test_tab_titles:
+                st.session_state.active_testing_tab = test_tab_titles[0]
+
+            selected_test_tab = st.radio(
+                "Testing Navigation Menu",
+                test_tab_titles,
+                label_visibility="collapsed",
+                horizontal=True,
+                key="testing_tab_radio_state"
+            )
+            st.session_state.active_testing_tab = selected_test_tab
             
             # --- TAB 1, 2, 3: INDIVIDUAL SEASONAL TESTING ---
             for tab_idx, s_label in enumerate(["Spring", "Summer", "Pre-Season"]):
