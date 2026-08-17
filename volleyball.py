@@ -6,7 +6,6 @@ from plotly.subplots import make_subplots
 import math 
 from datetime import timedelta, datetime
 import streamlit.components.v1 as components
-import textwrap
 
 # --- 1. PAGE CONFIG & SYSTEM GLOBAL CSS ---
 st.set_page_config(page_title="Lady Vols VB Performance", layout="wide")
@@ -193,6 +192,18 @@ def get_acwr_badge(ratio):
             return "#D93025", "#FCE8E6", "High Spike"
     except:
         return "#64748B", "#F1F5F9", "N/A"
+
+def get_readiness_zone_info(pct_score):
+    if pct_score >= 95:
+        return "#15803D", "#E6F4EA", "Peak Readiness"
+    elif pct_score >= 90:
+        return "#65A30D", "#F0FDF4", "High Readiness"
+    elif pct_score >= 80:
+        return "#D97706", "#FEF3C7", "Moderate Readiness"
+    elif pct_score >= 70:
+        return "#EA580C", "#FFEDD5", "Elevated Fatigue"
+    else:
+        return "#B91C1C", "#FEE2E2", "High Fatigue"
 
 phase_map = {}
 
@@ -400,7 +411,6 @@ if check_password():
         else:
             df_master, match_master, cmj_master, ash_master, er_master, calf_master, hip_master, shoulder_master, phase_master = raw_df, raw_match_df, raw_cmj_df, raw_ash_df, raw_er_df, raw_calf_df, raw_hip_df, raw_shoulder_df, raw_phase_df
 
-        # --- SESSION LIST SORTED IN DESCENDING ORDER (LATEST FIRST) ---
         session_list = df_master.sort_values('Date', ascending=False)['Session_Name'].dropna().unique().tolist() if not df_master.empty else []
 
         full_df_unfiltered = raw_df.copy()
@@ -905,277 +915,365 @@ if check_password():
             
             # --- TAB 0: CMJ DASHBOARD ---
             with testing_season_tabs[0]:
-                c_cmj_ath, c_cmj_date, c_cmj_comp = st.columns([2, 1.5, 1.5])
-                with c_cmj_ath:
-                    sel_cmj_ath = st.selectbox("Select Athlete", master_athlete_list, key="cmj_dash_ath_sel")
+                cmj_view_modes = st.tabs(["Individual Athlete", "Team CMJ Summary"])
                 
-                ath_cmj_all = raw_cmj_df[raw_cmj_df['Name'] == sel_cmj_ath].sort_values('Test Date')
-                
-                if ath_cmj_all.empty:
-                    st.info(f"No CMJ records found for {sel_cmj_ath}.")
-                else:
-                    valid_dates = ath_cmj_all['Test Date'].dropna().dt.strftime('%m/%d/%y').tolist()
-                    with c_cmj_date:
-                        sel_test_date_str = st.selectbox("Test Date", valid_dates, index=len(valid_dates)-1, key="cmj_dash_date_sel")
-                    with c_cmj_comp:
-                        comp_factor = st.selectbox("Comparison Factor", ["Individual (vs. Baseline)", "Team Benchmark (T-Score)"], key="cmj_dash_comp_sel")
-
-                    cur_test_row = ath_cmj_all[ath_cmj_all['Test Date'].dt.strftime('%m/%d/%y') == sel_test_date_str].iloc[-1]
-                    base_test_row = ath_cmj_all.iloc[0]
-
-                    meta_lookup = full_df_unfiltered[full_df_unfiltered['Name'] == sel_cmj_ath]
-                    photo_val = meta_lookup['PhotoURL'].iloc[0] if not meta_lookup.empty else "https://www.w3schools.com/howto/img_avatar.png"
-                    pos_val = meta_lookup['Position'].iloc[0] if not meta_lookup.empty else "N/A"
-
-                    cmj_metric_defs = [
-                        {"label": "Jump Height", "col": "Jump Height (Imp-Mom) [cm]", "unit": "cm", "fmt": "{:.1f}"},
-                        {"label": "Jump Momentum", "col": "Take-off Momentum [kg m/s]", "unit": "kg·m/s", "fmt": "{:.1f}"},
-                        {"label": "Peak Velocity", "col": "Concentric Peak Velocity [m/s]", "unit": "m/s", "fmt": "{:.2f}"},
-                        {"label": "Mean Con Force", "col": "Concentric Mean Force [N]", "unit": "N", "fmt": "{:.0f}"},
-                        {"label": "Force @ 0 Velocity", "col": "Force at Zero Velocity [N]", "unit": "N", "fmt": "{:.0f}"},
-                        {"label": "Positive Impulse", "col": "Positive Impulse [N s]", "unit": "N·s", "fmt": "{:.1f}"},
-                        {"label": "P1 Con Impulse", "col": "P1 Concentric Impulse [N s]", "unit": "N·s", "fmt": "{:.1f}"},
-                        {"label": "P2 Con Impulse", "col": "P2 Concentric Impulse [N s]", "unit": "N·s", "fmt": "{:.1f}"},
-                        {"label": "P2:P1 Impulse Ratio", "col": "P2 Concentric Impulse:P1 Concentric Impulse", "unit": "", "fmt": "{:.2f}"}
-                    ]
-
-                    # --- TOP SECTION: ATHLETE BANNER | DATA TABLE | GAUGE ---
-                    top_col1, top_col2, top_col3 = st.columns([1.2, 2.2, 1.6])
-
-                    # 1. Cleaned Athlete Card (Without BW and RSI-Mod)
-                    with top_col1:
-                        ath_card_html = f"""<div style="background:#4895DB; color:white; font-weight:900; font-size:18px; text-align:center; padding:8px 10px; border-radius:6px 6px 0 0;">{sel_cmj_ath}</div><div style="border:1px solid #E2E8F0; border-top:none; border-radius:0 0 6px 6px; padding:16px; background:white; display:flex; align-items:center; gap:16px;"><img src="{photo_val}" style="width:95px; height:95px; border-radius:8px; object-fit:contain; border:2px solid #FF8200;"><div style="font-size:14px; line-height:1.8; color:#1D1D1F;"><b>Position:</b> {pos_val}</div></div><div style="background:#4895DB; color:white; font-weight:800; font-size:13px; text-align:center; padding:6px; margin-top:10px; border-radius:4px;">Comparison Factor: Individual</div>"""
-                        st.markdown(ath_card_html, unsafe_allow_html=True)
-
-                    # 2. Performance Comparison Table
-                    with top_col2:
-                        table_rows_str = ""
-                        for m_info in cmj_metric_defs:
-                            lbl = m_info["label"]
-                            col_name = m_info["col"]
-                            fmt = m_info["fmt"]
-                            
-                            c_val = float(cur_test_row.get(col_name, 0.0)) if col_name in cur_test_row and pd.notna(cur_test_row.get(col_name)) else 0.0
-                            b_val = float(base_test_row.get(col_name, 0.0)) if col_name in base_test_row and pd.notna(base_test_row.get(col_name)) else 0.0
-                            
-                            diff = ((c_val - b_val) / b_val * 100) if b_val > 0 else 0.0
-                            pct_color = "#137333" if diff >= 0 else "#D93025"
-                            
-                            table_rows_str += f"""<tr><td style="text-align:left !important; padding-left:12px; font-weight:600;">{lbl}</td><td style="color:#64748B;">{fmt.format(b_val)}</td><td style="font-weight:800; background:#F0F7FF; border: 1px solid #3B82F6;">{fmt.format(c_val)}</td><td style="font-weight:800; color:{pct_color};">{diff:+.0f}%</td></tr>"""
-                        
-                        full_table_html = f"""<div style="background:#4895DB; color:white; font-weight:900; font-size:14px; text-align:center; padding:6px; border-radius:6px 6px 0 0;">Countermovement Jump Performance</div><table class="scout-table" style="width:100%; border:1px solid #E2E8F0; border-top:none; background:white; border-collapse:collapse; margin-bottom:0;"><thead><tr style="background:#F8FAFC; color:#64748B; font-size:11px;"><th style="text-align:left !important; padding:6px 12px;">Metric</th><th style="padding:6px;">Baseline</th><th style="padding:6px; background:#EBF5FF; color:#1E40AF;">Current</th><th style="padding:6px;">% Change</th></tr></thead><tbody>{table_rows_str}</tbody></table>"""
-                        st.markdown(full_table_html, unsafe_allow_html=True)
-
-                    # 3. Fixed Performance Readiness Gauge
-                    with top_col3:
-                        gauge_header = f"""<div style="background:#4895DB; color:white; font-weight:900; font-size:14px; text-align:center; padding:6px; border-radius:6px 6px 0 0;">Performance Readiness Score<br><span style="font-size:11px; font-weight:600;">{sel_test_date_str}</span></div>"""
-                        st.markdown(gauge_header, unsafe_allow_html=True)
-                        
-                        peak_h = ath_cmj_all[cmj_col].max() if cmj_col in ath_cmj_all else 1.0
-                        cur_h_val = float(cur_test_row.get(cmj_col, 0.0))
-                        gauge_score = min(100, max(0, int((cur_h_val / peak_h) * 100))) if peak_h > 0 else 94
-
-                        # Semicircle wedge breakdown (180 degrees total on top)
-                        # Red -> Orange -> Yellow -> Light Green -> Dark Green
-                        gauge_colors = ['#B91C1C', '#EA580C', '#FACC15', '#65A30D', '#15803D', 'rgba(0,0,0,0)']
-                        values = [20, 20, 20, 20, 20, 100]
-
-                        # Calculate needle angle (0% = 180 deg / Left, 100% = 0 deg / Right)
-                        angle_rad = math.pi * (1.0 - (gauge_score / 100.0))
-                        needle_length = 0.38
-                        needle_x = 0.5 + needle_length * math.cos(angle_rad)
-                        needle_y = 0.28 + needle_length * math.sin(angle_rad)
-
-                        fig_gauge = go.Figure()
-
-                        # Upward-curving gauge arch (rotation=270)
-                        fig_gauge.add_trace(go.Pie(
-                            values=values,
-                            rotation=270,
-                            direction='clockwise',
-                            hole=0.48,
-                            marker=dict(colors=gauge_colors, line=dict(color='white', width=1.5)),
-                            textinfo='none',
-                            hoverinfo='none',
-                            sort=False,
-                            domain=dict(x=[0, 1], y=[0, 0.85])
-                        ))
-
-                        # Needle line pointing from bottom center upwards
-                        fig_gauge.add_shape(
-                            type='line',
-                            x0=0.5, y0=0.28,
-                            x1=needle_x, y1=needle_y,
-                            line=dict(color='#111827', width=4)
-                        )
-
-                        # Center Pivot Point
-                        fig_gauge.add_shape(
-                            type='circle',
-                            x0=0.475, y0=0.255,
-                            x1=0.525, y1=0.305,
-                            fillcolor='#111827',
-                            line_color='#111827'
-                        )
-
-                        # Centered Badge
-                        fig_gauge.add_annotation(
-                            x=0.5, y=0.18,
-                            text=f"<b>{gauge_score}%</b>",
-                            showarrow=False,
-                            font=dict(size=14, color="white", weight="bold"),
-                            bgcolor="#1E293B",
-                            borderpad=4,
-                            bordercolor="#1E293B"
-                        )
-
-                        fig_gauge.update_layout(
-                            height=250,
-                            margin=dict(l=10, r=10, t=10, b=10),
-                            showlegend=False,
-                            xaxis=dict(showgrid=False, zeroline=False, visible=False, range=[0, 1]),
-                            yaxis=dict(showgrid=False, zeroline=False, visible=False, range=[0, 1]),
-                            paper_bgcolor="white"
-                        )
-                        st.plotly_chart(fig_gauge, use_container_width=True, config=LOCKED_CONFIG, key="cmj_readiness_gauge")
-
-                    st.markdown("<br>", unsafe_allow_html=True)
-
-                    # --- BOTTOM SECTION: PERFORMANCE BANDS & T-SCORE GRAPH ---
-                    st.markdown('<div class="section-header">Countermovement Jump Performance Standards</div>', unsafe_allow_html=True)
+                # --- SUB-TAB 1: INDIVIDUAL ATHLETE DEEP DIVE ---
+                with cmj_view_modes[0]:
+                    c_cmj_ath, c_cmj_date, c_cmj_comp = st.columns([2, 1.5, 1.5])
+                    with c_cmj_ath:
+                        sel_cmj_ath = st.selectbox("Select Athlete", master_athlete_list, key="cmj_dash_ath_sel")
                     
-                    chart_col, legend_col = st.columns([4.2, 1.1])
+                    ath_cmj_all = raw_cmj_df[raw_cmj_df['Name'] == sel_cmj_ath].sort_values('Test Date')
+                    
+                    if ath_cmj_all.empty:
+                        st.info(f"No CMJ records found for {sel_cmj_ath}.")
+                    else:
+                        valid_dates = ath_cmj_all['Test Date'].dropna().dt.strftime('%m/%d/%y').tolist()
+                        with c_cmj_date:
+                            sel_test_date_str = st.selectbox("Test Date", valid_dates, index=len(valid_dates)-1, key="cmj_dash_date_sel")
+                        with c_cmj_comp:
+                            comp_factor = st.selectbox("Comparison Factor", ["Individual (vs. Baseline)", "Team Benchmark (T-Score)"], key="cmj_dash_comp_sel")
 
-                    with chart_col:
-                        bar_metrics = [
-                            {"name": "Jump Height", "col": "Jump Height (Imp-Mom) [cm]"},
-                            {"name": "Jump Momentum", "col": "Take-off Momentum [kg m/s]"},
-                            {"name": "Peak Velocity", "col": "Concentric Peak Velocity [m/s]"},
-                            {"name": "Mean Con Force", "col": "Concentric Mean Force [N]"},
-                            {"name": "Force @ 0 Velocity", "col": "Force at Zero Velocity [N]"},
-                            {"name": "Positive Impulse", "col": "Positive Impulse [N s]"},
-                            {"name": "P1 Con Impulse", "col": "P1 Concentric Impulse [N s]"},
-                            {"name": "P2 Con Impulse", "col": "P2 Concentric Impulse [N s]"},
-                            {"name": "CM Depth", "col": "Countermovement Depth [cm]"},
-                            {"name": "Time to Takeoff", "col": "Time to Takeoff [s]"}
+                        cur_test_row = ath_cmj_all[ath_cmj_all['Test Date'].dt.strftime('%m/%d/%y') == sel_test_date_str].iloc[-1]
+                        base_test_row = ath_cmj_all.iloc[0]
+
+                        meta_lookup = full_df_unfiltered[full_df_unfiltered['Name'] == sel_cmj_ath]
+                        photo_val = meta_lookup['PhotoURL'].iloc[0] if not meta_lookup.empty else "https://www.w3schools.com/howto/img_avatar.png"
+                        pos_val = meta_lookup['Position'].iloc[0] if not meta_lookup.empty else "N/A"
+
+                        cmj_metric_defs = [
+                            {"label": "Jump Height", "col": "Jump Height (Imp-Mom) [cm]", "unit": "cm", "fmt": "{:.1f}"},
+                            {"label": "Jump Momentum", "col": "Take-off Momentum [kg m/s]", "unit": "kg·m/s", "fmt": "{:.1f}"},
+                            {"label": "Peak Velocity", "col": "Concentric Peak Velocity [m/s]", "unit": "m/s", "fmt": "{:.2f}"},
+                            {"label": "Mean Con Force", "col": "Concentric Mean Force [N]", "unit": "N", "fmt": "{:.0f}"},
+                            {"label": "Force @ 0 Velocity", "col": "Force at Zero Velocity [N]", "unit": "N", "fmt": "{:.0f}"},
+                            {"label": "Positive Impulse", "col": "Positive Impulse [N s]", "unit": "N·s", "fmt": "{:.1f}"},
+                            {"label": "P1 Con Impulse", "col": "P1 Concentric Impulse [N s]", "unit": "N·s", "fmt": "{:.1f}"},
+                            {"label": "P2 Con Impulse", "col": "P2 Concentric Impulse [N s]", "unit": "N·s", "fmt": "{:.1f}"},
+                            {"label": "P2:P1 Impulse Ratio", "col": "P2 Concentric Impulse:P1 Concentric Impulse", "unit": "", "fmt": "{:.2f}"}
                         ]
 
-                        t_scores = []
-                        x_labels = []
+                        top_col1, top_col2, top_col3 = st.columns([1.2, 2.2, 1.6])
 
-                        for bm in bar_metrics:
-                            x_labels.append(bm["name"])
-                            cname = bm["col"]
-                            if cname in raw_cmj_df.columns and raw_cmj_df[cname].dropna().std() > 0:
-                                m_mean = raw_cmj_df[cname].mean()
-                                m_std = raw_cmj_df[cname].std()
-                                ath_v = float(cur_test_row.get(cname, m_mean))
-                                if "time" in cname.lower():
-                                    t_val = 50.0 - (10.0 * (ath_v - m_mean) / m_std)
-                                else:
-                                    t_val = 50.0 + (10.0 * (ath_v - m_mean) / m_std)
-                                t_scores.append(round(min(100.0, max(0.0, t_val)), 1))
-                            else:
-                                fallback_map = {"CM Depth": 35.9, "Time to Takeoff": 59.0}
-                                t_scores.append(fallback_map.get(bm["name"], 50.0))
+                        # Athlete Card
+                        with top_col1:
+                            ath_card_html = f"""<div style="background:#4895DB; color:white; font-weight:900; font-size:18px; text-align:center; padding:8px 10px; border-radius:6px 6px 0 0;">{sel_cmj_ath}</div><div style="border:1px solid #E2E8F0; border-top:none; border-radius:0 0 6px 6px; padding:16px; background:white; display:flex; align-items:center; gap:16px;"><img src="{photo_val}" style="width:95px; height:95px; border-radius:8px; object-fit:contain; border:2px solid #FF8200;"><div style="font-size:14px; line-height:1.8; color:#1D1D1F;"><b>Position:</b> {pos_val}</div></div><div style="background:#4895DB; color:white; font-weight:800; font-size:13px; text-align:center; padding:6px; margin-top:10px; border-radius:4px;">Comparison Factor: Individual</div>"""
+                            st.markdown(ath_card_html, unsafe_allow_html=True)
 
-                        fig_bands = go.Figure()
+                        # Data Table
+                        with top_col2:
+                            table_rows_str = ""
+                            for m_info in cmj_metric_defs:
+                                lbl = m_info["label"]
+                                col_name = m_info["col"]
+                                fmt = m_info["fmt"]
+                                
+                                c_val = float(cur_test_row.get(col_name, 0.0)) if col_name in cur_test_row and pd.notna(cur_test_row.get(col_name)) else 0.0
+                                b_val = float(base_test_row.get(col_name, 0.0)) if col_name in base_test_row and pd.notna(base_test_row.get(col_name)) else 0.0
+                                
+                                diff = ((c_val - b_val) / b_val * 100) if b_val > 0 else 0.0
+                                pct_color = "#137333" if diff >= 0 else "#D93025"
+                                
+                                table_rows_str += f"""<tr><td style="text-align:left !important; padding-left:12px; font-weight:600;">{lbl}</td><td style="color:#64748B;">{fmt.format(b_val)}</td><td style="font-weight:800; background:#F0F7FF; border: 1px solid #3B82F6;">{fmt.format(c_val)}</td><td style="font-weight:800; color:{pct_color};">{diff:+.0f}%</td></tr>"""
+                            
+                            full_table_html = f"""<div style="background:#4895DB; color:white; font-weight:900; font-size:14px; text-align:center; padding:6px; border-radius:6px 6px 0 0;">Countermovement Jump Performance</div><table class="scout-table" style="width:100%; border:1px solid #E2E8F0; border-top:none; background:white; border-collapse:collapse; margin-bottom:0;"><thead><tr style="background:#F8FAFC; color:#64748B; font-size:11px;"><th style="text-align:left !important; padding:6px 12px;">Metric</th><th style="padding:6px;">Baseline</th><th style="padding:6px; background:#EBF5FF; color:#1E40AF;">Current</th><th style="padding:6px;">% Change</th></tr></thead><tbody>{table_rows_str}</tbody></table>"""
+                            st.markdown(full_table_html, unsafe_allow_html=True)
 
-                        # Vibrant Solid Color Performance Bands
-                        bands = [
-                            {"y0": 0, "y1": 20, "color": "#A00000"},
-                            {"y0": 20, "y1": 30, "color": "#E60000"},
-                            {"y0": 30, "y1": 40, "color": "#F05656"},
-                            {"y0": 40, "y1": 45, "color": "#F8A2A2"},
-                            {"y0": 45, "y1": 55, "color": "#FFFFFF"},
-                            {"y0": 55, "y1": 60, "color": "#C3E8A8"},
-                            {"y0": 60, "y1": 70, "color": "#81D350"},
-                            {"y0": 70, "y1": 80, "color": "#33A338"},
-                            {"y0": 80, "y1": 100, "color": "#1C7426"}
-                        ]
+                        # Calibrated Gauge
+                        with top_col3:
+                            gauge_header = f"""<div style="background:#4895DB; color:white; font-weight:900; font-size:14px; text-align:center; padding:6px; border-radius:6px 6px 0 0;">Performance Readiness Score<br><span style="font-size:11px; font-weight:600;">{sel_test_date_str}</span></div>"""
+                            st.markdown(gauge_header, unsafe_allow_html=True)
+                            
+                            peak_h = ath_cmj_all[cmj_col].max() if cmj_col in ath_cmj_all else 1.0
+                            cur_h_val = float(cur_test_row.get(cmj_col, 0.0))
+                            gauge_score = min(100, max(0, int((cur_h_val / peak_h) * 100))) if peak_h > 0 else 94
 
-                        for b in bands:
-                            fig_bands.add_hrect(
-                                y0=b["y0"], y1=b["y1"], 
-                                fillcolor=b["color"], 
-                                line_width=0, 
-                                opacity=1.0,
-                                layer="below"
+                            # Gauge setup
+                            gauge_colors = ['#B91C1C', '#EA580C', '#FACC15', '#65A30D', '#15803D', 'rgba(0,0,0,0)']
+                            values = [20, 20, 20, 20, 20, 100]
+
+                            center_x, center_y = 0.50, 0.50
+                            needle_length = 0.38
+                            
+                            angle_rad = math.pi * (1.0 - (gauge_score / 100.0))
+                            needle_x = center_x + needle_length * math.cos(angle_rad)
+                            needle_y = center_y + needle_length * math.sin(angle_rad)
+
+                            fig_gauge = go.Figure()
+
+                            fig_gauge.add_trace(go.Pie(
+                                values=values,
+                                rotation=270,
+                                direction='clockwise',
+                                hole=0.50,
+                                marker=dict(colors=gauge_colors, line=dict(color='white', width=2)),
+                                textinfo='none',
+                                hoverinfo='none',
+                                sort=False,
+                                domain=dict(x=[0, 1], y=[0, 1])
+                            ))
+
+                            fig_gauge.add_shape(
+                                type='line',
+                                x0=center_x, y0=center_y,
+                                x1=needle_x, y1=needle_y,
+                                line=dict(color='#111827', width=5)
                             )
 
-                        # Main charcoal bars
-                        fig_bands.add_trace(go.Bar(
-                            x=x_labels,
-                            y=t_scores,
-                            marker=dict(
-                                color='#3A3D40',
-                                line=dict(color='#1A1C1E', width=1.5)
-                            ),
-                            width=0.42,
-                            text=[f"<b>{val:.1f}</b>" for val in t_scores],
-                            textposition='inside',
-                            insidetextanchor='middle',
-                            textfont=dict(color='white', size=12),
-                            cliponaxis=False
-                        ))
-
-                        # Lock Category grouping blocks directly into plot coordinates
-                        # Indices: Speed: 0..2 | Strength: 3..6 | Power: 7 | Jump Strategy: 8..9
-                        category_boxes = [
-                            {"x0": -0.45, "x1": 2.45, "text": "Speed", "bg": "#F8E2E2"},
-                            {"x0": 2.55, "x1": 6.45, "text": "Strength", "bg": "#EBF3DF"},
-                            {"x0": 6.55, "x1": 7.45, "text": "Power", "bg": "#D3E2F4"},
-                            {"x0": 7.55, "x1": 9.45, "text": "Jump Strategy", "bg": "#E6E1F2"}
-                        ]
-
-                        for cb in category_boxes:
-                            fig_bands.add_shape(
-                                type="rect",
-                                xref="x", yref="paper",
-                                x0=cb["x0"], x1=cb["x1"],
-                                y0=-0.16, y1=-0.08,
-                                fillcolor=cb["bg"],
-                                line=dict(width=0),
-                                layer="above"
+                            fig_gauge.add_shape(
+                                type='circle',
+                                x0=center_x - 0.035, y0=center_y - 0.035,
+                                x1=center_x + 0.035, y1=center_y + 0.035,
+                                fillcolor='#111827',
+                                line_color='#111827'
                             )
-                            fig_bands.add_annotation(
-                                xref="x", yref="paper",
-                                x=(cb["x0"] + cb["x1"]) / 2,
-                                y=-0.12,
-                                text=f"<b>{cb['text']}</b>",
+
+                            fig_gauge.add_annotation(
+                                x=center_x, y=center_y - 0.02,
+                                text=f"<b>{gauge_score}%</b>",
                                 showarrow=False,
-                                font=dict(size=11, color="#111827"),
-                                align="center"
+                                font=dict(size=14, color="white", weight="bold"),
+                                bgcolor="#1E293B",
+                                borderpad=4,
+                                bordercolor="#1E293B"
                             )
 
-                        fig_bands.update_layout(
-                            height=450,
-                            margin=dict(l=30, r=10, t=15, b=65),
-                            plot_bgcolor='white',
-                            paper_bgcolor='white',
-                            xaxis=dict(
-                                tickangle=0, 
-                                tickfont=dict(size=10.5, weight='bold', color='#111827'),
-                                showgrid=False,
-                                showline=True,
-                                linecolor='#6B7280'
-                            ),
-                            yaxis=dict(
-                                range=[0, 100], 
-                                dtick=10, 
-                                showgrid=False, 
-                                showline=True,
-                                linecolor='#6B7280',
-                                title=dict(text="T-Score Performance Rating", font=dict(size=12, weight='bold', color='#4B5563'))
-                            ),
-                            showlegend=False
-                        )
-                        st.plotly_chart(fig_bands, use_container_width=True, config=LOCKED_CONFIG, key="cmj_performance_bands_chart")
+                            fig_gauge.update_layout(
+                                height=230,
+                                margin=dict(l=10, r=10, t=10, b=10),
+                                showlegend=False,
+                                xaxis=dict(showgrid=False, zeroline=False, visible=False, range=[0, 1]),
+                                yaxis=dict(showgrid=False, zeroline=False, visible=False, range=[0, 1]),
+                                paper_bgcolor="white"
+                            )
+                            st.plotly_chart(fig_gauge, use_container_width=True, config=LOCKED_CONFIG, key="cmj_readiness_gauge")
 
-                    with legend_col:
-                        legend_table_html = """<div style="background:#4895DB; color:white; font-weight:800; font-size:12px; text-align:center; padding:6px; border-radius:4px 4px 0 0;">Performance Bands<br><span style="font-size:10px; font-weight:600;">T-Score Rating</span></div><table style="width:100%; border-collapse:collapse; font-size:11px; text-align:center; font-weight:700;"><tr style="background:#1C7426; color:white;"><td style="padding:4px;">Excellent</td><td>> 80</td></tr><tr style="background:#33A338; color:white;"><td style="padding:4px;">Very Good</td><td>70 - 80</td></tr><tr style="background:#81D350; color:#111827;"><td style="padding:4px;">Good</td><td>60 - 70</td></tr><tr style="background:#C3E8A8; color:#111827;"><td style="padding:4px;">Above Avg.</td><td>55 - 60</td></tr><tr style="background:#FFFFFF; color:#111827; border-top:1px solid #E2E8F0; border-bottom:1px solid #E2E8F0;"><td style="padding:4px;">Average</td><td>45 - 55</td></tr><tr style="background:#F8A2A2; color:#111827;"><td style="padding:4px;">Below Avg.</td><td>40 - 45</td></tr><tr style="background:#F05656; color:white;"><td style="padding:4px;">Poor</td><td>30 - 40</td></tr><tr style="background:#E60000; color:white;"><td style="padding:4px;">Very Poor</td><td>20 - 30</td></tr><tr style="background:#A00000; color:white;"><td style="padding:4px;">Extremely Poor</td><td>< 20</td></tr></table>"""
-                        st.markdown(legend_table_html, unsafe_allow_html=True)
+                        st.markdown("<br>", unsafe_allow_html=True)
+
+                        # Performance Standards Graph
+                        st.markdown('<div class="section-header">Countermovement Jump Performance Standards</div>', unsafe_allow_html=True)
                         
+                        chart_col, legend_col = st.columns([4.2, 1.1])
+
+                        with chart_col:
+                            bar_metrics = [
+                                {"name": "Jump Height", "col": "Jump Height (Imp-Mom) [cm]"},
+                                {"name": "Jump Momentum", "col": "Take-off Momentum [kg m/s]"},
+                                {"name": "Peak Velocity", "col": "Concentric Peak Velocity [m/s]"},
+                                {"name": "Mean Con Force", "col": "Concentric Mean Force [N]"},
+                                {"name": "Force @ 0 Velocity", "col": "Force at Zero Velocity [N]"},
+                                {"name": "Positive Impulse", "col": "Positive Impulse [N s]"},
+                                {"name": "P1 Con Impulse", "col": "P1 Concentric Impulse [N s]"},
+                                {"name": "P2 Con Impulse", "col": "P2 Concentric Impulse [N s]"},
+                                {"name": "CM Depth", "col": "Countermovement Depth [cm]"},
+                                {"name": "Time to Takeoff", "col": "Time to Takeoff [s]"}
+                            ]
+
+                            t_scores = []
+                            x_labels = []
+
+                            for bm in bar_metrics:
+                                x_labels.append(bm["name"])
+                                cname = bm["col"]
+                                if cname in raw_cmj_df.columns and raw_cmj_df[cname].dropna().std() > 0:
+                                    m_mean = raw_cmj_df[cname].mean()
+                                    m_std = raw_cmj_df[cname].std()
+                                    ath_v = float(cur_test_row.get(cname, m_mean))
+                                    if "time" in cname.lower():
+                                        t_val = 50.0 - (10.0 * (ath_v - m_mean) / m_std)
+                                    else:
+                                        t_val = 50.0 + (10.0 * (ath_v - m_mean) / m_std)
+                                    t_scores.append(round(min(100.0, max(0.0, t_val)), 1))
+                                else:
+                                    fallback_map = {"CM Depth": 35.9, "Time to Takeoff": 59.0}
+                                    t_scores.append(fallback_map.get(bm["name"], 50.0))
+
+                            fig_bands = go.Figure()
+
+                            bands = [
+                                {"y0": 0, "y1": 20, "color": "#A00000"},
+                                {"y0": 20, "y1": 30, "color": "#E60000"},
+                                {"y0": 30, "y1": 40, "color": "#F05656"},
+                                {"y0": 40, "y1": 45, "color": "#F8A2A2"},
+                                {"y0": 45, "y1": 55, "color": "#FFFFFF"},
+                                {"y0": 55, "y1": 60, "color": "#C3E8A8"},
+                                {"y0": 60, "y1": 70, "color": "#81D350"},
+                                {"y0": 70, "y1": 80, "color": "#33A338"},
+                                {"y0": 80, "y1": 100, "color": "#1C7426"}
+                            ]
+
+                            for b in bands:
+                                fig_bands.add_hrect(
+                                    y0=b["y0"], y1=b["y1"], 
+                                    fillcolor=b["color"], 
+                                    line_width=0, 
+                                    opacity=1.0,
+                                    layer="below"
+                                )
+
+                            fig_bands.add_trace(go.Bar(
+                                x=x_labels,
+                                y=t_scores,
+                                marker=dict(
+                                    color='#3A3D40',
+                                    line=dict(color='#1A1C1E', width=1.5)
+                                ),
+                                width=0.42,
+                                text=[f"<b>{val:.1f}</b>" for val in t_scores],
+                                textposition='inside',
+                                insidetextanchor='middle',
+                                textfont=dict(color='white', size=12),
+                                cliponaxis=False
+                            ))
+
+                            category_boxes = [
+                                {"x0": -0.45, "x1": 2.45, "text": "Speed", "bg": "#F8E2E2"},
+                                {"x0": 2.55, "x1": 6.45, "text": "Strength", "bg": "#EBF3DF"},
+                                {"x0": 6.55, "x1": 7.45, "text": "Power", "bg": "#D3E2F4"},
+                                {"x0": 7.55, "x1": 9.45, "text": "Jump Strategy", "bg": "#E6E1F2"}
+                            ]
+
+                            for cb in category_boxes:
+                                fig_bands.add_shape(
+                                    type="rect",
+                                    xref="x", yref="paper",
+                                    x0=cb["x0"], x1=cb["x1"],
+                                    y0=-0.16, y1=-0.08,
+                                    fillcolor=cb["bg"],
+                                    line=dict(width=0),
+                                    layer="above"
+                                )
+                                fig_bands.add_annotation(
+                                    xref="x", yref="paper",
+                                    x=(cb["x0"] + cb["x1"]) / 2,
+                                    y=-0.12,
+                                    text=f"<b>{cb['text']}</b>",
+                                    showarrow=False,
+                                    font=dict(size=11, color="#111827"),
+                                    align="center"
+                                )
+
+                            fig_bands.update_layout(
+                                height=450,
+                                margin=dict(l=30, r=10, t=15, b=65),
+                                plot_bgcolor='white',
+                                paper_bgcolor='white',
+                                xaxis=dict(
+                                    tickangle=0, 
+                                    tickfont=dict(size=10.5, weight='bold', color='#111827'),
+                                    showgrid=False,
+                                    showline=True,
+                                    linecolor='#6B7280'
+                                ),
+                                yaxis=dict(
+                                    range=[0, 100], 
+                                    dtick=10, 
+                                    showgrid=False, 
+                                    showline=True,
+                                    linecolor='#6B7280',
+                                    title=dict(text="T-Score Performance Rating", font=dict(size=12, weight='bold', color='#4B5563'))
+                                ),
+                                showlegend=False
+                            )
+                            st.plotly_chart(fig_bands, use_container_width=True, config=LOCKED_CONFIG, key="cmj_performance_bands_chart")
+
+                        with legend_col:
+                            legend_table_html = """<div style="background:#4895DB; color:white; font-weight:800; font-size:12px; text-align:center; padding:6px; border-radius:4px 4px 0 0;">Performance Bands<br><span style="font-size:10px; font-weight:600;">T-Score Rating</span></div><table style="width:100%; border-collapse:collapse; font-size:11px; text-align:center; font-weight:700;"><tr style="background:#1C7426; color:white;"><td style="padding:4px;">Excellent</td><td>> 80</td></tr><tr style="background:#33A338; color:white;"><td style="padding:4px;">Very Good</td><td>70 - 80</td></tr><tr style="background:#81D350; color:#111827;"><td style="padding:4px;">Good</td><td>60 - 70</td></tr><tr style="background:#C3E8A8; color:#111827;"><td style="padding:4px;">Above Avg.</td><td>55 - 60</td></tr><tr style="background:#FFFFFF; color:#111827; border-top:1px solid #E2E8F0; border-bottom:1px solid #E2E8F0;"><td style="padding:4px;">Average</td><td>45 - 55</td></tr><tr style="background:#F8A2A2; color:#111827;"><td style="padding:4px;">Below Avg.</td><td>40 - 45</td></tr><tr style="background:#F05656; color:white;"><td style="padding:4px;">Poor</td><td>30 - 40</td></tr><tr style="background:#E60000; color:white;"><td style="padding:4px;">Very Poor</td><td>20 - 30</td></tr><tr style="background:#A00000; color:white;"><td style="padding:4px;">Extremely Poor</td><td>< 20</td></tr></table>"""
+                            st.markdown(legend_table_html, unsafe_allow_html=True)
+
+                # --- SUB-TAB 2: TEAM CMJ SUMMARY & READINESS DASHBOARD ---
+                with cmj_view_modes[1]:
+                    st.markdown("### Team Countermovement Jump Readiness Overview")
+                    
+                    team_cmj_dates = sorted(raw_cmj_df['Test Date'].dropna().dt.strftime('%m/%d/%y').unique().tolist(), reverse=True)
+                    
+                    c_sum_d1, c_sum_d2 = st.columns([1.5, 2])
+                    with c_sum_d1:
+                        sel_team_cmj_date = st.selectbox("Evaluation Test Date", team_cmj_dates, index=0, key="team_cmj_eval_date")
+                    with c_sum_d2:
+                        team_pos_f = st.selectbox("Filter by Position", ["All Positions"] + sorted([p for p in full_df_unfiltered['Position'].unique() if p != "N/A"]), key="team_cmj_pos_filter")
+
+                    team_cmj_rows = []
+                    
+                    for ath_name in sorted(raw_cmj_df['Name'].unique()):
+                        ath_sub_cmj = raw_cmj_df[raw_cmj_df['Name'] == ath_name].sort_values('Test Date')
+                        if ath_sub_cmj.empty:
+                            continue
+                        
+                        meta_row = full_df_unfiltered[full_df_unfiltered['Name'] == ath_name]
+                        pos_str = meta_row['Position'].iloc[0] if not meta_row.empty else "N/A"
+                        photo_url = meta_row['PhotoURL'].iloc[0] if not meta_row.empty else "https://www.w3schools.com/howto/img_avatar.png"
+                        
+                        if team_pos_f != "All Positions" and pos_str != team_pos_f:
+                            continue
+                            
+                        ath_date_point = ath_sub_cmj[ath_sub_cmj['Test Date'].dt.strftime('%m/%d/%y') == sel_team_cmj_date]
+                        if ath_date_point.empty:
+                            continue
+                            
+                        target_row = ath_date_point.iloc[-1]
+                        baseline_row = ath_sub_cmj.iloc[0]
+                        peak_h = ath_sub_cmj[cmj_col].max() if cmj_col in ath_sub_cmj else 1.0
+                        
+                        cur_h = float(target_row.get(cmj_col, 0.0))
+                        base_h = float(baseline_row.get(cmj_col, 0.0))
+                        cur_rsi = float(target_row.get(rsi_col, 0.0))
+                        
+                        readiness_pct = min(120, max(0, int((cur_h / peak_h) * 100))) if peak_h > 0 else 0
+                        pct_change = ((cur_h - base_h) / base_h * 100) if base_h > 0 else 0.0
+                        
+                        z_color, z_bg, z_status = get_readiness_zone_info(readiness_pct)
+                        
+                        team_cmj_rows.append({
+                            "Athlete": ath_name,
+                            "PhotoURL": photo_url,
+                            "Position": pos_str,
+                            "Readiness %": readiness_pct,
+                            "Status": z_status,
+                            "Status_Color": z_color,
+                            "Status_BG": z_bg,
+                            "Current Height": cur_h,
+                            "Baseline Height": base_h,
+                            "% Change": pct_change,
+                            "RSI Modified": cur_rsi
+                        })
+
+                    if team_cmj_rows:
+                        cmj_team_df = pd.DataFrame(team_cmj_rows).sort_values("Readiness %", ascending=False)
+                        
+                        c_kpi1, c_kpi2, c_kpi3, c_kpi4 = st.columns(4)
+                        avg_team_readiness = cmj_team_df['Readiness %'].mean()
+                        peak_count = sum(1 for r in team_cmj_rows if r['Readiness %'] >= 90)
+                        fatigue_count = sum(1 for r in team_cmj_rows if r['Readiness %'] < 80)
+                        
+                        c_kpi1.metric("Athletes Evaluated", len(team_cmj_rows))
+                        c_kpi2.metric("Team Mean Readiness", f"{avg_team_readiness:.1f}%")
+                        c_kpi3.metric("Optimal (>=90%)", peak_count)
+                        c_kpi4.metric("Fatigued (<80%)", fatigue_count)
+
+                        team_tbl_html = """<table class="scout-table" style="width:100%; border:1px solid #E2E8F0; background:white; margin-top:15px;"><thead><tr style="background:#4895DB; color:white;"><th style="width:60px;">Athlete</th><th style="text-align:left !important; padding-left:10px;">Name</th><th>Position</th><th>Readiness Score</th><th>Performance Zone</th><th>Jump Height</th><th>Baseline</th><th>% Shift</th><th>RSI-mod</th></tr></thead><tbody>"""
+                        
+                        for _, row in cmj_team_df.iterrows():
+                            c_pct = row['% Change']
+                            diff_color = "#137333" if c_pct >= 0 else "#D93025"
+                            
+                            team_tbl_html += f"""<tr>
+                                <td style="padding:4px;"><img src="{row['PhotoURL']}" style="width:36px; height:36px; border-radius:50%; object-fit:contain; border:2px solid #FF8200;"></td>
+                                <td style="text-align:left !important; font-weight:800; padding-left:10px;">{row['Athlete']}</td>
+                                <td>{row['Position']}</td>
+                                <td style="font-weight:900; font-size:14px; color:{row['Status_Color']};">{row['Readiness %']}%</td>
+                                <td><span style="background-color:{row['Status_BG']}; color:{row['Status_Color']}; padding:3px 8px; border-radius:10px; font-weight:700; font-size:11px;">{row['Status']}</span></td>
+                                <td style="font-weight:800;">{row['Current Height']:.1f} cm</td>
+                                <td style="color:#64748B;">{row['Baseline Height']:.1f} cm</td>
+                                <td style="font-weight:800; color:{diff_color};">{c_pct:+.1f}%</td>
+                                <td style="font-weight:700;">{row['RSI Modified']:.2f}</td>
+                            </tr>"""
+                        
+                        team_tbl_html += "</tbody></table>"
+                        st.markdown(team_tbl_html, unsafe_allow_html=True)
+                    else:
+                        st.info(f"No Countermovement Jump testing records logged on {sel_team_cmj_date}.")
+
             # --- SEASON SPECIFIC TESTING TABS ---
             for tab_idx, s_label in enumerate(["Spring", "Summer", "Pre-Season"]):
                 with testing_season_tabs[tab_idx + 1]:
@@ -1570,7 +1668,7 @@ if check_password():
                 sh_er_p = sh_p[sh_p['Direction'].str.contains('External|ER', case=False, na=False)] if not sh_p.empty and 'Direction' in sh_p.columns else pd.DataFrame()
 
                 max_sh_ir = max(sh_ir_p['L Max Force (N)'].max() if 'L Max Force (N)' in sh_ir_p.columns else 0.0, sh_ir_p['R Max Force (N)'].max() if 'R Max Force (N)' in sh_ir_p.columns else 0.0) if not sh_ir_p.empty else 0.0
-                max_sh_er = max(sh_er_p['L Max Force (N)'].max() if 'L Max Force (N)' in sh_ir_p.columns else 0.0, sh_er_p['R Max Force (N)'].max() if 'R Max Force (N)' in sh_ir_p.columns else 0.0) if not sh_ir_p.empty else 0.0
+                max_sh_er = max(sh_er_p['L Max Force (N)'].max() if 'L Max Force (N)' in sh_ir_p.columns else 0.0, sh_ir_p['R Max Force (N)'].max() if 'R Max Force (N)' in sh_ir_p.columns else 0.0) if not sh_ir_p.empty else 0.0
 
                 m_c1, m_c2, m_c3, m_c4, m_c5, m_c6 = st.columns(6)
                 m_c1.metric("Peak CMJ", f"{max_cmj_h:.1f} cm")
