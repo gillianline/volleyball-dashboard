@@ -473,11 +473,11 @@ if check_password():
         
         # 5 Core Practitioner Workflow Hubs
         workflow_hubs = [
-            "📊 Daily Monitoring & Wellness",
-            "🏐 Match Performance",
-            "📋 Practice & Drill Planning",
-            "📈 Workload & ACWR",
-            "🎯 Testing & Baselines"
+            "Daily Monitoring & Wellness",
+            "Match Performance",
+            "Practice & Drill Planning",
+            "Workload & ACWR",
+            "Testing"
         ]
         
         if "main_workflow_nav" not in st.session_state:
