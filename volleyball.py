@@ -1025,7 +1025,7 @@ if check_password():
                 sel_cmj_mode = st.radio("CMJ View Mode", cmj_view_modes, key="cmj_view_mode_subtab", horizontal=True, label_visibility="collapsed")
 
                 if sel_cmj_mode == "Individual Athlete":
-                    c_cmj_ath, c_cmj_date, c_cmj_comp = st.columns([2, 1.5, 1.5])
+                    c_cmj_ath, c_cmj_date = st.columns([2, 2])
                     with c_cmj_ath: sel_cmj_ath = st.selectbox("Select Athlete", master_athlete_list, key="cmj_dash_ath_sel")
                     ath_cmj_all = raw_cmj_df[raw_cmj_df['Name'] == sel_cmj_ath].sort_values('Test Date')
                     
@@ -1034,7 +1034,6 @@ if check_password():
                     else:
                         valid_dates = ath_cmj_all['Test Date'].dropna().dt.strftime('%m/%d/%y').tolist()
                         with c_cmj_date: sel_test_date_str = st.selectbox("Test Date", valid_dates, index=len(valid_dates)-1, key="cmj_dash_date_sel")
-                        with c_cmj_comp: comp_factor = st.selectbox("Comparison Factor", ["Individual", "Team", "Position"], key="cmj_dash_comp_sel")
 
                         cur_idx_list = ath_cmj_all[ath_cmj_all['Test Date'].dt.strftime('%m/%d/%y') == sel_test_date_str].index.tolist()
                         cur_test_row = ath_cmj_all.loc[cur_idx_list[-1]]
@@ -1072,8 +1071,9 @@ if check_password():
 
                         top_col1, top_col2, top_col3 = st.columns([1.2, 2.2, 1.6])
                         with top_col1:
-                            ath_card_html = f"""<div style="background:#4895DB; color:white; font-weight:900; font-size:18px; text-align:center; padding:8px 10px; border-radius:6px 6px 0 0;">{sel_cmj_ath}</div><div style="border:1px solid #E2E8F0; border-top:none; border-radius:0 0 6px 6px; padding:16px; background:white; display:flex; align-items:center; gap:16px;"><img src="{photo_val}" style="width:95px; height:95px; border-radius:8px; object-fit:contain; border:2px solid #FF8200;"><div style="font-size:14px; line-height:1.8; color:#1D1D1F;"><b>Position:</b> {pos_val}</div></div><div style="background:#4895DB; color:white; font-weight:800; font-size:13px; text-align:center; padding:6px; margin-top:10px; border-radius:4px;">Comparison: {comp_factor}</div>"""
+                            ath_card_html = f"""<div style="background:#4895DB; color:white; font-weight:900; font-size:18px; text-align:center; padding:8px 10px; border-radius:6px 6px 0 0;">{sel_cmj_ath}</div><div style="border:1px solid #E2E8F0; border-top:none; border-radius:0 0 6px 6px; padding:16px; background:white; display:flex; align-items:center; gap:16px;"><img src="{photo_val}" style="width:95px; height:95px; border-radius:8px; object-fit:contain; border:2px solid #FF8200;"><div style="font-size:14px; line-height:1.8; color:#1D1D1F;"><b>Position:</b> {pos_val}</div></div>"""
                             st.markdown(ath_card_html, unsafe_allow_html=True)
+                            comp_factor = st.selectbox("Comparison Factor", ["Individual", "Team", "Position"], key="cmj_dash_comp_sel")
 
                         with top_col2:
                             table_rows_str = ""
