@@ -1017,7 +1017,7 @@ if check_password():
                                         fig_p.update_layout(height=200, margin=dict(l=15, r=15, t=30, b=10), template="simple_white", xaxis=dict(type='category', title=None), yaxis=dict(visible=False))
                                         st.plotly_chart(fig_p, use_container_width=True, key=f"team_card_{name}_{sel_week}_t4")
 
-            elif sel_daily_tab == "CMJ Dashboard":
+            elif sel_daily_tab == "CMJ Performance":
                 cmj_view_modes = ["Individual Athlete", "Team CMJ Summary"]
                 if "cmj_view_mode_subtab" not in st.session_state:
                     st.session_state.cmj_view_mode_subtab = cmj_view_modes[0]
