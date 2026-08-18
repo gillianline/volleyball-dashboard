@@ -1939,49 +1939,130 @@ if check_password():
                 hip_p = raw_hip_df[raw_hip_df['Name'] == selected_overall_athlete]
                 sh_p = raw_shoulder_df[raw_shoulder_df['Name'] == selected_overall_athlete]
 
-                max_cmj_h = cmj_p[cmj_col].max() if not cmj_p.empty and cmj_col in cmj_p.columns else 0.0
-                max_rsi_val = cmj_p[rsi_col].max() if not cmj_p.empty and rsi_col in cmj_p.columns else 0.0
-                max_ash_l = ash_p['Peak Vertical Force [N] (L)'].max() if not ash_p.empty and 'Peak Vertical Force [N] (L)' in ash_p.columns else 0.0
-                max_ash_r = ash_p['Peak Vertical Force [N] (R)'].max() if not ash_p.empty and 'Peak Vertical Force [N] (R)' in ash_p.columns else 0.0
-                max_er_l = er_p['L Max ROM (°)'].max() if not er_p.empty and 'L Max ROM (°)' in er_p.columns else 0.0
-                max_er_r = er_p['R Max ROM (°)'].max() if not er_p.empty and 'R Max ROM (°)' in er_p.columns else 0.0
-                max_calf_l = calf_p['Peak Vertical Force [N] (L)'].max() if not calf_p.empty and 'Peak Vertical Force [N] (L)' in calf_p.columns else 0.0
-                max_calf_r = calf_p['Peak Vertical Force [N] (R)'].max() if not calf_p.empty and 'Peak Vertical Force [N] (R)' in calf_p.columns else 0.0
+                # --- Metric Extractions & Associated Dates ---
+                # CMJ Height
+                if not cmj_p.empty and cmj_col in cmj_p.columns and cmj_p[cmj_col].notna().any():
+                    cmj_h_row = cmj_p.loc[cmj_p[cmj_col].idxmax()]
+                    max_cmj_h = cmj_h_row[cmj_col]
+                    date_cmj_h = cmj_h_row['Test Date'].strftime('%Y-%m-%d') if pd.notna(cmj_h_row['Test Date']) else "N/A"
+                else:
+                    max_cmj_h, date_cmj_h = 0.0, "N/A"
 
+                # CMJ RSI-mod
+                if not cmj_p.empty and rsi_col in cmj_p.columns and cmj_p[rsi_col].notna().any():
+                    cmj_rsi_row = cmj_p.loc[cmj_p[rsi_col].idxmax()]
+                    max_rsi_val = cmj_rsi_row[rsi_col]
+                    date_cmj_rsi = cmj_rsi_row['Test Date'].strftime('%Y-%m-%d') if pd.notna(cmj_rsi_row['Test Date']) else "N/A"
+                else:
+                    max_rsi_val, date_cmj_rsi = 0.0, "N/A"
+
+                # ASH Shoulder (ISO-I)
+                ash_i_p = ash_p[ash_p['Isometric Type'].astype(str).str.contains('I', case=False, na=False)] if not ash_p.empty and 'Isometric Type' in ash_p.columns else ash_p
+                if not ash_i_p.empty and ('Peak Vertical Force [N] (L)' in ash_i_p.columns or 'Peak Vertical Force [N] (R)' in ash_i_p.columns):
+                    ash_i_p_calc = ash_i_p.copy()
+                    ash_i_p_calc['Combined_Peak'] = ash_i_p_calc[['Peak Vertical Force [N] (L)', 'Peak Vertical Force [N] (R)']].max(axis=1)
+                    ash_row = ash_i_p_calc.loc[ash_i_p_calc['Combined_Peak'].idxmax()]
+                    max_ash_l = ash_row.get('Peak Vertical Force [N] (L)', 0.0)
+                    max_ash_r = ash_row.get('Peak Vertical Force [N] (R)', 0.0)
+                    date_ash = ash_row['Test Date'].strftime('%Y-%m-%d') if pd.notna(ash_row['Test Date']) else "N/A"
+                else:
+                    max_ash_l, max_ash_r, date_ash = 0.0, 0.0, "N/A"
+
+                # External Rotation ROM
+                if not er_p.empty and ('L Max ROM (°)' in er_p.columns or 'R Max ROM (°)' in er_p.columns):
+                    er_p_calc = er_p.copy()
+                    er_p_calc['Combined_Peak'] = er_p_calc[['L Max ROM (°)', 'R Max ROM (°)']].max(axis=1)
+                    er_row = er_p_calc.loc[er_p_calc['Combined_Peak'].idxmax()]
+                    max_er_l = er_row.get('L Max ROM (°)', 0.0)
+                    max_er_r = er_row.get('R Max ROM (°)', 0.0)
+                    date_er = er_row['Test Date'].strftime('%Y-%m-%d') if pd.notna(er_row['Test Date']) else "N/A"
+                else:
+                    max_er_l, max_er_r, date_er = 0.0, 0.0, "N/A"
+
+                # Calf Raise
+                if not calf_p.empty and ('Peak Vertical Force [N] (L)' in calf_p.columns or 'Peak Vertical Force [N] (R)' in calf_p.columns):
+                    calf_p_calc = calf_p.copy()
+                    calf_p_calc['Combined_Peak'] = calf_p_calc[['Peak Vertical Force [N] (L)', 'Peak Vertical Force [N] (R)']].max(axis=1)
+                    calf_row = calf_p_calc.loc[calf_p_calc['Combined_Peak'].idxmax()]
+                    max_calf_l = calf_row.get('Peak Vertical Force [N] (L)', 0.0)
+                    max_calf_r = calf_row.get('Peak Vertical Force [N] (R)', 0.0)
+                    date_calf = calf_row['Test Date'].strftime('%Y-%m-%d') if pd.notna(calf_row['Test Date']) else "N/A"
+                else:
+                    max_calf_l, max_calf_r, date_calf = 0.0, 0.0, "N/A"
+
+                # Hip Adduction
                 hip_ad_p = hip_p[hip_p['Direction'].astype(str).str.contains('AD', case=False, na=False)] if not hip_p.empty and 'Direction' in hip_p.columns else pd.DataFrame()
+                if not hip_ad_p.empty:
+                    hip_ad_calc = hip_ad_p.copy()
+                    hip_ad_calc['Combined_Peak'] = hip_ad_calc[['L Max Force (N)', 'R Max Force (N)']].max(axis=1)
+                    ad_row = hip_ad_calc.loc[hip_ad_calc['Combined_Peak'].idxmax()]
+                    max_hip_ad_l = ad_row.get('L Max Force (N)', 0.0)
+                    max_hip_ad_r = ad_row.get('R Max Force (N)', 0.0)
+                    date_hip_ad = ad_row['Test Date'].strftime('%Y-%m-%d') if pd.notna(ad_row['Test Date']) else "N/A"
+                else:
+                    max_hip_ad_l, max_hip_ad_r, date_hip_ad = 0.0, 0.0, "N/A"
+
+                # Hip Abduction
                 hip_ab_p = hip_p[hip_p['Direction'].astype(str).str.contains('AB', case=False, na=False)] if not hip_p.empty and 'Direction' in hip_p.columns else pd.DataFrame()
-                max_hip_ad = max(hip_ad_p['L Max Force (N)'].max() if 'L Max Force (N)' in hip_ad_p.columns else 0.0, hip_ad_p['R Max Force (N)'].max() if 'R Max Force (N)' in hip_ad_p.columns else 0.0) if not hip_ad_p.empty else 0.0
-                max_hip_ab = max(hip_ab_p['L Max Force (N)'].max() if 'L Max Force (N)' in hip_ab_p.columns else 0.0, hip_ab_p['R Max Force (N)'].max() if 'R Max Force (N)' in hip_ab_p.columns else 0.0) if not hip_ab_p.empty else 0.0
+                if not hip_ab_p.empty:
+                    hip_ab_calc = hip_ab_p.copy()
+                    hip_ab_calc['Combined_Peak'] = hip_ab_calc[['L Max Force (N)', 'R Max Force (N)']].max(axis=1)
+                    ab_row = hip_ab_calc.loc[hip_ab_calc['Combined_Peak'].idxmax()]
+                    max_hip_ab_l = ab_row.get('L Max Force (N)', 0.0)
+                    max_hip_ab_r = ab_row.get('R Max Force (N)', 0.0)
+                    date_hip_ab = ab_row['Test Date'].strftime('%Y-%m-%d') if pd.notna(ab_row['Test Date']) else "N/A"
+                else:
+                    max_hip_ab_l, max_hip_ab_r, date_hip_ab = 0.0, 0.0, "N/A"
 
+                # Shoulder IR
                 sh_ir_p = sh_p[sh_p['Direction'].astype(str).str.contains('Internal|IR', case=False, na=False)] if not sh_p.empty and 'Direction' in sh_p.columns else pd.DataFrame()
-                sh_er_p = sh_p[sh_p['Direction'].astype(str).str.contains('External|ER', case=False, na=False)] if not sh_p.empty and 'Direction' in sh_p.columns else pd.DataFrame()
-                max_sh_ir = max(sh_ir_p['L Max Force (N)'].max() if 'L Max Force (N)' in sh_ir_p.columns else 0.0, sh_ir_p['R Max Force (N)'].max() if 'R Max Force (N)' in sh_ir_p.columns else 0.0) if not sh_ir_p.empty else 0.0
-                max_sh_er = max(sh_er_p['L Max Force (N)'].max() if 'L Max Force (N)' in sh_ir_p.columns else 0.0, sh_er_p['R Max Force (N)'].max() if 'R Max Force (N)' in sh_ir_p.columns else 0.0) if not sh_ir_p.empty else 0.0
+                if not sh_ir_p.empty:
+                    sh_ir_calc = sh_ir_p.copy()
+                    sh_ir_calc['Combined_Peak'] = sh_ir_calc[['L Max Force (N)', 'R Max Force (N)']].max(axis=1)
+                    ir_row = sh_ir_calc.loc[sh_ir_calc['Combined_Peak'].idxmax()]
+                    max_sh_ir_l = ir_row.get('L Max Force (N)', 0.0)
+                    max_sh_ir_r = ir_row.get('R Max Force (N)', 0.0)
+                    date_sh_ir = ir_row['Test Date'].strftime('%Y-%m-%d') if pd.notna(ir_row['Test Date']) else "N/A"
+                else:
+                    max_sh_ir_l, max_sh_ir_r, date_sh_ir = 0.0, 0.0, "N/A"
 
+                # Shoulder ER
+                sh_er_p = sh_p[sh_p['Direction'].astype(str).str.contains('External|ER', case=False, na=False)] if not sh_p.empty and 'Direction' in sh_p.columns else pd.DataFrame()
+                if not sh_er_p.empty:
+                    sh_er_calc = sh_er_p.copy()
+                    sh_er_calc['Combined_Peak'] = sh_er_calc[['L Max Force (N)', 'R Max Force (N)']].max(axis=1)
+                    er_sh_row = sh_er_calc.loc[sh_er_calc['Combined_Peak'].idxmax()]
+                    max_sh_er_l = er_sh_row.get('L Max Force (N)', 0.0)
+                    max_sh_er_r = er_sh_row.get('R Max Force (N)', 0.0)
+                    date_sh_er = er_sh_row['Test Date'].strftime('%Y-%m-%d') if pd.notna(er_sh_row['Test Date']) else "N/A"
+                else:
+                    max_sh_er_l, max_sh_er_r, date_sh_er = 0.0, 0.0, "N/A"
+
+                # KPI Metrics Cards
                 m_c1, m_c2, m_c3, m_c4, m_c5, m_c6 = st.columns(6)
                 m_c1.metric("Peak CMJ", f"{max_cmj_h:.1f}")
                 m_c2.metric("Peak RSI", f"{max_rsi_val:.2f}")
                 m_c3.metric("Peak ASH (L/R)", f"{max_ash_l:.0f} / {max_ash_r:.0f} N")
                 m_c4.metric("Peak ER ROM", f"{max(max_er_l, max_er_r):.1f}°")
                 m_c5.metric("Peak Calf Raise", f"{max(max_calf_l, max_calf_r):.0f} N")
-                m_c6.metric("Hip AD / AB", f"{max_hip_ad:.0f} / {max_hip_ab:.0f} N")
+                m_c6.metric("Hip AD / AB", f"{max(max_hip_ad_l, max_hip_ad_r):.0f} / {max(max_hip_ab_l, max_hip_ab_r):.0f} N")
 
                 st.markdown("<br>", unsafe_allow_html=True)
                 st.markdown("#### Comprehensive Peak Performance Matrix")
                 
                 ov_summary_data = [
-                    {"Test Domain": "Countermovement Jump", "Key Metric": "Max Height", "Peak Value": f"{max_cmj_h:.1f}"},
-                    {"Test Domain": "Countermovement Jump", "Key Metric": "Max RSI-Mod", "Peak Value": f"{max_rsi_val:.2f}"},
-                    {"Test Domain": "ASH Shoulder (Iso-I)", "Key Metric": "Peak Force (L / R)", "Peak Value": f"{max_ash_l:.0f} N / {max_ash_r:.0f} N"},
-                    {"Test Domain": "External Rotation", "Key Metric": "Max ROM (L / R)", "Peak Value": f"{max_er_l:.1f}° / {max_er_r:.1f}°"},
-                    {"Test Domain": "Single Leg Calf Raise", "Key Metric": "Peak Force (L / R)", "Peak Value": f"{max_calf_l:.0f} N / {max_calf_r:.0f} N"},
-                    {"Test Domain": "Hip Strength", "Key Metric": "Adduction (AD)", "Peak Value": f"{max_hip_ad:.1f} N"},
-                    {"Test Domain": "Hip Strength", "Key Metric": "Abduction (AB)", "Peak Value": f"{max_hip_ab:.1f} N"},
-                    {"Test Domain": "Shoulder Strength", "Key Metric": "Internal Rotation (IR)", "Peak Value": f"{max_sh_ir:.1f} N"},
-                    {"Test Domain": "Shoulder Strength", "Key Metric": "External Rotation (ER)", "Peak Value": f"{max_sh_er:.1f} N"},
+                    {"ASSESSMENT": "Countermovement Jump (Max Height)", "PEAK VALUE": f"{max_cmj_h:.1f}", "DATE": date_cmj_h},
+                    {"ASSESSMENT": "Countermovement Jump (Max RSI-Mod)", "PEAK VALUE": f"{max_rsi_val:.2f}", "DATE": date_cmj_rsi},
+                    {"ASSESSMENT": "ASH Shoulder (ISO-I) (L/R)", "PEAK VALUE": f"{max_ash_l:.1f} N / {max_ash_r:.1f} N", "DATE": date_ash},
+                    {"ASSESSMENT": "External Rotation ROM (L/R)", "PEAK VALUE": f"{max_er_l:.1f}° / {max_er_r:.1f}°", "DATE": date_er},
+                    {"ASSESSMENT": "Single Leg Calf Raise (L/R)", "PEAK VALUE": f"{max_calf_l:.1f} N / {max_calf_r:.1f} N", "DATE": date_calf},
+                    {"ASSESSMENT": "Hip Adduction (L/R)", "PEAK VALUE": f"{max_hip_ad_l:.1f} N / {max_hip_ad_r:.1f} N", "DATE": date_hip_ad},
+                    {"ASSESSMENT": "Hip Abduction (L/R)", "PEAK VALUE": f"{max_hip_ab_l:.1f} N / {max_hip_ab_r:.1f} N", "DATE": date_hip_ab},
+                    {"ASSESSMENT": "Shoulder Internal Rotation (L/R)", "PEAK VALUE": f"{max_sh_ir_l:.1f} N / {max_sh_ir_r:.1f} N", "DATE": date_sh_ir},
+                    {"ASSESSMENT": "Shoulder External Rotation (L/R)", "PEAK VALUE": f"{max_sh_er_l:.1f} N / {max_sh_er_r:.1f} N", "DATE": date_sh_er}
                 ]
                 st.dataframe(pd.DataFrame(ov_summary_data), use_container_width=True, hide_index=True)
-
+                
             elif sel_test_tab == "Season Comparison":
                 st.markdown("### Multi-Season Testing Performance Comparison")
                 c_comp_ath, _ = st.columns([2, 2])
