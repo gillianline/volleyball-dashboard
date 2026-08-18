@@ -580,7 +580,7 @@ if check_password():
         # --- HUB 1: DAILY MONITORING & WELLNESS ----------------------------------
         # =========================================================================
         if selected_hub == "Daily Monitoring & Wellness":
-            daily_subtabs = ["Individual Profile", "Practice Scores", "Daily Combined Scores", "Practice History", "CMJ Dashboard"]
+            daily_subtabs = ["Individual Profile", "Practice Scores", "Daily Combined Scores", "Practice History", "CMJ Performance"]
             if selected_season == "Summer":
                 daily_subtabs.append("Spring Max vs Daily Combined")
 
