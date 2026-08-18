@@ -232,12 +232,23 @@ def load_all_data():
 
     def assign_season(date_val):
         if pd.isna(date_val): return 'Spring'
+        y = date_val.year
         m = date_val.month
         d = date_val.day
-        if (m == 7 and d >= 28) or (m >= 8 and m <= 12): return 'Pre-Season'
-        elif 1 <= m <= 4: return 'Spring'
-        elif (m == 5 and d >= 20) or (m >= 5 and m <= 7): return 'Summer'
-        else: return 'Spring'
+        
+        # Isolate historical data (2025 and earlier) so it does not mix with the 2026 season tabs
+        if y < 2026:
+            return f"Historical {y}"
+            
+        # 2026 Active Season Boundaries
+        if (m == 7 and d >= 28) or (m >= 8 and m <= 12):
+            return 'Pre-Season'
+        elif 1 <= m <= 4:
+            return 'Spring'
+        elif (m == 5 and d >= 20) or (m >= 5 and m <= 7):
+            return 'Summer'
+        else:
+            return 'Spring'
 
     def clean_name_col(df_in):
         if 'Athlete' in df_in.columns and 'Name' not in df_in.columns:
