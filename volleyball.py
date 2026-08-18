@@ -1097,7 +1097,7 @@ if check_password():
                             st.plotly_chart(fig_gauge, use_container_width=True, config=LOCKED_CONFIG, key="cmj_wellness_gauge_ind")
 
                         st.markdown("<br>", unsafe_allow_html=True)
-                        st.markdown(f'<div class="section-header">Countermovement Jump Performance Standards ({comp_factor})</div>', unsafe_allow_html=True)
+                        st.markdown(f'<div class="section-header">Countermovement Jump Performance Standards </div>', unsafe_allow_html=True)
                         chart_col, legend_col = st.columns([4.2, 1.1])
 
                         with chart_col:
