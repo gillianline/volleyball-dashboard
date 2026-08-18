@@ -1032,8 +1032,9 @@ if check_password():
                     if ath_cmj_all.empty:
                         st.info(f"No CMJ records found for {sel_cmj_ath}.")
                     else:
-                        valid_dates = ath_cmj_all['Test Date'].dropna().dt.strftime('%m/%d/%y').tolist()
-                        with c_cmj_date: sel_test_date_str = st.selectbox("Test Date", valid_dates, index=len(valid_dates)-1, key="cmj_dash_date_sel")
+                        # Sorted reverse=True so the list begins with the most recent date
+                        valid_dates = ath_cmj_all['Test Date'].dropna().sort_values(ascending=False).dt.strftime('%m/%d/%y').unique().tolist()
+                        with c_cmj_date: sel_test_date_str = st.selectbox("Test Date", valid_dates, index=0, key="cmj_dash_date_sel")
 
                         cur_idx_list = ath_cmj_all[ath_cmj_all['Test Date'].dt.strftime('%m/%d/%y') == sel_test_date_str].index.tolist()
                         cur_test_row = ath_cmj_all.loc[cur_idx_list[-1]]
@@ -1177,7 +1178,8 @@ if check_password():
 
                 elif sel_cmj_mode == "Team CMJ Summary":
                     st.markdown("### Team Wellness Score Overview")
-                    team_cmj_dates = sorted(raw_cmj_df['Test Date'].dropna().dt.strftime('%m/%d/%y').unique().tolist(), reverse=True)
+                    # Dates parsed to datetime, sorted descending, and formatted
+                    team_cmj_dates = pd.to_datetime(raw_cmj_df['Test Date'].dropna().unique()).sort_values(ascending=False).strftime('%m/%d/%y').tolist()
                     
                     c_sum_d1, c_sum_d2 = st.columns([1.5, 2])
                     with c_sum_d1: sel_team_cmj_date = st.selectbox("Evaluation Test Date", team_cmj_dates, index=0, key="team_cmj_eval_date")
