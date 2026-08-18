@@ -234,19 +234,25 @@ def load_all_data():
         if pd.isna(date_val): return 'Spring'
         m = date_val.month
         d = date_val.day
-        y = date_val.year
-    
-        if y == 2026 and m == 7 and d >= 30: return 'Pre-Season'
-        elif y == 2026 and m >= 8: return 'Pre-Season'
+        # Universal seasonal calendar across all testing years
+        if (m == 7 and d >= 28) or (m >= 8 and m <= 12): return 'Pre-Season'
         elif 1 <= m <= 4: return 'Spring'
-        elif m == 5 and d >= 26: return 'Summer'
-        elif m >= 5 and m <= 7: return 'Summer'
+        elif (m == 5 and d >= 20) or (m >= 5 and m <= 7): return 'Summer'
         else: return 'Spring'
+
+    def clean_athlete_names(df_in):
+        if 'Athlete' in df_in.columns:
+            df_in.rename(columns={'Athlete': 'Name'}, inplace=True)
+        if 'Name' in df_in.columns:
+            df_in['Name'] = df_in['Name'].astype(str).str.strip()
+        if 'Date' in df_in.columns and 'Test Date' not in df_in.columns:
+            df_in.rename(columns={'Date': 'Test Date'}, inplace=True)
+        return df_in
 
     df = pd.read_csv(st.secrets["GOOGLE_SHEET_URL"])
     match_df = pd.read_csv(st.secrets["MATCHES_SHEET_URL"])
     
-    df = heavy_sanitize(df)
+    df = heavy_sanitize(clean_athlete_names(df))
     df['Sheet_Order'] = range(len(df))
     df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
     if 'Week' in df.columns:
@@ -257,7 +263,7 @@ def load_all_data():
     df['Session_Type'] = df['Activity'].apply(lambda x: 'Game' if any(w in str(x).lower() for w in ['game', 'match', 'v.']) else 'Practice')
     df['Season'] = df['Date'].apply(assign_season)
 
-    match_df = heavy_sanitize(match_df)
+    match_df = heavy_sanitize(clean_athlete_names(match_df))
     match_df['Sheet_Order'] = range(len(match_df))
     match_df['Date'] = pd.to_datetime(match_df['Date'], errors='coerce')
     if 'Week' in match_df.columns:
@@ -270,8 +276,7 @@ def load_all_data():
 
     cmj_df = pd.read_csv(st.secrets["CMJ_SHEET_URL"])
     cmj_df.columns = cmj_df.columns.str.strip()
-    if 'Athlete' in cmj_df.columns:
-        cmj_df.rename(columns={'Athlete': 'Name'}, inplace=True)
+    cmj_df = clean_athlete_names(cmj_df)
     cmj_df['Test Date'] = pd.to_datetime(cmj_df['Test Date'], errors='coerce')
     if 'Week' in cmj_df.columns:
         cmj_df['Week'] = pd.to_numeric(cmj_df['Week'].astype(str).str.extract(r'(\d+)', expand=False), errors='coerce').fillna(0).astype(int)
@@ -298,7 +303,7 @@ def load_all_data():
     try:
         ash_df = pd.read_csv(st.secrets["ASH_SHEET_URL"])
         ash_df.columns = ash_df.columns.str.strip()
-        ash_df.rename(columns={'Athlete': 'Name', 'Date': 'Test Date'}, inplace=True)
+        ash_df = clean_athlete_names(ash_df)
         ash_df['Test Date'] = pd.to_datetime(ash_df['Test Date'], errors='coerce')
         for col in ['Peak Vertical Force [N] (L)', 'Peak Vertical Force [N] (R)', 'Peak Vertical Force [N] (Asym)(%)']:
             if col in ash_df.columns:
@@ -311,7 +316,7 @@ def load_all_data():
     try:
         er_df = pd.read_csv(st.secrets["ER_SHEET_URL"])
         er_df.columns = er_df.columns.str.strip()
-        er_df.rename(columns={'Athlete': 'Name', 'Date': 'Test Date'}, inplace=True)
+        er_df = clean_athlete_names(er_df)
         er_df['Test Date'] = pd.to_datetime(er_df['Test Date'], errors='coerce')
         for col in ['L Max ROM (°)', 'R Max ROM (°)', 'ROM Asymmetry (%)']:
             if col in er_df.columns:
@@ -324,8 +329,11 @@ def load_all_data():
     try:
         calf_df = pd.read_csv(st.secrets["CALF_SHEET_URL"])
         calf_df.columns = calf_df.columns.str.strip()
-        calf_df.rename(columns={'Athlete': 'Name', 'Date': 'Test Date'}, inplace=True)
+        calf_df = clean_athlete_names(calf_df)
         calf_df['Test Date'] = pd.to_datetime(calf_df['Test Date'], errors='coerce')
+        for col in ['Peak Vertical Force [N] (L)', 'Peak Vertical Force [N] (R)', 'Peak Vertical Force / BM [N/kg] (L)']:
+            if col in calf_df.columns:
+                calf_df[col] = pd.to_numeric(calf_df[col].astype(str).str.replace(r'[^0-9.-]', '', regex=True), errors='coerce').fillna(0.0)
         calf_df['Season'] = calf_df['Test Date'].apply(assign_season)
     except:
         calf_df = pd.DataFrame(columns=['Name', 'Test Date', 'Season'])
@@ -334,8 +342,11 @@ def load_all_data():
     try:
         hip_df = pd.read_csv(st.secrets["HIP_SHEET_URL"])
         hip_df.columns = hip_df.columns.str.strip()
-        hip_df.rename(columns={'Athlete': 'Name', 'Date': 'Test Date'}, inplace=True)
+        hip_df = clean_athlete_names(hip_df)
         hip_df['Test Date'] = pd.to_datetime(hip_df['Test Date'], errors='coerce')
+        for col in ['L Max Force (N)', 'R Max Force (N)']:
+            if col in hip_df.columns:
+                hip_df[col] = pd.to_numeric(hip_df[col].astype(str).str.replace(r'[^0-9.-]', '', regex=True), errors='coerce').fillna(0.0)
         hip_df['Season'] = hip_df['Test Date'].apply(assign_season)
     except:
         hip_df = pd.DataFrame(columns=['Name', 'Test Date', 'Season'])
@@ -344,14 +355,17 @@ def load_all_data():
     try:
         shoulder_df = pd.read_csv(st.secrets["SHOULDER_SHEET_URL"])
         shoulder_df.columns = shoulder_df.columns.str.strip()
-        shoulder_df.rename(columns={'Athlete': 'Name', 'Date': 'Test Date'}, inplace=True)
+        shoulder_df = clean_athlete_names(shoulder_df)
         shoulder_df['Test Date'] = pd.to_datetime(shoulder_df['Test Date'], errors='coerce')
+        for col in ['L Max Force (N)', 'R Max Force (N)']:
+            if col in shoulder_df.columns:
+                shoulder_df[col] = pd.to_numeric(shoulder_df[col].astype(str).str.replace(r'[^0-9.-]', '', regex=True), errors='coerce').fillna(0.0)
         shoulder_df['Season'] = shoulder_df['Test Date'].apply(assign_season)
     except:
         shoulder_df = pd.DataFrame(columns=['Name', 'Test Date', 'Season'])
 
     phase_df = pd.read_csv(st.secrets["PHASES_SHEET_URL"])
-    phase_df = heavy_sanitize(phase_df)
+    phase_df = heavy_sanitize(clean_athlete_names(phase_df))
     if 'Phases' in phase_df.columns: phase_df = phase_df.rename(columns={'Phases': 'Phase'})
     phase_df['Date'] = pd.to_datetime(phase_df['Date'], errors='coerce')
 
@@ -508,10 +522,13 @@ if check_password():
         rsi_col = 'RSI-modified [m/s]'
 
         master_athlete_list = sorted(list(
-            set(raw_df['Name'].unique()) | 
-            set(raw_cmj_df['Name'].unique()) | 
-            set(raw_ash_df['Name'].unique()) | 
-            set(raw_er_df['Name'].unique())
+            set(raw_df['Name'].dropna().unique()) | 
+            set(raw_cmj_df['Name'].dropna().unique()) | 
+            set(raw_ash_df['Name'].dropna().unique()) | 
+            set(raw_er_df['Name'].dropna().unique()) |
+            set(raw_calf_df['Name'].dropna().unique()) |
+            set(raw_hip_df['Name'].dropna().unique()) |
+            set(raw_shoulder_df['Name'].dropna().unique())
         ))
 
         st.markdown('<div class="main-logo-container" style="text-align: center; margin-top: 10px; margin-bottom: 15px;"><img src="https://upload.wikimedia.org/wikipedia/commons/thumb/f/fc/Tennessee_Lady_Volunteers_logo.svg/1280px-Tennessee_Lady_Volunteers_logo.svg.png" width="120"><div style="color: #FF8200; font-size: 2rem; font-weight: 900; margin-top: 10px;">LADY VOLS VOLLEYBALL PERFORMANCE</div></div>', unsafe_allow_html=True)
@@ -1724,42 +1741,350 @@ if check_password():
                     else:
                         st.info(f"No Countermovement Jump testing records logged on {sel_team_cmj_date}.")
 
-            elif sel_test_tab == "Position Analysis":
-                df_t7 = df_master.copy()
-                st.markdown('<div class="section-header">Positional Performance Trends</div>', unsafe_allow_html=True)
-                pos_filter_an = st.selectbox("Select Position to Analyze", sorted([p for p in df_t7['Position'].unique() if p != "N/A"]), key="pos_an_filt_main_t7")
-                max_wk = df_t7['Week'].max()
-                rec_4 = list(range(max(0, int(max_wk) - 3), int(max_wk) + 1))
-                tr_df = df_t7[(df_t7['Week'].isin(rec_4)) & (df_t7['Position'] == pos_filter_an)]
-                players_in_pos = sorted(tr_df['Name'].unique())
+            elif sel_test_tab == "Intake Testing":
+                st.markdown("<h3 style='color:#1D1D1F; font-weight:900; text-transform:uppercase;'>Athlete Intake Assessment</h3>", unsafe_allow_html=True)
+                c_int_ath, _ = st.columns([2, 2])
+                with c_int_ath: selected_intake_athlete = st.selectbox("Select Athlete for Intake Assessment", master_athlete_list, key="intake_ath_select")
+
+                calf_ath = raw_calf_df[raw_calf_df['Name'] == selected_intake_athlete].sort_values('Test Date')
+                hip_ath = raw_hip_df[raw_hip_df['Name'] == selected_intake_athlete].sort_values('Test Date')
+                sh_ath = raw_shoulder_df[raw_shoulder_df['Name'] == selected_intake_athlete].sort_values('Test Date')
+                isoy_ath = raw_ash_df[(raw_ash_df['Name'] == selected_intake_athlete) & (raw_ash_df['Isometric Type'].astype(str).str.contains('ISO-Y|Y', case=False, na=False))].sort_values('Test Date')
+
+                has_data = not (calf_ath.empty and hip_ath.empty and sh_ath.empty and isoy_ath.empty)
+                if has_data:
+                    def render_val_with_arrow(current, initial, fmt="{:.1f}", unit=""):
+                        if initial == 0: return f"{fmt.format(current)}{unit}"
+                        diff = current - initial
+                        pct = (diff / initial) * 100
+                        arrow = "↑" if diff >= 0 else "↓"
+                        color = "#28a745" if diff >= 0 else "#dc3545"
+                        return f"{fmt.format(current)}{unit} <span style='color:{color}; font-size:11px; font-weight:bold;'>({arrow}{abs(pct):.1f}%)</span>"
+
+                    hud_col1, hud_col2 = st.columns([1.2, 1.8])
+                    with hud_col1:
+                        hud_html = """
+                        <!DOCTYPE html>
+                        <html>
+                        <head>
+                        <style>
+                            body { margin: 0; padding: 0; background-color: transparent; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+                            .hud-dashboard-card { background: #FFFFFF; border-radius: 16px; padding: 16px; border: 1px solid #E5E5E7; box-shadow: 0 4px 12px rgba(0,0,0,0.03); }
+                            .hud-header-title { color: #1D1D1F; font-weight: 800; font-size: 13px; letter-spacing: 1px; text-transform: uppercase; border-bottom: 2px solid #FF8200; padding-bottom: 6px; margin-bottom: 12px; }
+                            .hud-body-viewport { position: relative; width: 100%; height: 380px; background: #FAFDFD; border-radius: 12px; border: 1px solid #D5E5E8; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+                            svg { width: 100%; height: 100%; }
+                        </style>
+                        </head>
+                        <body>
+                            <div class="hud-dashboard-card">
+                                <div class="hud-header-title">Anatomy Location Map</div>
+                                <div class="hud-body-viewport">
+                                    <svg viewBox="0 0 140 220" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">
+                                        <defs>
+                                            <linearGradient id="anatomicalBodyGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                                                <stop offset="0%" stop-color="#C5CACC" />
+                                                <stop offset="25%" stop-color="#E8ECEE" />
+                                                <stop offset="50%" stop-color="#F2F5F7" />
+                                                <stop offset="75%" stop-color="#D0D5D8" />
+                                                <stop offset="100%" stop-color="#9AA0A6" />
+                                            </linearGradient>
+                                        </defs>
+                                        <ellipse cx="68" cy="214" rx="20" ry="3.5" fill="#000000" opacity="0.12" />
+                                        <g stroke="#2C3036" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
+                                            <ellipse cx="68" cy="17" rx="7" ry="9" fill="url(#anatomicalBodyGrad)" />
+                                            <path d="M 65 25 L 63 33 M 71 25 L 73 33" stroke-width="1.2" />
+                                            <path d="M 63 33 C 58 33, 48 36, 42 40 C 37 43, 36 50, 39 56 L 43 56 C 47 52, 49 46, 52 44 M 73 33 C 78 33, 88 36, 94 40 C 99 43, 100 50, 97 56 L 93 56 C 89 52, 87 46, 84 44" fill="url(#anatomicalBodyGrad)" />
+                                            <path d="M 42 40 C 37 43, 35 52, 33 64 C 31 74, 29 82, 27 92 C 25 96, 23 100, 22 104 C 21 106, 23 107, 25 106 C 27 104, 28 98, 30 92 C 33 82, 36 74, 38 64 C 40 54, 42 48, 43 56 Z" fill="url(#anatomicalBodyGrad)" />
+                                            <path d="M 22 104 C 20 106, 18 108, 17 110 M 23 105 C 21 108, 20 110, 19 112 M 24 105 C 23 108, 22 110, 21 112 M 25 104 C 25 107, 24 109, 23 111" fill="none" stroke-width="0.8" />
+                                            <path d="M 94 40 C 99 43, 101 52, 103 64 C 105 74, 107 82, 109 92 C 111 96, 113 100, 114 104 C 115 106, 113 107, 111 106 C 109 104, 108 98, 106 92 C 103 82, 100 74, 98 64 C 96 54, 94 48, 93 56 Z" fill="url(#anatomicalBodyGrad)" />
+                                            <path d="M 114 104 C 116 106, 118 108, 119 110 M 113 105 C 115 108, 116 110, 117 112 M 112 105 C 113 108, 114 110, 115 112 M 111 104 C 111 107, 112 109, 113 111" fill="none" stroke-width="0.8" />
+                                            <path d="M 52 44 L 54 75 L 52 92 L 68 106 L 84 92 L 82 75 L 84 44 Z" fill="url(#anatomicalBodyGrad)" />
+                                            <path d="M 52 92 C 50 105, 49 122, 53 138 C 55 144, 55 152, 54 162 C 52 175, 52 192, 54 205 L 48 210 L 58 210 L 59 203 C 60 190, 60 175, 60 162 C 60 152, 60 144, 62 138 C 66 122, 66 105, 68 106 Z" fill="url(#anatomicalBodyGrad)" />
+                                            <path d="M 84 92 C 86 105, 87 122, 83 138 C 81 144, 81 152, 82 162 C 84 175, 84 192, 82 205 L 88 210 L 78 210 L 77 203 C 76 190, 76 175, 76 162 C 76 152, 76 144, 74 138 C 70 122, 70 105, 68 106 Z" fill="url(#anatomicalBodyGrad)" />
+                                            <line x1="68" y1="8" x2="68" y2="211" stroke="#FF8200" stroke-width="1.3" />
+                                            <line x1="51" y1="116" x2="85" y2="116" stroke="#D32F2F" stroke-width="1.1" />
+                                            <line x1="55" y1="168" x2="81" y2="168" stroke="#D32F2F" stroke-width="1.1" />
+                                            <g stroke="#3A3F46" stroke-width="0.9" fill="none">
+                                                <path d="M 68 35 C 60 34, 52 37, 46 40 M 68 35 C 76 34, 84 37, 90 40" stroke-width="1" />
+                                                <path d="M 52 44 C 60 43, 67 47, 68 54 C 60 56, 52 52, 52 44 Z" fill="#E2E7EC" opacity="0.6" />
+                                                <path d="M 84 44 C 76 43, 69 47, 68 54 C 76 56, 84 52, 84 44 Z" fill="#E2E7EC" opacity="0.6" />
+                                                <path d="M 58 58 C 64 57, 72 57, 78 58" />
+                                                <path d="M 58 66 C 64 65, 72 65, 78 66" />
+                                                <path d="M 59 74 C 64 73, 72 73, 77 74" />
+                                                <path d="M 39 56 C 37 62, 35 70, 33 78" stroke-width="0.75" />
+                                                <path d="M 97 56 C 99 62, 101 70, 103 78" stroke-width="0.75" />
+                                                <path d="M 52 92 C 58 98, 64 103, 68 106 M 84 92 C 78 98, 72 103, 68 106" stroke-width="1" />
+                                                <path d="M 52 96 C 49 108, 50 125, 57 138" />
+                                                <path d="M 84 96 C 87 108, 86 125, 79 138" />
+                                                <ellipse cx="57" cy="142" rx="3" ry="3.5" stroke-width="0.9" fill="#E8EDF2" />
+                                                <ellipse cx="79" cy="142" rx="3" ry="3.5" stroke-width="0.9" fill="#E8EDF2" />
+                                                <path d="M 54 150 C 51 160, 52 178, 56 195" />
+                                                <path d="M 82 150 C 85 160, 84 178, 80 195" />
+                                            </g>
+                                        </g>
+                                        <circle cx="91" cy="46" r="3.5" fill="#FF8200" stroke="#FFFFFF" stroke-width="1" />
+                                        <line x1="91" y1="46" x2="118" y2="46" stroke="#FF8200" stroke-width="1.8" stroke-dasharray="2,2" />
+                                        <rect x="112" y="39" width="14" height="14" rx="3" fill="#FF8200" />
+                                        <text x="119" y="50" font-size="9" font-weight="900" fill="#FFFFFF" text-anchor="middle">1</text>
+                                        <circle cx="68" cy="54" r="3.5" fill="#FF8200" stroke="#FFFFFF" stroke-width="1" />
+                                        <line x1="68" y1="54" x2="118" y2="68" stroke="#FF8200" stroke-width="1.8" stroke-dasharray="2,2" />
+                                        <rect x="112" y="61" width="14" height="14" rx="3" fill="#FF8200" />
+                                        <text x="119" y="72" font-size="9" font-weight="900" fill="#FFFFFF" text-anchor="middle">2</text>
+                                        <circle cx="74" cy="122" r="3.5" fill="#4895DB" stroke="#FFFFFF" stroke-width="1" />
+                                        <line x1="74" y1="122" x2="118" y2="122" stroke="#4895DB" stroke-width="1.8" stroke-dasharray="2,2" />
+                                        <rect x="112" y="115" width="14" height="14" rx="3" fill="#4895DB" />
+                                        <text x="119" y="126" font-size="9" font-weight="900" fill="#FFFFFF" text-anchor="middle">3</text>
+                                        <circle cx="53" cy="116" r="3.5" fill="#4895DB" stroke="#FFFFFF" stroke-width="1" />
+                                        <line x1="53" y1="116" x2="22" y2="116" stroke="#4895DB" stroke-width="1.8" stroke-dasharray="2,2" />
+                                        <rect x="14" y="109" width="14" height="14" rx="3" fill="#4895DB" />
+                                        <text x="21" y="120" font-size="9" font-weight="900" fill="#FFFFFF" text-anchor="middle">4</text>
+                                        <circle cx="77" cy="172" r="3.5" fill="#4895DB" stroke="#FFFFFF" stroke-width="1" />
+                                        <line x1="77" y1="172" x2="118" y2="172" stroke="#4895DB" stroke-width="1.8" stroke-dasharray="2,2" />
+                                        <rect x="112" y="165" width="14" height="14" rx="3" fill="#4895DB" />
+                                        <text x="119" y="176" font-size="9" font-weight="900" fill="#FFFFFF" text-anchor="middle">5</text>
+                                    </svg>
+                                </div>
+                            </div>
+                        </body>
+                        </html>
+                        """
+                        components.html(hud_html, height=450)
+
+                    with hud_col2:
+                        st.markdown("""
+                            <style>
+                            .hud-details-card { background: #FFFFFF; border-radius: 16px; padding: 20px; border: 1px solid #E5E5E7; box-shadow: 0 4px 12px rgba(0,0,0,0.03); }
+                            .hud-header-title-light { color: #1D1D1F; font-weight: 800; font-size: 13px; letter-spacing: 1px; text-transform: uppercase; border-bottom: 2px solid #FF8200; padding-bottom: 6px; margin-bottom: 16px; }
+                            .hud-metric-row-light { background: #F8F9FA; border-left: 4px solid #FF8200; border-radius: 8px; padding: 10px 14px; margin-bottom: 10px; color: #1D1D1F; border-top: 1px solid #E5E5E7; border-right: 1px solid #E5E5E7; border-bottom: 1px solid #E5E5E7; }
+                            .hud-metric-row-light-blue { background: #F8F9FA; border-left: 4px solid #4895DB; border-radius: 8px; padding: 10px 14px; margin-bottom: 10px; color: #1D1D1F; border-top: 1px solid #E5E5E7; border-right: 1px solid #E5E5E7; border-bottom: 1px solid #E5E5E7; }
+                            .node-badge-orange { display: inline-block; width: 20px; height: 20px; background: #FF8200; color: #FFFFFF; font-weight: 900; font-size: 11px; border-radius: 4px; text-align: center; line-height: 20px; margin-right: 8px; }
+                            .node-badge-blue { display: inline-block; width: 20px; height: 20px; background: #4895DB; color: #FFFFFF; font-weight: 900; font-size: 11px; border-radius: 4px; text-align: center; line-height: 20px; margin-right: 8px; }
+                            </style>
+                            <div class="hud-details-card">
+                                <div class="hud-header-title-light">Anatomy Location Assessment Details</div>
+                        """, unsafe_allow_html=True)
+
+                        if not sh_ath.empty:
+                            sh_ir = sh_ath[sh_ath['Direction'].astype(str).str.contains('Internal|IR', case=False, na=False)] if 'Direction' in sh_ath.columns else sh_ath
+                            sh_er = sh_ath[sh_ath['Direction'].astype(str).str.contains('External|ER', case=False, na=False)] if 'Direction' in sh_ath.columns else sh_ath
+                            
+                            ir_base = sh_ir.iloc[0] if not sh_ir.empty else pd.Series()
+                            ir_latest = sh_ir.iloc[-1] if not sh_ir.empty else pd.Series()
+                            er_base = sh_er.iloc[0] if not sh_er.empty else pd.Series()
+                            er_latest = sh_er.iloc[-1] if not sh_er.empty else pd.Series()
+
+                            ir_bL, ir_bR = ir_base.get('L Max Force (N)', 0.0), ir_base.get('R Max Force (N)', 0.0)
+                            ir_lL, ir_lR = ir_latest.get('L Max Force (N)', 0.0), ir_latest.get('R Max Force (N)', 0.0)
+                            er_bL, er_bR = er_base.get('L Max Force (N)', 0.0), er_base.get('R Max Force (N)', 0.0)
+                            er_lL, er_lR = er_latest.get('L Max Force (N)', 0.0), er_latest.get('R Max Force (N)', 0.0)
+
+                            latest_date_str = ir_latest.get('Test Date', pd.Timestamp.now()).strftime('%m/%d/%Y') if not ir_latest.empty else "N/A"
+
+                            st.markdown(f"""
+                                <div class="hud-metric-row-light">
+                                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                                        <span style="font-weight:800; font-size:12px; color:#1D1D1F;"><span class="node-badge-orange">1</span>SHOULDER IR / ER</span>
+                                        <span style="font-size:10px; color:#6E6E73; font-weight:600;">Latest: {latest_date_str}</span>
+                                    </div>
+                                    <div style="font-size:11px; line-height:1.4; color:#1D1D1F;">
+                                        <b>Internal (IR):</b> Initial L {ir_bL:.1f}N | R {ir_bR:.1f}N &nbsp;→&nbsp; <b>Latest:</b> L {render_val_with_arrow(ir_lL, ir_bL, '{:.1f}', 'N')} | R {render_val_with_arrow(ir_lR, ir_bR, '{:.1f}', 'N')}<br>
+                                        <b>External (ER):</b> Initial L {er_bL:.1f}N | R {er_bR:.1f}N &nbsp;→&nbsp; <b>Latest:</b> L {render_val_with_arrow(er_lL, er_bL, '{:.1f}', 'N')} | R {render_val_with_arrow(er_lR, er_bR, '{:.1f}', 'N')}
+                                    </div>
+                                </div>
+                            """, unsafe_allow_html=True)
+
+                        if not isoy_ath.empty:
+                            b_y, l_y = isoy_ath.iloc[0], isoy_ath.iloc[-1]
+                            byL, byR = b_y.get('Peak Vertical Force [N] (L)', 0.0), b_y.get('Peak Vertical Force [N] (R)', 0.0)
+                            lyL, lyR = l_y.get('Peak Vertical Force [N] (L)', 0.0), l_y.get('Peak Vertical Force [N] (R)', 0.0)
+
+                            st.markdown(f"""
+                                <div class="hud-metric-row-light">
+                                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                                        <span style="font-weight:800; font-size:12px; color:#1D1D1F;"><span class="node-badge-orange">2</span>ISO-Y STRENGTH</span>
+                                        <span style="font-size:10px; color:#6E6E73; font-weight:600;">Latest: {l_y['Test Date'].strftime('%m/%d/%Y')}</span>
+                                    </div>
+                                    <div style="font-size:11px; line-height:1.4; color:#1D1D1F;">
+                                        <b>Initial Force:</b> L {byL:.0f}N | R {byR:.0f}N &nbsp;→&nbsp; <b>Latest:</b> L {render_val_with_arrow(lyL, byL, '{:.0f}', 'N')} | R {render_val_with_arrow(lyR, byR, '{:.0f}', 'N')}
+                                    </div>
+                                </div>
+                            """, unsafe_allow_html=True)
+
+                        if not hip_ath.empty:
+                            hip_ad = hip_ath[hip_ath['Direction'].astype(str).str.contains('AD', case=False, na=False)] if 'Direction' in hip_ath.columns else hip_ath
+                            hip_ab = hip_ath[hip_ath['Direction'].astype(str).str.contains('AB', case=False, na=False)] if 'Direction' in hip_ath.columns else hip_ath
+
+                            if not hip_ad.empty:
+                                ad_b, ad_l = hip_ad.iloc[0], hip_ad.iloc[-1]
+                                ad_bL, ad_bR = ad_b.get('L Max Force (N)', 0.0), ad_b.get('R Max Force (N)', 0.0)
+                                ad_lL, ad_lR = ad_l.get('L Max Force (N)', 0.0), ad_l.get('R Max Force (N)', 0.0)
+
+                                st.markdown(f"""
+                                    <div class="hud-metric-row-light-blue">
+                                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                                            <span style="font-weight:800; font-size:12px; color:#1D1D1F;"><span class="node-badge-blue">3</span>HIP ADDUCTION (AD)</span>
+                                            <span style="font-size:10px; color:#6E6E73; font-weight:600;">Latest: {ad_l['Test Date'].strftime('%m/%d/%Y')}</span>
+                                        </div>
+                                        <div style="font-size:11px; line-height:1.4; color:#1D1D1F;">
+                                            <b>Initial Force:</b> L {ad_bL:.1f}N | R {ad_bR:.1f}N &nbsp;→&nbsp; <b>Latest:</b> L {render_val_with_arrow(ad_lL, ad_bL, '{:.1f}', 'N')} | R {render_val_with_arrow(ad_lR, ad_bR, '{:.1f}', 'N')}
+                                        </div>
+                                    </div>
+                                """, unsafe_allow_html=True)
+
+                            if not hip_ab.empty:
+                                ab_b, ab_l = hip_ab.iloc[0], hip_ab.iloc[-1]
+                                ab_bL, ab_bR = ab_b.get('L Max Force (N)', 0.0), ab_b.get('R Max Force (N)', 0.0)
+                                ab_lL, ab_lR = ab_l.get('L Max Force (N)', 0.0), ab_l.get('R Max Force (N)', 0.0)
+
+                                st.markdown(f"""
+                                    <div class="hud-metric-row-light-blue">
+                                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                                            <span style="font-weight:800; font-size:12px; color:#1D1D1F;"><span class="node-badge-blue">4</span>HIP ABDUCTION (AB)</span>
+                                            <span style="font-size:10px; color:#6E6E73; font-weight:600;">Latest: {ab_l['Test Date'].strftime('%m/%d/%Y')}</span>
+                                        </div>
+                                        <div style="font-size:11px; line-height:1.4; color:#1D1D1F;">
+                                            <b>Initial Force:</b> L {ab_bL:.1f}N | R {ab_bR:.1f}N &nbsp;→&nbsp; <b>Latest:</b> L {render_val_with_arrow(ab_lL, ab_bL, '{:.1f}', 'N')} | R {render_val_with_arrow(ab_lR, ab_bR, '{:.1f}', 'N')}
+                                        </div>
+                                    </div>
+                                """, unsafe_allow_html=True)
+
+                        if not calf_ath.empty:
+                            b_c, l_c = calf_ath.iloc[0], calf_ath.iloc[-1]
+                            bcL, bcR = b_c.get('Peak Vertical Force [N] (L)', 0.0), b_c.get('Peak Vertical Force [N] (R)', 0.0)
+                            lcL, lcR = l_c.get('Peak Vertical Force [N] (L)', 0.0), l_c.get('Peak Vertical Force [N] (R)', 0.0)
+                            bcL_bm = b_c.get('Peak Vertical Force / BM [N/kg] (L)', 0.0)
+
+                            st.markdown(f"""
+                                <div class="hud-metric-row-light-blue">
+                                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                                        <span style="font-weight:800; font-size:12px; color:#1D1D1F;"><span class="node-badge-blue">5</span>SINGLE LEG CALF RAISE</span>
+                                        <span style="font-size:10px; color:#6E6E73; font-weight:600;">Latest: {l_c['Test Date'].strftime('%m/%d/%Y')}</span>
+                                    </div>
+                                    <div style="font-size:11px; line-height:1.4; color:#1D1D1F;">
+                                        <b>Initial Force:</b> L {bcL:.0f}N ({bcL_bm:.2f} N/kg) | R {bcR:.0f}N &nbsp;→&nbsp; <b>Latest:</b> L {render_val_with_arrow(lcL, bcL, '{:.0f}', 'N')} | R {render_val_with_arrow(lcR, bcR, '{:.0f}', 'N')}
+                                    </div>
+                                </div>
+                            """, unsafe_allow_html=True)
+
+                        st.markdown('</div>', unsafe_allow_html=True)
+                else:
+                    st.info(f"No Intake Assessment records found for {selected_intake_athlete}.")
+
+            elif sel_test_tab == "Overall Testing Profile":
+                st.markdown("<h3 style='color:#1D1D1F; font-weight:900; text-transform:uppercase;'>Overall Athletic Testing Profile</h3>", unsafe_allow_html=True)
+                c_ov_ath, _ = st.columns([2, 2])
+                with c_ov_ath: selected_overall_athlete = st.selectbox("Select Athlete for Overall Profile", master_athlete_list, key="overall_ath_select")
+
+                meta_lookup_ov = full_df_unfiltered[full_df_unfiltered['Name'] == selected_overall_athlete]
+                photo_val_ov = meta_lookup_ov['PhotoURL'].iloc[0] if not meta_lookup_ov.empty else "https://www.w3schools.com/howto/img_avatar.png"
+                pos_val_ov = meta_lookup_ov['Position'].iloc[0] if not meta_lookup_ov.empty else "N/A"
+
+                st.markdown(f'<div style="display:flex; align-items:center; gap:20px; padding:15px; background:#f8f9fa; border-radius:15px; border-left:6px solid #FF8200; margin-bottom:20px;"><img src="{photo_val_ov}" class="gallery-photo" style="width:80px; height:80px;"><div><h2 style="margin:0; color:#1D1D1F;">{selected_overall_athlete}</h2><p style="margin:0; color:#4895DB; font-weight:700; font-size:16px;">{pos_val_ov} | Overall All-Time Max Testing Baseline</p></div></div>', unsafe_allow_html=True)
+
+                cmj_p = raw_cmj_df[raw_cmj_df['Name'] == selected_overall_athlete]
+                ash_p = raw_ash_df[raw_ash_df['Name'] == selected_overall_athlete]
+                er_p = raw_er_df[raw_er_df['Name'] == selected_overall_athlete]
+                calf_p = raw_calf_df[raw_calf_df['Name'] == selected_overall_athlete]
+                hip_p = raw_hip_df[raw_hip_df['Name'] == selected_overall_athlete]
+                sh_p = raw_shoulder_df[raw_shoulder_df['Name'] == selected_overall_athlete]
+
+                max_cmj_h = cmj_p[cmj_col].max() if not cmj_p.empty and cmj_col in cmj_p.columns else 0.0
+                max_rsi_val = cmj_p[rsi_col].max() if not cmj_p.empty and rsi_col in cmj_p.columns else 0.0
+                max_ash_l = ash_p['Peak Vertical Force [N] (L)'].max() if not ash_p.empty and 'Peak Vertical Force [N] (L)' in ash_p.columns else 0.0
+                max_ash_r = ash_p['Peak Vertical Force [N] (R)'].max() if not ash_p.empty and 'Peak Vertical Force [N] (R)' in ash_p.columns else 0.0
+                max_er_l = er_p['L Max ROM (°)'].max() if not er_p.empty and 'L Max ROM (°)' in er_p.columns else 0.0
+                max_er_r = er_p['R Max ROM (°)'].max() if not er_p.empty and 'R Max ROM (°)' in er_p.columns else 0.0
+                max_calf_l = calf_p['Peak Vertical Force [N] (L)'].max() if not calf_p.empty and 'Peak Vertical Force [N] (L)' in calf_p.columns else 0.0
+                max_calf_r = calf_p['Peak Vertical Force [N] (R)'].max() if not calf_p.empty and 'Peak Vertical Force [N] (R)' in calf_p.columns else 0.0
+
+                hip_ad_p = hip_p[hip_p['Direction'].astype(str).str.contains('AD', case=False, na=False)] if not hip_p.empty and 'Direction' in hip_p.columns else pd.DataFrame()
+                hip_ab_p = hip_p[hip_p['Direction'].astype(str).str.contains('AB', case=False, na=False)] if not hip_p.empty and 'Direction' in hip_p.columns else pd.DataFrame()
+                max_hip_ad = max(hip_ad_p['L Max Force (N)'].max() if 'L Max Force (N)' in hip_ad_p.columns else 0.0, hip_ad_p['R Max Force (N)'].max() if 'R Max Force (N)' in hip_ad_p.columns else 0.0) if not hip_ad_p.empty else 0.0
+                max_hip_ab = max(hip_ab_p['L Max Force (N)'].max() if 'L Max Force (N)' in hip_ab_p.columns else 0.0, hip_ab_p['R Max Force (N)'].max() if 'R Max Force (N)' in hip_ab_p.columns else 0.0) if not hip_ab_p.empty else 0.0
+
+                sh_ir_p = sh_p[sh_p['Direction'].astype(str).str.contains('Internal|IR', case=False, na=False)] if not sh_p.empty and 'Direction' in sh_p.columns else pd.DataFrame()
+                sh_er_p = sh_p[sh_p['Direction'].astype(str).str.contains('External|ER', case=False, na=False)] if not sh_p.empty and 'Direction' in sh_p.columns else pd.DataFrame()
+                max_sh_ir = max(sh_ir_p['L Max Force (N)'].max() if 'L Max Force (N)' in sh_ir_p.columns else 0.0, sh_ir_p['R Max Force (N)'].max() if 'R Max Force (N)' in sh_ir_p.columns else 0.0) if not sh_ir_p.empty else 0.0
+                max_sh_er = max(sh_er_p['L Max Force (N)'].max() if 'L Max Force (N)' in sh_ir_p.columns else 0.0, sh_er_p['R Max Force (N)'].max() if 'R Max Force (N)' in sh_ir_p.columns else 0.0) if not sh_ir_p.empty else 0.0
+
+                m_c1, m_c2, m_c3, m_c4, m_c5, m_c6 = st.columns(6)
+                m_c1.metric("Peak CMJ", f"{max_cmj_h:.1f}")
+                m_c2.metric("Peak RSI", f"{max_rsi_val:.2f}")
+                m_c3.metric("Peak ASH (L/R)", f"{max_ash_l:.0f} / {max_ash_r:.0f} N")
+                m_c4.metric("Peak ER ROM", f"{max(max_er_l, max_er_r):.1f}°")
+                m_c5.metric("Peak Calf Raise", f"{max(max_calf_l, max_calf_r):.0f} N")
+                m_c6.metric("Hip AD / AB", f"{max_hip_ad:.0f} / {max_hip_ab:.0f} N")
+
+                st.markdown("<br>", unsafe_allow_html=True)
+                st.markdown("#### Comprehensive Peak Performance Matrix")
                 
-                if players_in_pos:
-                    tr_metrics = ["Player Load", "Estimated Distance (y)", "Explosive Efforts", "Total Jumps"]
-                    pos_weekly_sums = tr_df.groupby(['Week', 'Name'])[tr_metrics].sum().reset_index()
-                    pos_avg_weekly_total = pos_weekly_sums[tr_metrics].max()
+                ov_summary_data = [
+                    {"Test Domain": "Countermovement Jump", "Key Metric": "Max Height", "Peak Value": f"{max_cmj_h:.1f}"},
+                    {"Test Domain": "Countermovement Jump", "Key Metric": "Max RSI-Mod", "Peak Value": f"{max_rsi_val:.2f}"},
+                    {"Test Domain": "ASH Shoulder (Iso-I)", "Key Metric": "Peak Force (L / R)", "Peak Value": f"{max_ash_l:.0f} N / {max_ash_r:.0f} N"},
+                    {"Test Domain": "External Rotation", "Key Metric": "Max ROM (L / R)", "Peak Value": f"{max_er_l:.1f}° / {max_er_r:.1f}°"},
+                    {"Test Domain": "Single Leg Calf Raise", "Key Metric": "Peak Force (L / R)", "Peak Value": f"{max_calf_l:.0f} N / {max_calf_r:.0f} N"},
+                    {"Test Domain": "Hip Strength", "Key Metric": "Adduction (AD)", "Peak Value": f"{max_hip_ad:.1f} N"},
+                    {"Test Domain": "Hip Strength", "Key Metric": "Abduction (AB)", "Peak Value": f"{max_hip_ab:.1f} N"},
+                    {"Test Domain": "Shoulder Strength", "Key Metric": "Internal Rotation (IR)", "Peak Value": f"{max_sh_ir:.1f} N"},
+                    {"Test Domain": "Shoulder Strength", "Key Metric": "External Rotation (ER)", "Peak Value": f"{max_sh_er:.1f} N"},
+                ]
+                st.dataframe(pd.DataFrame(ov_summary_data), use_container_width=True, hide_index=True)
 
-                    for name in players_in_pos:
-                        p_data = tr_df[tr_df['Name'] == name]
-                        p_weekly_sums = p_data.groupby('Week')[tr_metrics].sum().reset_index()
-                        p_avg_weekly_total = p_weekly_sums[tr_metrics].max()
+            elif sel_test_tab == "Season Comparison":
+                st.markdown("### Multi-Season Testing Performance Comparison")
+                c_comp_ath, _ = st.columns([2, 2])
+                with c_comp_ath: comp_athlete = st.selectbox("Select Athlete for Cross-Seasonal Comparison", master_athlete_list, key="comp_ath_testing_t4")
 
-                        c_card1, c_card2 = st.columns([1.5, 3], gap="large")
-                        with c_card1:
-                            st.markdown(f"""<div class="player-row-container" style="padding: 20px; border: 1px solid #E5E5E7; border-radius:15px; background:white; margin-bottom: 0px;"><div style="text-align:center; padding:15px; background:#f8f9fa; border-bottom:2px solid #FF8200; border-radius: 12px;"><div style="width:90px; height:90px; border-radius:50%; background-color: white; overflow: hidden; display: flex; align-items: center; justify-content: center; border: 3px solid #FF8200; margin: 0 auto 10px auto;"><img src="{p_data["PhotoURL"].iloc[0]}" style="width:100%; height:100%; object-fit: contain;"></div><p style="margin:0; font-weight:900; color:#1D1D1F; font-size:18px;">{name}</p><p style="margin:0; font-size:12px; color:grey;">Weekly Max Volume</p></div><table class="scout-table" style="width:100%; margin-top:15px;"><thead><tr><th>Metric</th><th>Athlete Max</th><th>Pos. Max Total</th></tr></thead><tbody><tr><td style="font-weight:700;">Player Load</td><td>{p_avg_weekly_total['Player Load']:.0f}</td><td>{pos_avg_weekly_total['Player Load']:.0f}</td></tr><tr><td style="font-weight:700;">Est. Dist (y)</td><td>{p_avg_weekly_total['Estimated Distance (y)']:.0f}</td><td>{pos_avg_weekly_total['Estimated Distance (y)']:.0f}</td></tr><tr><td style="font-weight:700;">Explosive</td><td>{p_avg_weekly_total['Explosive Efforts']:.0f}</td><td>{pos_avg_weekly_total['Explosive Efforts']:.0f}</td></tr><tr><td style="font-weight:700;">Total Jumps</td><td>{p_avg_weekly_total['Total Jumps']:.0f}</td><td>{pos_avg_weekly_total['Total Jumps']:.0f}</td></tr></tbody></table></div>""", unsafe_allow_html=True)
+                cmj_comp = raw_cmj_df[raw_cmj_df['Name'] == comp_athlete].sort_values('Test Date')
+                ash_comp = raw_ash_df[raw_ash_df['Name'] == comp_athlete].sort_values('Test Date')
+                er_comp = raw_er_df[raw_er_df['Name'] == comp_athlete].sort_values('Test Date')
 
-                        with c_card2:
-                            st.write("<div style='height: 25px;'></div>", unsafe_allow_html=True)
-                            t_cols = st.columns(2) 
-                            for i, m in enumerate(tr_metrics):
-                                with t_cols[i % 2]:
-                                    fig_t = go.Figure()
-                                    p_t = p_data.groupby('Week')[m].sum().reset_index()
-                                    fig_t.add_trace(go.Scatter(x=p_t['Week'], y=p_t[m], name="Athlete", line=dict(color='#4895DB', width=4), mode='lines+markers'))
-                                    g_t = tr_df.groupby(['Week', 'Name'])[m].sum().reset_index().groupby('Week')[m].max().reset_index()
-                                    fig_t.add_trace(go.Scatter(x=g_t['Week'], y=g_t[m], name="Pos. Max", line=dict(color='#FF8200', dash='dash', width=2), mode='lines'))
-                                    fig_t.update_layout(title=dict(text=f"<b>Weekly Trend: {m.split(' (')[0]}</b>", font=dict(size=12), x=0.5, y=0.95), xaxis=dict(dtick=1, showgrid=False, title="Week"), yaxis=dict(showgrid=True, gridcolor='#F5F5F7', rangemode='tozero', title=m), height=270, margin=dict(l=20, r=20, t=50, b=65), showlegend=True, legend=dict(orientation="h", y=-0.4, x=0.5, xanchor="center"), template="simple_white")
-                                    st.plotly_chart(fig_t, use_container_width=True, config=LOCKED_CONFIG, key=f"trend_{name}_{m}_t7")
-                        st.write("<div style='height: 30px;'></div>", unsafe_allow_html=True)
+                if not cmj_comp.empty or not ash_comp.empty or not er_comp.empty:
+                    st.markdown("#### Countermovement Jump Trend Across Seasons")
+                    if not cmj_comp.empty:
+                        season_order = ["Spring", "Summer", "Pre-Season"]
+                        cmj_comp_ordered = cmj_comp.copy()
+                        cmj_comp_ordered['Season'] = pd.Categorical(cmj_comp_ordered['Season'], categories=season_order, ordered=True)
+            
+                        cmj_avg_season = cmj_comp_ordered.groupby('Season', observed=False)[[cmj_col, rsi_col]].mean().reset_index()
+                        cmj_avg_season = cmj_avg_season.sort_values('Season')
+
+                        max_h = cmj_avg_season[cmj_col].max() if not cmj_avg_season.empty and not pd.isna(cmj_avg_season[cmj_col].max()) else 50.0
+                        max_r = cmj_avg_season[rsi_col].max() if not cmj_avg_season.empty and not pd.isna(cmj_avg_season[rsi_col].max()) else 1.0
+
+                        fig_comp_cmj = make_subplots(specs=[[{"secondary_y": True}]])
+                        fig_comp_cmj.add_trace(go.Bar(x=cmj_avg_season['Season'], y=cmj_avg_season[cmj_col], name="Avg CMJ Height", marker_color='#FF8200', text=[f"<b>{val:.1f}</b>" if pd.notna(val) else "" for val in cmj_avg_season[cmj_col]], textposition="inside", insidetextanchor="middle", textfont=dict(color='white', size=13), cliponaxis=False), secondary_y=False)
+                        fig_comp_cmj.add_trace(go.Scatter(x=cmj_avg_season['Season'], y=cmj_avg_season[rsi_col], name="Avg RSI-mod", mode='lines+markers+text', text=[f"<b>RSI: {val:.2f}</b>" if pd.notna(val) else "" for val in cmj_avg_season[rsi_col]], textposition="top center", textfont=dict(color='#1D1D1F', size=12), line=dict(color='#4895DB', width=3), marker=dict(size=10, color='#4895DB'), cliponaxis=False), secondary_y=True)
+                        fig_comp_cmj.update_layout(template="simple_white", height=420, margin=dict(l=20, r=20, t=70, b=20), showlegend=True, legend=dict(orientation="h", yanchor="bottom", y=1.05, xanchor="right", x=1), xaxis=dict(categoryorder="array", categoryarray=season_order))
+                        fig_comp_cmj.update_yaxes(title_text="CMJ Height", range=[0, max_h * 1.30], secondary_y=False)
+                        fig_comp_cmj.update_yaxes(title_text="RSI Modified", range=[0, max_r * 1.45], secondary_y=True, showgrid=False)
+                        st.plotly_chart(fig_comp_cmj, use_container_width=True, config=LOCKED_CONFIG, key="cmj_cross_season_bar")
+                    
+                    st.markdown("#### Season-by-Season Best")
+                    summary_rows = []
+                    for season_period in ['Spring', 'Summer', 'Pre-Season']:
+                        s_cmj = cmj_comp[cmj_comp['Season'] == season_period]
+                        s_ash = ash_comp[ash_comp['Season'] == season_period]
+                        s_er = er_comp[er_comp['Season'] == season_period]
+                        
+                        max_cmj = s_cmj[cmj_col].max() if not s_cmj.empty else 0.0
+                        max_rsi = s_cmj[rsi_col].max() if not s_cmj.empty else 0.0
+                        max_ash_l = s_ash['Peak Vertical Force [N] (L)'].max() if not s_ash.empty and 'Peak Vertical Force [N] (L)' in s_ash.columns else 0.0
+                        max_ash_r = s_ash['Peak Vertical Force [N] (R)'].max() if not s_ash.empty and 'Peak Vertical Force [N] (R)' in s_ash.columns else 0.0
+                        max_er_l = s_er['L Max ROM (°)'].max() if not s_er.empty and 'L Max ROM (°)' in s_er.columns else 0.0
+                        max_er_r = s_er['R Max ROM (°)'].max() if not s_er.empty and 'R Max ROM (°)' in s_er.columns else 0.0
+                        
+                        summary_rows.append({
+                            'Season': season_period,
+                            'Max CMJ': round(max_cmj, 1),
+                            'Max RSI': round(max_rsi, 2),
+                            'Max ASH L (N)': round(max_ash_l, 0),
+                            'Max ASH R (N)': round(max_ash_r, 0),
+                            'Max ER ROM L (°)': round(max_er_l, 1),
+                            'Max ER ROM R (°)': round(max_er_r, 1)
+                        })
+                    st.dataframe(pd.DataFrame(summary_rows), use_container_width=True, hide_index=True)
 
             elif sel_test_tab in ["Spring Testing", "Summer Testing", "Pre-Season Testing"]:
                 s_label = sel_test_tab.replace(" Testing", "")
