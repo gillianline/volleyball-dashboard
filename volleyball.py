@@ -234,25 +234,21 @@ def load_all_data():
         if pd.isna(date_val): return 'Spring'
         m = date_val.month
         d = date_val.day
-        # Universal seasonal calendar across all testing years
         if (m == 7 and d >= 28) or (m >= 8 and m <= 12): return 'Pre-Season'
         elif 1 <= m <= 4: return 'Spring'
         elif (m == 5 and d >= 20) or (m >= 5 and m <= 7): return 'Summer'
         else: return 'Spring'
 
-    def clean_athlete_names(df_in):
-        if 'Athlete' in df_in.columns:
+    def clean_name_col(df_in):
+        if 'Athlete' in df_in.columns and 'Name' not in df_in.columns:
             df_in.rename(columns={'Athlete': 'Name'}, inplace=True)
         if 'Name' in df_in.columns:
             df_in['Name'] = df_in['Name'].astype(str).str.strip()
-        if 'Date' in df_in.columns and 'Test Date' not in df_in.columns:
-            df_in.rename(columns={'Date': 'Test Date'}, inplace=True)
         return df_in
 
+    # GPS Practice Data
     df = pd.read_csv(st.secrets["GOOGLE_SHEET_URL"])
-    match_df = pd.read_csv(st.secrets["MATCHES_SHEET_URL"])
-    
-    df = heavy_sanitize(clean_athlete_names(df))
+    df = clean_name_col(heavy_sanitize(df))
     df['Sheet_Order'] = range(len(df))
     df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
     if 'Week' in df.columns:
@@ -263,7 +259,9 @@ def load_all_data():
     df['Session_Type'] = df['Activity'].apply(lambda x: 'Game' if any(w in str(x).lower() for w in ['game', 'match', 'v.']) else 'Practice')
     df['Season'] = df['Date'].apply(assign_season)
 
-    match_df = heavy_sanitize(clean_athlete_names(match_df))
+    # GPS Matches Data
+    match_df = pd.read_csv(st.secrets["MATCHES_SHEET_URL"])
+    match_df = clean_name_col(heavy_sanitize(match_df))
     match_df['Sheet_Order'] = range(len(match_df))
     match_df['Date'] = pd.to_datetime(match_df['Date'], errors='coerce')
     if 'Week' in match_df.columns:
@@ -274,9 +272,12 @@ def load_all_data():
     match_df['Session_Type'] = match_df['Activity'].apply(lambda x: 'Game' if any(w in str(x).lower() for w in ['game', 'match', 'v.']) else 'Practice')
     match_df['Season'] = match_df['Date'].apply(assign_season)
 
+    # CMJ Testing Data
     cmj_df = pd.read_csv(st.secrets["CMJ_SHEET_URL"])
     cmj_df.columns = cmj_df.columns.str.strip()
-    cmj_df = clean_athlete_names(cmj_df)
+    cmj_df = clean_name_col(cmj_df)
+    if 'Test Date' not in cmj_df.columns and 'Date' in cmj_df.columns:
+        cmj_df.rename(columns={'Date': 'Test Date'}, inplace=True)
     cmj_df['Test Date'] = pd.to_datetime(cmj_df['Test Date'], errors='coerce')
     if 'Week' in cmj_df.columns:
         cmj_df['Week'] = pd.to_numeric(cmj_df['Week'].astype(str).str.extract(r'(\d+)', expand=False), errors='coerce').fillna(0).astype(int)
@@ -303,7 +304,9 @@ def load_all_data():
     try:
         ash_df = pd.read_csv(st.secrets["ASH_SHEET_URL"])
         ash_df.columns = ash_df.columns.str.strip()
-        ash_df = clean_athlete_names(ash_df)
+        ash_df = clean_name_col(ash_df)
+        if 'Test Date' not in ash_df.columns and 'Date' in ash_df.columns:
+            ash_df.rename(columns={'Date': 'Test Date'}, inplace=True)
         ash_df['Test Date'] = pd.to_datetime(ash_df['Test Date'], errors='coerce')
         for col in ['Peak Vertical Force [N] (L)', 'Peak Vertical Force [N] (R)', 'Peak Vertical Force [N] (Asym)(%)']:
             if col in ash_df.columns:
@@ -316,7 +319,9 @@ def load_all_data():
     try:
         er_df = pd.read_csv(st.secrets["ER_SHEET_URL"])
         er_df.columns = er_df.columns.str.strip()
-        er_df = clean_athlete_names(er_df)
+        er_df = clean_name_col(er_df)
+        if 'Test Date' not in er_df.columns and 'Date' in er_df.columns:
+            er_df.rename(columns={'Date': 'Test Date'}, inplace=True)
         er_df['Test Date'] = pd.to_datetime(er_df['Test Date'], errors='coerce')
         for col in ['L Max ROM (°)', 'R Max ROM (°)', 'ROM Asymmetry (%)']:
             if col in er_df.columns:
@@ -329,7 +334,9 @@ def load_all_data():
     try:
         calf_df = pd.read_csv(st.secrets["CALF_SHEET_URL"])
         calf_df.columns = calf_df.columns.str.strip()
-        calf_df = clean_athlete_names(calf_df)
+        calf_df = clean_name_col(calf_df)
+        if 'Test Date' not in calf_df.columns and 'Date' in calf_df.columns:
+            calf_df.rename(columns={'Date': 'Test Date'}, inplace=True)
         calf_df['Test Date'] = pd.to_datetime(calf_df['Test Date'], errors='coerce')
         for col in ['Peak Vertical Force [N] (L)', 'Peak Vertical Force [N] (R)', 'Peak Vertical Force / BM [N/kg] (L)']:
             if col in calf_df.columns:
@@ -342,7 +349,9 @@ def load_all_data():
     try:
         hip_df = pd.read_csv(st.secrets["HIP_SHEET_URL"])
         hip_df.columns = hip_df.columns.str.strip()
-        hip_df = clean_athlete_names(hip_df)
+        hip_df = clean_name_col(hip_df)
+        if 'Test Date' not in hip_df.columns and 'Date' in hip_df.columns:
+            hip_df.rename(columns={'Date': 'Test Date'}, inplace=True)
         hip_df['Test Date'] = pd.to_datetime(hip_df['Test Date'], errors='coerce')
         for col in ['L Max Force (N)', 'R Max Force (N)']:
             if col in hip_df.columns:
@@ -355,7 +364,9 @@ def load_all_data():
     try:
         shoulder_df = pd.read_csv(st.secrets["SHOULDER_SHEET_URL"])
         shoulder_df.columns = shoulder_df.columns.str.strip()
-        shoulder_df = clean_athlete_names(shoulder_df)
+        shoulder_df = clean_name_col(shoulder_df)
+        if 'Test Date' not in shoulder_df.columns and 'Date' in shoulder_df.columns:
+            shoulder_df.rename(columns={'Date': 'Test Date'}, inplace=True)
         shoulder_df['Test Date'] = pd.to_datetime(shoulder_df['Test Date'], errors='coerce')
         for col in ['L Max Force (N)', 'R Max Force (N)']:
             if col in shoulder_df.columns:
@@ -364,8 +375,9 @@ def load_all_data():
     except:
         shoulder_df = pd.DataFrame(columns=['Name', 'Test Date', 'Season'])
 
+    # Phases Data
     phase_df = pd.read_csv(st.secrets["PHASES_SHEET_URL"])
-    phase_df = heavy_sanitize(clean_athlete_names(phase_df))
+    phase_df = clean_name_col(heavy_sanitize(phase_df))
     if 'Phases' in phase_df.columns: phase_df = phase_df.rename(columns={'Phases': 'Phase'})
     phase_df['Date'] = pd.to_datetime(phase_df['Date'], errors='coerce')
 
@@ -568,7 +580,7 @@ if check_password():
         # --- HUB 1: DAILY MONITORING & WELLNESS ----------------------------------
         # =========================================================================
         if selected_hub == "Daily Monitoring & Wellness":
-            daily_subtabs = ["Individual Profile", "Practice Scores", "Daily Combined Scores", "Practice History"]
+            daily_subtabs = ["CMJ Dashboard", "Individual Profile", "Practice Scores", "Daily Combined Scores", "Practice History"]
             if selected_season == "Summer":
                 daily_subtabs.append("Spring Max vs Daily Combined")
 
@@ -577,7 +589,226 @@ if check_password():
 
             sel_daily_tab = st.radio("Daily Sub Navigation", daily_subtabs, key="daily_subtab_radio", horizontal=True, label_visibility="collapsed")
 
-            if sel_daily_tab == "Individual Profile":
+            if sel_daily_tab == "CMJ Dashboard":
+                cmj_view_modes = ["Individual Athlete", "Team CMJ Summary"]
+                if "cmj_view_mode_subtab" not in st.session_state:
+                    st.session_state.cmj_view_mode_subtab = cmj_view_modes[0]
+                    
+                sel_cmj_mode = st.radio("CMJ View Mode", cmj_view_modes, key="cmj_view_mode_subtab", horizontal=True, label_visibility="collapsed")
+
+                if sel_cmj_mode == "Individual Athlete":
+                    c_cmj_ath, c_cmj_date, c_cmj_comp = st.columns([2, 1.5, 1.5])
+                    with c_cmj_ath: sel_cmj_ath = st.selectbox("Select Athlete", master_athlete_list, key="cmj_dash_ath_sel")
+                    ath_cmj_all = raw_cmj_df[raw_cmj_df['Name'] == sel_cmj_ath].sort_values('Test Date')
+                    
+                    if ath_cmj_all.empty:
+                        st.info(f"No CMJ records found for {sel_cmj_ath}.")
+                    else:
+                        valid_dates = ath_cmj_all['Test Date'].dropna().dt.strftime('%m/%d/%y').tolist()
+                        with c_cmj_date: sel_test_date_str = st.selectbox("Test Date", valid_dates, index=len(valid_dates)-1, key="cmj_dash_date_sel")
+                        with c_cmj_comp: comp_factor = st.selectbox("Comparison Factor", ["Individual", "Team", "Position"], key="cmj_dash_comp_sel")
+
+                        cur_idx_list = ath_cmj_all[ath_cmj_all['Test Date'].dt.strftime('%m/%d/%y') == sel_test_date_str].index.tolist()
+                        cur_test_row = ath_cmj_all.loc[cur_idx_list[-1]]
+                        
+                        curr_season = cur_test_row.get('Season', 'Pre-Season')
+                        ath_season_data = ath_cmj_all[ath_cmj_all['Season'] == curr_season].sort_values('Test Date')
+                        if ath_season_data.empty: ath_season_data = ath_cmj_all
+
+                        base_test_row = ath_season_data.iloc[0]
+                        season_indices = list(ath_season_data.index)
+                        if cur_idx_list[-1] in season_indices:
+                            cur_pos = season_indices.index(cur_idx_list[-1])
+                            prev_test_row = ath_season_data.iloc[max(0, cur_pos - 1)]
+                        else:
+                            prev_test_row = cur_test_row
+
+                        meta_lookup = full_df_unfiltered[full_df_unfiltered['Name'] == sel_cmj_ath]
+                        photo_val = meta_lookup['PhotoURL'].iloc[0] if not meta_lookup.empty else "https://www.w3schools.com/howto/img_avatar.png"
+                        pos_val = meta_lookup['Position'].iloc[0] if not meta_lookup.empty else "N/A"
+
+                        cmj_metric_defs = [
+                            {"label": "Jump Height", "col": cmj_col, "fmt": "{:.1f}"},
+                            {"label": "Jump Momentum", "col": "Jump Momentum", "alt_col": "Take-off Momentum [kg m/s]", "fmt": "{:.1f}"},
+                            {"label": "Peak Velocity", "col": "Concentric Peak Velocity [m/s]", "fmt": "{:.2f}"},
+                            {"label": "Mean Con Force", "col": "Concentric Mean Force [N]", "fmt": "{:.0f}"},
+                            {"label": "Force @ 0 Velocity", "col": "Force at Zero Velocity [N]", "fmt": "{:.0f}"},
+                            {"label": "Positive Impulse", "col": "Positive Impulse [N s]", "fmt": "{:.1f}"},
+                            {"label": "P1 Con Impulse", "col": "P1 Concentric Impulse [N s]", "fmt": "{:.1f}"},
+                            {"label": "P2 Con Impulse", "col": "P2 Concentric Impulse [N s]", "fmt": "{:.1f}"},
+                            {"label": "P2:P1 Impulse Ratio", "col": "P2 Concentric Impulse:P1 Concentric Impulse", "fmt": "{:.2f}"}
+                        ]
+
+                        raw_readiness_avg = compute_excel_readiness_score(cur_test_row, prev_test_row)
+                        display_score = int(round(raw_readiness_avg))
+
+                        top_col1, top_col2, top_col3 = st.columns([1.2, 2.2, 1.6])
+                        with top_col1:
+                            ath_card_html = f"""<div style="background:#4895DB; color:white; font-weight:900; font-size:18px; text-align:center; padding:8px 10px; border-radius:6px 6px 0 0;">{sel_cmj_ath}</div><div style="border:1px solid #E2E8F0; border-top:none; border-radius:0 0 6px 6px; padding:16px; background:white; display:flex; align-items:center; gap:16px;"><img src="{photo_val}" style="width:95px; height:95px; border-radius:8px; object-fit:contain; border:2px solid #FF8200;"><div style="font-size:14px; line-height:1.8; color:#1D1D1F;"><b>Position:</b> {pos_val}</div></div><div style="background:#4895DB; color:white; font-weight:800; font-size:13px; text-align:center; padding:6px; margin-top:10px; border-radius:4px;">Comparison: {comp_factor}</div>"""
+                            st.markdown(ath_card_html, unsafe_allow_html=True)
+
+                        with top_col2:
+                            table_rows_str = ""
+                            for m_info in cmj_metric_defs:
+                                lbl = m_info["label"]
+                                col_name = m_info["col"] if m_info["col"] in cur_test_row else m_info.get("alt_col", m_info["col"])
+                                fmt = m_info["fmt"]
+                                c_val = float(cur_test_row.get(col_name, 0.0)) if col_name in cur_test_row and pd.notna(cur_test_row.get(col_name)) else 0.0
+                                b_val = float(base_test_row.get(col_name, 0.0)) if col_name in base_test_row and pd.notna(base_test_row.get(col_name)) else 0.0
+                                diff = ((c_val - b_val) / b_val * 100) if b_val > 0 else 0.0
+                                pct_color = "#137333" if diff >= 0 else "#D93025"
+                                table_rows_str += f"""<tr><td style="text-align:left !important; padding-left:12px; font-weight:600;">{lbl}</td><td style="color:#64748B;">{fmt.format(b_val)}</td><td style="font-weight:800; background:#F0F7FF; border: 1px solid #3B82F6;">{fmt.format(c_val)}</td><td style="font-weight:800; color:{pct_color};">{diff:+.0f}%</td></tr>"""
+                            
+                            full_table_html = f"""<div style="background:#4895DB; color:white; font-weight:900; font-size:14px; text-align:center; padding:6px; border-radius:6px 6px 0 0;">Countermovement Jump Performance</div><table class="scout-table" style="width:100%; border:1px solid #E2E8F0; border-top:none; background:white; border-collapse:collapse; margin-bottom:0;"><thead><tr style="background:#F8FAFC; color:#64748B; font-size:11px;"><th style="text-align:left !important; padding:6px 12px;">Metric</th><th style="padding:6px;">Baseline ({curr_season})</th><th style="padding:6px; background:#EBF5FF; color:#1E40AF;">Current</th><th style="padding:6px;">% Change</th></tr></thead><tbody>{table_rows_str}</tbody></table>"""
+                            st.markdown(full_table_html, unsafe_allow_html=True)
+
+                        with top_col3:
+                            gauge_header = f"""<div style="background:#4895DB; color:white; font-weight:900; font-size:14px; text-align:center; padding:6px; border-radius:6px 6px 0 0;">Wellness Score<br><span style="font-size:11px; font-weight:600;">{sel_test_date_str}</span></div>"""
+                            st.markdown(gauge_header, unsafe_allow_html=True)
+                            fig_gauge = create_wellness_gauge(display_score, height=230)
+                            st.plotly_chart(fig_gauge, use_container_width=True, config=LOCKED_CONFIG, key="cmj_wellness_gauge_ind")
+
+                        st.markdown("<br>", unsafe_allow_html=True)
+                        st.markdown(f'<div class="section-header">Countermovement Jump Performance Standards ({comp_factor})</div>', unsafe_allow_html=True)
+                        chart_col, legend_col = st.columns([4.2, 1.1])
+
+                        with chart_col:
+                            bar_metrics_excel = [
+                                {"name": "Jump Height", "col": cmj_col, "invert": False},
+                                {"name": "Jump Momentum", "col": "Jump Momentum", "alt_col": "Take-off Momentum [kg m/s]", "invert": False},
+                                {"name": "Peak Velocity", "col": "Concentric Peak Velocity [m/s]", "invert": False},
+                                {"name": "Mean Con Force", "col": "Relative Mean Con Force", "alt_col": "Concentric Mean Force [N]", "invert": False},
+                                {"name": "Force @ 0 Velocity", "col": "Relative Force @ 0 Velo", "alt_col": "Force at Zero Velocity [N]", "invert": False},
+                                {"name": "Positive Impulse", "col": "Positive Impulse [N s]", "invert": False},
+                                {"name": "P1 Con Impulse", "col": "P1 Concentric Impulse [N s]", "invert": False},
+                                {"name": "P2 Con Impulse", "col": "P2 Concentric Impulse [N s]", "invert": False},
+                                {"name": "CM Depth", "col": "Adjusted CMD", "alt_col": "Countermovement Depth [cm]", "invert": False},
+                                {"name": "Time to Takeoff", "col": "Contraction Time [ms]", "alt_col": "Time to Takeoff [s]", "invert": True}
+                            ]
+
+                            if comp_factor == "Individual":
+                                ref_pool_df = raw_cmj_df[raw_cmj_df['Name'] == sel_cmj_ath]
+                                title_prefix = "Individual"
+                            elif comp_factor == "Position":
+                                pos_athletes = full_df_unfiltered[full_df_unfiltered['Position'] == pos_val]['Name'].unique()
+                                ref_pool_df = raw_cmj_df[raw_cmj_df['Name'].isin(pos_athletes)]
+                                if ref_pool_df.empty: ref_pool_df = raw_cmj_df
+                                title_prefix = "Position"
+                            else:
+                                ref_pool_df = raw_cmj_df
+                                title_prefix = "Team"
+
+                            t_scores = []
+                            x_labels = []
+                            for bm in bar_metrics_excel:
+                                x_labels.append(bm["name"])
+                                cname = bm["col"] if bm["col"] in cur_test_row else bm.get("alt_col", bm["col"])
+                                ath_v = abs(float(cur_test_row.get(cname, 0.0))) if cname in cur_test_row and pd.notna(cur_test_row.get(cname)) else 0.0
+                                if cname in ref_pool_df.columns and len(ref_pool_df[cname].dropna()) > 1:
+                                    valid_series = ref_pool_df[cname].dropna().abs()
+                                    m_mean = valid_series.mean()
+                                    m_std = valid_series.std(ddof=1)
+                                    if m_std > 0:
+                                        z_val = -1.0 * ((ath_v - m_mean) / m_std) if bm["invert"] else (ath_v - m_mean) / m_std
+                                        t_val = 50.0 + (z_val * 10.0)
+                                        t_scores.append(round(min(100.0, max(0.0, t_val)), 1))
+                                    else: t_scores.append(50.0)
+                                else: t_scores.append(50.0)
+
+                            fig_bands = go.Figure()
+                            bands = [
+                                {"y0": 0, "y1": 20, "color": "#A00000"},
+                                {"y0": 20, "y1": 30, "color": "#E60000"},
+                                {"y0": 30, "y1": 40, "color": "#F05656"},
+                                {"y0": 40, "y1": 45, "color": "#F8A2A2"},
+                                {"y0": 45, "y1": 55, "color": "#FFFFFF"},
+                                {"y0": 55, "y1": 60, "color": "#C3E8A8"},
+                                {"y0": 60, "y1": 70, "color": "#81D350"},
+                                {"y0": 70, "y1": 80, "color": "#33A338"},
+                                {"y0": 80, "y1": 100, "color": "#1C7426"}
+                            ]
+                            for b in bands: fig_bands.add_hrect(y0=b["y0"], y1=b["y1"], fillcolor=b["color"], line_width=0, opacity=1.0, layer="below")
+                            fig_bands.add_trace(go.Bar(x=x_labels, y=t_scores, marker=dict(color='#3A3D40', line=dict(color='#1A1C1E', width=1.5)), width=0.42, text=[f"<b>{val:.1f}</b>" for val in t_scores], textposition='inside', insidetextanchor='middle', textfont=dict(color='white', size=12), cliponaxis=False))
+
+                            category_boxes = [
+                                {"x0": 0.55, "x1": 2.45, "text": "Speed", "bg": "#F8E2E2"},
+                                {"x0": 2.55, "x1": 6.45, "text": "Strength", "bg": "#EBF3DF"},
+                                {"x0": 6.55, "x1": 7.45, "text": "Power", "bg": "#D3E2F4"},
+                                {"x0": 7.55, "x1": 9.45, "text": "Jump Strategy", "bg": "#E6E1F2"}
+                            ]
+                            for cb in category_boxes:
+                                fig_bands.add_shape(type="rect", xref="x", yref="paper", x0=cb["x0"], x1=cb["x1"], y0=-0.16, y1=-0.08, fillcolor=cb["bg"], line=dict(width=0), layer="above")
+                                fig_bands.add_annotation(xref="x", yref="paper", x=(cb["x0"] + cb["x1"]) / 2, y=-0.12, text=f"<b>{cb['text']}</b>", showarrow=False, font=dict(size=11, color="#111827"), align="center")
+
+                            fig_bands.update_layout(height=450, margin=dict(l=30, r=10, t=15, b=65), plot_bgcolor='white', paper_bgcolor='white', xaxis=dict(tickangle=0, tickfont=dict(size=10.5, weight='bold', color='#111827'), showgrid=False, showline=True, linecolor='#6B7280'), yaxis=dict(range=[0, 100], dtick=10, showgrid=False, showline=True, linecolor='#6B7280', title=dict(text=f"{title_prefix} T-Score Performance Rating", font=dict(size=12, weight='bold', color='#4B5563'))), showlegend=False)
+                            st.plotly_chart(fig_bands, use_container_width=True, config=LOCKED_CONFIG, key=f"cmj_standards_chart_{comp_factor}")
+
+                        with legend_col:
+                            legend_table_html = """<div style="background:#4895DB; color:white; font-weight:800; font-size:12px; text-align:center; padding:6px; border-radius:4px 4px 0 0;">Performance Bands<br><span style="font-size:10px; font-weight:600;">T-Score Rating</span></div><table style="width:100%; border-collapse:collapse; font-size:11px; text-align:center; font-weight:700;"><tr style="background:#1C7426; color:white;"><td style="padding:4px;">Excellent</td><td>> 80</td></tr><tr style="background:#33A338; color:white;"><td style="padding:4px;">Very Good</td><td>70 - 80</td></tr><tr style="background:#81D350; color:#111827;"><td style="padding:4px;">Good</td><td>60 - 70</td></tr><tr style="background:#C3E8A8; color:#111827;"><td style="padding:4px;">Above Avg.</td><td>55 - 60</td></tr><tr style="background:#FFFFFF; color:#111827; border-top:1px solid #E2E8F0; border-bottom:1px solid #E2E8F0;"><td style="padding:4px;">Average</td><td>45 - 55</td></tr><tr style="background:#F8A2A2; color:#111827;"><td style="padding:4px;">Below Avg.</td><td>40 - 45</td></tr><tr style="background:#F05656; color:white;"><td style="padding:4px;">Poor</td><td>30 - 40</td></tr><tr style="background:#E60000; color:white;"><td style="padding:4px;">Very Poor</td><td>20 - 30</td></tr><tr style="background:#A00000; color:white;"><td style="padding:4px;">Extremely Poor</td><td>< 20</td></tr></table>"""
+                            st.markdown(legend_table_html, unsafe_allow_html=True)
+
+                elif sel_cmj_mode == "Team CMJ Summary":
+                    st.markdown("### Team Wellness Score Overview")
+                    team_cmj_dates = sorted(raw_cmj_df['Test Date'].dropna().dt.strftime('%m/%d/%y').unique().tolist(), reverse=True)
+                    
+                    c_sum_d1, c_sum_d2 = st.columns([1.5, 2])
+                    with c_sum_d1: sel_team_cmj_date = st.selectbox("Evaluation Test Date", team_cmj_dates, index=0, key="team_cmj_eval_date")
+                    with c_sum_d2: team_pos_f = st.selectbox("Filter by Position", ["All Positions"] + sorted([p for p in full_df_unfiltered['Position'].unique() if p != "N/A"]), key="team_cmj_pos_filter")
+
+                    team_cmj_rows = []
+                    for ath_name in sorted(raw_cmj_df['Name'].unique()):
+                        ath_sub_cmj = raw_cmj_df[raw_cmj_df['Name'] == ath_name].sort_values('Test Date')
+                        if ath_sub_cmj.empty: continue
+                        
+                        meta_row = full_df_unfiltered[full_df_unfiltered['Name'] == ath_name]
+                        pos_str = meta_row['Position'].iloc[0] if not meta_row.empty else "N/A"
+                        photo_url = meta_row['PhotoURL'].iloc[0] if not meta_row.empty else "https://www.w3schools.com/howto/img_avatar.png"
+                        if team_pos_f != "All Positions" and pos_str != team_pos_f: continue
+                            
+                        ath_date_match = ath_sub_cmj[ath_sub_cmj['Test Date'].dt.strftime('%m/%d/%y') == sel_team_cmj_date]
+                        if ath_date_match.empty: continue
+                            
+                        target_row = ath_date_match.iloc[-1]
+                        ath_season = target_row.get('Season', 'Pre-Season')
+                        ath_season_sub = ath_sub_cmj[ath_sub_cmj['Season'] == ath_season].sort_values('Test Date')
+                        if ath_season_sub.empty: ath_season_sub = ath_sub_cmj
+                            
+                        season_indices = list(ath_season_sub.index)
+                        if target_row.name in season_indices:
+                            cur_pos = season_indices.index(target_row.name)
+                            prev_row = ath_season_sub.iloc[max(0, cur_pos - 1)]
+                        else: prev_row = target_row
+                        
+                        readiness_pct = int(round(compute_excel_readiness_score(target_row, prev_row)))
+                        z_color = get_readiness_color(readiness_pct)
+                        team_cmj_rows.append({"Athlete": ath_name, "PhotoURL": photo_url, "Position": pos_str, "Readiness %": readiness_pct, "Status_Color": z_color})
+
+                    if team_cmj_rows:
+                        cmj_team_df = pd.DataFrame(team_cmj_rows).sort_values("Readiness %", ascending=False)
+                        c_kpi1, c_kpi2, c_kpi3, c_kpi4 = st.columns(4)
+                        avg_team_readiness = cmj_team_df['Readiness %'].mean()
+                        peak_count = sum(1 for r in team_cmj_rows if r['Readiness %'] >= 90)
+                        fatigue_count = sum(1 for r in team_cmj_rows if r['Readiness %'] < 80)
+                        
+                        c_kpi1.metric("Athletes Evaluated", len(team_cmj_rows))
+                        c_kpi2.metric("Team Mean Wellness", f"{avg_team_readiness:.1f}%")
+                        c_kpi3.metric("Optimal (>=90%)", peak_count)
+                        c_kpi4.metric("Fatigued (<80%)", fatigue_count)
+
+                        team_tbl_html = """<table class="scout-table" style="width:100%; border:1px solid #E2E8F0; background:white; margin-top:15px;"><thead><tr style="background:#4895DB; color:white;"><th style="width:60px;">Athlete</th><th style="text-align:left !important; padding-left:15px;">Name</th><th>Position</th><th>Wellness Score</th></tr></thead><tbody>"""
+                        for _, row in cmj_team_df.iterrows():
+                            team_tbl_html += f"""<tr>
+                                <td style="padding:6px;"><img src="{row['PhotoURL']}" style="width:38px; height:38px; border-radius:50%; object-fit:contain; border:2px solid #FF8200;"></td>
+                                <td style="text-align:left !important; font-weight:800; padding-left:15px; font-size:13px;">{row['Athlete']}</td>
+                                <td style="font-weight:600; color:#4B5563;">{row['Position']}</td>
+                                <td style="font-weight:900; font-size:15px; color:{row['Status_Color']};">{row['Readiness %']}%</td>
+                            </tr>"""
+                        team_tbl_html += "</tbody></table>"
+                        st.markdown(team_tbl_html, unsafe_allow_html=True)
+                    else:
+                        st.info(f"No Countermovement Jump testing records logged on {sel_team_cmj_date}.")
+
+            elif sel_daily_tab == "Individual Profile":
                 df_t0 = df_master.copy()
                 cmj_t0 = cmj_master.copy()
                 ash_t0 = ash_master.copy()
@@ -762,29 +993,6 @@ if check_password():
                         st.plotly_chart(fig_er, use_container_width=True, config=LOCKED_CONFIG, key="er_profile_chart_t0")
                 else:
                     st.info("No External Rotation data recorded.")
-
-                st.divider()
-                target_activity = p_meta.get('Activity', p_meta.get('Session_Name', selected_session_prof))
-
-                p_ph = phase_t0[
-                    (phase_t0['Name'] == selected_athlete_prof) & 
-                    (phase_t0['Date'].dt.date == curr_date_prof.date())
-                ].copy()
-
-                if 'Activity' in p_ph.columns and target_activity:
-                    p_ph_act = p_ph[p_ph['Activity'].astype(str).str.strip().str.lower() == str(target_activity).strip().lower()]
-                    if not p_ph_act.empty:
-                        p_ph = p_ph_act
-
-                if not p_ph.empty:
-                    st.markdown('<div class="section-header">Practice Phase Analysis</div>', unsafe_allow_html=True)
-                    fig_ph = make_subplots(specs=[[{"secondary_y": True}]])
-                    fig_ph.add_trace(go.Bar(x=p_ph['Phase'], y=p_ph['Player Load'], name="Player Load", marker_color='#4895DB'), secondary_y=False)
-                    fig_ph.add_trace(go.Scatter(x=p_ph['Phase'], y=p_ph['Total Jumps'], name="Total Jumps", line=dict(color='#FF8200', width=4), mode='lines+markers'), secondary_y=True)
-                    fig_ph.update_layout(height=350, showlegend=True, template="simple_white", legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1), margin=dict(l=0, r=0, t=30, b=0))
-                    fig_ph.update_yaxes(title_text="Player Load", secondary_y=False)
-                    fig_ph.update_yaxes(title_text="Total Jumps", secondary_y=True)
-                    st.plotly_chart(fig_ph, use_container_width=True, config=LOCKED_CONFIG, key="phase_analysis_t0")
 
             elif sel_daily_tab == "Practice Scores":
                 df_t1 = df_master.copy()
@@ -1508,7 +1716,6 @@ if check_password():
         # =========================================================================
         elif selected_hub == "Testing & Baselines":
             testing_subtabs = [
-                "CMJ Dashboard", 
                 "Intake Testing", 
                 "Overall Testing Profile", 
                 "Season Comparison",
@@ -1522,226 +1729,7 @@ if check_password():
 
             sel_test_tab = st.radio("Testing Sub Navigation", testing_subtabs, key="test_subtab_radio", horizontal=True, label_visibility="collapsed")
 
-            if sel_test_tab == "CMJ Dashboard":
-                cmj_view_modes = ["Individual Athlete", "Team CMJ Summary"]
-                if "cmj_view_mode_subtab" not in st.session_state:
-                    st.session_state.cmj_view_mode_subtab = cmj_view_modes[0]
-                    
-                sel_cmj_mode = st.radio("CMJ View Mode", cmj_view_modes, key="cmj_view_mode_subtab", horizontal=True, label_visibility="collapsed")
-
-                if sel_cmj_mode == "Individual Athlete":
-                    c_cmj_ath, c_cmj_date, c_cmj_comp = st.columns([2, 1.5, 1.5])
-                    with c_cmj_ath: sel_cmj_ath = st.selectbox("Select Athlete", master_athlete_list, key="cmj_dash_ath_sel")
-                    ath_cmj_all = raw_cmj_df[raw_cmj_df['Name'] == sel_cmj_ath].sort_values('Test Date')
-                    
-                    if ath_cmj_all.empty:
-                        st.info(f"No CMJ records found for {sel_cmj_ath}.")
-                    else:
-                        valid_dates = ath_cmj_all['Test Date'].dropna().dt.strftime('%m/%d/%y').tolist()
-                        with c_cmj_date: sel_test_date_str = st.selectbox("Test Date", valid_dates, index=len(valid_dates)-1, key="cmj_dash_date_sel")
-                        with c_cmj_comp: comp_factor = st.selectbox("Comparison Factor", ["Individual", "Team", "Position"], key="cmj_dash_comp_sel")
-
-                        cur_idx_list = ath_cmj_all[ath_cmj_all['Test Date'].dt.strftime('%m/%d/%y') == sel_test_date_str].index.tolist()
-                        cur_test_row = ath_cmj_all.loc[cur_idx_list[-1]]
-                        
-                        curr_season = cur_test_row.get('Season', 'Pre-Season')
-                        ath_season_data = ath_cmj_all[ath_cmj_all['Season'] == curr_season].sort_values('Test Date')
-                        if ath_season_data.empty: ath_season_data = ath_cmj_all
-
-                        base_test_row = ath_season_data.iloc[0]
-                        season_indices = list(ath_season_data.index)
-                        if cur_idx_list[-1] in season_indices:
-                            cur_pos = season_indices.index(cur_idx_list[-1])
-                            prev_test_row = ath_season_data.iloc[max(0, cur_pos - 1)]
-                        else:
-                            prev_test_row = cur_test_row
-
-                        meta_lookup = full_df_unfiltered[full_df_unfiltered['Name'] == sel_cmj_ath]
-                        photo_val = meta_lookup['PhotoURL'].iloc[0] if not meta_lookup.empty else "https://www.w3schools.com/howto/img_avatar.png"
-                        pos_val = meta_lookup['Position'].iloc[0] if not meta_lookup.empty else "N/A"
-
-                        cmj_metric_defs = [
-                            {"label": "Jump Height", "col": cmj_col, "fmt": "{:.1f}"},
-                            {"label": "Jump Momentum", "col": "Jump Momentum", "alt_col": "Take-off Momentum [kg m/s]", "fmt": "{:.1f}"},
-                            {"label": "Peak Velocity", "col": "Concentric Peak Velocity [m/s]", "fmt": "{:.2f}"},
-                            {"label": "Mean Con Force", "col": "Concentric Mean Force [N]", "fmt": "{:.0f}"},
-                            {"label": "Force @ 0 Velocity", "col": "Force at Zero Velocity [N]", "fmt": "{:.0f}"},
-                            {"label": "Positive Impulse", "col": "Positive Impulse [N s]", "fmt": "{:.1f}"},
-                            {"label": "P1 Con Impulse", "col": "P1 Concentric Impulse [N s]", "fmt": "{:.1f}"},
-                            {"label": "P2 Con Impulse", "col": "P2 Concentric Impulse [N s]", "fmt": "{:.1f}"},
-                            {"label": "P2:P1 Impulse Ratio", "col": "P2 Concentric Impulse:P1 Concentric Impulse", "fmt": "{:.2f}"}
-                        ]
-
-                        raw_readiness_avg = compute_excel_readiness_score(cur_test_row, prev_test_row)
-                        display_score = int(round(raw_readiness_avg))
-
-                        top_col1, top_col2, top_col3 = st.columns([1.2, 2.2, 1.6])
-                        with top_col1:
-                            ath_card_html = f"""<div style="background:#4895DB; color:white; font-weight:900; font-size:18px; text-align:center; padding:8px 10px; border-radius:6px 6px 0 0;">{sel_cmj_ath}</div><div style="border:1px solid #E2E8F0; border-top:none; border-radius:0 0 6px 6px; padding:16px; background:white; display:flex; align-items:center; gap:16px;"><img src="{photo_val}" style="width:95px; height:95px; border-radius:8px; object-fit:contain; border:2px solid #FF8200;"><div style="font-size:14px; line-height:1.8; color:#1D1D1F;"><b>Position:</b> {pos_val}</div></div><div style="background:#4895DB; color:white; font-weight:800; font-size:13px; text-align:center; padding:6px; margin-top:10px; border-radius:4px;">Comparison: {comp_factor}</div>"""
-                            st.markdown(ath_card_html, unsafe_allow_html=True)
-
-                        with top_col2:
-                            table_rows_str = ""
-                            for m_info in cmj_metric_defs:
-                                lbl = m_info["label"]
-                                col_name = m_info["col"] if m_info["col"] in cur_test_row else m_info.get("alt_col", m_info["col"])
-                                fmt = m_info["fmt"]
-                                c_val = float(cur_test_row.get(col_name, 0.0)) if col_name in cur_test_row and pd.notna(cur_test_row.get(col_name)) else 0.0
-                                b_val = float(base_test_row.get(col_name, 0.0)) if col_name in base_test_row and pd.notna(base_test_row.get(col_name)) else 0.0
-                                diff = ((c_val - b_val) / b_val * 100) if b_val > 0 else 0.0
-                                pct_color = "#137333" if diff >= 0 else "#D93025"
-                                table_rows_str += f"""<tr><td style="text-align:left !important; padding-left:12px; font-weight:600;">{lbl}</td><td style="color:#64748B;">{fmt.format(b_val)}</td><td style="font-weight:800; background:#F0F7FF; border: 1px solid #3B82F6;">{fmt.format(c_val)}</td><td style="font-weight:800; color:{pct_color};">{diff:+.0f}%</td></tr>"""
-                            
-                            full_table_html = f"""<div style="background:#4895DB; color:white; font-weight:900; font-size:14px; text-align:center; padding:6px; border-radius:6px 6px 0 0;">Countermovement Jump Performance</div><table class="scout-table" style="width:100%; border:1px solid #E2E8F0; border-top:none; background:white; border-collapse:collapse; margin-bottom:0;"><thead><tr style="background:#F8FAFC; color:#64748B; font-size:11px;"><th style="text-align:left !important; padding:6px 12px;">Metric</th><th style="padding:6px;">Baseline ({curr_season})</th><th style="padding:6px; background:#EBF5FF; color:#1E40AF;">Current</th><th style="padding:6px;">% Change</th></tr></thead><tbody>{table_rows_str}</tbody></table>"""
-                            st.markdown(full_table_html, unsafe_allow_html=True)
-
-                        with top_col3:
-                            gauge_header = f"""<div style="background:#4895DB; color:white; font-weight:900; font-size:14px; text-align:center; padding:6px; border-radius:6px 6px 0 0;">Wellness Score<br><span style="font-size:11px; font-weight:600;">{sel_test_date_str}</span></div>"""
-                            st.markdown(gauge_header, unsafe_allow_html=True)
-                            fig_gauge = create_wellness_gauge(display_score, height=230)
-                            st.plotly_chart(fig_gauge, use_container_width=True, config=LOCKED_CONFIG, key="cmj_wellness_gauge_ind")
-
-                        st.markdown("<br>", unsafe_allow_html=True)
-                        st.markdown(f'<div class="section-header">Countermovement Jump Performance Standards ({comp_factor})</div>', unsafe_allow_html=True)
-                        chart_col, legend_col = st.columns([4.2, 1.1])
-
-                        with chart_col:
-                            bar_metrics_excel = [
-                                {"name": "Jump Height", "col": cmj_col, "invert": False},
-                                {"name": "Jump Momentum", "col": "Jump Momentum", "alt_col": "Take-off Momentum [kg m/s]", "invert": False},
-                                {"name": "Peak Velocity", "col": "Concentric Peak Velocity [m/s]", "invert": False},
-                                {"name": "Mean Con Force", "col": "Relative Mean Con Force", "alt_col": "Concentric Mean Force [N]", "invert": False},
-                                {"name": "Force @ 0 Velocity", "col": "Relative Force @ 0 Velo", "alt_col": "Force at Zero Velocity [N]", "invert": False},
-                                {"name": "Positive Impulse", "col": "Positive Impulse [N s]", "invert": False},
-                                {"name": "P1 Con Impulse", "col": "P1 Concentric Impulse [N s]", "invert": False},
-                                {"name": "P2 Con Impulse", "col": "P2 Concentric Impulse [N s]", "invert": False},
-                                {"name": "CM Depth", "col": "Adjusted CMD", "alt_col": "Countermovement Depth [cm]", "invert": False},
-                                {"name": "Time to Takeoff", "col": "Contraction Time [ms]", "alt_col": "Time to Takeoff [s]", "invert": True}
-                            ]
-
-                            if comp_factor == "Individual":
-                                ref_pool_df = raw_cmj_df[raw_cmj_df['Name'] == sel_cmj_ath]
-                                title_prefix = "Individual"
-                            elif comp_factor == "Position":
-                                pos_athletes = full_df_unfiltered[full_df_unfiltered['Position'] == pos_val]['Name'].unique()
-                                ref_pool_df = raw_cmj_df[raw_cmj_df['Name'].isin(pos_athletes)]
-                                if ref_pool_df.empty: ref_pool_df = raw_cmj_df
-                                title_prefix = "Position"
-                            else:
-                                ref_pool_df = raw_cmj_df
-                                title_prefix = "Team"
-
-                            t_scores = []
-                            x_labels = []
-                            for bm in bar_metrics_excel:
-                                x_labels.append(bm["name"])
-                                cname = bm["col"] if bm["col"] in cur_test_row else bm.get("alt_col", bm["col"])
-                                ath_v = abs(float(cur_test_row.get(cname, 0.0))) if cname in cur_test_row and pd.notna(cur_test_row.get(cname)) else 0.0
-                                if cname in ref_pool_df.columns and len(ref_pool_df[cname].dropna()) > 1:
-                                    valid_series = ref_pool_df[cname].dropna().abs()
-                                    m_mean = valid_series.mean()
-                                    m_std = valid_series.std(ddof=1)
-                                    if m_std > 0:
-                                        z_val = -1.0 * ((ath_v - m_mean) / m_std) if bm["invert"] else (ath_v - m_mean) / m_std
-                                        t_val = 50.0 + (z_val * 10.0)
-                                        t_scores.append(round(min(100.0, max(0.0, t_val)), 1))
-                                    else: t_scores.append(50.0)
-                                else: t_scores.append(50.0)
-
-                            fig_bands = go.Figure()
-                            bands = [
-                                {"y0": 0, "y1": 20, "color": "#A00000"},
-                                {"y0": 20, "y1": 30, "color": "#E60000"},
-                                {"y0": 30, "y1": 40, "color": "#F05656"},
-                                {"y0": 40, "y1": 45, "color": "#F8A2A2"},
-                                {"y0": 45, "y1": 55, "color": "#FFFFFF"},
-                                {"y0": 55, "y1": 60, "color": "#C3E8A8"},
-                                {"y0": 60, "y1": 70, "color": "#81D350"},
-                                {"y0": 70, "y1": 80, "color": "#33A338"},
-                                {"y0": 80, "y1": 100, "color": "#1C7426"}
-                            ]
-                            for b in bands: fig_bands.add_hrect(y0=b["y0"], y1=b["y1"], fillcolor=b["color"], line_width=0, opacity=1.0, layer="below")
-                            fig_bands.add_trace(go.Bar(x=x_labels, y=t_scores, marker=dict(color='#3A3D40', line=dict(color='#1A1C1E', width=1.5)), width=0.42, text=[f"<b>{val:.1f}</b>" for val in t_scores], textposition='inside', insidetextanchor='middle', textfont=dict(color='white', size=12), cliponaxis=False))
-
-                            category_boxes = [
-                                {"x0": 0.55, "x1": 2.45, "text": "Speed", "bg": "#F8E2E2"},
-                                {"x0": 2.55, "x1": 6.45, "text": "Strength", "bg": "#EBF3DF"},
-                                {"x0": 6.55, "x1": 7.45, "text": "Power", "bg": "#D3E2F4"},
-                                {"x0": 7.55, "x1": 9.45, "text": "Jump Strategy", "bg": "#E6E1F2"}
-                            ]
-                            for cb in category_boxes:
-                                fig_bands.add_shape(type="rect", xref="x", yref="paper", x0=cb["x0"], x1=cb["x1"], y0=-0.16, y1=-0.08, fillcolor=cb["bg"], line=dict(width=0), layer="above")
-                                fig_bands.add_annotation(xref="x", yref="paper", x=(cb["x0"] + cb["x1"]) / 2, y=-0.12, text=f"<b>{cb['text']}</b>", showarrow=False, font=dict(size=11, color="#111827"), align="center")
-
-                            fig_bands.update_layout(height=450, margin=dict(l=30, r=10, t=15, b=65), plot_bgcolor='white', paper_bgcolor='white', xaxis=dict(tickangle=0, tickfont=dict(size=10.5, weight='bold', color='#111827'), showgrid=False, showline=True, linecolor='#6B7280'), yaxis=dict(range=[0, 100], dtick=10, showgrid=False, showline=True, linecolor='#6B7280', title=dict(text=f"{title_prefix} T-Score Performance Rating", font=dict(size=12, weight='bold', color='#4B5563'))), showlegend=False)
-                            st.plotly_chart(fig_bands, use_container_width=True, config=LOCKED_CONFIG, key=f"cmj_standards_chart_{comp_factor}")
-
-                        with legend_col:
-                            legend_table_html = """<div style="background:#4895DB; color:white; font-weight:800; font-size:12px; text-align:center; padding:6px; border-radius:4px 4px 0 0;">Performance Bands<br><span style="font-size:10px; font-weight:600;">T-Score Rating</span></div><table style="width:100%; border-collapse:collapse; font-size:11px; text-align:center; font-weight:700;"><tr style="background:#1C7426; color:white;"><td style="padding:4px;">Excellent</td><td>> 80</td></tr><tr style="background:#33A338; color:white;"><td style="padding:4px;">Very Good</td><td>70 - 80</td></tr><tr style="background:#81D350; color:#111827;"><td style="padding:4px;">Good</td><td>60 - 70</td></tr><tr style="background:#C3E8A8; color:#111827;"><td style="padding:4px;">Above Avg.</td><td>55 - 60</td></tr><tr style="background:#FFFFFF; color:#111827; border-top:1px solid #E2E8F0; border-bottom:1px solid #E2E8F0;"><td style="padding:4px;">Average</td><td>45 - 55</td></tr><tr style="background:#F8A2A2; color:#111827;"><td style="padding:4px;">Below Avg.</td><td>40 - 45</td></tr><tr style="background:#F05656; color:white;"><td style="padding:4px;">Poor</td><td>30 - 40</td></tr><tr style="background:#E60000; color:white;"><td style="padding:4px;">Very Poor</td><td>20 - 30</td></tr><tr style="background:#A00000; color:white;"><td style="padding:4px;">Extremely Poor</td><td>< 20</td></tr></table>"""
-                            st.markdown(legend_table_html, unsafe_allow_html=True)
-
-                elif sel_cmj_mode == "Team CMJ Summary":
-                    st.markdown("### Team Wellness Score Overview")
-                    team_cmj_dates = sorted(raw_cmj_df['Test Date'].dropna().dt.strftime('%m/%d/%y').unique().tolist(), reverse=True)
-                    
-                    c_sum_d1, c_sum_d2 = st.columns([1.5, 2])
-                    with c_sum_d1: sel_team_cmj_date = st.selectbox("Evaluation Test Date", team_cmj_dates, index=0, key="team_cmj_eval_date")
-                    with c_sum_d2: team_pos_f = st.selectbox("Filter by Position", ["All Positions"] + sorted([p for p in full_df_unfiltered['Position'].unique() if p != "N/A"]), key="team_cmj_pos_filter")
-
-                    team_cmj_rows = []
-                    for ath_name in sorted(raw_cmj_df['Name'].unique()):
-                        ath_sub_cmj = raw_cmj_df[raw_cmj_df['Name'] == ath_name].sort_values('Test Date')
-                        if ath_sub_cmj.empty: continue
-                        
-                        meta_row = full_df_unfiltered[full_df_unfiltered['Name'] == ath_name]
-                        pos_str = meta_row['Position'].iloc[0] if not meta_row.empty else "N/A"
-                        photo_url = meta_row['PhotoURL'].iloc[0] if not meta_row.empty else "https://www.w3schools.com/howto/img_avatar.png"
-                        if team_pos_f != "All Positions" and pos_str != team_pos_f: continue
-                            
-                        ath_date_match = ath_sub_cmj[ath_sub_cmj['Test Date'].dt.strftime('%m/%d/%y') == sel_team_cmj_date]
-                        if ath_date_match.empty: continue
-                            
-                        target_row = ath_date_match.iloc[-1]
-                        ath_season = target_row.get('Season', 'Pre-Season')
-                        ath_season_sub = ath_sub_cmj[ath_sub_cmj['Season'] == ath_season].sort_values('Test Date')
-                        if ath_season_sub.empty: ath_season_sub = ath_sub_cmj
-                            
-                        season_indices = list(ath_season_sub.index)
-                        if target_row.name in season_indices:
-                            cur_pos = season_indices.index(target_row.name)
-                            prev_row = ath_season_sub.iloc[max(0, cur_pos - 1)]
-                        else: prev_row = target_row
-                        
-                        readiness_pct = int(round(compute_excel_readiness_score(target_row, prev_row)))
-                        z_color = get_readiness_color(readiness_pct)
-                        team_cmj_rows.append({"Athlete": ath_name, "PhotoURL": photo_url, "Position": pos_str, "Readiness %": readiness_pct, "Status_Color": z_color})
-
-                    if team_cmj_rows:
-                        cmj_team_df = pd.DataFrame(team_cmj_rows).sort_values("Readiness %", ascending=False)
-                        c_kpi1, c_kpi2, c_kpi3, c_kpi4 = st.columns(4)
-                        avg_team_readiness = cmj_team_df['Readiness %'].mean()
-                        peak_count = sum(1 for r in team_cmj_rows if r['Readiness %'] >= 90)
-                        fatigue_count = sum(1 for r in team_cmj_rows if r['Readiness %'] < 80)
-                        
-                        c_kpi1.metric("Athletes Evaluated", len(team_cmj_rows))
-                        c_kpi2.metric("Team Mean Wellness", f"{avg_team_readiness:.1f}%")
-                        c_kpi3.metric("Optimal (>=90%)", peak_count)
-                        c_kpi4.metric("Fatigued (<80%)", fatigue_count)
-
-                        team_tbl_html = """<table class="scout-table" style="width:100%; border:1px solid #E2E8F0; background:white; margin-top:15px;"><thead><tr style="background:#4895DB; color:white;"><th style="width:60px;">Athlete</th><th style="text-align:left !important; padding-left:15px;">Name</th><th>Position</th><th>Wellness Score</th></tr></thead><tbody>"""
-                        for _, row in cmj_team_df.iterrows():
-                            team_tbl_html += f"""<tr>
-                                <td style="padding:6px;"><img src="{row['PhotoURL']}" style="width:38px; height:38px; border-radius:50%; object-fit:contain; border:2px solid #FF8200;"></td>
-                                <td style="text-align:left !important; font-weight:800; padding-left:15px; font-size:13px;">{row['Athlete']}</td>
-                                <td style="font-weight:600; color:#4B5563;">{row['Position']}</td>
-                                <td style="font-weight:900; font-size:15px; color:{row['Status_Color']};">{row['Readiness %']}%</td>
-                            </tr>"""
-                        team_tbl_html += "</tbody></table>"
-                        st.markdown(team_tbl_html, unsafe_allow_html=True)
-                    else:
-                        st.info(f"No Countermovement Jump testing records logged on {sel_team_cmj_date}.")
-
-            elif sel_test_tab == "Intake Testing":
+            if sel_test_tab == "Intake Testing":
                 st.markdown("<h3 style='color:#1D1D1F; font-weight:900; text-transform:uppercase;'>Athlete Intake Assessment</h3>", unsafe_allow_html=True)
                 c_int_ath, _ = st.columns([2, 2])
                 with c_int_ath: selected_intake_athlete = st.selectbox("Select Athlete for Intake Assessment", master_athlete_list, key="intake_ath_select")
