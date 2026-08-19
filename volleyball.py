@@ -183,7 +183,7 @@ def get_acwr_badge(ratio):
         if pd.isna(r) or r == 0:
             return "#64748B", "#F1F5F9", "No Baseline"
         elif r < 0.80:
-            return "#D97706", "#FEF3C7", "Under-training"
+            return "#D97706", "#FEF3C7", "Under"
         elif 0.80 <= r <= 1.30:
             return "#137333", "#E6F4EA", "Optimal Spot"
         elif 1.30 < r <= 1.50:
@@ -1574,7 +1574,7 @@ if check_password():
                         sc1, sc2, sc3, sc4 = st.columns(4)
                         sc1.metric("Active Athletes Evaluated", len(team_summary_rows))
                         sc2.metric("Optimal (0.80-1.30)", sweet_count)
-                        sc3.metric("Under-training (<0.80)", under_count)
+                        sc3.metric("Under (<0.80)", under_count)
                         sc4.metric("High Spikes (>1.50)", spike_count)
                         
                         st.markdown(f"#### ACWR Grid on {eval_date_obj.strftime('%m/%d/%Y')} (Active 7-Day Window)")
