@@ -1943,23 +1943,73 @@ if check_password():
                     st.markdown("<br>", unsafe_allow_html=True)
                     st.markdown(f"<h3 style='color:#1D1D1F; font-weight:900;'>Intake Assessment Raw Logs for {selected_intake_athlete}</h3>", unsafe_allow_html=True)
 
+                    # Helper function to format tables exactly like the reference UI
+                    def format_intake_table(df_source, test_col='Direction', test_fallback='Test'):
+                        if df_source.empty:
+                            return pd.DataFrame()
+                        
+                        df_out = df_source.sort_values('Test Date', ascending=True).copy()
+                        df_out['DATE'] = pd.to_datetime(df_out['Test Date']).dt.strftime('%Y-%m-%d')
+                        
+                        # Identify Test Name / Type
+                        if test_col in df_out.columns:
+                            df_out['TEST'] = df_out[test_col].astype(str)
+                        elif 'Isometric Type' in df_out.columns:
+                            df_out['TEST'] = df_out['Isometric Type'].astype(str)
+                        else:
+                            df_out['TEST'] = test_fallback
+                            
+                        # Extract Left and Right Force
+                        l_col = 'L Max Force (N)' if 'L Max Force (N)' in df_out.columns else 'Peak Vertical Force [N] (L)'
+                        r_col = 'R Max Force (N)' if 'R Max Force (N)' in df_out.columns else 'Peak Vertical Force [N] (R)'
+                        
+                        df_out['L_VAL'] = pd.to_numeric(df_out[l_col], errors='coerce').fillna(0.0) if l_col in df_out.columns else 0.0
+                        df_out['R_VAL'] = pd.to_numeric(df_out[r_col], errors='coerce').fillna(0.0) if r_col in df_out.columns else 0.0
+                        
+                        # Calculate Max Imbalance (%)
+                        def calc_imbalance(row):
+                            lv, rv = row['L_VAL'], row['R_VAL']
+                            high = max(lv, rv)
+                            if high > 0:
+                                return round((abs(lv - rv) / high) * 100.0, 2)
+                            return 0.0
+
+                        df_out['MAX IMBALANCE'] = df_out.apply(calc_imbalance, axis=1)
+                        
+                        # Formatting numeric display
+                        df_out['L MAX FORCE (N)'] = df_out['L_VAL'].apply(lambda x: f"{x:.2f}")
+                        df_out['R MAX FORCE (N)'] = df_out['R_VAL'].apply(lambda x: f"{x:.2f}")
+                        df_out['MAX IMBALANCE'] = df_out['MAX IMBALANCE'].apply(lambda x: f"{x:.2f}")
+                        
+                        return df_out[['DATE', 'TEST', 'L MAX FORCE (N)', 'R MAX FORCE (N)', 'MAX IMBALANCE']]
+
+                    with st.expander("Shoulder IR / ER Log", expanded=False):
+                        sh_tbl = format_intake_table(sh_ath, test_col='Direction', test_fallback='Shoulder ISO')
+                        if not sh_tbl.empty:
+                            st.dataframe(sh_tbl, use_container_width=True, hide_index=True)
+                        else:
+                            st.info(f"No Shoulder IR / ER records found for {selected_intake_athlete}.")
+
+                    with st.expander("ISO-Y Strength Log", expanded=False):
+                        isoy_tbl = format_intake_table(isoy_ath, test_col='Isometric Type', test_fallback='ISO-Y')
+                        if not isoy_tbl.empty:
+                            st.dataframe(isoy_tbl, use_container_width=True, hide_index=True)
+                        else:
+                            st.info(f"No ISO-Y Strength records found for {selected_intake_athlete}.")
+
                     with st.expander("Hip Adduction / Abduction Log", expanded=False):
-                        if not hip_ath.empty:
-                            hip_display = hip_ath.sort_values('Test Date', ascending=False).copy()
-                            if 'Test Date' in hip_display.columns:
-                                hip_display['Test Date'] = pd.to_datetime(hip_display['Test Date']).dt.strftime('%m/%d/%Y')
-                            st.dataframe(hip_display, use_container_width=True, hide_index=True)
+                        hip_tbl = format_intake_table(hip_ath, test_col='Direction', test_fallback='Hip ISO')
+                        if not hip_tbl.empty:
+                            st.dataframe(hip_tbl, use_container_width=True, hide_index=True)
                         else:
                             st.info(f"No Hip Adduction / Abduction records found for {selected_intake_athlete}.")
 
-                    with st.expander("Ankle Plantar Flexion Log", expanded=False):
-                        if not calf_ath.empty:
-                            calf_display = calf_ath.sort_values('Test Date', ascending=False).copy()
-                            if 'Test Date' in calf_display.columns:
-                                calf_display['Test Date'] = pd.to_datetime(calf_display['Test Date']).dt.strftime('%m/%d/%Y')
-                            st.dataframe(calf_display, use_container_width=True, hide_index=True)
+                    with st.expander("Single Leg Calf Raise Log", expanded=False):
+                        calf_tbl = format_intake_table(calf_ath, test_col='Direction', test_fallback='Single Leg Calf Raise')
+                        if not calf_tbl.empty:
+                            st.dataframe(calf_tbl, use_container_width=True, hide_index=True)
                         else:
-                            st.info(f"No Ankle Plantar Flexion (Calf) records found for {selected_intake_athlete}.")
+                            st.info(f"No Single Leg Calf Raise records found for {selected_intake_athlete}.")
                     
 
             elif sel_test_tab == "Overall Testing Profile":
