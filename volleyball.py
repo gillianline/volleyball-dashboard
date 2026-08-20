@@ -1714,13 +1714,40 @@ if check_password():
 
             if sel_test_tab == "Intake Testing":
                 st.markdown("<h3 style='color:#1D1D1F; font-weight:900; text-transform:uppercase;'>Athlete Intake Assessment</h3>", unsafe_allow_html=True)
-                c_int_ath, _ = st.columns([2, 2])
-                with c_int_ath: selected_intake_athlete = st.selectbox("Select Athlete for Intake Assessment", master_athlete_list, key="intake_ath_select")
+                
+                # --- Athlete and Test Date Selectors ---
+                c_int_ath, c_int_date = st.columns([2, 2])
+                with c_int_ath: 
+                    selected_intake_athlete = st.selectbox("Select Athlete for Intake Assessment", master_athlete_list, key="intake_ath_select")
 
-                calf_ath = raw_calf_df[raw_calf_df['Name'] == selected_intake_athlete].sort_values('Test Date')
-                hip_ath = raw_hip_df[raw_hip_df['Name'] == selected_intake_athlete].sort_values('Test Date')
-                sh_ath = raw_shoulder_df[raw_shoulder_df['Name'] == selected_intake_athlete].sort_values('Test Date')
-                isoy_ath = raw_ash_df[(raw_ash_df['Name'] == selected_intake_athlete) & (raw_ash_df['Isometric Type'].astype(str).str.contains('ISO-Y|Y', case=False, na=False))].sort_values('Test Date')
+                calf_ath_all = raw_calf_df[raw_calf_df['Name'] == selected_intake_athlete].sort_values('Test Date')
+                hip_ath_all = raw_hip_df[raw_hip_df['Name'] == selected_intake_athlete].sort_values('Test Date')
+                sh_ath_all = raw_shoulder_df[raw_shoulder_df['Name'] == selected_intake_athlete].sort_values('Test Date')
+                isoy_ath_all = raw_ash_df[(raw_ash_df['Name'] == selected_intake_athlete) & (raw_ash_df['Isometric Type'].astype(str).str.contains('ISO-Y|Y', case=False, na=False))].sort_values('Test Date')
+
+                # Gather all historical test dates logged across all 4 intake sheets
+                all_intake_dates = sorted(list(set(
+                    calf_ath_all['Test Date'].dropna().dt.strftime('%m/%d/%y').tolist() +
+                    hip_ath_all['Test Date'].dropna().dt.strftime('%m/%d/%y').tolist() +
+                    sh_ath_all['Test Date'].dropna().dt.strftime('%m/%d/%y').tolist() +
+                    isoy_ath_all['Test Date'].dropna().dt.strftime('%m/%d/%y').tolist()
+                )), key=lambda d: pd.to_datetime(d, format='%m/%d/%y'), reverse=True)
+
+                if all_intake_dates:
+                    with c_int_date:
+                        sel_intake_date_str = st.selectbox("Select Test Date / History", all_intake_dates, index=0, key="intake_date_select")
+                    
+                    sel_intake_date = pd.to_datetime(sel_intake_date_str, format='%m/%d/%y')
+                    
+                    # Filter current snapshot by selected date
+                    calf_ath = calf_ath_all[calf_ath_all['Test Date'].dt.date <= sel_intake_date.date()]
+                    hip_ath = hip_ath_all[hip_ath_all['Test Date'].dt.date <= sel_intake_date.date()]
+                    sh_ath = sh_ath_all[sh_ath_all['Test Date'].dt.date <= sel_intake_date.date()]
+                    isoy_ath = isoy_ath_all[isoy_ath_all['Test Date'].dt.date <= sel_intake_date.date()]
+                else:
+                    with c_int_date:
+                        st.selectbox("Select Test Date / History", ["No History Available"], disabled=True, key="intake_date_select_empty")
+                    calf_ath, hip_ath, sh_ath, isoy_ath = calf_ath_all, hip_ath_all, sh_ath_all, isoy_ath_all
 
                 has_data = not (calf_ath.empty and hip_ath.empty and sh_ath.empty and isoy_ath.empty)
                 if has_data:
@@ -1855,11 +1882,11 @@ if check_password():
                                 <div class="hud-metric-row-light">
                                     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
                                         <span style="font-weight:800; font-size:12px; color:#1D1D1F;"><span class="node-badge-orange">1</span>SHOULDER IR / ER</span>
-                                        <span style="font-size:10px; color:#6E6E73; font-weight:600;">Latest: {latest_date_str}</span>
+                                        <span style="font-size:10px; color:#6E6E73; font-weight:600;">Selected Date: {latest_date_str}</span>
                                     </div>
                                     <div style="font-size:11px; line-height:1.4; color:#1D1D1F;">
-                                        <b>Internal (IR):</b> Initial L {ir_bL:.1f}N | R {ir_bR:.1f}N &nbsp;→&nbsp; <b>Latest:</b> L {render_val_with_arrow(ir_lL, ir_bL, '{:.1f}', 'N')} | R {render_val_with_arrow(ir_lR, ir_bR, '{:.1f}', 'N')}<br>
-                                        <b>External (ER):</b> Initial L {er_bL:.1f}N | R {er_bR:.1f}N &nbsp;→&nbsp; <b>Latest:</b> L {render_val_with_arrow(er_lL, er_bL, '{:.1f}', 'N')} | R {render_val_with_arrow(er_lR, er_bR, '{:.1f}', 'N')}
+                                        <b>Internal (IR):</b> Initial L {ir_bL:.1f}N | R {ir_bR:.1f}N &nbsp;→&nbsp; <b>Recorded:</b> L {render_val_with_arrow(ir_lL, ir_bL, '{:.1f}', 'N')} | R {render_val_with_arrow(ir_lR, ir_bR, '{:.1f}', 'N')}<br>
+                                        <b>External (ER):</b> Initial L {er_bL:.1f}N | R {er_bR:.1f}N &nbsp;→&nbsp; <b>Recorded:</b> L {render_val_with_arrow(er_lL, er_bL, '{:.1f}', 'N')} | R {render_val_with_arrow(er_lR, er_bR, '{:.1f}', 'N')}
                                     </div>
                                 </div>
                             """, unsafe_allow_html=True)
@@ -1873,10 +1900,10 @@ if check_password():
                                 <div class="hud-metric-row-light">
                                     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
                                         <span style="font-weight:800; font-size:12px; color:#1D1D1F;"><span class="node-badge-orange">2</span>ISO-Y STRENGTH</span>
-                                        <span style="font-size:10px; color:#6E6E73; font-weight:600;">Latest: {l_y['Test Date'].strftime('%m/%d/%Y')}</span>
+                                        <span style="font-size:10px; color:#6E6E73; font-weight:600;">Selected Date: {l_y['Test Date'].strftime('%m/%d/%Y')}</span>
                                     </div>
                                     <div style="font-size:11px; line-height:1.4; color:#1D1D1F;">
-                                        <b>Initial Force:</b> L {byL:.0f}N | R {byR:.0f}N &nbsp;→&nbsp; <b>Latest:</b> L {render_val_with_arrow(lyL, byL, '{:.0f}', 'N')} | R {render_val_with_arrow(lyR, byR, '{:.0f}', 'N')}
+                                        <b>Initial Force:</b> L {byL:.0f}N | R {byR:.0f}N &nbsp;→&nbsp; <b>Recorded:</b> L {render_val_with_arrow(lyL, byL, '{:.0f}', 'N')} | R {render_val_with_arrow(lyR, byR, '{:.0f}', 'N')}
                                     </div>
                                 </div>
                             """, unsafe_allow_html=True)
@@ -1894,10 +1921,10 @@ if check_password():
                                     <div class="hud-metric-row-light-blue">
                                         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
                                             <span style="font-weight:800; font-size:12px; color:#1D1D1F;"><span class="node-badge-blue">3</span>HIP ADDUCTION (AD)</span>
-                                            <span style="font-size:10px; color:#6E6E73; font-weight:600;">Latest: {ad_l['Test Date'].strftime('%m/%d/%Y')}</span>
+                                            <span style="font-size:10px; color:#6E6E73; font-weight:600;">Selected Date: {ad_l['Test Date'].strftime('%m/%d/%Y')}</span>
                                         </div>
                                         <div style="font-size:11px; line-height:1.4; color:#1D1D1F;">
-                                            <b>Initial Force:</b> L {ad_bL:.1f}N | R {ad_bR:.1f}N &nbsp;→&nbsp; <b>Latest:</b> L {render_val_with_arrow(ad_lL, ad_bL, '{:.1f}', 'N')} | R {render_val_with_arrow(ad_lR, ad_bR, '{:.1f}', 'N')}
+                                            <b>Initial Force:</b> L {ad_bL:.1f}N | R {ad_bR:.1f}N &nbsp;→&nbsp; <b>Recorded:</b> L {render_val_with_arrow(ad_lL, ad_bL, '{:.1f}', 'N')} | R {render_val_with_arrow(ad_lR, ad_bR, '{:.1f}', 'N')}
                                         </div>
                                     </div>
                                 """, unsafe_allow_html=True)
@@ -1911,10 +1938,10 @@ if check_password():
                                     <div class="hud-metric-row-light-blue">
                                         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
                                             <span style="font-weight:800; font-size:12px; color:#1D1D1F;"><span class="node-badge-blue">4</span>HIP ABDUCTION (AB)</span>
-                                            <span style="font-size:10px; color:#6E6E73; font-weight:600;">Latest: {ab_l['Test Date'].strftime('%m/%d/%Y')}</span>
+                                            <span style="font-size:10px; color:#6E6E73; font-weight:600;">Selected Date: {ab_l['Test Date'].strftime('%m/%d/%Y')}</span>
                                         </div>
                                         <div style="font-size:11px; line-height:1.4; color:#1D1D1F;">
-                                            <b>Initial Force:</b> L {ab_bL:.1f}N | R {ab_bR:.1f}N &nbsp;→&nbsp; <b>Latest:</b> L {render_val_with_arrow(ab_lL, ab_bL, '{:.1f}', 'N')} | R {render_val_with_arrow(ab_lR, ab_bR, '{:.1f}', 'N')}
+                                            <b>Initial Force:</b> L {ab_bL:.1f}N | R {ab_bR:.1f}N &nbsp;→&nbsp; <b>Recorded:</b> L {render_val_with_arrow(ab_lL, ab_bL, '{:.1f}', 'N')} | R {render_val_with_arrow(ab_lR, ab_bR, '{:.1f}', 'N')}
                                         </div>
                                     </div>
                                 """, unsafe_allow_html=True)
@@ -1929,10 +1956,10 @@ if check_password():
                                 <div class="hud-metric-row-light-blue">
                                     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
                                         <span style="font-weight:800; font-size:12px; color:#1D1D1F;"><span class="node-badge-blue">5</span>SINGLE LEG CALF RAISE</span>
-                                        <span style="font-size:10px; color:#6E6E73; font-weight:600;">Latest: {l_c['Test Date'].strftime('%m/%d/%Y')}</span>
+                                        <span style="font-size:10px; color:#6E6E73; font-weight:600;">Selected Date: {l_c['Test Date'].strftime('%m/%d/%Y')}</span>
                                     </div>
                                     <div style="font-size:11px; line-height:1.4; color:#1D1D1F;">
-                                        <b>Initial Force:</b> L {bcL:.0f}N ({bcL_bm:.2f} N/kg) | R {bcR:.0f}N &nbsp;→&nbsp; <b>Latest:</b> L {render_val_with_arrow(lcL, bcL, '{:.0f}', 'N')} | R {render_val_with_arrow(lcR, bcR, '{:.0f}', 'N')}
+                                        <b>Initial Force:</b> L {bcL:.0f}N ({bcL_bm:.2f} N/kg) | R {bcR:.0f}N &nbsp;→&nbsp; <b>Recorded:</b> L {render_val_with_arrow(lcL, bcL, '{:.0f}', 'N')} | R {render_val_with_arrow(lcR, bcR, '{:.0f}', 'N')}
                                     </div>
                                 </div>
                             """, unsafe_allow_html=True)
@@ -1940,6 +1967,7 @@ if check_password():
                         st.markdown('</div>', unsafe_allow_html=True)
                 else:
                     st.info(f"No Intake Assessment records found for {selected_intake_athlete}.")
+                    
 
             elif sel_test_tab == "Overall Testing Profile":
                 st.markdown("<h3 style='color:#1D1D1F; font-weight:900; text-transform:uppercase;'>Overall Athletic Testing Profile</h3>", unsafe_allow_html=True)
