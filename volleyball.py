@@ -59,11 +59,11 @@ st.markdown("""
     .player-divider { border: 0; height: 1px; background: #E5E5E7; margin-bottom: 15px; width: 100%; }
     .gallery-photo { 
         border-radius: 50%; 
-        width: 125px; 
-        height: 125px; 
+        width: 110px; 
+        height: 110px; 
         object-fit: contain; 
         border: 4px solid #FF8200; 
-        padding: 8px; 
+        padding: 4px; 
         box-sizing: border-box; 
         background-color: #FFFFFF;
     }
