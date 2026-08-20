@@ -1943,41 +1943,23 @@ if check_password():
                     st.markdown("<br>", unsafe_allow_html=True)
                     st.markdown(f"<h3 style='color:#1D1D1F; font-weight:900;'>Intake Assessment Raw Logs for {selected_intake_athlete}</h3>", unsafe_allow_html=True)
 
-                    with st.expander("NordBord Test Log", expanded=False):
-                        # Filter for NordBord / Hamstring test data if available in your sheets
-                        nord_df = raw_hip_df[(raw_hip_df['Name'] == selected_intake_athlete) & (raw_hip_df.get('Test Type', '').astype(str).str.contains('Nord|Hamstring', case=False, na=False))] if 'Test Type' in raw_hip_df.columns else pd.DataFrame()
-                        if not nord_df.empty:
-                            st.dataframe(nord_df.sort_values('Test Date', ascending=False), use_container_width=True, hide_index=True)
-                        else:
-                            st.info(f"No NordBord test records found for {selected_intake_athlete}.")
-
-                    with st.expander("Harness Belt Squat Log", expanded=False):
-                        squat_df = raw_calf_df[(raw_calf_df['Name'] == selected_intake_athlete) & (raw_calf_df.get('Test Type', '').astype(str).str.contains('Squat|Belt', case=False, na=False))] if 'Test Type' in raw_calf_df.columns else pd.DataFrame()
-                        if not squat_df.empty:
-                            st.dataframe(squat_df.sort_values('Test Date', ascending=False), use_container_width=True, hide_index=True)
-                        else:
-                            st.info(f"No Harness Belt Squat records found for {selected_intake_athlete}.")
-
-                    with st.expander("Knee Extension / Flexion Log", expanded=False):
-                        knee_df = raw_calf_df[(raw_calf_df['Name'] == selected_intake_athlete) & (raw_calf_df.get('Test Type', '').astype(str).str.contains('Knee', case=False, na=False))] if 'Test Type' in raw_calf_df.columns else pd.DataFrame()
-                        if not knee_df.empty:
-                            st.dataframe(knee_df.sort_values('Test Date', ascending=False), use_container_width=True, hide_index=True)
-                        else:
-                            st.info(f"No Knee Extension / Flexion records found for {selected_intake_athlete}.")
-
                     with st.expander("Hip Adduction / Abduction Log", expanded=False):
                         if not hip_ath.empty:
-                            st.dataframe(hip_ath.sort_values('Test Date', ascending=False), use_container_width=True, hide_index=True)
+                            hip_display = hip_ath.sort_values('Test Date', ascending=False).copy()
+                            if 'Test Date' in hip_display.columns:
+                                hip_display['Test Date'] = pd.to_datetime(hip_display['Test Date']).dt.strftime('%m/%d/%Y')
+                            st.dataframe(hip_display, use_container_width=True, hide_index=True)
                         else:
                             st.info(f"No Hip Adduction / Abduction records found for {selected_intake_athlete}.")
 
                     with st.expander("Ankle Plantar Flexion Log", expanded=False):
                         if not calf_ath.empty:
-                            st.dataframe(calf_ath.sort_values('Test Date', ascending=False), use_container_width=True, hide_index=True)
+                            calf_display = calf_ath.sort_values('Test Date', ascending=False).copy()
+                            if 'Test Date' in calf_display.columns:
+                                calf_display['Test Date'] = pd.to_datetime(calf_display['Test Date']).dt.strftime('%m/%d/%Y')
+                            st.dataframe(calf_display, use_container_width=True, hide_index=True)
                         else:
                             st.info(f"No Ankle Plantar Flexion (Calf) records found for {selected_intake_athlete}.")
-                else:
-                    st.info(f"No Intake Assessment records found for {selected_intake_athlete}.")
                     
 
             elif sel_test_tab == "Overall Testing Profile":
