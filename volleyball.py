@@ -416,7 +416,7 @@ def load_all_data():
 
 
 # --- 4. EWMA ACWR COMPUTATION ENGINE ---
-def compute_athlete_ewma_calendar(df_player, metrics_list):
+def compute_athlete_ewMA_calendar(df_player, metrics_list):
     if df_player.empty or df_player['Date'].dropna().empty:
         return pd.DataFrame()
     daily = df_player.groupby('Date')[metrics_list].sum().reset_index().sort_values('Date')
@@ -656,18 +656,18 @@ if check_password():
 
                 if p_row.empty or curr_date_prof is None or pd.isna(curr_date_prof):
                     curr_date_prof = pd.to_datetime(df_t0['Date'].max()) if not df_t0.empty and df_t0['Date'].notna().any() else pd.to_datetime("2026-08-06")
-                    meta_lookup = df_t0[df_t0['Name'] == selected_athlete_prof]
+                    meta_lookup = full_df_unfiltered[full_df_unfiltered['Name'] == selected_athlete_prof]
                     pos_val = meta_lookup['Position'].iloc[0] if not meta_lookup.empty else "N/A"
                     photo_val = meta_lookup['PhotoURL'].iloc[0] if not meta_lookup.empty else "https://www.w3schools.com/howto/img_avatar.png"
                     p_meta = pd.Series({'Name': selected_athlete_prof, 'Position': pos_val, 'PhotoURL': photo_val})
                     p_row = pd.Series({m: 0.0 for m in all_metrics})
                     p_row['Name'] = selected_athlete_prof
 
-                p_full_prof = df_t0[df_t0['Name'] == selected_athlete_prof]
+                # ALWAYS calculate 30-day rolling max from full unfiltered historical data
+                p_full_prof = full_df_unfiltered[full_df_unfiltered['Name'] == selected_athlete_prof]
                 curr_order = p_row.get('Sheet_Order', float('inf'))
 
                 lb_prof = p_full_prof[
-                    (p_full_prof['Season'] == selected_season) &
                     (p_full_prof['Date'].dt.date >= curr_date_prof.date() - timedelta(days=30)) & 
                     (p_full_prof['Date'].dt.date <= curr_date_prof.date()) &
                     (p_full_prof['Sheet_Order'] <= curr_order)
@@ -867,11 +867,11 @@ if check_password():
                             if i + j < len(athlete_names):
                                 name = athlete_names[i + j]
                                 p_session_row = display_df[display_df['Name'] == name].iloc[0]
-                                p_full_g = df_t1[df_t1['Name'] == name]
+                                # Look up across full historical dataset
+                                p_full_g = full_df_unfiltered[full_df_unfiltered['Name'] == name]
                                 curr_order = p_session_row.get('Sheet_Order', float('inf'))
 
                                 lb_sums = p_full_g[
-                                    (p_full_g['Season'] == selected_season) &
                                     (p_full_g['Date'].dt.date >= curr_date_gal.date() - timedelta(days=30)) & 
                                     (p_full_g['Date'].dt.date <= curr_date_gal.date()) &
                                     (p_full_g['Sheet_Order'] <= curr_order)
@@ -928,7 +928,8 @@ if check_password():
                             if i + j < len(athlete_names_comb):
                                 name = athlete_names_comb[i + j]
                                 p_session_row = display_df_comb[display_df_comb['Name'] == name].iloc[0]
-                                p_full_g = df_t2[(df_t2['Name'] == name) & (df_t2['Season'] == selected_season)]
+                                # Calculate 30-day daily sums across all seasons
+                                p_full_g = full_df_unfiltered[full_df_unfiltered['Name'] == name]
                                 daily_sums_g = p_full_g.groupby('Date')[all_metrics].sum().reset_index()
                                 lb_sums = daily_sums_g[(daily_sums_g['Date'] >= target_date_obj_comb - timedelta(days=30)) & (daily_sums_g['Date'] <= target_date_obj_comb)]
                                 
@@ -959,15 +960,15 @@ if check_password():
 
                 if selected_ph_subtab == "Individual Review":
                     sel_ath_hist = st.selectbox("Select Athlete", sorted(df_t4['Name'].unique()), key="master_ath_sel_t4")
-                    p_full = df_t4[df_t4['Name'] == sel_ath_hist].copy()
+                    p_full = full_df_unfiltered[full_df_unfiltered['Name'] == sel_ath_hist].copy()
                     p_full['Date'] = pd.to_datetime(p_full['Date'])
-                    p_sessions = p_full.sort_values(['Date', 'Sheet_Order']).reset_index(drop=True)
+                    p_sessions = df_t4[df_t4['Name'] == sel_ath_hist].sort_values(['Date', 'Sheet_Order']).reset_index(drop=True)
 
                     scores_list = []
                     for idx, row in p_sessions.iterrows():
                         row_grades = []
                         curr_order = row.get('Sheet_Order', float('inf'))
-                        lb_sums = p_full[(p_full['Season'] == selected_season) & (p_full['Date'] >= row['Date'] - timedelta(days=30)) & (p_full['Date'] <= row['Date']) & (p_full['Sheet_Order'] <= curr_order)]
+                        lb_sums = p_full[(p_full['Date'] >= row['Date'] - timedelta(days=30)) & (p_full['Date'] <= row['Date']) & (p_full['Sheet_Order'] <= curr_order)]
                         
                         for m in metrics_to_score:
                             val = row[m]
@@ -1019,15 +1020,15 @@ if check_password():
                         for j in range(2):
                             if i + j < len(ath_names):
                                 name = ath_names[i+j]
-                                p_all = df_t4[df_t4['Name'] == name].sort_values(['Date', 'Sheet_Order']).reset_index(drop=True)
-                                w_daily = p_all[p_all['Week'].astype(str) == str(sel_week)]
+                                p_all = full_df_unfiltered[full_df_unfiltered['Name'] == name].sort_values(['Date', 'Sheet_Order']).reset_index(drop=True)
+                                w_daily = df_t4[(df_t4['Name'] == name) & (df_t4['Week'].astype(str) == str(sel_week))]
                                 
                                 if not w_daily.empty:
                                     card_scores = []
                                     for idx, r in w_daily.iterrows():
                                         r_grades = []
                                         curr_order = r.get('Sheet_Order', float('inf'))
-                                        lb = p_all[(p_all['Season'] == selected_season) & (p_all['Date'] >= r['Date'] - timedelta(days=30)) & (p_all['Date'] <= r['Date']) & (p_all['Sheet_Order'] <= curr_order)]
+                                        lb = p_all[(p_all['Date'] >= r['Date'] - timedelta(days=30)) & (p_all['Date'] <= r['Date']) & (p_all['Sheet_Order'] <= curr_order)]
                                         for m in metrics_to_score:
                                             mx = lb[m].max() if not lb.empty else 1.0
                                             r_grades.append(math.ceil((r[m] / mx) * 100) if mx > 0 else 0)
@@ -1639,7 +1640,7 @@ if check_password():
                             ath_recent_7d = ath_all[(ath_all['Date'] >= week_start_window) & (ath_all['Date'] <= eval_date_obj)]
                             if ath_recent_7d.empty or (ath_recent_7d[metrics_to_score].sum().sum() == 0): continue
                             
-                        ath_cal = compute_athlete_ewma_calendar(ath_all, metrics_to_score)
+                        ath_cal = compute_athlete_ewMA_calendar(ath_all, metrics_to_score)
                         if ath_cal.empty: continue
                             
                         cal_point = ath_cal[ath_cal['Date'] <= eval_date_obj]
@@ -1722,7 +1723,7 @@ if check_password():
                 photo_url = meta_lookup['PhotoURL'].iloc[0] if not meta_lookup.empty else "https://www.w3schools.com/howto/img_avatar.png"
                 pos_str = meta_lookup['Position'].iloc[0] if not meta_lookup.empty else "N/A"
                 
-                ath_cal_ind = compute_athlete_ewma_calendar(ath_all_ind, metrics_to_score)
+                ath_cal_ind = compute_athlete_ewMA_calendar(ath_all_ind, metrics_to_score)
                 
                 if ath_cal_ind.empty or ath_cal_ind[ath_cal_ind['Date'] == sel_ind_date].empty:
                     st.info(f"No training history found for {sel_ind_ath} around {sel_ind_date.strftime('%m/%d/%Y')}.")
