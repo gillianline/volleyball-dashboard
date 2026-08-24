@@ -559,7 +559,7 @@ if check_password():
             set(raw_df['Name'].dropna().unique()) | 
             set(raw_cmj_df['Name'].dropna().unique()) | 
             set(raw_ash_df['Name'].dropna().unique()) | 
-            set(raw_er_df['Name'].dropna().unique()) |
+            set(raw_er_df['Name'].dropna().unique()) | 
             set(raw_calf_df['Name'].dropna().unique()) | 
             set(raw_hip_df['Name'].dropna().unique()) | 
             set(raw_shoulder_df['Name'].dropna().unique())
@@ -667,6 +667,7 @@ if check_password():
                 curr_order = p_row.get('Sheet_Order', float('inf'))
 
                 lb_prof = p_full_prof[
+                    (p_full_prof['Season'] == selected_season) &
                     (p_full_prof['Date'].dt.date >= curr_date_prof.date() - timedelta(days=30)) & 
                     (p_full_prof['Date'].dt.date <= curr_date_prof.date()) &
                     (p_full_prof['Sheet_Order'] <= curr_order)
@@ -870,6 +871,7 @@ if check_password():
                                 curr_order = p_session_row.get('Sheet_Order', float('inf'))
 
                                 lb_sums = p_full_g[
+                                    (p_full_g['Season'] == selected_season) &
                                     (p_full_g['Date'].dt.date >= curr_date_gal.date() - timedelta(days=30)) & 
                                     (p_full_g['Date'].dt.date <= curr_date_gal.date()) &
                                     (p_full_g['Sheet_Order'] <= curr_order)
@@ -926,7 +928,7 @@ if check_password():
                             if i + j < len(athlete_names_comb):
                                 name = athlete_names_comb[i + j]
                                 p_session_row = display_df_comb[display_df_comb['Name'] == name].iloc[0]
-                                p_full_g = df_t2[df_t2['Name'] == name]
+                                p_full_g = df_t2[(df_t2['Name'] == name) & (df_t2['Season'] == selected_season)]
                                 daily_sums_g = p_full_g.groupby('Date')[all_metrics].sum().reset_index()
                                 lb_sums = daily_sums_g[(daily_sums_g['Date'] >= target_date_obj_comb - timedelta(days=30)) & (daily_sums_g['Date'] <= target_date_obj_comb)]
                                 
@@ -965,7 +967,7 @@ if check_password():
                     for idx, row in p_sessions.iterrows():
                         row_grades = []
                         curr_order = row.get('Sheet_Order', float('inf'))
-                        lb_sums = p_full[(p_full['Date'] >= row['Date'] - timedelta(days=30)) & (p_full['Date'] <= row['Date']) & (p_full['Sheet_Order'] <= curr_order)]
+                        lb_sums = p_full[(p_full['Season'] == selected_season) & (p_full['Date'] >= row['Date'] - timedelta(days=30)) & (p_full['Date'] <= row['Date']) & (p_full['Sheet_Order'] <= curr_order)]
                         
                         for m in metrics_to_score:
                             val = row[m]
@@ -1025,7 +1027,7 @@ if check_password():
                                     for idx, r in w_daily.iterrows():
                                         r_grades = []
                                         curr_order = r.get('Sheet_Order', float('inf'))
-                                        lb = p_all[(p_all['Date'] >= r['Date'] - timedelta(days=30)) & (p_all['Date'] <= r['Date']) & (p_all['Sheet_Order'] <= curr_order)]
+                                        lb = p_all[(p_all['Season'] == selected_season) & (p_all['Date'] >= r['Date'] - timedelta(days=30)) & (p_all['Date'] <= r['Date']) & (p_all['Sheet_Order'] <= curr_order)]
                                         for m in metrics_to_score:
                                             mx = lb[m].max() if not lb.empty else 1.0
                                             r_grades.append(math.ceil((r[m] / mx) * 100) if mx > 0 else 0)
