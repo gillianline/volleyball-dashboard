@@ -65,7 +65,7 @@ st.markdown("""
         border: 4px solid #FF8200; 
         padding: 4px; 
         box-sizing: border-box; 
-        background-color: #FFFFFF;
+        background-color: #FFFFFF; 
     }
     .section-header { font-size: 20px; font-weight: 800; color: #4895DB; border-bottom: 2px solid #FF8200; margin-top: 15px; margin-bottom: 10px; padding-bottom: 5px; text-transform: uppercase; }
 
@@ -160,7 +160,7 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 
-# --- 2. PASSWORD VALIDATION ---
+# --- 2. PASSWORD & UTILITY FUNCTIONS ---
 def check_password():
     def password_entered():
         if st.session_state["password"] == st.secrets["PASSWORD"]:
@@ -216,7 +216,7 @@ def get_readiness_color(pct_score):
 
 phase_map = {}
 
-# --- 3. HARD DECOUPLED DATA FETCHING ENGINE ---
+# --- 3. DATA FETCHING ENGINE ---
 @st.cache_data(ttl=10)
 def load_all_data():
     def heavy_sanitize(frame):
@@ -245,11 +245,9 @@ def load_all_data():
         m = date_val.month
         d = date_val.day
     
-        # Isolate historical data (2025 and earlier)
         if y < 2026:
             return f"Historical {y}"
         
-        # 2026 Active Season Boundaries
         if (m == 8 and d >= 24) or (m > 8 and m <= 12):
             return 'In-Season'
         elif (m == 7 and d >= 28) or (m == 8 and d < 24):
@@ -305,7 +303,6 @@ def load_all_data():
         cmj_df['Week'] = pd.to_numeric(cmj_df['Week'].astype(str).str.extract(r'(\d+)', expand=False), errors='coerce').fillna(0).astype(int)
     cmj_df['Season'] = cmj_df['Test Date'].apply(assign_season)
 
-    # Standardized calculated columns
     if 'Countermovement Depth [cm]' in cmj_df.columns:
         cmj_df['Adjusted CMD'] = pd.to_numeric(cmj_df['Countermovement Depth [cm]'], errors='coerce').abs()
     else:
@@ -560,8 +557,8 @@ if check_password():
             set(raw_cmj_df['Name'].dropna().unique()) | 
             set(raw_ash_df['Name'].dropna().unique()) | 
             set(raw_er_df['Name'].dropna().unique()) |
-            set(raw_calf_df['Name'].dropna().unique()) |
-            set(raw_hip_df['Name'].dropna().unique()) |
+            set(raw_calf_df['Name'].dropna().unique()) | 
+            set(raw_hip_df['Name'].dropna().unique()) | 
             set(raw_shoulder_df['Name'].dropna().unique())
         ))
 
@@ -745,14 +742,14 @@ if check_password():
                         base_li = baseline_ash.iloc[-1]['Peak Vertical Force [N] (L)'] if not baseline_ash.empty else 0.0
                         base_ri = baseline_ash.iloc[-1]['Peak Vertical Force [N] (R)'] if not baseline_ash.empty else 0.0
                         pct_l = ((li - base_li) / base_li * 100) if base_li > 0 else 0
-                        pct_r = ((ri - base_ri) / base_ri * 100) if base_ri > 0 else 0
+                        pct_r_ash = ((ri - base_ri) / base_ri * 100) if base_ri > 0 else 0
                         color_ash_l = "#28a745" if li >= 100 else "#dc3545"
                         color_ash_r = "#28a745" if ri >= 100 else "#dc3545"
 
                         sc1, sc2 = st.columns(2)
                         with sc1: st.markdown(f'<div style="text-align:center;"><div class="score-box" style="background-color:{color_ash_l}; line-height:1.2; padding-top:15px; height:80px; width:100%;"><span style="font-size:18px;">{li:.0f} N</span><span style="font-size:10px; display:block; font-weight:bold; margin-top:2px;">LEFT</span></div></div>', unsafe_allow_html=True)
                         with sc2: st.markdown(f'<div style="text-align:center;"><div class="score-box" style="background-color:{color_ash_r}; line-height:1.2; padding-top:15px; height:80px; width:100%;"><span style="font-size:18px;">{ri:.0f} N</span><span style="font-size:10px; display:block; font-weight:bold; margin-top:2px;">RIGHT</span></div></div>', unsafe_allow_html=True)
-                        st.markdown(f'<div class="info-box" style="text-align:center; margin-top:10px;"><p style="margin:0; font-size:11px; color:grey;"><b>Asymmetry:</b> {asym_i:+.1f}%</p><p style="margin:0; font-size:11px; color:grey;"><b>% Change from Base:</b> L: {pct_l:+.1f}% | R: {pct_r:+.1f}%</p><p style="margin:0; font-size:11px; color:grey;"><b>Base Force:</b> L: {base_li:.0f} N | R: {base_ri:.0f} N</p></div>', unsafe_allow_html=True)
+                        st.markdown(f'<div class="info-box" style="text-align:center; margin-top:10px;"><p style="margin:0; font-size:11px; color:grey;"><b>Asymmetry:</b> {asym_i:+.1f}%</p><p style="margin:0; font-size:11px; color:grey;"><b>% Change from Base:</b> L: {pct_l:+.1f}% | R: {pct_r_ash:+.1f}%</p><p style="margin:0; font-size:11px; color:grey;"><b>Base Force:</b> L: {base_li:.0f} N | R: {base_ri:.0f} N</p></div>', unsafe_allow_html=True)
                     with ac2:
                         p_ash_i_only = p_ash_all[p_ash_all['Isometric Type'].str.contains('I', case=False, na=False)]
                         if not p_ash_i_only.empty:
@@ -787,7 +784,7 @@ if check_password():
                             sc1, sc2 = st.columns(2)
                             with sc1: st.markdown(f'<div style="text-align:center;"><div class="score-box" style="background-color:{color_er_l}; line-height:1.2; padding-top:15px; height:80px; width:100%;"><span style="font-size:18px;">{cur_l_rom:.1f}°</span><span style="font-size:10px; display:block; font-weight:bold; margin-top:2px;">LEFT</span></div></div>', unsafe_allow_html=True)
                             with sc2: st.markdown(f'<div style="text-align:center;"><div class="score-box" style="background-color:{color_er_r}; line-height:1.2; padding-top:15px; height:80px; width:100%;"><span style="font-size:18px;">{cur_r_rom:.1f}°</span><span style="font-size:10px; display:block; font-weight:bold; margin-top:2px;">RIGHT</span></div></div>', unsafe_allow_html=True)
-                            st.markdown(f'<div class="info-box" style="text-align:center; margin-top:10px;"><p style="margin:0; font-size:11px; color:grey;"><b>Asymmetry:</b> {cur_asym_rom:+.1f}%</p><p style="margin:0; font-size:11px; color:grey;"><b>% Change from Base:</b> L: {rom_pct_l:+.1f}% | R: {pct_r:+.1f}%</p><p style="margin:0; font-size:11px; color:grey;"><b>Base ROM:</b> L: {base_l_rom:.1f}° | R: {base_r_rom:.1f}°</p></div>', unsafe_allow_html=True)
+                            st.markdown(f'<div class="info-box" style="text-align:center; margin-top:10px;"><p style="margin:0; font-size:11px; color:grey;"><b>Asymmetry:</b> {cur_asym_rom:+.1f}%</p><p style="margin:0; font-size:11px; color:grey;"><b>% Change from Base:</b> L: {rom_pct_l:+.1f}% | R: {rom_pct_r:+.1f}%</p><p style="margin:0; font-size:11px; color:grey;"><b>Base ROM:</b> L: {base_l_rom:.1f}° | R: {base_r_rom:.1f}°</p></div>', unsafe_allow_html=True)
                     with ec2:
                         fig_er = go.Figure()
                         fig_er.add_trace(go.Scatter(x=p_er_hist['Test Date'], y=p_er_hist['L Max ROM (°)'], name="Left Max ROM", mode='lines+markers', line=dict(color='#4895DB', width=2.5)))
@@ -1054,7 +1051,6 @@ if check_password():
                     if ath_cmj_all.empty:
                         st.info(f"No CMJ records found for {sel_cmj_ath}.")
                     else:
-                        # Safely sort unique test dates in descending order (most recent first)
                         valid_dates = ath_cmj_all['Test Date'].dropna().drop_duplicates().sort_values(ascending=False).dt.strftime('%m/%d/%y').tolist()
                         with c_cmj_date: sel_test_date_str = st.selectbox("Test Date", valid_dates, index=0, key="cmj_dash_date_sel")
 
@@ -1200,7 +1196,6 @@ if check_password():
 
                 elif sel_cmj_mode == "Team CMJ Summary":
                     st.markdown("### Team Wellness Score Overview")
-                    # Safely sort unique team evaluation dates in descending order
                     team_cmj_dates = raw_cmj_df['Test Date'].dropna().drop_duplicates().sort_values(ascending=False).dt.strftime('%m/%d/%y').tolist()
                     
                     c_sum_d1, c_sum_d2 = st.columns([1.5, 2])
@@ -1704,10 +1699,10 @@ if check_password():
                 "Intake Testing", 
                 "Overall Testing Profile", 
                 "Season Comparison",
-                "Spring Testing", 
-                "Summer Testing", 
+                "In-Season Testing",
                 "Pre-Season Testing",
-                "Position Analysis"
+                "Summer Testing", 
+                "Spring Testing"
             ]
             if "test_subtab_radio" not in st.session_state or st.session_state["test_subtab_radio"] not in testing_subtabs:
                 st.session_state["test_subtab_radio"] = testing_subtabs[0]
@@ -1945,7 +1940,6 @@ if check_password():
                     st.markdown("<br>", unsafe_allow_html=True)
                     st.markdown(f"<h3 style='color:#1D1D1F; font-weight:900;'>Intake Assessment Raw Logs for {selected_intake_athlete}</h3>", unsafe_allow_html=True)
 
-                    # Helper function to format tables exactly like the reference UI
                     def format_intake_table(df_source, test_col='Direction', test_fallback='Test'):
                         if df_source.empty:
                             return pd.DataFrame()
@@ -1953,7 +1947,6 @@ if check_password():
                         df_out = df_source.sort_values('Test Date', ascending=True).copy()
                         df_out['DATE'] = pd.to_datetime(df_out['Test Date']).dt.strftime('%Y-%m-%d')
                         
-                        # Identify Test Name / Type
                         if test_col in df_out.columns:
                             df_out['TEST'] = df_out[test_col].astype(str)
                         elif 'Isometric Type' in df_out.columns:
@@ -1961,14 +1954,12 @@ if check_password():
                         else:
                             df_out['TEST'] = test_fallback
                             
-                        # Extract Left and Right Force
                         l_col = 'L Max Force (N)' if 'L Max Force (N)' in df_out.columns else 'Peak Vertical Force [N] (L)'
                         r_col = 'R Max Force (N)' if 'R Max Force (N)' in df_out.columns else 'Peak Vertical Force [N] (R)'
                         
                         df_out['L_VAL'] = pd.to_numeric(df_out[l_col], errors='coerce').fillna(0.0) if l_col in df_out.columns else 0.0
                         df_out['R_VAL'] = pd.to_numeric(df_out[r_col], errors='coerce').fillna(0.0) if r_col in df_out.columns else 0.0
                         
-                        # Calculate Max Imbalance (%)
                         def calc_imbalance(row):
                             lv, rv = row['L_VAL'], row['R_VAL']
                             high = max(lv, rv)
@@ -1978,7 +1969,6 @@ if check_password():
 
                         df_out['MAX IMBALANCE'] = df_out.apply(calc_imbalance, axis=1)
                         
-                        # Formatting numeric display
                         df_out['L MAX FORCE (N)'] = df_out['L_VAL'].apply(lambda x: f"{x:.2f}")
                         df_out['R MAX FORCE (N)'] = df_out['R_VAL'].apply(lambda x: f"{x:.2f}")
                         df_out['MAX IMBALANCE'] = df_out['MAX IMBALANCE'].apply(lambda x: f"{x:.2f}")
@@ -2168,7 +2158,7 @@ if check_password():
                 if not cmj_comp.empty or not ash_comp.empty or not er_comp.empty:
                     st.markdown("#### Countermovement Jump Trend Across Seasons")
                     if not cmj_comp.empty:
-                        season_order = ["Spring", "Summer", "Pre-Season"]
+                        season_order = ["Spring", "Summer", "Pre-Season", "In-Season"]
                         cmj_comp_ordered = cmj_comp.copy()
                         cmj_comp_ordered['Season'] = pd.Categorical(cmj_comp_ordered['Season'], categories=season_order, ordered=True)
             
@@ -2188,7 +2178,7 @@ if check_password():
                     
                     st.markdown("#### Season-by-Season Best")
                     summary_rows = []
-                    for season_period in ['Spring', 'Summer', 'Pre-Season']:
+                    for season_period in ['Spring', 'Summer', 'Pre-Season', 'In-Season']:
                         s_cmj = cmj_comp[cmj_comp['Season'] == season_period]
                         s_ash = ash_comp[ash_comp['Season'] == season_period]
                         s_er = er_comp[er_comp['Season'] == season_period]
@@ -2211,7 +2201,7 @@ if check_password():
                         })
                     st.dataframe(pd.DataFrame(summary_rows), use_container_width=True, hide_index=True)
 
-            elif sel_test_tab in ["Spring Testing", "Summer Testing", "Pre-Season Testing"]:
+            elif sel_test_tab in ["In-Season Testing", "Pre-Season Testing", "Summer Testing", "Spring Testing"]:
                 s_label = sel_test_tab.replace(" Testing", "")
                 c_t_ath, _ = st.columns([2, 2])
                 with c_t_ath: selected_athlete_test = st.selectbox(f"Select Athlete ({s_label})", master_athlete_list, key=f"nav_ath_test_{s_label}")
@@ -2268,14 +2258,14 @@ if check_password():
                         base_li = baseline_ash.iloc[-1]['Peak Vertical Force [N] (L)'] if not baseline_ash.empty else 0.0
                         base_ri = baseline_ash.iloc[-1]['Peak Vertical Force [N] (R)'] if not baseline_ash.empty else 0.0
                         pct_l = ((li - base_li) / base_li * 100) if base_li > 0 else 0
-                        pct_r = ((ri - base_ri) / base_ri * 100) if base_ri > 0 else 0
+                        pct_r_ash = ((ri - base_ri) / base_ri * 100) if base_ri > 0 else 0
                         color_ash_l = "#28a745" if li >= 100 else "#dc3545"
                         color_ash_r = "#28a745" if ri >= 100 else "#dc3545"
 
                         sc1, sc2 = st.columns(2)
                         with sc1: st.markdown(f'<div style="text-align:center;"><div class="score-box" style="background-color:{color_ash_l}; line-height:1.2; padding-top:15px; height:80px; width:100%;"><span style="font-size:18px;">{li:.0f} N</span><span style="font-size:10px; display:block; font-weight:bold; margin-top:2px;">LEFT</span></div></div>', unsafe_allow_html=True)
                         with sc2: st.markdown(f'<div style="text-align:center;"><div class="score-box" style="background-color:{color_ash_r}; line-height:1.2; padding-top:15px; height:80px; width:100%;"><span style="font-size:18px;">{ri:.0f} N</span><span style="font-size:10px; display:block; font-weight:bold; margin-top:2px;">RIGHT</span></div></div>', unsafe_allow_html=True)
-                        st.markdown(f'<div class="info-box" style="text-align:center; margin-top:10px;"><p style="margin:0; font-size:11px; color:grey;"><b>Asymmetry:</b> {asym_i:+.1f}%</p><p style="margin:0; font-size:11px; color:grey;"><b>% Change from Base:</b> L: {pct_l:+.1f}% | R: {pct_r:+.1f}%</p><p style="margin:0; font-size:11px; color:grey;"><b>Base Force:</b> L: {base_li:.0f} N | R: {base_ri:.0f} N</p></div>', unsafe_allow_html=True)
+                        st.markdown(f'<div class="info-box" style="text-align:center; margin-top:10px;"><p style="margin:0; font-size:11px; color:grey;"><b>Asymmetry:</b> {asym_i:+.1f}%</p><p style="margin:0; font-size:11px; color:grey;"><b>% Change from Base:</b> L: {pct_l:+.1f}% | R: {pct_r_ash:+.1f}%</p><p style="margin:0; font-size:11px; color:grey;"><b>Base Force:</b> L: {base_li:.0f} N | R: {base_ri:.0f} N</p></div>', unsafe_allow_html=True)
                     with ac2:
                         fig_ash_t = go.Figure()
                         fig_ash_t.add_trace(go.Scatter(x=ash_t_data['Test Date'], y=ash_t_data['Peak Vertical Force [N] (L)'], name="Left Peak Force", mode='lines+markers', line=dict(color='#4895DB', width=2.5)))
@@ -2306,7 +2296,7 @@ if check_password():
                         sc1, sc2 = st.columns(2)
                         with sc1: st.markdown(f'<div style="text-align:center;"><div class="score-box" style="background-color:{color_er_l}; line-height:1.2; padding-top:15px; height:80px; width:100%;"><span style="font-size:18px;">{cur_l_rom:.1f}°</span><span style="font-size:10px; display:block; font-weight:bold; margin-top:2px;">LEFT</span></div></div>', unsafe_allow_html=True)
                         with sc2: st.markdown(f'<div style="text-align:center;"><div class="score-box" style="background-color:{color_er_r}; line-height:1.2; padding-top:15px; height:80px; width:100%;"><span style="font-size:18px;">{cur_r_rom:.1f}°</span><span style="font-size:10px; display:block; font-weight:bold; margin-top:2px;">RIGHT</span></div></div>', unsafe_allow_html=True)
-                        st.markdown(f'<div class="info-box" style="text-align:center; margin-top:10px;"><p style="margin:0; font-size:11px; color:grey;"><b>Asymmetry:</b> {cur_asym_rom:+.1f}%</p><p style="margin:0; font-size:11px; color:grey;"><b>% Change from Base:</b> L: {rom_pct_l:+.1f}% | R: {pct_r:+.1f}%</p><p style="margin:0; font-size:11px; color:grey;"><b>Base ROM:</b> L: {base_l_rom:.1f}° | R: {base_r_rom:.1f}°</p></div>', unsafe_allow_html=True)
+                        st.markdown(f'<div class="info-box" style="text-align:center; margin-top:10px;"><p style="margin:0; font-size:11px; color:grey;"><b>Asymmetry:</b> {cur_asym_rom:+.1f}%</p><p style="margin:0; font-size:11px; color:grey;"><b>% Change from Base:</b> L: {rom_pct_l:+.1f}% | R: {rom_pct_r:+.1f}%</p><p style="margin:0; font-size:11px; color:grey;"><b>Base ROM:</b> L: {base_l_rom:.1f}° | R: {base_r_rom:.1f}°</p></div>', unsafe_allow_html=True)
                     with ec2:
                         fig_er_t = go.Figure()
                         fig_er_t.add_trace(go.Scatter(x=er_t_data['Test Date'], y=er_t_data['L Max ROM (°)'], name="Left Max ROM", mode='lines+markers', line=dict(color='#4895DB', width=2.5)))
