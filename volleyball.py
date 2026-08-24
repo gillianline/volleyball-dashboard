@@ -244,13 +244,15 @@ def load_all_data():
         y = date_val.year
         m = date_val.month
         d = date_val.day
-        
-        # Isolate historical data (2025 and earlier) so it does not mix with the 2026 season tabs
+    
+        # Isolate historical data (2025 and earlier)
         if y < 2026:
             return f"Historical {y}"
-            
+        
         # 2026 Active Season Boundaries
-        if (m == 7 and d >= 28) or (m >= 8 and m <= 12):
+        if (m == 8 and d >= 24) or (m > 8 and m <= 12):
+            return 'In-Season'
+        elif (m == 7 and d >= 28) or (m == 8 and d < 24):
             return 'Pre-Season'
         elif 1 <= m <= 4:
             return 'Spring'
@@ -504,16 +506,16 @@ if check_password():
 
         # --- GLOBAL SIDEBAR ---
         st.sidebar.markdown("### Active Season")
-        view_seasons = ["Pre-Season", "Spring", "Summer"]
+        view_seasons = ["In-Season", "Pre-Season", "Spring", "Summer"]
         if "global_season_toggle" not in st.session_state:
-            st.session_state.global_season_toggle = "Pre-Season"
-            
+            st.session_state.global_season_toggle = "In-Season"
+    
         selected_season = st.sidebar.selectbox(
             "Select Season", 
             view_seasons, 
             key="global_season_toggle"
         )
-        
+            
         st.sidebar.markdown("---")
         st.sidebar.markdown("### Performance Hubs")
         
