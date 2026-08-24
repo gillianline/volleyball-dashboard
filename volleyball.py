@@ -216,7 +216,7 @@ def get_readiness_color(pct_score):
 
 phase_map = {}
 
-# --- 3. DATA FETCHING ENGINE ---
+# --- 3. HARD DECOUPLED DATA FETCHING ENGINE ---
 @st.cache_data(ttl=10)
 def load_all_data():
     def heavy_sanitize(frame):
@@ -245,9 +245,11 @@ def load_all_data():
         m = date_val.month
         d = date_val.day
     
+        # Isolate historical data (2025 and earlier)
         if y < 2026:
             return f"Historical {y}"
         
+        # 2026 Active Season Boundaries
         if (m == 8 and d >= 24) or (m > 8 and m <= 12):
             return 'In-Season'
         elif (m == 7 and d >= 28) or (m == 8 and d < 24):
@@ -303,6 +305,7 @@ def load_all_data():
         cmj_df['Week'] = pd.to_numeric(cmj_df['Week'].astype(str).str.extract(r'(\d+)', expand=False), errors='coerce').fillna(0).astype(int)
     cmj_df['Season'] = cmj_df['Test Date'].apply(assign_season)
 
+    # Standardized calculated columns
     if 'Countermovement Depth [cm]' in cmj_df.columns:
         cmj_df['Adjusted CMD'] = pd.to_numeric(cmj_df['Countermovement Depth [cm]'], errors='coerce').abs()
     else:
@@ -1057,15 +1060,12 @@ if check_password():
                         cur_idx_list = ath_cmj_all[ath_cmj_all['Test Date'].dt.strftime('%m/%d/%y') == sel_test_date_str].index.tolist()
                         cur_test_row = ath_cmj_all.loc[cur_idx_list[-1]]
                         
-                        curr_season = cur_test_row.get('Season', 'Pre-Season')
-                        ath_season_data = ath_cmj_all[ath_cmj_all['Season'] == curr_season].sort_values('Test Date')
-                        if ath_season_data.empty: ath_season_data = ath_cmj_all
-
-                        base_test_row = ath_season_data.iloc[0]
-                        season_indices = list(ath_season_data.index)
-                        if cur_idx_list[-1] in season_indices:
-                            cur_pos = season_indices.index(cur_idx_list[-1])
-                            prev_test_row = ath_season_data.iloc[max(0, cur_pos - 1)]
+                        # --- OVERALL ALL-TIME BASELINE & PREVIOUS JUMP LOOKUP ---
+                        base_test_row = ath_cmj_all.iloc[0]
+                        all_indices = list(ath_cmj_all.index)
+                        if cur_idx_list[-1] in all_indices:
+                            cur_pos = all_indices.index(cur_idx_list[-1])
+                            prev_test_row = ath_cmj_all.iloc[max(0, cur_pos - 1)]
                         else:
                             prev_test_row = cur_test_row
 
@@ -1106,7 +1106,7 @@ if check_password():
                                 pct_color = "#137333" if diff >= 0 else "#D93025"
                                 table_rows_str += f"""<tr><td style="text-align:left !important; padding-left:12px; font-weight:600;">{lbl}</td><td style="color:#64748B;">{fmt.format(b_val)}</td><td style="font-weight:800; background:#F0F7FF; border: 1px solid #3B82F6;">{fmt.format(c_val)}</td><td style="font-weight:800; color:{pct_color};">{diff:+.0f}%</td></tr>"""
                             
-                            full_table_html = f"""<div style="background:#4895DB; color:white; font-weight:900; font-size:14px; text-align:center; padding:6px; border-radius:6px 6px 0 0;">Countermovement Jump Performance</div><table class="scout-table" style="width:100%; border:1px solid #E2E8F0; border-top:none; background:white; border-collapse:collapse; margin-bottom:0;"><thead><tr style="background:#F8FAFC; color:#64748B; font-size:11px;"><th style="text-align:left !important; padding:6px 12px;">Metric</th><th style="padding:6px;">Baseline ({curr_season})</th><th style="padding:6px; background:#EBF5FF; color:#1E40AF;">Current</th><th style="padding:6px;">% Change</th></tr></thead><tbody>{table_rows_str}</tbody></table>"""
+                            full_table_html = f"""<div style="background:#4895DB; color:white; font-weight:900; font-size:14px; text-align:center; padding:6px; border-radius:6px 6px 0 0;">Countermovement Jump Performance</div><table class="scout-table" style="width:100%; border:1px solid #E2E8F0; border-top:none; background:white; border-collapse:collapse; margin-bottom:0;"><thead><tr style="background:#F8FAFC; color:#64748B; font-size:11px;"><th style="text-align:left !important; padding:6px 12px;">Metric</th><th style="padding:6px;">Baseline (Overall)</th><th style="padding:6px; background:#EBF5FF; color:#1E40AF;">Current</th><th style="padding:6px;">% Change</th></tr></thead><tbody>{table_rows_str}</tbody></table>"""
                             st.markdown(full_table_html, unsafe_allow_html=True)
 
                         with top_col3:
@@ -1216,15 +1216,14 @@ if check_password():
                         if ath_date_match.empty: continue
                             
                         target_row = ath_date_match.iloc[-1]
-                        ath_season = target_row.get('Season', 'Pre-Season')
-                        ath_season_sub = ath_sub_cmj[ath_sub_cmj['Season'] == ath_season].sort_values('Test Date')
-                        if ath_season_sub.empty: ath_season_sub = ath_sub_cmj
-                            
-                        season_indices = list(ath_season_sub.index)
-                        if target_row.name in season_indices:
-                            cur_pos = season_indices.index(target_row.name)
-                            prev_row = ath_season_sub.iloc[max(0, cur_pos - 1)]
-                        else: prev_row = target_row
+                        
+                        # --- OVERALL CHRONOLOGICAL PREVIOUS TEST LOOKUP ---
+                        all_indices = list(ath_sub_cmj.index)
+                        if target_row.name in all_indices:
+                            cur_pos = all_indices.index(target_row.name)
+                            prev_row = ath_sub_cmj.iloc[max(0, cur_pos - 1)]
+                        else: 
+                            prev_row = target_row
                         
                         readiness_pct = int(round(compute_excel_readiness_score(target_row, prev_row)))
                         z_color = get_readiness_color(readiness_pct)
