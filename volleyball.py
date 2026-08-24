@@ -1377,56 +1377,76 @@ if check_password():
                     if sel_pos_m != "All Positions":
                         filtered_match = filtered_match[filtered_match['Position'] == sel_pos_m]
                         
-                    recovery_rows = []
+                    filtered_match = filtered_match.sort_values("Total Jumps", ascending=False)
+                    
+                    table_rows_html = ""
                     for _, row in filtered_match.iterrows():
                         ath_name = row['Name']
                         m_date = pd.to_datetime(row['Date'])
+                        pos_str = row['Position']
                         
                         ath_all_cmj = raw_cmj_df[raw_cmj_df['Name'] == ath_name].sort_values('Test Date')
                         
                         # Pre-match baseline jump (latest test on or before match day)
                         pre_cmj = ath_all_cmj[ath_all_cmj['Test Date'] <= m_date]
                         pre_h = pre_cmj.iloc[-1][cmj_col] if (not pre_cmj.empty and cmj_col in pre_cmj.columns) else None
-                        pre_rsi = pre_cmj.iloc[-1][rsi_col] if (not pre_cmj.empty and rsi_col in pre_cmj.columns) else None
                         
                         # Post-match recovery jump (first test within 1-4 days after match day)
                         post_cmj = ath_all_cmj[(ath_all_cmj['Test Date'] > m_date) & (ath_all_cmj['Test Date'] <= m_date + timedelta(days=4))]
                         post_h = post_cmj.iloc[0][cmj_col] if (not post_cmj.empty and cmj_col in post_cmj.columns) else None
-                        post_rsi = post_cmj.iloc[0][rsi_col] if (not post_cmj.empty and rsi_col in post_cmj.columns) else None
                         
-                        # Delta calculations
+                        # Delta and Badge formatting
                         if pre_h is not None and post_h is not None and pre_h > 0:
                             diff_h = ((post_h - pre_h) / pre_h) * 100
-                            h_diff_str = f"{diff_h:+.1f}%"
+                            if diff_h >= 0:
+                                delta_badge = f'<span style="background-color: #E6F4EA; color: #137333; padding: 4px 10px; border-radius: 12px; font-weight: 800; font-size: 11px;">↑ +{diff_h:.1f}%</span>'
+                            else:
+                                delta_badge = f'<span style="background-color: #FCE8E6; color: #D93025; padding: 4px 10px; border-radius: 12px; font-weight: 800; font-size: 11px;">↓ {diff_h:.1f}%</span>'
                         else:
-                            h_diff_str = "N/A"
+                            delta_badge = '<span style="background-color: #F1F5F9; color: #64748B; padding: 4px 10px; border-radius: 12px; font-weight: 700; font-size: 11px;">No Post-Test</span>'
                             
-                        if pre_rsi is not None and post_rsi is not None and pre_rsi > 0:
-                            diff_rsi = ((post_rsi - pre_rsi) / pre_rsi) * 100
-                            rsi_diff_str = f"{diff_rsi:+.1f}%"
-                        else:
-                            rsi_diff_str = "N/A"
-                            
-                        recovery_rows.append({
-                            "Athlete": ath_name,
-                            "Position": row['Position'],
-                            "Match Jumps": int(row['Total Jumps']),
-                            "Match Load": f"{row['Player Load']:.0f}",
-                            "Explosive Efforts": int(row['Explosive Efforts']),
-                            "Pre-Match CMJ": f"{pre_h:.1f}" if pre_h is not None else "—",
-                            "Post-Match CMJ": f"{post_h:.1f}" if post_h is not None else "—",
-                            "CMJ Height Δ": h_diff_str,
-                            "Pre-Match RSI": f"{pre_rsi:.2f}" if pre_rsi is not None else "—",
-                            "Post-Match RSI": f"{post_rsi:.2f}" if post_rsi is not None else "—",
-                            "RSI Δ": rsi_diff_str
-                        })
+                        pre_str = f"{pre_h:.1f} in" if pre_h is not None else "—"
+                        post_str = f"{post_h:.1f} in" if post_h is not None else "—"
                         
-                    if recovery_rows:
-                        st.dataframe(pd.DataFrame(recovery_rows).sort_values("Match Jumps", ascending=False), use_container_width=True, hide_index=True)
+                        table_rows_html += f"""
+                        <tr>
+                            <td style="font-weight: 800; text-align: left !important; padding-left: 14px;">{ath_name}</td>
+                            <td style="font-weight: 600; color: #64748B;">{pos_str}</td>
+                            <td style="font-weight: 800; color: #FF8200; font-size: 13px;">{int(row['Total Jumps'])}</td>
+                            <td style="font-weight: 600;">{row['Player Load']:.0f}</td>
+                            <td style="font-weight: 600;">{int(row['Explosive Efforts'])}</td>
+                            <td style="color: #475569; font-weight: 700;">{pre_str}</td>
+                            <td style="font-weight: 800; color: #0F172A;">{post_str}</td>
+                            <td>{delta_badge}</td>
+                        </tr>
+                        """
+                        
+                    if table_rows_html:
+                        full_table_html = f"""
+                        <table class="scout-table" style="width: 100%; border: 1px solid #E2E8F0; background: white; margin-top: 15px; box-shadow: 0 1px 3px rgba(0,0,0,0.02);">
+                            <thead>
+                                <tr style="background: #4895DB; color: white;">
+                                    <th style="text-align: left !important; padding-left: 14px;">Athlete</th>
+                                    <th>Position</th>
+                                    <th>Match Jumps</th>
+                                    <th>Match Load</th>
+                                    <th>Efforts</th>
+                                    <th>Pre-Match CMJ</th>
+                                    <th>Post-Match CMJ</th>
+                                    <th>Recovery Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {table_rows_html}
+                            </tbody>
+                        </table>
+                        """
+                        st.markdown(full_table_html, unsafe_allow_html=True)
                     else:
                         st.info("No athlete match records found.")
                 else:
                     st.info("No match session records available in the selected season.")
+                    
             
 
 
