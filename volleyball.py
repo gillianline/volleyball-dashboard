@@ -1258,7 +1258,7 @@ if check_password():
         # --- HUB 2: MATCH PERFORMANCE --------------------------------------------
         # =========================================================================
         elif selected_hub == "Match Performance":
-            match_subtabs = ["Match Summary", "Match v. Practice", "Match v. Jumps & Recovery"]
+            match_subtabs = ["Match Summary", "Match v. Practice", "Match v. CMJ Recovery"]
             if "match_subtab_radio" not in st.session_state or st.session_state["match_subtab_radio"] not in match_subtabs:
                 st.session_state["match_subtab_radio"] = match_subtabs[0]
 
@@ -1361,52 +1361,72 @@ if check_password():
                         overall_html += f"""<tr><td style="padding: 10px; border: 1px solid #ddd;"><b>{m}</b></td><td style="padding: 10px; border: 1px solid #ddd;">{p_rate:.2f}</td><td style="padding: 10px; border: 1px solid #ddd;">{m_rate:.2f}</td><td style="padding: 10px; border: 1px solid #ddd; font-weight: bold;">{(((m_rate - p_rate) / p_rate * 100) if p_rate > 0 else 0):+.1f}%</td></tr>"""
                     st.markdown(overall_html + "</table>", unsafe_allow_html=True)
 
-            elif sel_match_tab == "Match v. Jumps & Recovery":
-                st.markdown('<div class="section-header">Match Jump Demands & Recovery Overview</div>', unsafe_allow_html=True)
+            elif sel_match_tab == "Match v. CMJ Recovery":
+                st.markdown('<div class="section-header">Match Volume Demands vs. CMJ Jump Recovery</div>', unsafe_allow_html=True)
                 
                 match_rec_df = match_master.copy()
                 
                 if not match_rec_df.empty:
                     c_m1, c_m2 = st.columns([1.5, 2])
                     with c_m1:
-                        sel_match_session = st.selectbox("Select Match Session", sorted(match_rec_df['Session_Name'].unique()), key="m_v_rec_session")
+                        sel_match_session = st.selectbox("Select Match Session", sorted(match_rec_df['Session_Name'].unique()), key="m_v_cmj_session")
                     with c_m2:
-                        sel_pos_m = st.selectbox("Position Filter", ["All Positions"] + sorted([p for p in match_rec_df['Position'].unique() if p != "N/A"]), key="m_v_rec_pos")
+                        sel_pos_m = st.selectbox("Position Filter", ["All Positions"] + sorted([p for p in match_rec_df['Position'].unique() if p != "N/A"]), key="m_v_cmj_pos")
                         
                     filtered_match = match_rec_df[match_rec_df['Session_Name'] == sel_match_session].copy()
                     if sel_pos_m != "All Positions":
                         filtered_match = filtered_match[filtered_match['Position'] == sel_pos_m]
                         
-                    summary_rows = []
+                    recovery_rows = []
                     for _, row in filtered_match.iterrows():
                         ath_name = row['Name']
-                        m_date = row['Date']
+                        m_date = pd.to_datetime(row['Date'])
                         
-                        # Find closest following CMJ test within 72h
-                        cmj_post = raw_cmj_df[(raw_cmj_df['Name'] == ath_name) & (raw_cmj_df['Test Date'] >= m_date) & (raw_cmj_df['Test Date'] <= m_date + timedelta(days=3))].sort_values('Test Date')
+                        ath_all_cmj = raw_cmj_df[raw_cmj_df['Name'] == ath_name].sort_values('Test Date')
                         
-                        post_score_str = "N/A"
-                        if not cmj_post.empty:
-                            t_row = cmj_post.iloc[0]
-                            all_ath_cmj = raw_cmj_df[raw_cmj_df['Name'] == ath_name].sort_values('Test Date')
-                            pos_idx = list(all_ath_cmj.index).index(t_row.name)
-                            prev_row = all_ath_cmj.iloc[max(0, pos_idx - 1)]
-                            post_score = int(round(compute_excel_readiness_score(t_row, prev_row)))
-                            post_score_str = f"{post_score}%"
+                        # Pre-match baseline jump (latest test on or before match day)
+                        pre_cmj = ath_all_cmj[ath_all_cmj['Test Date'] <= m_date]
+                        pre_h = pre_cmj.iloc[-1][cmj_col] if (not pre_cmj.empty and cmj_col in pre_cmj.columns) else None
+                        pre_rsi = pre_cmj.iloc[-1][rsi_col] if (not pre_cmj.empty and rsi_col in pre_cmj.columns) else None
                         
-                        summary_rows.append({
+                        # Post-match recovery jump (first test within 1-4 days after match day)
+                        post_cmj = ath_all_cmj[(ath_all_cmj['Test Date'] > m_date) & (ath_all_cmj['Test Date'] <= m_date + timedelta(days=4))]
+                        post_h = post_cmj.iloc[0][cmj_col] if (not post_cmj.empty and cmj_col in post_cmj.columns) else None
+                        post_rsi = post_cmj.iloc[0][rsi_col] if (not post_cmj.empty and rsi_col in post_cmj.columns) else None
+                        
+                        # Delta calculations
+                        if pre_h is not None and post_h is not None and pre_h > 0:
+                            diff_h = ((post_h - pre_h) / pre_h) * 100
+                            h_diff_str = f"{diff_h:+.1f}%"
+                        else:
+                            h_diff_str = "N/A"
+                            
+                        if pre_rsi is not None and post_rsi is not None and pre_rsi > 0:
+                            diff_rsi = ((post_rsi - pre_rsi) / pre_rsi) * 100
+                            rsi_diff_str = f"{diff_rsi:+.1f}%"
+                        else:
+                            rsi_diff_str = "N/A"
+                            
+                        recovery_rows.append({
                             "Athlete": ath_name,
                             "Position": row['Position'],
-                            "Total Jumps": int(row['Total Jumps']),
-                            "Player Load": f"{row['Player Load']:.1f}",
+                            "Match Jumps": int(row['Total Jumps']),
+                            "Match Load": f"{row['Player Load']:.0f}",
                             "Explosive Efforts": int(row['Explosive Efforts']),
-                            "Post-Match Wellness": post_score_str
+                            "Pre-Match CMJ": f"{pre_h:.1f}" if pre_h is not None else "—",
+                            "Post-Match CMJ": f"{post_h:.1f}" if post_h is not None else "—",
+                            "CMJ Height Δ": h_diff_str,
+                            "Pre-Match RSI": f"{pre_rsi:.2f}" if pre_rsi is not None else "—",
+                            "Post-Match RSI": f"{post_rsi:.2f}" if post_rsi is not None else "—",
+                            "RSI Δ": rsi_diff_str
                         })
                         
-                    if summary_rows:
-                        st.dataframe(pd.DataFrame(summary_rows).sort_values("Total Jumps", ascending=False), use_container_width=True, hide_index=True)
+                    if recovery_rows:
+                        st.dataframe(pd.DataFrame(recovery_rows).sort_values("Match Jumps", ascending=False), use_container_width=True, hide_index=True)
                     else:
-                        st.info("No athlete data recorded for this match session.")
+                        st.info("No athlete match records found.")
+                else:
+                    st.info("No match session records available in the selected season.")
             
 
 
