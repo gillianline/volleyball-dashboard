@@ -1258,7 +1258,7 @@ if check_password():
         # --- HUB 2: MATCH PERFORMANCE --------------------------------------------
         # =========================================================================
         elif selected_hub == "Match Performance":
-            match_subtabs = ["Match Summary", "Match v. Practice"]
+            match_subtabs = ["Match Summary", "Match v. Practice", "Match v. Jumps & Recovery"]
             if "match_subtab_radio" not in st.session_state or st.session_state["match_subtab_radio"] not in match_subtabs:
                 st.session_state["match_subtab_radio"] = match_subtabs[0]
 
@@ -1360,6 +1360,54 @@ if check_password():
                         m_rate = s_m_avg[m] / s_m_avg['Duration'] if s_m_avg['Duration'] > 0 else 0
                         overall_html += f"""<tr><td style="padding: 10px; border: 1px solid #ddd;"><b>{m}</b></td><td style="padding: 10px; border: 1px solid #ddd;">{p_rate:.2f}</td><td style="padding: 10px; border: 1px solid #ddd;">{m_rate:.2f}</td><td style="padding: 10px; border: 1px solid #ddd; font-weight: bold;">{(((m_rate - p_rate) / p_rate * 100) if p_rate > 0 else 0):+.1f}%</td></tr>"""
                     st.markdown(overall_html + "</table>", unsafe_allow_html=True)
+                    
+            elif sel_match_tab == "Match v. Jumps & Recovery":
+            st.markdown('<div class="section-header">Match Jump Demands & Recovery Overview</div>', unsafe_allow_html=True)
+    
+            match_rec_df = match_master.copy()
+    
+            if not match_rec_df.empty:
+                c_m1, c_m2 = st.columns([1.5, 2])
+                with c_m1:
+                    sel_match_session = st.selectbox("Select Match Session", sorted(match_rec_df['Session_Name'].unique()), key="m_v_rec_session")
+                with c_m2:
+                    sel_pos_m = st.selectbox("Position Filter", ["All Positions"] + sorted([p for p in match_rec_df['Position'].unique() if p != "N/A"]), key="m_v_rec_pos")
+            
+                filtered_match = match_rec_df[match_rec_df['Session_Name'] == sel_match_session].copy()
+                if sel_pos_m != "All Positions":
+                    filtered_match = filtered_match[filtered_match['Position'] == sel_pos_m]
+            
+                summary_rows = []
+                for _, row in filtered_match.iterrows():
+                    ath_name = row['Name']
+                    m_date = row['Date']
+            
+                    # Find closest following CMJ test within 72h
+                    cmj_post = raw_cmj_df[(raw_cmj_df['Name'] == ath_name) & (raw_cmj_df['Test Date'] >= m_date) & (raw_cmj_df['Test Date'] <= m_date + timedelta(days=3))].sort_values('Test Date')
+            
+                    post_score_str = "N/A"
+                    if not cmj_post.empty:
+                        t_row = cmj_post.iloc[0]
+                        all_ath_cmj = raw_cmj_df[raw_cmj_df['Name'] == ath_name].sort_values('Test Date')
+                        pos_idx = list(all_ath_cmj.index).index(t_row.name)
+                        prev_row = all_ath_cmj.iloc[max(0, pos_idx - 1)]
+                        post_score = int(round(compute_excel_readiness_score(t_row, prev_row)))
+                        post_score_str = f"{post_score}%"
+            
+                    summary_rows.append({
+                        "Athlete": ath_name,
+                        "Position": row['Position'],
+                        "Total Jumps": int(row['Total Jumps']),
+                        "Player Load": f"{row['Player Load']:.1f}",
+                        "Explosive Efforts": int(row['Explosive Efforts']),
+                        "Post-Match Wellness": post_score_str
+                    })
+            
+                if summary_rows:
+                    st.dataframe(pd.DataFrame(summary_rows).sort_values("Total Jumps", ascending=False), use_container_width=True, hide_index=True)
+                else:
+                    st.info("No athlete data recorded for this match session.")
+            
 
 
         # =========================================================================
