@@ -1270,7 +1270,7 @@ if check_password():
             if sel_match_tab == "Match Summary":
                 match_t6 = match_master.copy()
                 custom_colors = ['#4895DB', '#FF8200', '#515154', '#A52A2A', '#008080', '#6A1B9A', '#2E7D32']
-        
+
                 if st.session_state.is_printing:
                     if st.button("Back to Editor", key="back_editor_btn_t6"):
                         st.session_state.is_printing = False
@@ -1280,28 +1280,52 @@ if check_password():
                     if st.button("Prepare PDF for Printing", key="prep_print_btn_t6"):
                         st.session_state.is_printing = True
                         st.rerun()
-                    match_list_t = match_t6.sort_values(['Date', 'Sheet_Order'])['Session_Name'].unique().tolist()
-                    if "matches_state" not in st.session_state: st.session_state.matches_state = match_list_t[-3:] if len(match_list_t) >= 3 else match_list_t
-                    st.session_state.matches_state = st.multiselect("Select Matches", match_list_t, default=st.session_state.matches_state, key="ms_select_t6")
-                    st.session_state.pos_state = st.selectbox("Filter by Position", ["All Positions"] + sorted(list(match_t6['Position'].unique())), key="pos_select_t6")
+                    
+                    # Clean match session extraction sorted chronologically
+                    match_list_t = match_t6.sort_values(['Date', 'Sheet_Order'])['Session_Name'].dropna().unique().tolist()
+                    latest_matches = match_list_t[-3:] if len(match_list_t) >= 3 else match_list_t
+                    
+                    # Dynamically sync selections and auto-include new matches if not set
+                    valid_defaults = [m for m in st.session_state.get("matches_state", []) if m in match_list_t]
+                    if not valid_defaults:
+                        valid_defaults = latest_matches
+
+                    selected_matches = st.multiselect(
+                        "Select Matches", 
+                        options=match_list_t, 
+                        default=valid_defaults, 
+                        key="matches_summary_selector"
+                    )
+                    st.session_state.matches_state = selected_matches
+
+                    pos_filter_t = st.selectbox(
+                        "Filter by Position", 
+                        ["All Positions"] + sorted(list(match_t6['Position'].dropna().unique())), 
+                        key="pos_select_t6"
+                    )
                     st.markdown('</div>', unsafe_allow_html=True)
 
-                if st.session_state.is_printing: st.markdown('<script>window.print();</script>', unsafe_allow_html=True)
+                if st.session_state.is_printing: 
+                    st.markdown('<script>window.print();</script>', unsafe_allow_html=True)
+
                 selected_matches = st.session_state.get("matches_state", [])
-                pos_filter_t = st.session_state.get("pos_state", "All Positions")
+                pos_filter_t = st.session_state.get("pos_select_t6", "All Positions")
 
                 if selected_matches:
                     m_map = {m: custom_colors[idx % len(custom_colors)] for idx, m in enumerate(selected_matches)}
                     st.markdown('<div class="section-header">Athlete Match Performance Breakdown</div>', unsafe_allow_html=True)
                     tourney_df = match_t6[match_t6['Session_Name'].isin(selected_matches)].sort_values(['Date', 'Sheet_Order'])
-                    if pos_filter_t != "All Positions": tourney_df = tourney_df[tourney_df['Position'] == pos_filter_t]
+                    if pos_filter_t != "All Positions": 
+                        tourney_df = tourney_df[tourney_df['Position'] == pos_filter_t]
 
                     for name in sorted(tourney_df['Name'].unique()):
                         ad = tourney_df[tourney_df['Name'] == name]
-                        try: correct_photo = df_master[df_master['Name'] == name]['PhotoURL'].iloc[0]
-                        except: correct_photo = "https://www.w3schools.com/howto/img_avatar.png"
+                        try: 
+                            correct_photo = df_master[df_master['Name'] == name]['PhotoURL'].iloc[0]
+                        except: 
+                            correct_photo = "https://www.w3schools.com/howto/img_avatar.png"
                         
-                        st.markdown(f'<div class="player-row-container"><div class="player-divider"></div>', unsafe_allow_html=True)
+                        st.markdown('<div class="player-row-container"><div class="player-divider"></div>', unsafe_allow_html=True)
                         side_cols = st.columns([1.5, 2])
                         with side_cols[0]:
                             card_start = f"""<div style="display:flex; align-items:center; gap:12px; padding:10px; background:#f8f9fa; border-bottom:2px solid #FF8200;"><img src="{correct_photo}" class="gallery-photo" style="width:65px; height:65px;"><div><p style="margin:0; font-weight:900; color:#1D1D1F; font-size:18px;">{name}</p><p style="margin:0; color:#4895DB; font-weight:700; font-size:16px;">{ad['Position'].iloc[0]}</p></div></div><div style="padding:5px;"><table class="scout-table" style="margin-bottom:0;"><thead><tr><th>Match</th><th>Jumps</th><th>Load</th><th>Efforts</th></tr></thead><tbody>"""
@@ -1318,6 +1342,8 @@ if check_password():
                             fig_ath.update_layout(barmode='group', height=260, margin=dict(l=10, r=10, t=10, b=80), template="simple_white", font=dict(color="#333333", size=10), legend=dict(orientation="h", yanchor="top", y=-0.3, xanchor="center", x=0.5), yaxis=dict(showgrid=False, title="Jumps / Efforts"), yaxis2=dict(showgrid=False, title="Player Load", overlaying='y', side='right'))
                             st.plotly_chart(fig_ath, use_container_width=True, config=LOCKED_CONFIG, key=f"match_breakdown_{name}")
                         st.markdown('</div>', unsafe_allow_html=True)
+                else:
+                    st.info("Please select at least one match from the dropdown above.")
 
             elif sel_match_tab == "Match v. Practice":
                 df_t5 = df_master.copy()
@@ -1325,7 +1351,8 @@ if check_password():
                 st.markdown('<div class="section-header">Season Preparation vs. Match Demands</div>', unsafe_allow_html=True)
                 
                 c_mode, c_sel = st.columns([1, 3])
-                with c_mode: view_mode_t5 = st.radio("View Level", ["Team", "Position", "Individual"], horizontal=True, key="gp_view_mode_t5")
+                with c_mode: 
+                    view_mode_t5 = st.radio("View Level", ["Team", "Position", "Individual"], horizontal=True, key="gp_view_mode_t5")
                 
                 with c_sel:
                     if view_mode_t5 == "Individual":
@@ -1345,8 +1372,10 @@ if check_password():
                     target_df = target_df.rename(columns={'Total Player Load': 'Player Load', 'PlayerLoad': 'Player Load'})
                     cols_to_clean = ['Player Load', 'Explosive Efforts', 'Total Jumps', 'Jump Load', 'Duration']
                     for c in cols_to_clean:
-                        if c in target_df.columns: target_df[c] = pd.to_numeric(target_df[c], errors='coerce').fillna(0)
-                    if 'Duration' in target_df.columns: target_df['Duration'] = target_df['Duration'].apply(lambda x: x if x > 0 else 1)
+                        if c in target_df.columns: 
+                            target_df[c] = pd.to_numeric(target_df[c], errors='coerce').fillna(0)
+                    if 'Duration' in target_df.columns: 
+                        target_df['Duration'] = target_df['Duration'].apply(lambda x: x if x > 0 else 1)
                     return target_df
 
                 main_filtered = clean_gp_data(main_filtered)
@@ -1363,6 +1392,8 @@ if check_password():
                         m_rate = s_m_avg[m] / s_m_avg['Duration'] if s_m_avg['Duration'] > 0 else 0
                         overall_html += f"""<tr><td style="padding: 10px; border: 1px solid #ddd;"><b>{m}</b></td><td style="padding: 10px; border: 1px solid #ddd;">{p_rate:.2f}</td><td style="padding: 10px; border: 1px solid #ddd;">{m_rate:.2f}</td><td style="padding: 10px; border: 1px solid #ddd; font-weight: bold;">{(((m_rate - p_rate) / p_rate * 100) if p_rate > 0 else 0):+.1f}%</td></tr>"""
                     st.markdown(overall_html + "</table>", unsafe_allow_html=True)
+                else:
+                    st.info("Insufficient practice or match records available for comparison.")
 
             elif sel_match_tab == "Match v. CMJ Recovery":
                 st.markdown('<div class="section-header">Match Volume Demands vs. CMJ Jump Recovery</div>', unsafe_allow_html=True)
