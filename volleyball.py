@@ -1236,47 +1236,22 @@ if check_password():
                         with asym_c2:
                             sel_asym_date_str = st.selectbox("Select Test Date", asym_valid_dates, index=0, key="cmj_asym_date_sel")
                         with asym_c3:
-                            known_injury_side = st.selectbox("Known Injured / Re-hab Side", ["None / Unknown", "Left", "Right"], key="cmj_asym_injured_side")
+                            known_injury_side = st.selectbox("Known Injured / Rehab Side", ["None / Unknown", "Left", "Right"], key="cmj_asym_injured_side")
 
                         cur_asym_idx = ath_cmj_asym[ath_cmj_asym['Test Date'].dt.strftime('%m/%d/%y') == sel_asym_date_str].index[-1]
                         cur_asym_row = ath_cmj_asym.loc[cur_asym_idx]
 
                         asym_metric_list = [
-                            {
-                                "label": "Eccentric Braking RFD %", 
-                                "col": "Eccentric Braking RFD % (Asym) (%)", 
-                                "phase": "Eccentric Braking",
-                                "desc": "Rate of force development as the athlete decelerates downward. Unloading here indicates fear/inability to absorb high eccentric load on that limb."
-                            },
-                            {
-                                "label": "Eccentric Decel RFD %", 
-                                "col": "Eccentric Deceleration RFD % (Asym) (%)", 
-                                "phase": "Eccentric Deceleration",
-                                "desc": "Braking rate immediately prior to bottom turnaround. Major indicator of limb-specific deceleration capacity and confidence."
-                            },
-                            {
-                                "label": "Force @ 0 Velocity %", 
-                                "col": "Force at Zero Velocity % (Asym) (%)", 
-                                "phase": "Amortization (Turnaround)",
-                                "desc": "Force distribution at the lowest point of the dip (transition from eccentric to concentric). Key marker of isometric holding strength and stability."
-                            },
-                            {
-                                "label": "Concentric Mean Force %", 
-                                "col": "Concentric Mean Force % (Asym) (%)", 
-                                "phase": "Concentric Drive",
-                                "desc": "Average upward propulsion force across the entire upward push. Shows general limb contribution during standard triple extension."
-                            },
-                            {
-                                "label": "Takeoff Peak Force %", 
-                                "col": "Takeoff Peak Force % (Asym) (%)", 
-                                "phase": "Terminal Takeoff",
-                                "desc": "Peak explosive force achieved just prior to leaving the force plates. Highlights final push-off compensation strategies."
-                            }
+                            {"label": "Concentric Mean Force %", "col": "Concentric Mean Force % (Asym) (%)", "phase": "Concentric"},
+                            {"label": "Eccentric Braking RFD %", "col": "Eccentric Braking RFD % (Asym) (%)", "phase": "Eccentric Braking"},
+                            {"label": "Eccentric Decel RFD %", "col": "Eccentric Deceleration RFD % (Asym) (%)", "phase": "Eccentric Decel"},
+                            {"label": "Force @ 0 Velocity %", "col": "Force at Zero Velocity % (Asym) (%)", "phase": "Amortization"},
+                            {"label": "Takeoff Peak Force %", "col": "Takeoff Peak Force % (Asym) (%)", "phase": "Takeoff"}
                         ]
 
                         parsed_records = []
                         for item in asym_metric_list:
-                            raw_val = cur_asym_row.get(item["col"], None)
+                            raw_val = cur_asym_row.get(item["col"], np.nan)
                             parsed_signed_val, side_favored = parse_asym_val(raw_val)
                             
                             status_msg = "Symmetric (<10%)"
@@ -1288,7 +1263,6 @@ if check_password():
                             parsed_records.append({
                                 "Phase / Metric": item["label"],
                                 "Phase": item["phase"],
-                                "Description": item["desc"],
                                 "Signed_Val": parsed_signed_val,
                                 "Magnitude": abs(parsed_signed_val),
                                 "Favored": side_favored,
@@ -1298,7 +1272,7 @@ if check_password():
 
                         asym_table_df = pd.DataFrame(parsed_records)
 
-                        # Top Diagnostic Cards with Tooltip Explanations
+                        # Top Diagnostic Cards
                         kpi_a1, kpi_a2, kpi_a3 = st.columns(3)
                         mean_mag = asym_table_df["Magnitude"].mean()
                         max_imbalance_row = asym_table_df.loc[asym_table_df["Magnitude"].idxmax()]
@@ -1312,21 +1286,9 @@ if check_password():
                         elif l_count > r_count:
                             primary_favoring = "Left Leg (Unloading Right)"
 
-                        kpi_a1.metric(
-                            "Mean Asymmetry", 
-                            f"{mean_mag:.1f}%",
-                            help="Average magnitude of L/R asymmetry across all braking, amortization, and concentric jump phases. Values under 10% generally reflect normal bilateral variability."
-                        )
-                        kpi_a2.metric(
-                            "Dominant Favoring", 
-                            primary_favoring,
-                            help="The limb consistently bearing greater mechanical force across the majority of jump phases."
-                        )
-                        kpi_a3.metric(
-                            "Peak Phase Imbalance", 
-                            f"{max_imbalance_row['Phase']} ({max_imbalance_row['Magnitude']:.1f}% {max_imbalance_row['Favored'][0]})",
-                            help="The single countermovement phase displaying the largest side-to-side force divergence."
-                        )
+                        kpi_a1.metric("Mean Asymmetry", f"{mean_mag:.1f}%")
+                        kpi_a2.metric("Dominant Favoring", primary_favoring)
+                        kpi_a3.metric("Peak Phase Imbalance", f"{max_imbalance_row['Phase']} ({max_imbalance_row['Magnitude']:.1f}% {max_imbalance_row['Favored'][0]})")
 
                         # Injury Correlation Diagnostic Box
                         if known_injury_side != "None / Unknown":
@@ -1348,12 +1310,7 @@ if check_password():
 
                         # Bidirectional Left vs Right Favoring Chart
                         fig_asym = go.Figure()
-                        fig_asym.add_vrect(
-                            x0=-10, x1=10, 
-                            fillcolor="#E2E8F0", opacity=0.4, line_width=0, layer="below", 
-                            annotation_text="Symmetric Zone (±10%)", annotation_position="top left", 
-                            annotation_font_size=10, annotation_font_color="#64748B"
-                        )
+                        fig_asym.add_vrect(x0=-10, x1=10, fillcolor="#E2E8F0", opacity=0.4, line_width=0, layer="below", annotation_text="Symmetric Zone (±10%)", annotation_position="top left", annotation_font_size=10, annotation_font_color="#64748B")
                         
                         bar_colors = ['#FF8200' if v > 0 else '#4895DB' for v in asym_table_df["Signed_Val"]]
                         
@@ -1378,47 +1335,22 @@ if check_password():
                         )
                         st.plotly_chart(fig_asym, use_container_width=True, config=LOCKED_CONFIG, key="cmj_asym_horizontal_bar")
 
-                        # Detailed Breakdown Table with Sub-notes
-                        st.markdown("#### Phase Asymmetry Log & Metric Descriptions")
-                        asym_table_html = """<table class="scout-table" style="width:100%; border:1px solid #E2E8F0; background:white;">
-                            <thead>
-                                <tr style="background:#4895DB; color:white;">
-                                    <th style="text-align:left !important; padding-left:14px; width:45%;">Phase Metric & Meaning</th>
-                                    <th style="width:12%;">Raw Export</th>
-                                    <th style="width:13%;">Favored Limb</th>
-                                    <th style="width:12%;">Magnitude</th>
-                                    <th style="width:18%;">Status</th>
-                                </tr>
-                            </thead>
-                            <tbody>"""
+                        # Detailed Breakdown Table
+                        st.markdown("#### Phase Asymmetry Log")
+                        asym_table_html = """<table class="scout-table" style="width:100%; border:1px solid #E2E8F0; background:white;"><thead><tr style="background:#4895DB; color:white;"><th style="text-align:left !important; padding-left:14px;">CMJ Phase Metric</th><th>Raw ForcePlate Log</th><th>Favored Limb</th><th>Magnitude</th><th>Clinical Classification</th></tr></thead><tbody>"""
                         for _, row in asym_table_df.iterrows():
                             badge_color = "#137333" if "Symmetric" in row["Status"] else ("#D97706" if "Moderate" in row["Status"] else "#D93025")
                             badge_bg = "#E6F4EA" if "Symmetric" in row["Status"] else ("#FEF3C7" if "Moderate" in row["Status"] else "#FCE8E6")
                             
                             asym_table_html += f"""<tr>
-                                <td style="text-align:left !important; padding-left:14px; padding-top:8px; padding-bottom:8px;">
-                                    <div style="font-weight:800; font-size:12px; color:#111827;">{row['Phase / Metric']}</div>
-                                    <div style="font-size:10.5px; color:#64748B; line-height:1.3; margin-top:2px;">{row['Description']}</div>
-                                </td>
-                                <td style="color:#64748B; font-weight:700;">{row['Raw']}</td>
+                                <td style="text-align:left !important; padding-left:14px; font-weight:700;">{row['Phase / Metric']}</td>
+                                <td style="color:#64748B; font-weight:600;">{row['Raw']}</td>
                                 <td style="font-weight:800; color:{'#FF8200' if row['Favored']=='Right' else ('#4895DB' if row['Favored']=='Left' else '#64748B')};">{row['Favored']}</td>
                                 <td style="font-weight:800;">{row['Magnitude']:.1f}%</td>
                                 <td><span style="background:{badge_bg}; color:{badge_color}; padding:3px 8px; border-radius:10px; font-weight:700; font-size:11px;">{row['Status']}</span></td>
                             </tr>"""
                         asym_table_html += "</tbody></table>"
                         st.markdown(asym_table_html, unsafe_allow_html=True)
-
-                        # Educational Diagnostic Expander
-                        with st.expander("📖 Asymmetry Interpretation Guide & Clinical Thresholds", expanded=False):
-                            st.markdown("""
-                            * **Eccentric vs. Concentric Divergence:**
-                              * **Eccentric / Braking Asymmetries (>10–15%):** Often indicate deficits in structural tolerance, stretch-shortening cycle (SSC) absorption, or hesitation to load a previously injured joint.
-                              * **Concentric / Takeoff Asymmetries (>10–15%):** Often reflect residual force production capacity or triple extension compensation strategies.
-                            * **Clinical Thresholds:**
-                              * **< 10% Asymmetry:** Normal biological baseline variability.
-                              * **10% – 15% Asymmetry:** Moderate asymmetry. Monitor across successive jump evaluations.
-                              * **> 15% Asymmetry:** Clinically significant compensation. Athlete is meaningfully offloading one limb.
-                            """)
 
                 # -------------------------------------------------------------------------
                 # --- 3. TEAM CMJ SUMMARY ------------------------------------------------
