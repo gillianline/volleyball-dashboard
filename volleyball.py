@@ -1362,7 +1362,7 @@ if check_password():
 
                         # Detailed Breakdown Table
                         st.markdown("#### Phase Asymmetry Log")
-                        asym_table_html = """<table class="scout-table" style="width:100%; border:1px solid #E2E8F0; background:white;"><thead><tr style="background:#4895DB; color:white;"><th style="text-align:left !important; padding-left:14px;">CMJ Phase Metric</th><th>Raw ForcePlate Log</th><th>Favored Limb</th><th>Magnitude</th><th>Clinical Classification</th></tr></thead><tbody>"""
+                        asym_table_html = """<table class="scout-table" style="width:100%; border:1px solid #E2E8F0; background:white;"><thead><tr style="background:#4895DB; color:white;"><th style="text-align:left !important; padding-left:14px;">CMJ Phase Metric</th><th>ForcePlate Log</th><th>Favored Limb</th><th>Magnitude</th><th>Clinical Classification</th></tr></thead><tbody>"""
                         for _, row in asym_table_df.iterrows():
                             badge_color = "#137333" if "Symmetric" in row["Status"] else ("#D97706" if "Moderate" in row["Status"] else "#D93025")
                             badge_bg = "#E6F4EA" if "Symmetric" in row["Status"] else ("#FEF3C7" if "Moderate" in row["Status"] else "#FCE8E6")
