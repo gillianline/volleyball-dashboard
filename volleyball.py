@@ -1242,11 +1242,36 @@ if check_password():
                         cur_asym_row = ath_cmj_asym.loc[cur_asym_idx]
 
                         asym_metric_list = [
-                            {"label": "Concentric Mean Force %", "col": "Concentric Mean Force % (Asym) (%)", "phase": "Concentric"},
-                            {"label": "Eccentric Braking RFD %", "col": "Eccentric Braking RFD % (Asym) (%)", "phase": "Eccentric Braking"},
-                            {"label": "Eccentric Decel RFD %", "col": "Eccentric Deceleration RFD % (Asym) (%)", "phase": "Eccentric Decel"},
-                            {"label": "Force @ 0 Velocity %", "col": "Force at Zero Velocity % (Asym) (%)", "phase": "Amortization"},
-                            {"label": "Takeoff Peak Force %", "col": "Takeoff Peak Force % (Asym) (%)", "phase": "Takeoff"}
+                            {
+                                "label": "Eccentric Braking RFD % (Asym) (%)", 
+                                "col": "Eccentric Braking RFD % (Asym) (%)", 
+                                "phase": "Eccentric Braking RFD",
+                                "desc": "Rate of force development during downward braking. Unloading indicates hesitation or reduced capacity to absorb eccentric load."
+                            },
+                            {
+                                "label": "Eccentric Deceleration RFD % (Asym) (%)", 
+                                "col": "Eccentric Deceleration RFD % (Asym) (%)", 
+                                "phase": "Eccentric Deceleration RFD",
+                                "desc": "Braking rate immediately prior to turnaround. Key marker of limb-specific deceleration capacity and confidence."
+                            },
+                            {
+                                "label": "Force at Zero Velocity % (Asym) (%)", 
+                                "col": "Force at Zero Velocity % (Asym) (%)", 
+                                "phase": "Force at Zero Velocity",
+                                "desc": "Force distribution at the lowest point of the dip (v = 0). Highlights isometric holding capacity and load-transfer stability."
+                            },
+                            {
+                                "label": "Concentric Mean Force % (Asym) (%)", 
+                                "col": "Concentric Mean Force % (Asym) (%)", 
+                                "phase": "Concentric Mean Force",
+                                "desc": "Average upward force produced across the entire propulsion drive phase."
+                            },
+                            {
+                                "label": "Takeoff Peak Force % (Asym) (%)", 
+                                "col": "Takeoff Peak Force % (Asym) (%)", 
+                                "phase": "Takeoff Peak Force",
+                                "desc": "Peak explosive force right before leaving the plates. Captures terminal extension compensations."
+                            }
                         ]
 
                         parsed_records = []
