@@ -1236,7 +1236,7 @@ if check_password():
                         with asym_c2:
                             sel_asym_date_str = st.selectbox("Select Test Date", asym_valid_dates, index=0, key="cmj_asym_date_sel")
                         with asym_c3:
-                            known_injury_side = st.selectbox("Known Injured / Re-hab Side", ["None / Unknown", "Left", "Right"], key="cmj_asym_injured_side")
+                            known_injury_side = st.selectbox("Known Injured / Rehab Side", ["None / Unknown", "Left", "Right"], key="cmj_asym_injured_side")
 
                         cur_asym_idx = ath_cmj_asym[ath_cmj_asym['Test Date'].dt.strftime('%m/%d/%y') == sel_asym_date_str].index[-1]
                         cur_asym_row = ath_cmj_asym.loc[cur_asym_idx]
