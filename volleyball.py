@@ -1221,7 +1221,7 @@ if check_password():
                 # --- 2. ASYMMETRY & FAVORING ANALYSIS -----------------------------------
                 # -------------------------------------------------------------------------
                 elif sel_cmj_mode == "Asymmetry & Favoring":
-                    st.markdown('<div class="section-header">Bilateral CMJ Asymmetry & Favoring Analysis</div>', unsafe_allow_html=True)
+                    st.markdown('<div class="section-header">Bilateral CMJ Asymmetry & Performance Standards</div>', unsafe_allow_html=True)
                     
                     asym_c1, asym_c2, asym_c3 = st.columns([1.5, 1.5, 1.2])
                     with asym_c1:
@@ -1236,69 +1236,130 @@ if check_password():
                         with asym_c2:
                             sel_asym_date_str = st.selectbox("Select Test Date", asym_valid_dates, index=0, key="cmj_asym_date_sel")
                         with asym_c3:
-                            known_injury_side = st.selectbox("Known Injured / Rehab Side", ["None / Unknown", "Left", "Right"], key="cmj_asym_injured_side")
+                            known_injury_side = st.selectbox("Known Injured / Re-hab Side", ["None / Unknown", "Left", "Right"], key="cmj_asym_injured_side")
 
                         cur_asym_idx = ath_cmj_asym[ath_cmj_asym['Test Date'].dt.strftime('%m/%d/%y') == sel_asym_date_str].index[-1]
                         cur_asym_row = ath_cmj_asym.loc[cur_asym_idx]
 
+                        # Pull Body Weight for relative calculations (fallback to 80kg if not logged)
+                        bw_kg = float(cur_asym_row.get("BW [KG]", cur_asym_row.get("Body Weight [kg]", 80.0)))
+                        bw_n = bw_kg * 9.81
+
+                        # Comprehensive Mapping: Absolute Metric + Asymmetry Metric + Benchmark Logic
                         asym_metric_list = [
                             {
-                                "label": "Eccentric Braking RFD % (Asym) (%)", 
-                                "col": "Eccentric Braking RFD % (Asym) (%)", 
+                                "label": "Eccentric Braking RFD",
+                                "raw_val_col": "Eccentric Braking RFD [N/s]",
+                                "asym_col": "Eccentric Braking RFD % (Asym) (%)",
                                 "phase": "Eccentric Braking RFD",
-                                "desc": "Rate of force development during downward braking. Unloading indicates hesitation or reduced capacity to absorb eccentric load."
+                                "unit": "N/s",
+                                "fmt": "{:.0f}",
+                                "target_min": 4000.0,
+                                "target_max": 8000.0,
+                                "target_label": "4,000 - 8,000 N/s",
+                                "desc": "Rate of force development as the athlete decelerates downward."
                             },
                             {
-                                "label": "Eccentric Deceleration RFD % (Asym) (%)", 
-                                "col": "Eccentric Deceleration RFD % (Asym) (%)", 
+                                "label": "Eccentric Deceleration RFD",
+                                "raw_val_col": "Eccentric Deceleration RFD [N/s]",
+                                "asym_col": "Eccentric Deceleration RFD % (Asym) (%)",
                                 "phase": "Eccentric Deceleration RFD",
-                                "desc": "Braking rate immediately prior to turnaround. Key marker of limb-specific deceleration capacity and confidence."
+                                "unit": "N/s",
+                                "fmt": "{:.0f}",
+                                "target_min": 4500.0,
+                                "target_max": 8500.0,
+                                "target_label": "4,500 - 8,500 N/s",
+                                "desc": "Braking rate immediately prior to turnaround into upward drive."
                             },
                             {
-                                "label": "Force at Zero Velocity % (Asym) (%)", 
-                                "col": "Force at Zero Velocity % (Asym) (%)", 
+                                "label": "Force at Zero Velocity",
+                                "raw_val_col": "Force at Zero Velocity [N]",
+                                "asym_col": "Force at Zero Velocity % (Asym) (%)",
                                 "phase": "Force at Zero Velocity",
-                                "desc": "Force distribution at the lowest point of the dip (v = 0). Highlights isometric holding capacity and load-transfer stability."
+                                "unit": "N",
+                                "fmt": "{:.0f}",
+                                "target_min": round(bw_n * 2.2, 0),
+                                "target_max": round(bw_n * 2.6, 0),
+                                "target_label": f"{bw_n*2.2:.0f} - {bw_n*2.6:.0f} N (2.2-2.6x BW)",
+                                "desc": "Vertical load absorbed at the absolute bottom of the dip (v = 0)."
                             },
                             {
-                                "label": "Concentric Mean Force % (Asym) (%)", 
-                                "col": "Concentric Mean Force % (Asym) (%)", 
+                                "label": "Concentric Mean Force",
+                                "raw_val_col": "Concentric Mean Force [N]",
+                                "asym_col": "Concentric Mean Force % (Asym) (%)",
                                 "phase": "Concentric Mean Force",
-                                "desc": "Average upward force produced across the entire propulsion drive phase."
+                                "unit": "N",
+                                "fmt": "{:.0f}",
+                                "target_min": round(bw_n * 1.6, 0),
+                                "target_max": round(bw_n * 1.9, 0),
+                                "target_label": f"{bw_n*1.6:.0f} - {bw_n*1.9:.0f} N (1.6-1.9x BW)",
+                                "desc": "Average upward thrust produced across the propulsion phase."
                             },
                             {
-                                "label": "Takeoff Peak Force % (Asym) (%)", 
-                                "col": "Takeoff Peak Force % (Asym) (%)", 
+                                "label": "Takeoff Peak Force",
+                                "raw_val_col": "Takeoff Peak Force [N]",
+                                "asym_col": "Takeoff Peak Force % (Asym) (%)",
                                 "phase": "Takeoff Peak Force",
-                                "desc": "Peak explosive force right before leaving the plates. Captures terminal extension compensations."
+                                "unit": "N",
+                                "fmt": "{:.0f}",
+                                "target_min": round(bw_n * 2.0, 0),
+                                "target_max": round(bw_n * 2.5, 0),
+                                "target_label": f"{bw_n*2.0:.0f} - {bw_n*2.5:.0f} N (2.0-2.5x BW)",
+                                "desc": "Maximum explosive force spike generated before leaving the plates."
                             }
                         ]
 
                         parsed_records = []
                         for item in asym_metric_list:
-                            raw_val = cur_asym_row.get(item["col"], np.nan)
-                            parsed_signed_val, side_favored = parse_asym_val(raw_val)
+                            # Absolute Output Value
+                            raw_num_val = float(cur_asym_row.get(item["raw_val_col"], 0.0)) if item["raw_val_col"] in cur_asym_row and pd.notna(cur_asym_row.get(item["raw_val_col"])) else None
                             
-                            status_msg = "Symmetric (<10%)"
+                            # Check Output Standard Status
+                            if raw_num_val is not None and raw_num_val > 0:
+                                if raw_num_val >= item["target_min"]:
+                                    out_status = "Optimal" if raw_num_val <= item["target_max"] * 1.25 else "Elite"
+                                    out_color = "#137333"
+                                    out_bg = "#E6F4EA"
+                                else:
+                                    out_status = "Below Norm"
+                                    out_color = "#D93025"
+                                    out_bg = "#FCE8E6"
+                            else:
+                                out_status = "No Data"
+                                out_color = "#64748B"
+                                out_bg = "#F1F5F9"
+
+                            # Asymmetry Value Parsing
+                            raw_asym_val = cur_asym_row.get(item["asym_col"], None)
+                            parsed_signed_val, side_favored = parse_asym_val(raw_asym_val)
+                            
+                            asym_status = "Symmetric (<10%)"
                             if abs(parsed_signed_val) >= 15.0:
-                                status_msg = f"High Imbalance (>{abs(parsed_signed_val):.1f}%)"
+                                asym_status = f"High Bias ({abs(parsed_signed_val):.1f}%)"
                             elif abs(parsed_signed_val) >= 10.0:
-                                status_msg = f"Moderate Imbalance ({abs(parsed_signed_val):.1f}%)"
+                                asym_status = f"Moderate Bias ({abs(parsed_signed_val):.1f}%)"
                             
                             parsed_records.append({
                                 "Phase / Metric": item["label"],
                                 "Phase": item["phase"],
+                                "Description": item["desc"],
+                                "Absolute_Val": raw_num_val,
+                                "Formatted_Val": f"{item['fmt'].format(raw_num_val)} {item['unit']}" if raw_num_val is not None else "—",
+                                "Target_Range": item["target_label"],
+                                "Output_Status": out_status,
+                                "Output_Color": out_color,
+                                "Output_Bg": out_bg,
                                 "Signed_Val": parsed_signed_val,
                                 "Magnitude": abs(parsed_signed_val),
                                 "Favored": side_favored,
-                                "Raw": str(raw_val) if pd.notna(raw_val) else "0.0",
-                                "Status": status_msg
+                                "Raw_Asym": str(raw_asym_val) if pd.notna(raw_asym_val) else "0.0",
+                                "Asym_Status": asym_status
                             })
 
                         asym_table_df = pd.DataFrame(parsed_records)
 
                         # Top Diagnostic Cards
-                        kpi_a1, kpi_a2, kpi_a3 = st.columns(3)
+                        kpi_a1, kpi_a2, kpi_a3, kpi_a4 = st.columns(4)
                         mean_mag = asym_table_df["Magnitude"].mean()
                         max_imbalance_row = asym_table_df.loc[asym_table_df["Magnitude"].idxmax()]
                         
@@ -1311,9 +1372,12 @@ if check_password():
                         elif l_count > r_count:
                             primary_favoring = "Left Leg (Unloading Right)"
 
-                        kpi_a1.metric("Mean Asymmetry", f"{mean_mag:.1f}%")
-                        kpi_a2.metric("Dominant Favoring", primary_favoring)
-                        kpi_a3.metric("Peak Phase Imbalance", f"{max_imbalance_row['Phase']} ({max_imbalance_row['Magnitude']:.1f}% {max_imbalance_row['Favored'][0]})")
+                        meets_count = sum(1 for r in parsed_records if r["Output_Status"] in ["Optimal", "Elite"])
+
+                        kpi_a1.metric("Recorded Body Weight", f"{bw_kg:.1f} kg", help="Used to normalize force thresholds (N/kg).")
+                        kpi_a2.metric("Output Standards Met", f"{meets_count} / {len(parsed_records)}", help="Number of force/RFD metrics meeting or exceeding collegiate benchmarks.")
+                        kpi_a3.metric("Dominant Favoring", primary_favoring, help="Limb consistently generating higher force across jump phases.")
+                        kpi_a4.metric("Peak Phase Imbalance", f"{max_imbalance_row['Phase']} ({max_imbalance_row['Magnitude']:.1f}% {max_imbalance_row['Favored'][0]})")
 
                         # Injury Correlation Diagnostic Box
                         if known_injury_side != "None / Unknown":
@@ -1321,7 +1385,7 @@ if check_password():
                             if unloaded_side == known_injury_side:
                                 diag_color = "#D93025"
                                 diag_bg = "#FCE8E6"
-                                diag_text = f"<b>Compensatory Unloading Detected:</b> Athlete is heavily favoring the healthy <b>{primary_favoring.split()[0]}</b> side and unloading the injured <b>{known_injury_side}</b> side."
+                                diag_text = f"<b>Compensatory Unloading Detected:</b> Athlete is meeting output standards overall but heavily offloading the injured <b>{known_injury_side}</b> side onto the healthy <b>{primary_favoring.split()[0]}</b> limb."
                             elif unloaded_side != "None":
                                 diag_color = "#D97706"
                                 diag_bg = "#FEF3C7"
@@ -1335,7 +1399,12 @@ if check_password():
 
                         # Bidirectional Left vs Right Favoring Chart
                         fig_asym = go.Figure()
-                        fig_asym.add_vrect(x0=-10, x1=10, fillcolor="#E2E8F0", opacity=0.4, line_width=0, layer="below", annotation_text="Symmetric Zone (±10%)", annotation_position="top left", annotation_font_size=10, annotation_font_color="#64748B")
+                        fig_asym.add_vrect(
+                            x0=-10, x1=10, 
+                            fillcolor="#E2E8F0", opacity=0.4, line_width=0, layer="below", 
+                            annotation_text="Symmetric Zone (±10%)", annotation_position="top left", 
+                            annotation_font_size=10, annotation_font_color="#64748B"
+                        )
                         
                         bar_colors = ['#FF8200' if v > 0 else '#4895DB' for v in asym_table_df["Signed_Val"]]
                         
@@ -1360,23 +1429,39 @@ if check_password():
                         )
                         st.plotly_chart(fig_asym, use_container_width=True, config=LOCKED_CONFIG, key="cmj_asym_horizontal_bar")
 
-                        # Detailed Breakdown Table
-                        st.markdown("#### Phase Asymmetry Log")
-                        asym_table_html = """<table class="scout-table" style="width:100%; border:1px solid #E2E8F0; background:white;"><thead><tr style="background:#4895DB; color:white;"><th style="text-align:left !important; padding-left:14px;">CMJ Phase Metric</th><th>ForcePlate Log</th><th>Favored Limb</th><th>Magnitude</th><th>Clinical Classification</th></tr></thead><tbody>"""
+                        # Unified Absolute Output + Asymmetry Performance Table
+                        st.markdown("#### Combined Metric Values, Standards & Limb Asymmetry")
+                        unified_tbl_html = """<table class="scout-table" style="width:100%; border:1px solid #E2E8F0; background:white;">
+                            <thead>
+                                <tr style="background:#4895DB; color:white;">
+                                    <th style="text-align:left !important; padding-left:14px; width:30%;">Phase Metric</th>
+                                    <th style="width:14%;">Actual Total</th>
+                                    <th style="width:18%;">D1 Standard Target</th>
+                                    <th style="width:12%;">Output Standard</th>
+                                    <th style="width:13%;">Favored Limb</th>
+                                    <th style="width:13%;">Asymmetry %</th>
+                                </tr>
+                            </thead>
+                            <tbody>"""
                         for _, row in asym_table_df.iterrows():
-                            badge_color = "#137333" if "Symmetric" in row["Status"] else ("#D97706" if "Moderate" in row["Status"] else "#D93025")
-                            badge_bg = "#E6F4EA" if "Symmetric" in row["Status"] else ("#FEF3C7" if "Moderate" in row["Status"] else "#FCE8E6")
+                            asym_badge_color = "#137333" if "Symmetric" in row["Asym_Status"] else ("#D97706" if "Moderate" in row["Asym_Status"] else "#D93025")
+                            asym_badge_bg = "#E6F4EA" if "Symmetric" in row["Asym_Status"] else ("#FEF3C7" if "Moderate" in row["Asym_Status"] else "#FCE8E6")
                             
-                            asym_table_html += f"""<tr>
-                                <td style="text-align:left !important; padding-left:14px; font-weight:700;">{row['Phase / Metric']}</td>
-                                <td style="color:#64748B; font-weight:600;">{row['Raw']}</td>
-                                <td style="font-weight:800; color:{'#FF8200' if row['Favored']=='Right' else ('#4895DB' if row['Favored']=='Left' else '#64748B')};">{row['Favored']}</td>
-                                <td style="font-weight:800;">{row['Magnitude']:.1f}%</td>
-                                <td><span style="background:{badge_bg}; color:{badge_color}; padding:3px 8px; border-radius:10px; font-weight:700; font-size:11px;">{row['Status']}</span></td>
+                            favored_text_color = '#FF8200' if row['Favored'] == 'Right' else ('#4895DB' if row['Favored'] == 'Left' else '#64748B')
+                            
+                            unified_tbl_html += f"""<tr>
+                                <td style="text-align:left !important; padding-left:14px; padding-top:8px; padding-bottom:8px;">
+                                    <div style="font-weight:800; font-size:12px; color:#111827;">{row['Phase / Metric']}</div>
+                                    <div style="font-size:10px; color:#64748B; line-height:1.2;">{row['Description']}</div>
+                                </td>
+                                <td style="font-weight:800; font-size:13px; color:#0F172A;">{row['Formatted_Val']}</td>
+                                <td style="color:#64748B; font-weight:600; font-size:11px;">{row['Target_Range']}</td>
+                                <td><span style="background:{row['Output_Bg']}; color:{row['Output_Color']}; padding:3px 8px; border-radius:10px; font-weight:700; font-size:11px;">{row['Output_Status']}</span></td>
+                                <td style="font-weight:800; color:{favored_text_color};">{row['Favored']}</td>
+                                <td><span style="background:{asym_badge_bg}; color:{asym_badge_color}; padding:3px 8px; border-radius:10px; font-weight:800; font-size:11px;">{row['Raw_Asym']}</span></td>
                             </tr>"""
-                        asym_table_html += "</tbody></table>"
-                        st.markdown(asym_table_html, unsafe_allow_html=True)
-
+                        unified_tbl_html += "</tbody></table>"
+                        st.markdown(unified_tbl_html, unsafe_allow_html=True)
                 # -------------------------------------------------------------------------
                 # --- 3. TEAM CMJ SUMMARY ------------------------------------------------
                 # -------------------------------------------------------------------------
