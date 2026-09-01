@@ -1047,8 +1047,9 @@ if check_password():
             elif sel_daily_tab == "CMJ Performance":
                 cmj_view_modes = [
                     "Individual Athlete",
-                    "Asymmetry & Favoring",
                     "Team CMJ Summary",
+                    "Match v. CMJ Recovery",
+                    "Asymmetry & Favoring",
                 ]
 
                 if (
@@ -1559,7 +1560,231 @@ if check_password():
                             st.markdown(legend_table_html, unsafe_allow_html=True)
 
                 # -------------------------------------------------------------------------
-                # --- 2. ASYMMETRY & FAVORING ANALYSIS ------------------------------------
+                # --- 2. TEAM CMJ SUMMARY ------------------------------------------------
+                # -------------------------------------------------------------------------
+                elif sel_cmj_mode == "Team CMJ Summary":
+                    st.markdown("### Team Wellness Score Overview")
+                    team_cmj_dates = (
+                        raw_cmj_df["Test Date"]
+                        .dropna()
+                        .drop_duplicates()
+                        .sort_values(ascending=False)
+                        .dt.strftime("%m/%d/%y")
+                        .tolist()
+                    )
+
+                    c_sum_d1, c_sum_d2 = st.columns([1.5, 2])
+                    with c_sum_d1:
+                        sel_team_cmj_date = st.selectbox(
+                            "Evaluation Test Date",
+                            team_cmj_dates,
+                            index=0,
+                            key="team_cmj_eval_date",
+                        )
+                    with c_sum_d2:
+                        team_pos_f = st.selectbox(
+                            "Filter by Position",
+                            ["All Positions"]
+                            + sorted([
+                                p
+                                for p in full_df_unfiltered["Position"].unique()
+                                if p != "N/A"
+                            ]),
+                            key="team_cmj_pos_filter",
+                        )
+
+                    team_cmj_rows = []
+                    for ath_name in sorted(raw_cmj_df["Name"].unique()):
+                        ath_sub_cmj = raw_cmj_df[
+                            raw_cmj_df["Name"] == ath_name
+                        ].sort_values("Test Date")
+                        if ath_sub_cmj.empty:
+                            continue
+
+                        meta_row = full_df_unfiltered[
+                            full_df_unfiltered["Name"] == ath_name
+                        ]
+                        pos_str = (
+                            meta_row["Position"].iloc[0]
+                            if not meta_row.empty
+                            else "N/A"
+                        )
+                        photo_url = (
+                            meta_row["PhotoURL"].iloc[0]
+                            if not meta_row.empty
+                            else "https://www.w3schools.com/howto/img_avatar.png"
+                        )
+                        if (
+                            team_pos_f != "All Positions"
+                            and pos_str != team_pos_f
+                        ):
+                            continue
+
+                        ath_date_match = ath_sub_cmj[
+                            ath_sub_cmj["Test Date"].dt.strftime("%m/%d/%y")
+                            == sel_team_cmj_date
+                        ]
+                        if ath_date_match.empty:
+                            continue
+
+                        target_row = ath_date_match.iloc[-1]
+
+                        all_indices = list(ath_sub_cmj.index)
+                        if target_row.name in all_indices:
+                            cur_pos = all_indices.index(target_row.name)
+                            prev_row = ath_sub_cmj.iloc[max(0, cur_pos - 1)]
+                        else:
+                            prev_row = target_row
+
+                        readiness_pct = int(
+                            round(
+                                compute_excel_readiness_score(
+                                    target_row, prev_row
+                                )
+                            )
+                        )
+                        z_color = get_readiness_color(readiness_pct)
+                        team_cmj_rows.append({
+                            "Athlete": ath_name,
+                            "PhotoURL": photo_url,
+                            "Position": pos_str,
+                            "Readiness %": readiness_pct,
+                            "Status_Color": z_color,
+                        })
+
+                    if team_cmj_rows:
+                        cmj_team_df = pd.DataFrame(team_cmj_rows).sort_values(
+                            "Readiness %", ascending=False
+                        )
+                        c_kpi1, c_kpi2, c_kpi3, c_kpi4 = st.columns(4)
+                        avg_team_readiness = cmj_team_df["Readiness %"].mean()
+                        peak_count = sum(
+                            1
+                            for r in team_cmj_rows
+                            if r["Readiness %"] >= 90
+                        )
+                        fatigue_count = sum(
+                            1
+                            for r in team_cmj_rows
+                            if r["Readiness %"] < 80
+                        )
+
+                        c_kpi1.metric(
+                            "Athletes Evaluated", len(team_cmj_rows)
+                        )
+                        c_kpi2.metric(
+                            "Team Mean Wellness", f"{avg_team_readiness:.1f}%"
+                        )
+                        c_kpi3.metric("Optimal (>=90%)", peak_count)
+                        c_kpi4.metric("Fatigued (<80%)", fatigue_count)
+
+                        team_tbl_html = """<table class="scout-table" style="width:100%; border:1px solid #E2E8F0; background:white; margin-top:15px;"><thead><tr style="background:#4895DB; color:white;"><th style="width:60px;">Athlete</th><th style="text-align:left !important; padding-left:15px;">Name</th><th>Position</th><th>Wellness Score</th></tr></thead><tbody>"""
+                        for _, row in cmj_team_df.iterrows():
+                            team_tbl_html += f"""<tr>
+                                <td style="padding:6px;"><img src="{row['PhotoURL']}" style="width:38px; height:38px; border-radius:50%; object-fit:contain; border:2px solid #FF8200;"></td>
+                                <td style="text-align:left !important; font-weight:800; padding-left:15px; font-size:13px;">{row['Athlete']}</td>
+                                <td style="font-weight:600; color:#4B5563;">{row['Position']}</td>
+                                <td style="font-weight:900; font-size:15px; color:{row['Status_Color']};">{row['Readiness %']}%</td>
+                            </tr>"""
+                        team_tbl_html += "</tbody></table>"
+                        st.markdown(team_tbl_html, unsafe_allow_html=True)
+                    else:
+                        st.info(
+                            "No Countermovement Jump testing records logged on"
+                            f" {sel_team_cmj_date}."
+                        )
+
+                # -------------------------------------------------------------------------
+                # --- 3. MATCH V. CMJ RECOVERY -------------------------------------------
+                # -------------------------------------------------------------------------
+                elif sel_cmj_mode == "Match v. CMJ Recovery":
+                    st.markdown('<div class="section-header">Match Volume Demands vs. CMJ Jump Recovery</div>', unsafe_allow_html=True)
+                    
+                    match_rec_df = match_master.copy()
+                    
+                    if not match_rec_df.empty:
+                        c_m1, c_m2 = st.columns([1.5, 2])
+                        with c_m1:
+                            sel_match_session = st.selectbox("Select Match Session", sorted(match_rec_df['Session_Name'].unique()), key="m_v_cmj_session_tab")
+                        with c_m2:
+                            sel_pos_m = st.selectbox("Position Filter", ["All Positions"] + sorted([p for p in match_rec_df['Position'].unique() if p != "N/A"]), key="m_v_cmj_pos_tab")
+                            
+                        filtered_match = match_rec_df[match_rec_df['Session_Name'] == sel_match_session].copy()
+                        if sel_pos_m != "All Positions":
+                            filtered_match = filtered_match[filtered_match['Position'] == sel_pos_m]
+                            
+                        filtered_match = filtered_match.sort_values("Total Jumps", ascending=False)
+                        
+                        table_rows_html = ""
+                        for _, row in filtered_match.iterrows():
+                            ath_name = row['Name']
+                            m_date = pd.to_datetime(row['Date'])
+                            pos_str = row['Position']
+                            
+                            ath_all_cmj = raw_cmj_df[raw_cmj_df['Name'] == ath_name].sort_values('Test Date')
+                            
+                            # Pre-match baseline jump (latest test on or before match day)
+                            pre_cmj = ath_all_cmj[ath_all_cmj['Test Date'] <= m_date]
+                            pre_h = pre_cmj.iloc[-1][cmj_col] if (not pre_cmj.empty and cmj_col in pre_cmj.columns) else None
+                            
+                            # Post-match recovery jump (first test within 1-4 days after match day)
+                            post_cmj = ath_all_cmj[(ath_all_cmj['Test Date'] > m_date) & (ath_all_cmj['Test Date'] <= m_date + timedelta(days=4))]
+                            post_h = post_cmj.iloc[0][cmj_col] if (not post_cmj.empty and cmj_col in post_cmj.columns) else None
+                            
+                            # Delta and Badge formatting
+                            if pre_h is not None and post_h is not None and pre_h > 0:
+                                diff_h = ((post_h - pre_h) / pre_h) * 100
+                                if diff_h >= 0:
+                                    delta_badge = f'<span style="background-color: #E6F4EA; color: #137333; padding: 4px 10px; border-radius: 12px; font-weight: 800; font-size: 11px;">↑ +{diff_h:.1f}%</span>'
+                                else:
+                                    delta_badge = f'<span style="background-color: #FCE8E6; color: #D93025; padding: 4px 10px; border-radius: 12px; font-weight: 800; font-size: 11px;">↓ {diff_h:.1f}%</span>'
+                            else:
+                                delta_badge = '<span style="background-color: #F1F5F9; color: #64748B; padding: 4px 10px; border-radius: 12px; font-weight: 700; font-size: 11px;">No Post-Test</span>'
+                                
+                            pre_str = f"{pre_h:.1f} in" if pre_h is not None else "—"
+                            post_str = f"{post_h:.1f} in" if post_h is not None else "—"
+                            
+                            table_rows_html += f"""
+                            <tr>
+                                <td style="font-weight: 800; text-align: left !important; padding-left: 14px;">{ath_name}</td>
+                                <td style="font-weight: 600; color: #64748B;">{pos_str}</td>
+                                <td style="font-weight: 800; color: #FF8200; font-size: 13px;">{int(row['Total Jumps'])}</td>
+                                <td style="font-weight: 600;">{row['Player Load']:.0f}</td>
+                                <td style="font-weight: 600;">{int(row['Explosive Efforts'])}</td>
+                                <td style="color: #475569; font-weight: 700;">{pre_str}</td>
+                                <td style="font-weight: 800; color: #0F172A;">{post_str}</td>
+                                <td>{delta_badge}</td>
+                            </tr>
+                            """
+                            
+                        if table_rows_html:
+                            full_table_html = f"""
+                            <table class="scout-table" style="width: 100%; border: 1px solid #E2E8F0; background: white; margin-top: 15px; box-shadow: 0 1px 3px rgba(0,0,0,0.02);">
+                                <thead>
+                                    <tr style="background: #4895DB; color: white;">
+                                        <th style="text-align: left !important; padding-left: 14px;">Athlete</th>
+                                        <th>Position</th>
+                                        <th>Match Jumps</th>
+                                        <th>Match Load</th>
+                                        <th>Efforts</th>
+                                        <th>Pre-Match CMJ</th>
+                                        <th>Post-Match CMJ</th>
+                                        <th>Recovery Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {table_rows_html}
+                                </tbody>
+                            </table>
+                            """
+                            st.markdown(full_table_html, unsafe_allow_html=True)
+                        else:
+                            st.info("No athlete match records found.")
+                    else:
+                        st.info("No match session records available in the selected season.")
+
+                # -------------------------------------------------------------------------
+                # --- 4. ASYMMETRY & FAVORING ANALYSIS ------------------------------------
                 # -------------------------------------------------------------------------
                 elif sel_cmj_mode == "Asymmetry & Favoring":
                     st.markdown(
@@ -2206,7 +2431,6 @@ if check_password():
                                     )
                                 )
 
-                                # Single-layer annotations to avoid blurry double-text
                                 annotations = []
                                 for r_idx, metric in enumerate(
                                     pivot_asym.index
@@ -2336,147 +2560,12 @@ if check_password():
                                 </tr>"""
                             unified_tbl_html += "</tbody></table>"
                             st.markdown(unified_tbl_html, unsafe_allow_html=True)
-
-                # -------------------------------------------------------------------------
-                # --- 3. TEAM CMJ SUMMARY ------------------------------------------------
-                # -------------------------------------------------------------------------
-                elif sel_cmj_mode == "Team CMJ Summary":
-                    st.markdown("### Team Wellness Score Overview")
-                    team_cmj_dates = (
-                        raw_cmj_df["Test Date"]
-                        .dropna()
-                        .drop_duplicates()
-                        .sort_values(ascending=False)
-                        .dt.strftime("%m/%d/%y")
-                        .tolist()
-                    )
-
-                    c_sum_d1, c_sum_d2 = st.columns([1.5, 2])
-                    with c_sum_d1:
-                        sel_team_cmj_date = st.selectbox(
-                            "Evaluation Test Date",
-                            team_cmj_dates,
-                            index=0,
-                            key="team_cmj_eval_date",
-                        )
-                    with c_sum_d2:
-                        team_pos_f = st.selectbox(
-                            "Filter by Position",
-                            ["All Positions"]
-                            + sorted([
-                                p
-                                for p in full_df_unfiltered["Position"].unique()
-                                if p != "N/A"
-                            ]),
-                            key="team_cmj_pos_filter",
-                        )
-
-                    team_cmj_rows = []
-                    for ath_name in sorted(raw_cmj_df["Name"].unique()):
-                        ath_sub_cmj = raw_cmj_df[
-                            raw_cmj_df["Name"] == ath_name
-                        ].sort_values("Test Date")
-                        if ath_sub_cmj.empty:
-                            continue
-
-                        meta_row = full_df_unfiltered[
-                            full_df_unfiltered["Name"] == ath_name
-                        ]
-                        pos_str = (
-                            meta_row["Position"].iloc[0]
-                            if not meta_row.empty
-                            else "N/A"
-                        )
-                        photo_url = (
-                            meta_row["PhotoURL"].iloc[0]
-                            if not meta_row.empty
-                            else "https://www.w3schools.com/howto/img_avatar.png"
-                        )
-                        if (
-                            team_pos_f != "All Positions"
-                            and pos_str != team_pos_f
-                        ):
-                            continue
-
-                        ath_date_match = ath_sub_cmj[
-                            ath_sub_cmj["Test Date"].dt.strftime("%m/%d/%y")
-                            == sel_team_cmj_date
-                        ]
-                        if ath_date_match.empty:
-                            continue
-
-                        target_row = ath_date_match.iloc[-1]
-
-                        all_indices = list(ath_sub_cmj.index)
-                        if target_row.name in all_indices:
-                            cur_pos = all_indices.index(target_row.name)
-                            prev_row = ath_sub_cmj.iloc[max(0, cur_pos - 1)]
-                        else:
-                            prev_row = target_row
-
-                        readiness_pct = int(
-                            round(
-                                compute_excel_readiness_score(
-                                    target_row, prev_row
-                                )
-                            )
-                        )
-                        z_color = get_readiness_color(readiness_pct)
-                        team_cmj_rows.append({
-                            "Athlete": ath_name,
-                            "PhotoURL": photo_url,
-                            "Position": pos_str,
-                            "Readiness %": readiness_pct,
-                            "Status_Color": z_color,
-                        })
-
-                    if team_cmj_rows:
-                        cmj_team_df = pd.DataFrame(team_cmj_rows).sort_values(
-                            "Readiness %", ascending=False
-                        )
-                        c_kpi1, c_kpi2, c_kpi3, c_kpi4 = st.columns(4)
-                        avg_team_readiness = cmj_team_df["Readiness %"].mean()
-                        peak_count = sum(
-                            1
-                            for r in team_cmj_rows
-                            if r["Readiness %"] >= 90
-                        )
-                        fatigue_count = sum(
-                            1
-                            for r in team_cmj_rows
-                            if r["Readiness %"] < 80
-                        )
-
-                        c_kpi1.metric(
-                            "Athletes Evaluated", len(team_cmj_rows)
-                        )
-                        c_kpi2.metric(
-                            "Team Mean Wellness", f"{avg_team_readiness:.1f}%"
-                        )
-                        c_kpi3.metric("Optimal (>=90%)", peak_count)
-                        c_kpi4.metric("Fatigued (<80%)", fatigue_count)
-
-                        team_tbl_html = """<table class="scout-table" style="width:100%; border:1px solid #E2E8F0; background:white; margin-top:15px;"><thead><tr style="background:#4895DB; color:white;"><th style="width:60px;">Athlete</th><th style="text-align:left !important; padding-left:15px;">Name</th><th>Position</th><th>Wellness Score</th></tr></thead><tbody>"""
-                        for _, row in cmj_team_df.iterrows():
-                            team_tbl_html += f"""<tr>
-                                <td style="padding:6px;"><img src="{row['PhotoURL']}" style="width:38px; height:38px; border-radius:50%; object-fit:contain; border:2px solid #FF8200;"></td>
-                                <td style="text-align:left !important; font-weight:800; padding-left:15px; font-size:13px;">{row['Athlete']}</td>
-                                <td style="font-weight:600; color:#4B5563;">{row['Position']}</td>
-                                <td style="font-weight:900; font-size:15px; color:{row['Status_Color']};">{row['Readiness %']}%</td>
-                            </tr>"""
-                        team_tbl_html += "</tbody></table>"
-                        st.markdown(team_tbl_html, unsafe_allow_html=True)
-                    else:
-                        st.info(
-                            "No Countermovement Jump testing records logged on"
-                            f" {sel_team_cmj_date}."
-                        )
                         
         # =========================================================================
         # --- HUB 2: MATCH PERFORMANCE --------------------------------------------
         # =========================================================================
         elif selected_hub == "Match Performance":
-            match_subtabs = ["Match Summary", "Match v. Practice", "Match v. CMJ Recovery"]
+            match_subtabs = ["Match Summary", "Match v. Practice"]
             if "match_subtab_radio" not in st.session_state or st.session_state["match_subtab_radio"] not in match_subtabs:
                 st.session_state["match_subtab_radio"] = match_subtabs[0]
 
@@ -2609,94 +2698,6 @@ if check_password():
                     st.markdown(overall_html + "</table>", unsafe_allow_html=True)
                 else:
                     st.info("Insufficient practice or match records available for comparison.")
-
-            elif sel_match_tab == "Match v. CMJ Recovery":
-                st.markdown('<div class="section-header">Match Volume Demands vs. CMJ Jump Recovery</div>', unsafe_allow_html=True)
-                
-                match_rec_df = match_master.copy()
-                
-                if not match_rec_df.empty:
-                    c_m1, c_m2 = st.columns([1.5, 2])
-                    with c_m1:
-                        sel_match_session = st.selectbox("Select Match Session", sorted(match_rec_df['Session_Name'].unique()), key="m_v_cmj_session")
-                    with c_m2:
-                        sel_pos_m = st.selectbox("Position Filter", ["All Positions"] + sorted([p for p in match_rec_df['Position'].unique() if p != "N/A"]), key="m_v_cmj_pos")
-                        
-                    filtered_match = match_rec_df[match_rec_df['Session_Name'] == sel_match_session].copy()
-                    if sel_pos_m != "All Positions":
-                        filtered_match = filtered_match[filtered_match['Position'] == sel_pos_m]
-                        
-                    filtered_match = filtered_match.sort_values("Total Jumps", ascending=False)
-                    
-                    table_rows_html = ""
-                    for _, row in filtered_match.iterrows():
-                        ath_name = row['Name']
-                        m_date = pd.to_datetime(row['Date'])
-                        pos_str = row['Position']
-                        
-                        ath_all_cmj = raw_cmj_df[raw_cmj_df['Name'] == ath_name].sort_values('Test Date')
-                        
-                        # Pre-match baseline jump (latest test on or before match day)
-                        pre_cmj = ath_all_cmj[ath_all_cmj['Test Date'] <= m_date]
-                        pre_h = pre_cmj.iloc[-1][cmj_col] if (not pre_cmj.empty and cmj_col in pre_cmj.columns) else None
-                        
-                        # Post-match recovery jump (first test within 1-4 days after match day)
-                        post_cmj = ath_all_cmj[(ath_all_cmj['Test Date'] > m_date) & (ath_all_cmj['Test Date'] <= m_date + timedelta(days=4))]
-                        post_h = post_cmj.iloc[0][cmj_col] if (not post_cmj.empty and cmj_col in post_cmj.columns) else None
-                        
-                        # Delta and Badge formatting
-                        if pre_h is not None and post_h is not None and pre_h > 0:
-                            diff_h = ((post_h - pre_h) / pre_h) * 100
-                            if diff_h >= 0:
-                                delta_badge = f'<span style="background-color: #E6F4EA; color: #137333; padding: 4px 10px; border-radius: 12px; font-weight: 800; font-size: 11px;">↑ +{diff_h:.1f}%</span>'
-                            else:
-                                delta_badge = f'<span style="background-color: #FCE8E6; color: #D93025; padding: 4px 10px; border-radius: 12px; font-weight: 800; font-size: 11px;">↓ {diff_h:.1f}%</span>'
-                        else:
-                            delta_badge = '<span style="background-color: #F1F5F9; color: #64748B; padding: 4px 10px; border-radius: 12px; font-weight: 700; font-size: 11px;">No Post-Test</span>'
-                            
-                        pre_str = f"{pre_h:.1f} in" if pre_h is not None else "—"
-                        post_str = f"{post_h:.1f} in" if post_h is not None else "—"
-                        
-                        table_rows_html += f"""
-                        <tr>
-                            <td style="font-weight: 800; text-align: left !important; padding-left: 14px;">{ath_name}</td>
-                            <td style="font-weight: 600; color: #64748B;">{pos_str}</td>
-                            <td style="font-weight: 800; color: #FF8200; font-size: 13px;">{int(row['Total Jumps'])}</td>
-                            <td style="font-weight: 600;">{row['Player Load']:.0f}</td>
-                            <td style="font-weight: 600;">{int(row['Explosive Efforts'])}</td>
-                            <td style="color: #475569; font-weight: 700;">{pre_str}</td>
-                            <td style="font-weight: 800; color: #0F172A;">{post_str}</td>
-                            <td>{delta_badge}</td>
-                        </tr>
-                        """
-                        
-                    if table_rows_html:
-                        full_table_html = f"""
-                        <table class="scout-table" style="width: 100%; border: 1px solid #E2E8F0; background: white; margin-top: 15px; box-shadow: 0 1px 3px rgba(0,0,0,0.02);">
-                            <thead>
-                                <tr style="background: #4895DB; color: white;">
-                                    <th style="text-align: left !important; padding-left: 14px;">Athlete</th>
-                                    <th>Position</th>
-                                    <th>Match Jumps</th>
-                                    <th>Match Load</th>
-                                    <th>Efforts</th>
-                                    <th>Pre-Match CMJ</th>
-                                    <th>Post-Match CMJ</th>
-                                    <th>Recovery Status</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {table_rows_html}
-                            </tbody>
-                        </table>
-                        """
-                        st.markdown(full_table_html, unsafe_allow_html=True)
-                    else:
-                        st.info("No athlete match records found.")
-                else:
-                    st.info("No match session records available in the selected season.")
-                    
-            
 
 
         # =========================================================================
