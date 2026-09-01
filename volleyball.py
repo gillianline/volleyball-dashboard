@@ -1427,7 +1427,7 @@ if check_password():
                                 <tr style="background:#4895DB; color:white;">
                                     <th style="text-align:left !important; padding-left:14px; width:30%;">Phase Metric</th>
                                     <th style="width:14%;">Actual Total</th>
-                                    <th style="width:18%;">D1 Standard Target</th>
+                                    <th style="width:18%;">Target</th>
                                     <th style="width:12%;">Output Standard</th>
                                     <th style="width:13%;">Favored Limb</th>
                                     <th style="width:13%;">Asymmetry %</th>
