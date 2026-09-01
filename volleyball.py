@@ -1496,39 +1496,38 @@ if check_password():
                                     aggfunc="mean"
                                 ).reindex(metric_order).fillna(0.0)
                                 
-                                diverging_scale = [
-                                    [0.00, "#2563EB"],  # Deep Blue (Heavy Left)
-                                    [0.30, "#93C5FD"],  # Light Blue
-                                    [0.45, "#F1F5F9"],  # Balanced (<10%)
-                                    [0.55, "#F1F5F9"],  # Balanced (<10%)
-                                    [0.70, "#FDBA74"],  # Light Orange
-                                    [1.00, "#FF8200"]   # Tennessee Orange (Heavy Right)
-                                ]
-                                
-                                text_annotations = []
-                                for row_vals in pivot_asym.values:
-                                    row_text = []
-                                    for val in row_vals:
+                                # Matrix text creation
+                                text_matrix = np.empty(pivot_asym.shape, dtype=object)
+                                for r_idx, row_vals in enumerate(pivot_asym.values):
+                                    for c_idx, val in enumerate(row_vals):
                                         if abs(val) >= 0.1:
                                             side_char = "R" if val > 0 else "L"
-                                            row_text.append(f"{abs(val):.1f}% {side_char}")
+                                            text_matrix[r_idx, c_idx] = f"{abs(val):.1f}% {side_char}"
                                         else:
-                                            row_text.append("0%")
-                                text_annotations.append(row_text)
+                                            text_matrix[r_idx, c_idx] = "0.0%"
+
+                                diverging_scale = [
+                                    [0.00, "#1D4ED8"],  # Deep Blue (Heavy Left)
+                                    [0.30, "#93C5FD"],  # Light Blue (Moderate Left)
+                                    [0.45, "#F1F5F9"],  # Light Gray (Symmetric Zone)
+                                    [0.55, "#F1F5F9"],  # Light Gray (Symmetric Zone)
+                                    [0.70, "#FDBA74"],  # Light Orange (Moderate Right)
+                                    [1.00, "#EA580C"]   # Deep Orange (Heavy Right)
+                                ]
 
                                 fig_heat = go.Figure(data=go.Heatmap(
                                     z=pivot_asym.values,
-                                    x=pivot_asym.columns,
-                                    y=pivot_asym.index,
+                                    x=list(pivot_asym.columns),
+                                    y=list(pivot_asym.index),
+                                    text=text_matrix,
+                                    texttemplate="<b>%{text}</b>",
+                                    textfont=dict(size=12, family="Arial"),
                                     colorscale=diverging_scale,
                                     zmid=0,
                                     zmin=-25,
                                     zmax=25,
-                                    text=text_annotations,
-                                    texttemplate="<b>%{text}</b>",
-                                    textfont=dict(size=11, color="#0F172A"),
-                                    xgap=3,
-                                    ygap=3,
+                                    xgap=4,
+                                    ygap=4,
                                     colorbar=dict(
                                         title=dict(text="Limb Bias", font=dict(size=11, color="#64748B")),
                                         tickvals=[-20, -10, 0, 10, 20],
@@ -1537,13 +1536,28 @@ if check_password():
                                     )
                                 ))
 
+                                annotations = []
+                                for r_idx, metric in enumerate(pivot_asym.index):
+                                    for c_idx, date_val in enumerate(pivot_asym.columns):
+                                        val = pivot_asym.iloc[r_idx, c_idx]
+                                        txt = text_matrix[r_idx, c_idx]
+                                        font_color = "#FFFFFF" if abs(val) >= 12.0 else "#0F172A"
+                                        annotations.append(dict(
+                                            x=date_val,
+                                            y=metric,
+                                            text=f"<b>{txt}</b>",
+                                            font=dict(size=12, color=font_color),
+                                            showarrow=False
+                                        ))
+
                                 fig_heat.update_layout(
-                                    height=270,
-                                    margin=dict(l=20, r=20, t=10, b=25),
-                                    xaxis=dict(title=None, showgrid=False, tickfont=dict(size=11, color="#1D1D1F")),
+                                    height=300,
+                                    margin=dict(l=20, r=20, t=10, b=30),
+                                    xaxis=dict(title=None, showgrid=False, tickfont=dict(size=12, color="#1D1D1F", weight="bold")),
                                     yaxis=dict(autorange="reversed", showgrid=False, tickfont=dict(size=11, weight="bold", color="#1D1D1F")),
                                     plot_bgcolor="white",
-                                    paper_bgcolor="white"
+                                    paper_bgcolor="white",
+                                    annotations=annotations
                                 )
                                 st.plotly_chart(fig_heat, use_container_width=True, config=LOCKED_CONFIG, key=f"asym_heatmap_{sel_asym_ath}_{sel_asym_season}")
 
