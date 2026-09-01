@@ -1045,34 +1045,30 @@ if check_password():
                                         st.plotly_chart(fig_p, use_container_width=True, key=f"team_card_{name}_{sel_week}_t4")
 
             elif sel_daily_tab == "CMJ Performance":
-                # To restore asymmetry tab later:
-                # 1. Add "Asymmetry & Favoring" back to cmj_view_modes
-                # 2. Uncomment the parse_asym_val helper function
-                # 3. Uncomment the elif sel_cmj_mode == "Asymmetry & Favoring": block below
 
-                cmj_view_modes = ["Individual Athlete", "Team CMJ Summary"]
-                # cmj_view_modes = ["Individual Athlete", "Asymmetry & Favoring", "Team CMJ Summary"]
+                #cmj_view_modes = ["Individual Athlete", "Team CMJ Summary"]
+                cmj_view_modes = ["Individual Athlete", "Asymmetry & Favoring", "Team CMJ Summary"]
                 
                 if "cmj_view_mode_subtab" not in st.session_state or st.session_state.cmj_view_mode_subtab not in cmj_view_modes:
                     st.session_state.cmj_view_mode_subtab = cmj_view_modes[0]
                     
                 sel_cmj_mode = st.radio("CMJ View Mode", cmj_view_modes, key="cmj_view_mode_subtab", horizontal=True, label_visibility="collapsed")
 
-                # =========================================================================
-                # --- ASYMMETRY HELPER FUNCTION (SAVED FOR LATER) ------------------------
-                # =========================================================================
-                # def parse_asym_val(raw_val):
-                #     if pd.isna(raw_val):
-                #         return 0.0, "Balanced"
-                #     s = str(raw_val).strip().upper()
-                #     num_part = re.findall(r"[-+]?(?:\d*\.\d+|\d+)", s)
-                #     val = float(num_part[0]) if num_part else 0.0
-                #     if "L" in s:
-                #         return -abs(val), "Left"
-                #     elif "R" in s:
-                #         return abs(val), "Right"
-                #     else:
-                #         return val, "Right" if val > 0 else ("Left" if val < 0 else "Balanced")
+                 =========================================================================
+                 --- ASYMMETRY HELPER FUNCTION (SAVED FOR LATER) ------------------------
+                 =========================================================================
+                 def parse_asym_val(raw_val):
+                     if pd.isna(raw_val):
+                         return 0.0, "Balanced"
+                     s = str(raw_val).strip().upper()
+                     num_part = re.findall(r"[-+]?(?:\d*\.\d+|\d+)", s)
+                     val = float(num_part[0]) if num_part else 0.0
+                     if "L" in s:
+                         return -abs(val), "Left"
+                     elif "R" in s:
+                         return abs(val), "Right"
+                     else:
+                         return val, "Right" if val > 0 else ("Left" if val < 0 else "Balanced")
 
                 # -------------------------------------------------------------------------
                 # --- 1. INDIVIDUAL ATHLETE PROFILE --------------------------------------
