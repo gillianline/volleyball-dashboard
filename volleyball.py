@@ -1397,8 +1397,6 @@ if check_password():
 
                             asym_table_df = pd.DataFrame(parsed_records)
 
-                            kpi_a1, kpi_a2, kpi_a3, kpi_a4 = st.columns(4)
-                            mean_mag = asym_table_df["Magnitude"].mean()
                             max_imbalance_row = asym_table_df.loc[asym_table_df["Magnitude"].idxmax()]
                             
                             r_count = sum(1 for r in parsed_records if r["Favored"] == "Right" and r["Magnitude"] >= 5.0)
@@ -1410,12 +1408,9 @@ if check_password():
                             elif l_count > r_count:
                                 primary_favoring = "Left Leg (Unloading Right)"
 
-                            meets_count = sum(1 for r in parsed_records if r["Output_Status"] in ["Optimal", "Elite"])
-
-                            kpi_a1.metric("Recorded Body Weight", f"{bw_kg:.1f} kg", help="Used to normalize force thresholds (N/kg).")
-                            kpi_a2.metric("Output Standards Met", f"{meets_count} / {len(parsed_records)}", help="Number of force/RFD metrics meeting or exceeding collegiate benchmarks.")
-                            kpi_a3.metric("Dominant Favoring", primary_favoring, help="Limb consistently generating higher force across jump phases.")
-                            kpi_a4.metric("Peak Phase Imbalance", f"{max_imbalance_row['Phase']} ({max_imbalance_row['Magnitude']:.1f}% {max_imbalance_row['Favored'][0]})")
+                            kpi_a1, kpi_a2 = st.columns(2)
+                            kpi_a1.metric("Dominant Favoring", primary_favoring, help="Limb consistently generating higher force across jump phases.")
+                            kpi_a2.metric("Peak Phase Imbalance", f"{max_imbalance_row['Phase']} ({max_imbalance_row['Magnitude']:.1f}% {max_imbalance_row['Favored'][0]})")
 
                             if known_injury_side != "None / Unknown":
                                 unloaded_side = "Left" if "Right" in primary_favoring else ("Right" if "Left" in primary_favoring else "None")
@@ -1466,7 +1461,7 @@ if check_password():
                             st.plotly_chart(fig_asym, use_container_width=True, config=LOCKED_CONFIG, key="cmj_asym_horizontal_bar")
 
                             # =========================================================================
-                            # --- OPTION 1: LONGITUDINAL LIMB FAVORING HEATMAP ------------------------
+                            # --- LONGITUDINAL LIMB FAVORING HEATMAP ----------------------------------
                             # =========================================================================
                             st.markdown("<br>", unsafe_allow_html=True)
                             season_heatmap_label = f"({sel_asym_season})" if sel_asym_season != "All Seasons" else "(All Seasons)"
@@ -1494,7 +1489,6 @@ if check_password():
                             if not trend_df.empty:
                                 metric_order = [m["label"] for m in asym_metric_list]
                                 
-                                # Aggregate duplicate tests on the same date using mean
                                 pivot_asym = trend_df.pivot_table(
                                     index="Metric", 
                                     columns="Date_Str", 
@@ -1520,7 +1514,7 @@ if check_password():
                                             row_text.append(f"{abs(val):.1f}% {side_char}")
                                         else:
                                             row_text.append("0%")
-                                    text_annotations.append(row_text)
+                                text_annotations.append(row_text)
 
                                 fig_heat = go.Figure(data=go.Heatmap(
                                     z=pivot_asym.values,
