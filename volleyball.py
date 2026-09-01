@@ -1053,7 +1053,7 @@ if check_password():
                 sel_cmj_mode = st.radio("CMJ View Mode", cmj_view_modes, key="cmj_view_mode_subtab", horizontal=True, label_visibility="collapsed")
 
                 # =========================================================================
-                # --- ASYMMETRY HELPER FUNCTION -------------------------------------------
+                # --- ASYMMETRY HELPER FUNCTIONS ------------------------------------------
                 # =========================================================================
                 def parse_asym_val(raw_val):
                     if pd.isna(raw_val):
@@ -1067,6 +1067,20 @@ if check_password():
                         return abs(val), "Right"
                     else:
                         return val, "Right" if val > 0 else ("Left" if val < 0 else "Balanced")
+
+                def resolve_col_val(row, primary_col, alt_cols=[]):
+                    candidates = [primary_col] + alt_cols
+                    for col in candidates:
+                        if col in row and pd.notna(row[col]) and str(row[col]).strip() != "":
+                            return row[col]
+                    row_keys_norm = {re.sub(r'[^a-zA-Z0-9]', '', str(k)).lower(): k for k in row.index}
+                    for col in candidates:
+                        norm = re.sub(r'[^a-zA-Z0-9]', '', str(col)).lower()
+                        if norm in row_keys_norm:
+                            matched_key = row_keys_norm[norm]
+                            if pd.notna(row[matched_key]) and str(row[matched_key]).strip() != "":
+                                return row[matched_key]
+                    return None
 
                 # -------------------------------------------------------------------------
                 # --- 1. INDIVIDUAL ATHLETE PROFILE --------------------------------------
@@ -1249,7 +1263,9 @@ if check_password():
                             {
                                 "label": "Eccentric Braking RFD",
                                 "raw_val_col": "Eccentric Braking RFD [N/s]",
+                                "alt_raw": ["Eccentric Braking RFD", "Braking RFD [N/s]", "Braking RFD"],
                                 "asym_col": "Eccentric Braking RFD % (Asym) (%)",
+                                "alt_asym": ["Eccentric Braking RFD (Asym) (%)", "Eccentric Braking RFD Asymmetry (%)", "Braking RFD (Asym) (%)"],
                                 "phase": "Eccentric Braking RFD",
                                 "unit": "N/s",
                                 "fmt": "{:.0f}",
@@ -1261,7 +1277,9 @@ if check_password():
                             {
                                 "label": "Eccentric Deceleration RFD",
                                 "raw_val_col": "Eccentric Deceleration RFD [N/s]",
+                                "alt_raw": ["Eccentric Deceleration RFD", "Eccentric RFD [N/s]", "Eccentric RFD"],
                                 "asym_col": "Eccentric Deceleration RFD % (Asym) (%)",
+                                "alt_asym": ["Eccentric Deceleration RFD (Asym) (%)", "Eccentric RFD % (Asym) (%)", "Eccentric RFD (Asym) (%)"],
                                 "phase": "Eccentric Deceleration RFD",
                                 "unit": "N/s",
                                 "fmt": "{:.0f}",
@@ -1273,7 +1291,9 @@ if check_password():
                             {
                                 "label": "Force at Zero Velocity",
                                 "raw_val_col": "Force at Zero Velocity [N]",
+                                "alt_raw": ["Force at Zero Velocity", "Force @ 0 Velo", "Relative Force @ 0 Velo"],
                                 "asym_col": "Force at Zero Velocity % (Asym) (%)",
+                                "alt_asym": ["Force at Zero Velocity (Asym) (%)", "Force at Zero Velocity Asymmetry (%)", "Force @ 0 Velo (Asym) (%)"],
                                 "phase": "Force at Zero Velocity",
                                 "unit": "N",
                                 "fmt": "{:.0f}",
@@ -1285,7 +1305,9 @@ if check_password():
                             {
                                 "label": "Concentric Mean Force",
                                 "raw_val_col": "Concentric Mean Force [N]",
+                                "alt_raw": ["Concentric Mean Force", "Relative Mean Con Force", "Mean Concentric Force [N]"],
                                 "asym_col": "Concentric Mean Force % (Asym) (%)",
+                                "alt_asym": ["Concentric Mean Force (Asym) (%)", "Concentric Mean Force Asymmetry (%)"],
                                 "phase": "Concentric Mean Force",
                                 "unit": "N",
                                 "fmt": "{:.0f}",
@@ -1297,7 +1319,9 @@ if check_password():
                             {
                                 "label": "Takeoff Peak Force",
                                 "raw_val_col": "Takeoff Peak Force [N]",
+                                "alt_raw": ["Takeoff Peak Force", "Take-off Peak Force [N]", "Take-off Peak Force", "Peak Takeoff Force [N]", "Peak Takeoff Force", "Takeoff Force [N]", "Takeoff Force", "Concentric Peak Force [N]", "Concentric Peak Force"],
                                 "asym_col": "Takeoff Peak Force % (Asym) (%)",
+                                "alt_asym": ["Takeoff Peak Force (Asym) (%)", "Takeoff Peak Force [N] (Asym) (%)", "Take-off Peak Force % (Asym) (%)", "Take-off Peak Force (Asym) (%)", "Peak Takeoff Force % (Asym) (%)", "Takeoff Peak Force Asymmetry (%)", "Concentric Peak Force % (Asym) (%)"],
                                 "phase": "Takeoff Peak Force",
                                 "unit": "N",
                                 "fmt": "{:.0f}",
@@ -1310,7 +1334,16 @@ if check_password():
 
                         parsed_records = []
                         for item in asym_metric_list:
-                            raw_num_val = float(cur_asym_row.get(item["raw_val_col"], 0.0)) if item["raw_val_col"] in cur_asym_row and pd.notna(cur_asym_row.get(item["raw_val_col"])) else None
+                            raw_val_found = resolve_col_val(cur_asym_row, item["raw_val_col"], item.get("alt_raw", []))
+                            raw_num_val = None
+                            if raw_val_found is not None:
+                                try:
+                                    cleaned_num = float(re.sub(r'[^0-9.]', '', str(raw_val_found)))
+                                    if cleaned_num > 0:
+                                        raw_num_val = cleaned_num
+                                except:
+                                    raw_num_val = None
+
                             if raw_num_val is not None and raw_num_val > 0:
                                 if raw_num_val >= item["target_min"]:
                                     out_status = "Optimal" if raw_num_val <= item["target_max"] * 1.25 else "Elite"
@@ -1325,8 +1358,8 @@ if check_password():
                                 out_color = "#64748B"
                                 out_bg = "#F1F5F9"
 
-                            raw_asym_val = cur_asym_row.get(item["asym_col"], None)
-                            parsed_signed_val, side_favored = parse_asym_val(raw_asym_val)
+                            raw_asym_found = resolve_col_val(cur_asym_row, item["asym_col"], item.get("alt_asym", []))
+                            parsed_signed_val, side_favored = parse_asym_val(raw_asym_found)
                             
                             asym_status = "Symmetric (<10%)"
                             if abs(parsed_signed_val) >= 15.0:
@@ -1347,7 +1380,7 @@ if check_password():
                                 "Signed_Val": parsed_signed_val,
                                 "Magnitude": abs(parsed_signed_val),
                                 "Favored": side_favored,
-                                "Raw_Asym": str(raw_asym_val) if pd.notna(raw_asym_val) else "0.0",
+                                "Raw_Asym": str(raw_asym_found) if pd.notna(raw_asym_found) and str(raw_asym_found).strip() != "" else "0.0",
                                 "Asym_Status": asym_status
                             })
 
@@ -1421,6 +1454,87 @@ if check_password():
                         )
                         st.plotly_chart(fig_asym, use_container_width=True, config=LOCKED_CONFIG, key="cmj_asym_horizontal_bar")
 
+                        # =========================================================================
+                        # --- LONGITUDINAL ASYMMETRY & FAVORING TREND OVER TIME -------------------
+                        # =========================================================================
+                        st.markdown("<br>", unsafe_allow_html=True)
+                        st.markdown(f"#### Longitudinal Limb Loading Trends: {sel_asym_ath}")
+                        
+                        trend_records = []
+                        for _, test_row in ath_cmj_asym.iterrows():
+                            t_date = test_row['Test Date']
+                            t_date_str = pd.to_datetime(t_date).strftime('%m/%d/%y')
+                            
+                            for item in asym_metric_list:
+                                raw_asym_val = resolve_col_val(test_row, item["asym_col"], item.get("alt_asym", []))
+                                signed_v, fav_side = parse_asym_val(raw_asym_val)
+                                trend_records.append({
+                                    "Date": t_date,
+                                    "Date_Str": t_date_str,
+                                    "Metric": item["label"],
+                                    "Signed_Asymmetry": signed_v,
+                                    "Magnitude": abs(signed_v),
+                                    "Favored": fav_side
+                                })
+                        
+                        trend_df = pd.DataFrame(trend_records).sort_values("Date")
+                        
+                        if not trend_df.empty:
+                            asym_trend_colors = {
+                                "Eccentric Braking RFD": "#FF8200",
+                                "Eccentric Deceleration RFD": "#EA580C",
+                                "Force at Zero Velocity": "#10B981",
+                                "Concentric Mean Force": "#4895DB",
+                                "Takeoff Peak Force": "#8B5CF6"
+                            }
+                            
+                            fig_trend = go.Figure()
+                            
+                            # Symmetric baseline band (±10%)
+                            fig_trend.add_hrect(
+                                y0=-10, y1=10,
+                                fillcolor="#E2E8F0", opacity=0.45, line_width=0, layer="below",
+                                annotation_text="Symmetric Zone (±10%)", annotation_position="top left",
+                                annotation_font_size=10, annotation_font_color="#64748B"
+                            )
+                            
+                            # Center zero balance divider
+                            fig_trend.add_hline(y=0, line_dash="solid", line_color="#111827", line_width=1.5, layer="below")
+                            
+                            for m_label in asym_metric_list:
+                                lbl = m_label["label"]
+                                m_sub = trend_df[trend_df["Metric"] == lbl]
+                                if not m_sub.empty:
+                                    fig_trend.add_trace(go.Scatter(
+                                        x=m_sub["Date_Str"],
+                                        y=m_sub["Signed_Asymmetry"],
+                                        name=lbl,
+                                        mode="lines+markers",
+                                        line=dict(color=asym_trend_colors.get(lbl, "#4895DB"), width=2.5),
+                                        marker=dict(size=7, line=dict(width=1, color="white")),
+                                        hovertemplate="<b>%{fullData.name}</b><br>Date: %{x}<br>Bias: %{customdata}<extra></extra>",
+                                        customdata=[f"{abs(v):.1f}% {s}" for v, s in zip(m_sub["Signed_Asymmetry"], m_sub["Favored"])]
+                                    ))
+                            
+                            all_magnitudes = trend_df["Magnitude"].dropna()
+                            max_trend_bound = max(25.0, (all_magnitudes.max() * 1.25) if not all_magnitudes.empty else 25.0)
+                            
+                            fig_trend.update_layout(
+                                height=380,
+                                template="simple_white",
+                                margin=dict(l=20, r=40, t=30, b=20),
+                                xaxis=dict(type='category', title=dict(text="Evaluation Date", font=dict(size=11, color="#64748B"))),
+                                yaxis=dict(
+                                    range=[-max_trend_bound, max_trend_bound],
+                                    ticksuffix="%",
+                                    title=dict(text="← Left Favored (%) | Right Favored (%) →", font=dict(size=12, weight="bold", color="#1D1D1F")),
+                                    zeroline=False
+                                ),
+                                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0)
+                            )
+                            st.plotly_chart(fig_trend, use_container_width=True, config=LOCKED_CONFIG, key=f"cmj_asym_longitudinal_trend_{sel_asym_ath}")
+                        
+                        st.markdown("<br>", unsafe_allow_html=True)
                         st.markdown("#### Combined Metric Values, Standards & Limb Asymmetry")
                         unified_tbl_html = """<table class="scout-table" style="width:100%; border:1px solid #E2E8F0; background:white;">
                             <thead>
