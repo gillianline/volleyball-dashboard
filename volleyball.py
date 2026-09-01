@@ -1054,9 +1054,9 @@ if check_password():
                     
                 sel_cmj_mode = st.radio("CMJ View Mode", cmj_view_modes, key="cmj_view_mode_subtab", horizontal=True, label_visibility="collapsed")
 
-                 =========================================================================
-                 --- ASYMMETRY HELPER FUNCTION (SAVED FOR LATER) ------------------------
-                 =========================================================================
+                 #=========================================================================
+                # --- ASYMMETRY HELPER FUNCTION (SAVED FOR LATER) ------------------------
+                 #=========================================================================
                  def parse_asym_val(raw_val):
                      if pd.isna(raw_val):
                          return 0.0, "Balanced"
