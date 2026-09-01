@@ -1460,101 +1460,101 @@ if check_password():
                             )
                             st.plotly_chart(fig_asym, use_container_width=True, config=LOCKED_CONFIG, key="cmj_asym_horizontal_bar")
 
-                            # =========================================================================
-                            # --- LONGITUDINAL LIMB FAVORING HEATMAP ----------------------------------
-                            # =========================================================================
-                            st.markdown("<br>", unsafe_allow_html=True)
-                            season_heatmap_label = f"({sel_asym_season})" if sel_asym_season != "All Seasons" else "(All Seasons)"
-                            st.markdown(f"#### Longitudinal Limb Favoring Heatmap: {sel_asym_ath} {season_heatmap_label}")
+                # =========================================================================
+                # --- LONGITUDINAL LIMB FAVORING HEATMAP ----------------------------------
+                # =========================================================================
+                st.markdown("<br>", unsafe_allow_html=True)
+                season_heatmap_label = f"({sel_asym_season})" if sel_asym_season != "All Seasons" else "(All Seasons)"
+                st.markdown(f"#### Longitudinal Limb Favoring Heatmap: {sel_asym_ath} {season_heatmap_label}")
                             
-                            trend_records = []
-                            for _, test_row in ath_cmj_asym.iterrows():
-                                t_date = test_row['Test Date']
-                                t_date_str = pd.to_datetime(t_date).strftime('%m/%d/%y')
+                trend_records = []
+                for _, test_row in ath_cmj_asym.iterrows():
+                    t_date = test_row['Test Date']
+                    t_date_str = pd.to_datetime(t_date).strftime('%m/%d/%y')
                                 
-                                for item in asym_metric_list:
-                                    raw_asym_val = resolve_col_val(test_row, item["asym_col"], item.get("alt_asym", []))
-                                    signed_v, fav_side = parse_asym_val(raw_asym_val)
-                                    trend_records.append({
-                                        "Date": t_date,
-                                        "Date_Str": t_date_str,
-                                        "Metric": item["label"],
-                                        "Signed_Asymmetry": signed_v,
-                                        "Magnitude": abs(signed_v),
-                                        "Favored": fav_side
-                                    })
+                    for item in asym_metric_list:
+                        raw_asym_val = resolve_col_val(test_row, item["asym_col"], item.get("alt_asym", []))
+                        signed_v, fav_side = parse_asym_val(raw_asym_val)
+                        trend_records.append({
+                            "Date": t_date,
+                            "Date_Str": t_date_str,
+                            "Metric": item["label"],
+                            "Signed_Asymmetry": signed_v,
+                            "Magnitude": abs(signed_v),
+                            "Favored": fav_side
+                        })
                             
-                            trend_df = pd.DataFrame(trend_records).sort_values("Date")
+                trend_df = pd.DataFrame(trend_records).sort_values("Date")
                             
-                            if not trend_df.empty:
-                                metric_order = [m["label"] for m in asym_metric_list]
+                if not trend_df.empty:
+                     metric_order = [m["label"] for m in asym_metric_list]
                                 
-                                pivot_asym = trend_df.pivot_table(
-                                    index="Metric", 
-                                    columns="Date_Str", 
-                                    values="Signed_Asymmetry", 
-                                    aggfunc="mean"
-                                ).reindex(metric_order).fillna(0.0)
+                    pivot_asym = trend_df.pivot_table(
+                        index="Metric", 
+                        columns="Date_Str", 
+                        values="Signed_Asymmetry", 
+                        aggfunc="mean"
+                    ).reindex(metric_order).fillna(0.0)
                                 
-                                diverging_scale = [
-                                    [0.00, "#1E40AF"],  # Dark Navy Blue (Heavy Left)
-                                    [0.30, "#60A5FA"],  # Light Blue (Moderate Left)
-                                    [0.45, "#F1F5F9"],  # Soft Neutral Gray (Balanced Zone)
-                                    [0.55, "#F1F5F9"],  # Soft Neutral Gray (Balanced Zone)
-                                    [0.70, "#FB923C"],  # Soft Orange (Moderate Right)
-                                    [1.00, "#C2410C"]   # Dark Tennessee Orange (Heavy Right)
-                                ]
+                    diverging_scale = [
+                        [0.00, "#1E40AF"],  # Dark Navy Blue (Heavy Left)
+                        [0.30, "#60A5FA"],  # Light Blue (Moderate Left)
+                        [0.45, "#F1F5F9"],  # Soft Neutral Gray (Balanced Zone)
+                        [0.55, "#F1F5F9"],  # Soft Neutral Gray (Balanced Zone)
+                        [0.70, "#FB923C"],  # Soft Orange (Moderate Right)
+                        [1.00, "#C2410C"]   # Dark Tennessee Orange (Heavy Right)
+                    ]
 
-                                fig_heat = go.Figure(data=go.Heatmap(
-                                    z=pivot_asym.values,
-                                    x=list(pivot_asym.columns),
-                                    y=list(pivot_asym.index),
-                                    colorscale=diverging_scale,
-                                    zmid=0,
-                                    zmin=-25,
-                                    zmax=25,
-                                    xgap=5,
-                                    ygap=5,
-                                    hoverinfo='none',
-                                    colorbar=dict(
-                                        title=dict(text="Limb Bias", font=dict(size=11, color="#64748B")),
-                                        tickvals=[-20, -10, 0, 10, 20],
-                                        ticktext=["Left (20%+)", "Left (10%)", "Balanced", "Right (10%)", "Right (20%+)"],
-                                        len=0.9
-                                    )
-                                ))
+                    fig_heat = go.Figure(data=go.Heatmap(
+                        z=pivot_asym.values,
+                        x=list(pivot_asym.columns),
+                        y=list(pivot_asym.index),
+                        colorscale=diverging_scale,
+                        zmid=0,
+                        zmin=-25,
+                        zmax=25,
+                        xgap=5,
+                        ygap=5,
+                        hoverinfo='none',
+                        colorbar=dict(
+                            title=dict(text="Limb Bias", font=dict(size=11, color="#64748B")),
+                            tickvals=[-20, -10, 0, 10, 20],
+                            ticktext=["Left (20%+)", "Left (10%)", "Balanced", "Right (10%)", "Right (20%+)"],
+                            len=0.9
+                        )
+                    ))
 
-                                annotations = []
-                                for r_idx, metric in enumerate(pivot_asym.index):
-                                    for c_idx, date_val in enumerate(pivot_asym.columns):
-                                        val = pivot_asym.iloc[r_idx, c_idx]
-                                        if abs(val) >= 0.1:
-                                            side_char = "R" if val > 0 else "L"
-                                            display_txt = f"{abs(val):.1f}% {side_char}"
-                                        else:
-                                            display_txt = "0.0%"
+                    annotations = []
+                    for r_idx, metric in enumerate(pivot_asym.index):
+                        for c_idx, date_val in enumerate(pivot_asym.columns):
+                            val = pivot_asym.iloc[r_idx, c_idx]
+                            if abs(val) >= 0.1:
+                                side_char = "R" if val > 0 else "L"
+                                display_txt = f"{abs(val):.1f}% {side_char}"
+                            else:
+                                display_txt = "0.0%"
                                         
-                                        # Strict contrast: crisp white text on colored/dark cells, dark navy on light gray
-                                        font_color = "#FFFFFF" if abs(val) >= 8.0 else "#0F172A"
+                            # Strict contrast: crisp white text on colored/dark cells, dark navy on light gray
+                            font_color = "#FFFFFF" if abs(val) >= 8.0 else "#0F172A"
                                         
-                                        annotations.append(dict(
-                                            x=date_val,
-                                            y=metric,
-                                            text=f"<b>{display_txt}</b>",
-                                            font=dict(size=13, color=font_color, family="Arial"),
-                                            showarrow=False
-                                        ))
+                            annotations.append(dict(
+                                x=date_val,
+                                y=metric,
+                                text=f"<b>{display_txt}</b>",
+                                font=dict(size=13, color=font_color, family="Arial"),
+                                showarrow=False
+                            ))
 
-                                fig_heat.update_layout(
-                                    height=300,
-                                    margin=dict(l=20, r=20, t=10, b=30),
-                                    xaxis=dict(title=None, showgrid=False, tickfont=dict(size=12, color="#1D1D1F", weight="bold")),
-                                    yaxis=dict(autorange="reversed", showgrid=False, tickfont=dict(size=11, weight="bold", color="#1D1D1F")),
-                                    plot_bgcolor="white",
-                                    paper_bgcolor="white",
-                                    annotations=annotations
-                                )
-                                st.plotly_chart(fig_heat, use_container_width=True, config=LOCKED_CONFIG, key=f"asym_heatmap_{sel_asym_ath}_{sel_asym_season}")
+                    fig_heat.update_layout(
+                        height=300,
+                        margin=dict(l=20, r=20, t=10, b=30),
+                        xaxis=dict(title=None, showgrid=False, tickfont=dict(size=12, color="#1D1D1F", weight="bold")),
+                        yaxis=dict(autorange="reversed", showgrid=False, tickfont=dict(size=11, weight="bold", color="#1D1D1F")),
+                        plot_bgcolor="white",
+                        paper_bgcolor="white",
+                        annotations=annotations
+                    )
+                    st.plotly_chart(fig_heat, use_container_width=True, config=LOCKED_CONFIG, key=f"asym_heatmap_{sel_asym_ath}_{sel_asym_season}")
 
                 # -------------------------------------------------------------------------
                 # --- 3. TEAM CMJ SUMMARY ------------------------------------------------
