@@ -1481,9 +1481,15 @@ if check_password():
                         
                         if not trend_df.empty:
                             metric_order = [m["label"] for m in asym_metric_list]
-                            pivot_asym = trend_df.pivot(index="Metric", columns="Date_Str", values="Signed_Asymmetry").reindex(metric_order).fillna(0.0)
                             
-                            # Custom Diverging Color Scale: Tennessee Blue (Left) -> Slate (Balanced) -> Tennessee Orange (Right)
+                            # Aggregate duplicate tests on the same date using mean
+                            pivot_asym = trend_df.pivot_table(
+                                index="Metric", 
+                                columns="Date_Str", 
+                                values="Signed_Asymmetry", 
+                                aggfunc="mean"
+                            ).reindex(metric_order).fillna(0.0)
+                            
                             diverging_scale = [
                                 [0.00, "#2563EB"],  # Deep Blue (Heavy Left)
                                 [0.30, "#93C5FD"],  # Light Blue
