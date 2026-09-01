@@ -1447,7 +1447,7 @@ if check_password():
                         fig_asym.update_layout(
                             height=320,
                             template="simple_white",
-                            title=dict(text="<b>Limb Loading Bias (← Left Favored | Right Favored →)</b>", font=dict(size=13, color="#1D1D1F")),
+                            title=dict(text="<b>Current Test: Limb Loading Bias (← Left Favored | Right Favored →)</b>", font=dict(size=13, color="#1D1D1F")),
                             margin=dict(l=20, r=40, t=40, b=20),
                             xaxis=dict(range=[-max_range, max_range], ticksuffix="%", zeroline=True, zerolinewidth=2, zerolinecolor="#111827"),
                             yaxis=dict(autorange="reversed")
@@ -1455,10 +1455,10 @@ if check_password():
                         st.plotly_chart(fig_asym, use_container_width=True, config=LOCKED_CONFIG, key="cmj_asym_horizontal_bar")
 
                         # =========================================================================
-                        # --- LONGITUDINAL ASYMMETRY & FAVORING TREND OVER TIME -------------------
+                        # --- OPTION 1: LONGITUDINAL LIMB FAVORING HEATMAP ------------------------
                         # =========================================================================
                         st.markdown("<br>", unsafe_allow_html=True)
-                        st.markdown(f"#### Longitudinal Limb Loading Trends: {sel_asym_ath}")
+                        st.markdown(f"#### Longitudinal Limb Favoring Heatmap: {sel_asym_ath}")
                         
                         trend_records = []
                         for _, test_row in ath_cmj_asym.iterrows():
@@ -1480,60 +1480,61 @@ if check_password():
                         trend_df = pd.DataFrame(trend_records).sort_values("Date")
                         
                         if not trend_df.empty:
-                            asym_trend_colors = {
-                                "Eccentric Braking RFD": "#FF8200",
-                                "Eccentric Deceleration RFD": "#EA580C",
-                                "Force at Zero Velocity": "#10B981",
-                                "Concentric Mean Force": "#4895DB",
-                                "Takeoff Peak Force": "#8B5CF6"
-                            }
+                            metric_order = [m["label"] for m in asym_metric_list]
+                            pivot_asym = trend_df.pivot(index="Metric", columns="Date_Str", values="Signed_Asymmetry").reindex(metric_order).fillna(0.0)
                             
-                            fig_trend = go.Figure()
+                            # Custom Diverging Color Scale: Tennessee Blue (Left) -> Slate (Balanced) -> Tennessee Orange (Right)
+                            diverging_scale = [
+                                [0.00, "#2563EB"],  # Deep Blue (Heavy Left)
+                                [0.30, "#93C5FD"],  # Light Blue
+                                [0.45, "#F1F5F9"],  # Balanced (<10%)
+                                [0.55, "#F1F5F9"],  # Balanced (<10%)
+                                [0.70, "#FDBA74"],  # Light Orange
+                                [1.00, "#FF8200"]   # Tennessee Orange (Heavy Right)
+                            ]
                             
-                            # Symmetric baseline band (±10%)
-                            fig_trend.add_hrect(
-                                y0=-10, y1=10,
-                                fillcolor="#E2E8F0", opacity=0.45, line_width=0, layer="below",
-                                annotation_text="Symmetric Zone (±10%)", annotation_position="top left",
-                                annotation_font_size=10, annotation_font_color="#64748B"
+                            text_annotations = []
+                            for row_vals in pivot_asym.values:
+                                row_text = []
+                                for val in row_vals:
+                                    if abs(val) >= 0.1:
+                                        side_char = "R" if val > 0 else "L"
+                                        row_text.append(f"{abs(val):.1f}% {side_char}")
+                                    else:
+                                        row_text.append("0%")
+                                text_annotations.append(row_text)
+
+                            fig_heat = go.Figure(data=go.Heatmap(
+                                z=pivot_asym.values,
+                                x=pivot_asym.columns,
+                                y=pivot_asym.index,
+                                colorscale=diverging_scale,
+                                zmid=0,
+                                zmin=-25,
+                                zmax=25,
+                                text=text_annotations,
+                                texttemplate="<b>%{text}</b>",
+                                textfont=dict(size=11, color="#0F172A"),
+                                xgap=3,
+                                ygap=3,
+                                colorbar=dict(
+                                    title=dict(text="Limb Bias", font=dict(size=11, color="#64748B")),
+                                    tickvals=[-20, -10, 0, 10, 20],
+                                    ticktext=["Left (20%+)", "Left (10%)", "Balanced", "Right (10%)", "Right (20%+)"],
+                                    len=0.9
+                                )
+                            ))
+
+                            fig_heat.update_layout(
+                                height=270,
+                                margin=dict(l=20, r=20, t=10, b=25),
+                                xaxis=dict(title=None, showgrid=False, tickfont=dict(size=11, color="#1D1D1F")),
+                                yaxis=dict(autorange="reversed", showgrid=False, tickfont=dict(size=11, weight="bold", color="#1D1D1F")),
+                                plot_bgcolor="white",
+                                paper_bgcolor="white"
                             )
-                            
-                            # Center zero balance divider
-                            fig_trend.add_hline(y=0, line_dash="solid", line_color="#111827", line_width=1.5, layer="below")
-                            
-                            for m_label in asym_metric_list:
-                                lbl = m_label["label"]
-                                m_sub = trend_df[trend_df["Metric"] == lbl]
-                                if not m_sub.empty:
-                                    fig_trend.add_trace(go.Scatter(
-                                        x=m_sub["Date_Str"],
-                                        y=m_sub["Signed_Asymmetry"],
-                                        name=lbl,
-                                        mode="lines+markers",
-                                        line=dict(color=asym_trend_colors.get(lbl, "#4895DB"), width=2.5),
-                                        marker=dict(size=7, line=dict(width=1, color="white")),
-                                        hovertemplate="<b>%{fullData.name}</b><br>Date: %{x}<br>Bias: %{customdata}<extra></extra>",
-                                        customdata=[f"{abs(v):.1f}% {s}" for v, s in zip(m_sub["Signed_Asymmetry"], m_sub["Favored"])]
-                                    ))
-                            
-                            all_magnitudes = trend_df["Magnitude"].dropna()
-                            max_trend_bound = max(25.0, (all_magnitudes.max() * 1.25) if not all_magnitudes.empty else 25.0)
-                            
-                            fig_trend.update_layout(
-                                height=380,
-                                template="simple_white",
-                                margin=dict(l=20, r=40, t=30, b=20),
-                                xaxis=dict(type='category', title=dict(text="Evaluation Date", font=dict(size=11, color="#64748B"))),
-                                yaxis=dict(
-                                    range=[-max_trend_bound, max_trend_bound],
-                                    ticksuffix="%",
-                                    title=dict(text="← Left Favored (%) | Right Favored (%) →", font=dict(size=12, weight="bold", color="#1D1D1F")),
-                                    zeroline=False
-                                ),
-                                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0)
-                            )
-                            st.plotly_chart(fig_trend, use_container_width=True, config=LOCKED_CONFIG, key=f"cmj_asym_longitudinal_trend_{sel_asym_ath}")
-                        
+                            st.plotly_chart(fig_heat, use_container_width=True, config=LOCKED_CONFIG, key=f"asym_heatmap_{sel_asym_ath}")
+
                         st.markdown("<br>", unsafe_allow_html=True)
                         st.markdown("#### Combined Metric Values, Standards & Limb Asymmetry")
                         unified_tbl_html = """<table class="scout-table" style="width:100%; border:1px solid #E2E8F0; background:white;">
