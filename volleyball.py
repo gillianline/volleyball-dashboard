@@ -1378,207 +1378,207 @@ if check_password():
                                 elif abs(parsed_signed_val) >= 10.0:
                                     asym_status = f"Moderate Bias ({abs(parsed_signed_val):.1f}%)"
                                 
-                                parsed_records.append({
-                                    "Phase / Metric": item["label"],
-                                    "Phase": item["phase"],
-                                    "Description": item["desc"],
-                                    "Absolute_Val": raw_num_val,
-                                    "Formatted_Val": f"{item['fmt'].format(raw_num_val)} {item['unit']}" if raw_num_val is not None else "—",
-                                    "Target_Range": item["target_label"],
-                                    "Output_Status": out_status,
-                                    "Output_Color": out_color,
-                                    "Output_Bg": out_bg,
-                                    "Signed_Val": parsed_signed_val,
-                                    "Magnitude": abs(parsed_signed_val),
-                                    "Favored": side_favored,
-                                    "Raw_Asym": str(raw_asym_found) if pd.notna(raw_asym_found) and str(raw_asym_found).strip() != "" else "0.0",
-                                    "Asym_Status": asym_status
+                            parsed_records.append({
+                                "Phase / Metric": item["label"],
+                                "Phase": item["phase"],
+                                "Description": item["desc"],
+                                "Absolute_Val": raw_num_val,
+                                "Formatted_Val": f"{item['fmt'].format(raw_num_val)} {item['unit']}" if raw_num_val is not None else "—",
+                                "Target_Range": item["target_label"],
+                                "Output_Status": out_status,
+                                "Output_Color": out_color,
+                                "Output_Bg": out_bg,
+                                "Signed_Val": parsed_signed_val,
+                                "Magnitude": abs(parsed_signed_val),
+                                "Favored": side_favored,
+                                "Raw_Asym": str(raw_asym_found) if pd.notna(raw_asym_found) and str(raw_asym_found).strip() != "" else "0.0",
+                                "Asym_Status": asym_status
+                            })
+
+                        asym_table_df = pd.DataFrame(parsed_records)
+
+                        max_imbalance_row = asym_table_df.loc[asym_table_df["Magnitude"].idxmax()]
+                        
+                        r_count = sum(1 for r in parsed_records if r["Favored"] == "Right" and r["Magnitude"] >= 5.0)
+                        l_count = sum(1 for r in parsed_records if r["Favored"] == "Left" and r["Magnitude"] >= 5.0)
+                        
+                        primary_favoring = "Balanced"
+                        if r_count > l_count:
+                            primary_favoring = "Right Leg (Unloading Left)"
+                        elif l_count > r_count:
+                            primary_favoring = "Left Leg (Unloading Right)"
+
+                        kpi_a1, kpi_a2 = st.columns(2)
+                        kpi_a1.metric("Dominant Favoring", primary_favoring, help="Limb consistently generating higher force across jump phases.")
+                        kpi_a2.metric("Peak Phase Imbalance", f"{max_imbalance_row['Phase']} ({max_imbalance_row['Magnitude']:.1f}% {max_imbalance_row['Favored'][0]})")
+
+                        if known_injury_side != "None / Unknown":
+                            unloaded_side = "Left" if "Right" in primary_favoring else ("Right" if "Left" in primary_favoring else "None")
+                            if unloaded_side == known_injury_side:
+                                diag_color = "#D93025"
+                                diag_bg = "#FCE8E6"
+                                diag_text = f"<b>Compensatory Unloading Detected:</b> Athlete is meeting output standards overall but heavily offloading the injured <b>{known_injury_side}</b> side onto the healthy <b>{primary_favoring.split()[0]}</b> limb."
+                            elif unloaded_side != "None":
+                                diag_color = "#D97706"
+                                diag_bg = "#FEF3C7"
+                                diag_text = f"<b>Observation:</b> Athlete is favoring the injured side (<b>{known_injury_side}</b>). Verify test mechanics or limb dominance compensation."
+                            else:
+                                diag_color = "#137333"
+                                diag_bg = "#E6F4EA"
+                                diag_text = f"<b>Symmetric Strategy:</b> Jump mechanics show balanced loading across both limbs."
+                            
+                            st.markdown(f'<div style="background:{diag_bg}; border-left:5px solid {diag_color}; padding:10px 14px; border-radius:6px; margin: 15px 0; font-size:13px; color:#111827;">{diag_text}</div>', unsafe_allow_html=True)
+
+                        fig_asym = go.Figure()
+                        fig_asym.add_vrect(
+                            x0=-10, x1=10, 
+                            fillcolor="#E2E8F0", opacity=0.4, line_width=0, layer="below", 
+                            annotation_text="Symmetric Zone (±10%)", annotation_position="top left", 
+                            annotation_font_size=10, annotation_font_color="#64748B"
+                        )
+                        
+                        bar_colors = ['#FF8200' if v > 0 else '#4895DB' for v in asym_table_df["Signed_Val"]]
+                        
+                        fig_asym.add_trace(go.Bar(
+                            y=asym_table_df["Phase / Metric"],
+                            x=asym_table_df["Signed_Val"],
+                            orientation='h',
+                            marker=dict(color=bar_colors, line=dict(color='#1E293B', width=1)),
+                            text=[f"<b>{r['Magnitude']:.1f}% {r['Favored'][0]}</b>" if r['Magnitude'] > 0 else "0%" for _, r in asym_table_df.iterrows()],
+                            textposition='outside',
+                            cliponaxis=False
+                        ))
+
+                        max_range = max(30.0, asym_table_df["Magnitude"].max() * 1.35)
+                        fig_asym.update_layout(
+                            height=320,
+                            template="simple_white",
+                            title=dict(text="<b>Current Test: Limb Loading Bias (← Left Favored | Right Favored →)</b>", font=dict(size=13, color="#1D1D1F")),
+                            margin=dict(l=20, r=40, t=40, b=20),
+                            xaxis=dict(range=[-max_range, max_range], ticksuffix="%", zeroline=True, zerolinewidth=2, zerolinecolor="#111827"),
+                            yaxis=dict(autorange="reversed")
+                        )
+                        st.plotly_chart(fig_asym, use_container_width=True, config=LOCKED_CONFIG, key="cmj_asym_horizontal_bar")
+
+                        # =========================================================================
+                        # --- LONGITUDINAL LIMB FAVORING HEATMAP ----------------------------------
+                        # =========================================================================
+                        st.markdown("<br>", unsafe_allow_html=True)
+                        season_heatmap_label = f"({sel_asym_season})" if sel_asym_season != "All Seasons" else "(All Seasons)"
+                        st.markdown(f"#### Longitudinal Limb Favoring Heatmap: {sel_asym_ath} {season_heatmap_label}")
+                        
+                        trend_records = []
+                        for _, test_row in ath_cmj_asym.iterrows():
+                            t_date = test_row['Test Date']
+                            t_date_str = pd.to_datetime(t_date).strftime('%m/%d/%y')
+                            
+                            for item in asym_metric_list:
+                                raw_asym_val = resolve_col_val(test_row, item["asym_col"], item.get("alt_asym", []))
+                                signed_v, fav_side = parse_asym_val(raw_asym_val)
+                                trend_records.append({
+                                    "Date": t_date,
+                                    "Date_Str": t_date_str,
+                                    "Metric": item["label"],
+                                    "Signed_Asymmetry": signed_v,
+                                    "Magnitude": abs(signed_v),
+                                    "Favored": fav_side
                                 })
-
-                            asym_table_df = pd.DataFrame(parsed_records)
-
-                            max_imbalance_row = asym_table_df.loc[asym_table_df["Magnitude"].idxmax()]
+                        
+                        trend_df = pd.DataFrame(trend_records).sort_values("Date")
+                        
+                        if not trend_df.empty:
+                            metric_order = [m["label"] for m in asym_metric_list]
                             
-                            r_count = sum(1 for r in parsed_records if r["Favored"] == "Right" and r["Magnitude"] >= 5.0)
-                            l_count = sum(1 for r in parsed_records if r["Favored"] == "Left" and r["Magnitude"] >= 5.0)
+                            pivot_asym = trend_df.pivot_table(
+                                index="Metric", 
+                                columns="Date_Str", 
+                                values="Signed_Asymmetry", 
+                                aggfunc="mean"
+                            ).reindex(metric_order).fillna(0.0)
                             
-                            primary_favoring = "Balanced"
-                            if r_count > l_count:
-                                primary_favoring = "Right Leg (Unloading Left)"
-                            elif l_count > r_count:
-                                primary_favoring = "Left Leg (Unloading Right)"
-
-                            kpi_a1, kpi_a2 = st.columns(2)
-                            kpi_a1.metric("Dominant Favoring", primary_favoring, help="Limb consistently generating higher force across jump phases.")
-                            kpi_a2.metric("Peak Phase Imbalance", f"{max_imbalance_row['Phase']} ({max_imbalance_row['Magnitude']:.1f}% {max_imbalance_row['Favored'][0]})")
-
-                            if known_injury_side != "None / Unknown":
-                                unloaded_side = "Left" if "Right" in primary_favoring else ("Right" if "Left" in primary_favoring else "None")
-                                if unloaded_side == known_injury_side:
-                                    diag_color = "#D93025"
-                                    diag_bg = "#FCE8E6"
-                                    diag_text = f"<b>Compensatory Unloading Detected:</b> Athlete is meeting output standards overall but heavily offloading the injured <b>{known_injury_side}</b> side onto the healthy <b>{primary_favoring.split()[0]}</b> limb."
-                                elif unloaded_side != "None":
-                                    diag_color = "#D97706"
-                                    diag_bg = "#FEF3C7"
-                                    diag_text = f"<b>Observation:</b> Athlete is favoring the injured side (<b>{known_injury_side}</b>). Verify test mechanics or limb dominance compensation."
-                                else:
-                                    diag_color = "#137333"
-                                    diag_bg = "#E6F4EA"
-                                    diag_text = f"<b>Symmetric Strategy:</b> Jump mechanics show balanced loading across both limbs."
-                                
-                                st.markdown(f'<div style="background:{diag_bg}; border-left:5px solid {diag_color}; padding:10px 14px; border-radius:6px; margin: 15px 0; font-size:13px; color:#111827;">{diag_text}</div>', unsafe_allow_html=True)
-
-                            fig_asym = go.Figure()
-                            fig_asym.add_vrect(
-                                x0=-10, x1=10, 
-                                fillcolor="#E2E8F0", opacity=0.4, line_width=0, layer="below", 
-                                annotation_text="Symmetric Zone (±10%)", annotation_position="top left", 
-                                annotation_font_size=10, annotation_font_color="#64748B"
-                            )
+                            diverging_scale = [
+                                [0.00, "#2563EB"],  # Deep Blue (Heavy Left)
+                                [0.30, "#93C5FD"],  # Light Blue
+                                [0.45, "#F1F5F9"],  # Balanced (<10%)
+                                [0.55, "#F1F5F9"],  # Balanced (<10%)
+                                [0.70, "#FDBA74"],  # Light Orange
+                                [1.00, "#FF8200"]   # Tennessee Orange (Heavy Right)
+                            ]
                             
-                            bar_colors = ['#FF8200' if v > 0 else '#4895DB' for v in asym_table_df["Signed_Val"]]
-                            
-                            fig_asym.add_trace(go.Bar(
-                                y=asym_table_df["Phase / Metric"],
-                                x=asym_table_df["Signed_Val"],
-                                orientation='h',
-                                marker=dict(color=bar_colors, line=dict(color='#1E293B', width=1)),
-                                text=[f"<b>{r['Magnitude']:.1f}% {r['Favored'][0]}</b>" if r['Magnitude'] > 0 else "0%" for _, r in asym_table_df.iterrows()],
-                                textposition='outside',
-                                cliponaxis=False
-                            ))
-
-                            max_range = max(30.0, asym_table_df["Magnitude"].max() * 1.35)
-                            fig_asym.update_layout(
-                                height=320,
-                                template="simple_white",
-                                title=dict(text="<b>Current Test: Limb Loading Bias (← Left Favored | Right Favored →)</b>", font=dict(size=13, color="#1D1D1F")),
-                                margin=dict(l=20, r=40, t=40, b=20),
-                                xaxis=dict(range=[-max_range, max_range], ticksuffix="%", zeroline=True, zerolinewidth=2, zerolinecolor="#111827"),
-                                yaxis=dict(autorange="reversed")
-                            )
-                            st.plotly_chart(fig_asym, use_container_width=True, config=LOCKED_CONFIG, key="cmj_asym_horizontal_bar")
-
-                            # =========================================================================
-                            # --- LONGITUDINAL LIMB FAVORING HEATMAP ----------------------------------
-                            # =========================================================================
-                            st.markdown("<br>", unsafe_allow_html=True)
-                            season_heatmap_label = f"({sel_asym_season})" if sel_asym_season != "All Seasons" else "(All Seasons)"
-                            st.markdown(f"#### Longitudinal Limb Favoring Heatmap: {sel_asym_ath} {season_heatmap_label}")
-                            
-                            trend_records = []
-                            for _, test_row in ath_cmj_asym.iterrows():
-                                t_date = test_row['Test Date']
-                                t_date_str = pd.to_datetime(t_date).strftime('%m/%d/%y')
-                                
-                                for item in asym_metric_list:
-                                    raw_asym_val = resolve_col_val(test_row, item["asym_col"], item.get("alt_asym", []))
-                                    signed_v, fav_side = parse_asym_val(raw_asym_val)
-                                    trend_records.append({
-                                        "Date": t_date,
-                                        "Date_Str": t_date_str,
-                                        "Metric": item["label"],
-                                        "Signed_Asymmetry": signed_v,
-                                        "Magnitude": abs(signed_v),
-                                        "Favored": fav_side
-                                    })
-                            
-                            trend_df = pd.DataFrame(trend_records).sort_values("Date")
-                            
-                            if not trend_df.empty:
-                                metric_order = [m["label"] for m in asym_metric_list]
-                                
-                                pivot_asym = trend_df.pivot_table(
-                                    index="Metric", 
-                                    columns="Date_Str", 
-                                    values="Signed_Asymmetry", 
-                                    aggfunc="mean"
-                                ).reindex(metric_order).fillna(0.0)
-                                
-                                diverging_scale = [
-                                    [0.00, "#2563EB"],  # Deep Blue (Heavy Left)
-                                    [0.30, "#93C5FD"],  # Light Blue
-                                    [0.45, "#F1F5F9"],  # Balanced (<10%)
-                                    [0.55, "#F1F5F9"],  # Balanced (<10%)
-                                    [0.70, "#FDBA74"],  # Light Orange
-                                    [1.00, "#FF8200"]   # Tennessee Orange (Heavy Right)
-                                ]
-                                
-                                text_annotations = []
-                                for row_vals in pivot_asym.values:
-                                    row_text = []
-                                    for val in row_vals:
-                                        if abs(val) >= 0.1:
-                                            side_char = "R" if val > 0 else "L"
-                                            row_text.append(f"{abs(val):.1f}% {side_char}")
-                                        else:
-                                            row_text.append("0%")
+                            text_annotations = []
+                            for row_vals in pivot_asym.values:
+                                row_text = []
+                                for val in row_vals:
+                                    if abs(val) >= 0.1:
+                                        side_char = "R" if val > 0 else "L"
+                                        row_text.append(f"{abs(val):.1f}% {side_char}")
+                                    else:
+                                        row_text.append("0%")
                                 text_annotations.append(row_text)
 
-                                fig_heat = go.Figure(data=go.Heatmap(
-                                    z=pivot_asym.values,
-                                    x=pivot_asym.columns,
-                                    y=pivot_asym.index,
-                                    colorscale=diverging_scale,
-                                    zmid=0,
-                                    zmin=-25,
-                                    zmax=25,
-                                    text=text_annotations,
-                                    texttemplate="<b>%{text}</b>",
-                                    textfont=dict(size=11, color="#0F172A"),
-                                    xgap=3,
-                                    ygap=3,
-                                    colorbar=dict(
-                                        title=dict(text="Limb Bias", font=dict(size=11, color="#64748B")),
-                                        tickvals=[-20, -10, 0, 10, 20],
-                                        ticktext=["Left (20%+)", "Left (10%)", "Balanced", "Right (10%)", "Right (20%+)"],
-                                        len=0.9
-                                    )
-                                ))
-
-                                fig_heat.update_layout(
-                                    height=270,
-                                    margin=dict(l=20, r=20, t=10, b=25),
-                                    xaxis=dict(title=None, showgrid=False, tickfont=dict(size=11, color="#1D1D1F")),
-                                    yaxis=dict(autorange="reversed", showgrid=False, tickfont=dict(size=11, weight="bold", color="#1D1D1F")),
-                                    plot_bgcolor="white",
-                                    paper_bgcolor="white"
+                            fig_heat = go.Figure(data=go.Heatmap(
+                                z=pivot_asym.values,
+                                x=pivot_asym.columns,
+                                y=pivot_asym.index,
+                                colorscale=diverging_scale,
+                                zmid=0,
+                                zmin=-25,
+                                zmax=25,
+                                text=text_annotations,
+                                texttemplate="<b>%{text}</b>",
+                                textfont=dict(size=11, color="#0F172A"),
+                                xgap=3,
+                                ygap=3,
+                                colorbar=dict(
+                                    title=dict(text="Limb Bias", font=dict(size=11, color="#64748B")),
+                                    tickvals=[-20, -10, 0, 10, 20],
+                                    ticktext=["Left (20%+)", "Left (10%)", "Balanced", "Right (10%)", "Right (20%+)"],
+                                    len=0.9
                                 )
-                                st.plotly_chart(fig_heat, use_container_width=True, config=LOCKED_CONFIG, key=f"asym_heatmap_{sel_asym_ath}_{sel_asym_season}")
+                            ))
 
-                            st.markdown("<br>", unsafe_allow_html=True)
-                            st.markdown("#### Combined Metric Values, Standards & Limb Asymmetry")
-                            unified_tbl_html = """<table class="scout-table" style="width:100%; border:1px solid #E2E8F0; background:white;">
-                                <thead>
-                                    <tr style="background:#4895DB; color:white;">
-                                        <th style="text-align:left !important; padding-left:14px; width:30%;">Phase Metric</th>
-                                        <th style="width:14%;">Actual Total</th>
-                                        <th style="width:18%;">D1 Standard Target</th>
-                                        <th style="width:12%;">Output Standard</th>
-                                        <th style="width:13%;">Favored Limb</th>
-                                        <th style="width:13%;">Asymmetry %</th>
-                                    </tr>
-                                </thead>
-                                <tbody>"""
-                            for _, row in asym_table_df.iterrows():
-                                asym_badge_color = "#137333" if "Symmetric" in row["Asym_Status"] else ("#D97706" if "Moderate" in row["Asym_Status"] else "#D93025")
-                                asym_badge_bg = "#E6F4EA" if "Symmetric" in row["Asym_Status"] else ("#FEF3C7" if "Moderate" in row["Asym_Status"] else "#FCE8E6")
-                                favored_text_color = '#FF8200' if row['Favored'] == 'Right' else ('#4895DB' if row['Favored'] == 'Left' else '#64748B')
-                                
-                                unified_tbl_html += f"""<tr>
-                                    <td style="text-align:left !important; padding-left:14px; padding-top:8px; padding-bottom:8px;">
-                                        <div style="font-weight:800; font-size:12px; color:#111827;">{row['Phase / Metric']}</div>
-                                        <div style="font-size:10px; color:#64748B; line-height:1.2;">{row['Description']}</div>
-                                    </td>
-                                    <td style="font-weight:800; font-size:13px; color:#0F172A;">{row['Formatted_Val']}</td>
-                                    <td style="color:#64748B; font-weight:600; font-size:11px;">{row['Target_Range']}</td>
-                                    <td><span style="background:{row['Output_Bg']}; color:{row['Output_Color']}; padding:3px 8px; border-radius:10px; font-weight:700; font-size:11px;">{row['Output_Status']}</span></td>
-                                    <td style="font-weight:800; color:{favored_text_color};">{row['Favored']}</td>
-                                    <td><span style="background:{asym_badge_bg}; color:{asym_badge_color}; padding:3px 8px; border-radius:10px; font-weight:800; font-size:11px;">{row['Raw_Asym']}</span></td>
-                                </tr>"""
-                            unified_tbl_html += "</tbody></table>"
-                            st.markdown(unified_tbl_html, unsafe_allow_html=True)
+                            fig_heat.update_layout(
+                                height=270,
+                                margin=dict(l=20, r=20, t=10, b=25),
+                                xaxis=dict(title=None, showgrid=False, tickfont=dict(size=11, color="#1D1D1F")),
+                                yaxis=dict(autorange="reversed", showgrid=False, tickfont=dict(size=11, weight="bold", color="#1D1D1F")),
+                                plot_bgcolor="white",
+                                paper_bgcolor="white"
+                            )
+                            st.plotly_chart(fig_heat, use_container_width=True, config=LOCKED_CONFIG, key=f"asym_heatmap_{sel_asym_ath}_{sel_asym_season}")
+
+                        st.markdown("<br>", unsafe_allow_html=True)
+                        st.markdown("#### Combined Metric Values, Standards & Limb Asymmetry")
+                        unified_tbl_html = """<table class="scout-table" style="width:100%; border:1px solid #E2E8F0; background:white;">
+                            <thead>
+                                <tr style="background:#4895DB; color:white;">
+                                    <th style="text-align:left !important; padding-left:14px; width:30%;">Phase Metric</th>
+                                    <th style="width:14%;">Actual Total</th>
+                                    <th style="width:18%;">D1 Standard Target</th>
+                                    <th style="width:12%;">Output Standard</th>
+                                    <th style="width:13%;">Favored Limb</th>
+                                    <th style="width:13%;">Asymmetry %</th>
+                                </tr>
+                            </thead>
+                            <tbody>"""
+                        for _, row in asym_table_df.iterrows():
+                            asym_badge_color = "#137333" if "Symmetric" in row["Asym_Status"] else ("#D97706" if "Moderate" in row["Asym_Status"] else "#D93025")
+                            asym_badge_bg = "#E6F4EA" if "Symmetric" in row["Asym_Status"] else ("#FEF3C7" if "Moderate" in row["Asym_Status"] else "#FCE8E6")
+                            favored_text_color = '#FF8200' if row['Favored'] == 'Right' else ('#4895DB' if row['Favored'] == 'Left' else '#64748B')
+                            
+                            unified_tbl_html += f"""<tr>
+                                <td style="text-align:left !important; padding-left:14px; padding-top:8px; padding-bottom:8px;">
+                                    <div style="font-weight:800; font-size:12px; color:#111827;">{row['Phase / Metric']}</div>
+                                    <div style="font-size:10px; color:#64748B; line-height:1.2;">{row['Description']}</div>
+                                </td>
+                                <td style="font-weight:800; font-size:13px; color:#0F172A;">{row['Formatted_Val']}</td>
+                                <td style="color:#64748B; font-weight:600; font-size:11px;">{row['Target_Range']}</td>
+                                <td><span style="background:{row['Output_Bg']}; color:{row['Output_Color']}; padding:3px 8px; border-radius:10px; font-weight:700; font-size:11px;">{row['Output_Status']}</span></td>
+                                <td style="font-weight:800; color:{favored_text_color};">{row['Favored']}</td>
+                                <td><span style="background:{asym_badge_bg}; color:{asym_badge_color}; padding:3px 8px; border-radius:10px; font-weight:800; font-size:11px;">{row['Raw_Asym']}</span></td>
+                            </tr>"""
+                        unified_tbl_html += "</tbody></table>"
+                        st.markdown(unified_tbl_html, unsafe_allow_html=True)
 
                 # -------------------------------------------------------------------------
                 # --- 3. TEAM CMJ SUMMARY ------------------------------------------------
