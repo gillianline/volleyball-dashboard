@@ -1101,6 +1101,7 @@ if check_password():
                             {"label": "Jump Height", "col": cmj_col, "fmt": "{:.1f}"},
                             {"label": "Jump Momentum", "col": "Jump Momentum", "alt_col": "Take-off Momentum [kg m/s]", "fmt": "{:.1f}"},
                             {"label": "Peak Velocity", "col": "Concentric Peak Velocity [m/s]", "fmt": "{:.2f}"},
+                            {"label": "Takeoff Peak Force", "col": "Takeoff Peak Force [N]", "alt_col": "Peak Takeoff Force [N]", "fmt": "{:.0f}"},
                             {"label": "Mean Con Force", "col": "Concentric Mean Force [N]", "fmt": "{:.0f}"},
                             {"label": "Force @ 0 Velocity", "col": "Force at Zero Velocity [N]", "fmt": "{:.0f}"},
                             {"label": "Positive Impulse", "col": "Positive Impulse [N s]", "fmt": "{:.1f}"},
@@ -1148,6 +1149,7 @@ if check_password():
                                 {"name": "Jump Height", "col": cmj_col, "invert": False},
                                 {"name": "Jump Momentum", "col": "Jump Momentum", "alt_col": "Take-off Momentum [kg m/s]", "invert": False},
                                 {"name": "Peak Velocity", "col": "Concentric Peak Velocity [m/s]", "invert": False},
+                                {"name": "Takeoff Force", "col": "Takeoff Peak Force [N]", "alt_col": "Peak Takeoff Force [N]", "invert": False},
                                 {"name": "Mean Con Force", "col": "Relative Mean Con Force", "alt_col": "Concentric Mean Force [N]", "invert": False},
                                 {"name": "Force @ 0 Velocity", "col": "Relative Force @ 0 Velo", "alt_col": "Force at Zero Velocity [N]", "invert": False},
                                 {"name": "Positive Impulse", "col": "Positive Impulse [N s]", "invert": False},
@@ -1202,16 +1204,16 @@ if check_password():
                             fig_bands.add_trace(go.Bar(x=x_labels, y=t_scores, marker=dict(color='#3A3D40', line=dict(color='#1A1C1E', width=1.5)), width=0.42, text=[f"<b>{val:.1f}</b>" for val in t_scores], textposition='inside', insidetextanchor='middle', textfont=dict(color='white', size=12), cliponaxis=False))
 
                             category_boxes = [
-                                {"x0": 0.55, "x1": 2.45, "text": "Speed", "bg": "#F8E2E2"},
-                                {"x0": 2.55, "x1": 6.45, "text": "Strength", "bg": "#EBF3DF"},
-                                {"x0": 6.55, "x1": 7.45, "text": "Power", "bg": "#D3E2F4"},
-                                {"x0": 7.55, "x1": 9.45, "text": "Jump Strategy", "bg": "#E6E1F2"}
+                                {"x0": -0.45, "x1": 2.45, "text": "Speed", "bg": "#F8E2E2"},
+                                {"x0": 2.55, "x1": 7.45, "text": "Strength", "bg": "#EBF3DF"},
+                                {"x0": 7.55, "x1": 8.45, "text": "Power", "bg": "#D3E2F4"},
+                                {"x0": 8.55, "x1": 10.45, "text": "Jump Strategy", "bg": "#E6E1F2"}
                             ]
                             for cb in category_boxes:
                                 fig_bands.add_shape(type="rect", xref="x", yref="paper", x0=cb["x0"], x1=cb["x1"], y0=-0.16, y1=-0.08, fillcolor=cb["bg"], line=dict(width=0), layer="above")
                                 fig_bands.add_annotation(xref="x", yref="paper", x=(cb["x0"] + cb["x1"]) / 2, y=-0.12, text=f"<b>{cb['text']}</b>", showarrow=False, font=dict(size=11, color="#111827"), align="center")
 
-                            fig_bands.update_layout(height=450, margin=dict(l=30, r=10, t=15, b=65), plot_bgcolor='white', paper_bgcolor='white', xaxis=dict(tickangle=0, tickfont=dict(size=10.5, weight='bold', color='#111827'), showgrid=False, showline=True, linecolor='#6B7280'), yaxis=dict(range=[0, 100], dtick=10, showgrid=False, showline=True, linecolor='#6B7280', title=dict(text=f"{title_prefix} T-Score Performance Rating", font=dict(size=12, weight='bold', color='#4B5563'))), showlegend=False)
+                            fig_bands.update_layout(height=450, margin=dict(l=30, r=10, t=15, b=65), plot_bgcolor='white', paper_bgcolor='white', xaxis=dict(tickangle=0, tickfont=dict(size=10, weight='bold', color='#111827'), showgrid=False, showline=True, linecolor='#6B7280'), yaxis=dict(range=[0, 100], dtick=10, showgrid=False, showline=True, linecolor='#6B7280', title=dict(text=f"{title_prefix} T-Score Performance Rating", font=dict(size=12, weight='bold', color='#4B5563'))), showlegend=False)
                             st.plotly_chart(fig_bands, use_container_width=True, config=LOCKED_CONFIG, key=f"cmj_standards_chart_{comp_factor}")
 
                         with legend_col:
@@ -1427,7 +1429,7 @@ if check_password():
                                 <tr style="background:#4895DB; color:white;">
                                     <th style="text-align:left !important; padding-left:14px; width:30%;">Phase Metric</th>
                                     <th style="width:14%;">Actual Total</th>
-                                    <th style="width:18%;">Target</th>
+                                    <th style="width:18%;">D1 Standard Target</th>
                                     <th style="width:12%;">Output Standard</th>
                                     <th style="width:13%;">Favored Limb</th>
                                     <th style="width:13%;">Asymmetry %</th>
