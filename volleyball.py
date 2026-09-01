@@ -1045,12 +1045,26 @@ if check_password():
                                         st.plotly_chart(fig_p, use_container_width=True, key=f"team_card_{name}_{sel_week}_t4")
 
             elif sel_daily_tab == "CMJ Performance":
-                cmj_view_modes = ["Individual Athlete", "Asymmetry & Favoring", "Team CMJ Summary"]
-                
-                if "cmj_view_mode_subtab" not in st.session_state or st.session_state.cmj_view_mode_subtab not in cmj_view_modes:
+                cmj_view_modes = [
+                    "Individual Athlete",
+                    "Asymmetry & Favoring",
+                    "Team CMJ Summary",
+                ]
+
+                if (
+                    "cmj_view_mode_subtab" not in st.session_state
+                    or st.session_state.cmj_view_mode_subtab
+                    not in cmj_view_modes
+                ):
                     st.session_state.cmj_view_mode_subtab = cmj_view_modes[0]
-                    
-                sel_cmj_mode = st.radio("CMJ View Mode", cmj_view_modes, key="cmj_view_mode_subtab", horizontal=True, label_visibility="collapsed")
+
+                sel_cmj_mode = st.radio(
+                    "CMJ View Mode",
+                    cmj_view_modes,
+                    key="cmj_view_mode_subtab",
+                    horizontal=True,
+                    label_visibility="collapsed",
+                )
 
                 # =========================================================================
                 # --- ASYMMETRY HELPER FUNCTIONS ------------------------------------------
@@ -1066,19 +1080,36 @@ if check_password():
                     elif "R" in s:
                         return abs(val), "Right"
                     else:
-                        return val, "Right" if val > 0 else ("Left" if val < 0 else "Balanced")
+                        return (
+                            val,
+                            (
+                                "Right"
+                                if val > 0
+                                else ("Left" if val < 0 else "Balanced")
+                            ),
+                        )
 
                 def resolve_col_val(row, primary_col, alt_cols=[]):
                     candidates = [primary_col] + alt_cols
                     for col in candidates:
-                        if col in row and pd.notna(row[col]) and str(row[col]).strip() != "":
+                        if (
+                            col in row
+                            and pd.notna(row[col])
+                            and str(row[col]).strip() != ""
+                        ):
                             return row[col]
-                    row_keys_norm = {re.sub(r'[^a-zA-Z0-9]', '', str(k)).lower(): k for k in row.index}
+                    row_keys_norm = {
+                        re.sub(r"[^a-zA-Z0-9]", "", str(k)).lower(): k
+                        for k in row.index
+                    }
                     for col in candidates:
-                        norm = re.sub(r'[^a-zA-Z0-9]', '', str(col)).lower()
+                        norm = re.sub(r"[^a-zA-Z0-9]", "", str(col)).lower()
                         if norm in row_keys_norm:
                             matched_key = row_keys_norm[norm]
-                            if pd.notna(row[matched_key]) and str(row[matched_key]).strip() != "":
+                            if (
+                                pd.notna(row[matched_key])
+                                and str(row[matched_key]).strip() != ""
+                            ):
                                 return row[matched_key]
                     return None
 
@@ -1087,97 +1118,263 @@ if check_password():
                 # -------------------------------------------------------------------------
                 if sel_cmj_mode == "Individual Athlete":
                     c_cmj_ath, c_cmj_date = st.columns([2, 2])
-                    with c_cmj_ath: sel_cmj_ath = st.selectbox("Select Athlete", master_athlete_list, key="cmj_dash_ath_sel")
-                    ath_cmj_all = raw_cmj_df[raw_cmj_df['Name'] == sel_cmj_ath].sort_values('Test Date')
-                    
+                    with c_cmj_ath:
+                        sel_cmj_ath = st.selectbox(
+                            "Select Athlete",
+                            master_athlete_list,
+                            key="cmj_dash_ath_sel",
+                        )
+                    ath_cmj_all = raw_cmj_df[
+                        raw_cmj_df["Name"] == sel_cmj_ath
+                    ].sort_values("Test Date")
+
                     if ath_cmj_all.empty:
                         st.info(f"No CMJ records found for {sel_cmj_ath}.")
                     else:
-                        valid_dates = ath_cmj_all['Test Date'].dropna().drop_duplicates().sort_values(ascending=False).dt.strftime('%m/%d/%y').tolist()
-                        with c_cmj_date: sel_test_date_str = st.selectbox("Test Date", valid_dates, index=0, key="cmj_dash_date_sel")
+                        valid_dates = (
+                            ath_cmj_all["Test Date"]
+                            .dropna()
+                            .drop_duplicates()
+                            .sort_values(ascending=False)
+                            .dt.strftime("%m/%d/%y")
+                            .tolist()
+                        )
+                        with c_cmj_date:
+                            sel_test_date_str = st.selectbox(
+                                "Test Date",
+                                valid_dates,
+                                index=0,
+                                key="cmj_dash_date_sel",
+                            )
 
-                        cur_idx_list = ath_cmj_all[ath_cmj_all['Test Date'].dt.strftime('%m/%d/%y') == sel_test_date_str].index.tolist()
+                        cur_idx_list = ath_cmj_all[
+                            ath_cmj_all["Test Date"].dt.strftime("%m/%d/%y")
+                            == sel_test_date_str
+                        ].index.tolist()
                         cur_test_row = ath_cmj_all.loc[cur_idx_list[-1]]
-                        
+
                         base_test_row = ath_cmj_all.iloc[0]
                         all_indices = list(ath_cmj_all.index)
                         if cur_idx_list[-1] in all_indices:
                             cur_pos = all_indices.index(cur_idx_list[-1])
-                            prev_test_row = ath_cmj_all.iloc[max(0, cur_pos - 1)]
+                            prev_test_row = ath_cmj_all.iloc[
+                                max(0, cur_pos - 1)
+                            ]
                         else:
                             prev_test_row = cur_test_row
 
-                        meta_lookup = full_df_unfiltered[full_df_unfiltered['Name'] == sel_cmj_ath]
-                        photo_val = meta_lookup['PhotoURL'].iloc[0] if not meta_lookup.empty else "https://www.w3schools.com/howto/img_avatar.png"
-                        pos_val = meta_lookup['Position'].iloc[0] if not meta_lookup.empty else "N/A"
+                        meta_lookup = full_df_unfiltered[
+                            full_df_unfiltered["Name"] == sel_cmj_ath
+                        ]
+                        photo_val = (
+                            meta_lookup["PhotoURL"].iloc[0]
+                            if not meta_lookup.empty
+                            else "https://www.w3schools.com/howto/img_avatar.png"
+                        )
+                        pos_val = (
+                            meta_lookup["Position"].iloc[0]
+                            if not meta_lookup.empty
+                            else "N/A"
+                        )
 
                         cmj_metric_defs = [
-                            {"label": "Jump Height", "col": cmj_col, "fmt": "{:.1f}"},
-                            {"label": "Jump Momentum", "col": "Jump Momentum", "alt_col": "Take-off Momentum [kg m/s]", "fmt": "{:.1f}"},
-                            {"label": "Peak Velocity", "col": "Concentric Peak Velocity [m/s]", "fmt": "{:.2f}"},
-                            {"label": "Mean Con Force", "col": "Concentric Mean Force [N]", "fmt": "{:.0f}"},
-                            {"label": "Force @ 0 Velocity", "col": "Force at Zero Velocity [N]", "fmt": "{:.0f}"},
-                            {"label": "Positive Impulse", "col": "Positive Impulse [N s]", "fmt": "{:.1f}"},
-                            {"label": "P1 Con Impulse", "col": "P1 Concentric Impulse [N s]", "fmt": "{:.1f}"},
-                            {"label": "P2 Con Impulse", "col": "P2 Concentric Impulse [N s]", "fmt": "{:.1f}"},
-                            {"label": "P2:P1 Impulse Ratio", "col": "P2 Concentric Impulse:P1 Concentric Impulse", "fmt": "{:.2f}"}
+                            {
+                                "label": "Jump Height",
+                                "col": cmj_col,
+                                "fmt": "{:.1f}",
+                            },
+                            {
+                                "label": "Jump Momentum",
+                                "col": "Jump Momentum",
+                                "alt_col": "Take-off Momentum [kg m/s]",
+                                "fmt": "{:.1f}",
+                            },
+                            {
+                                "label": "Peak Velocity",
+                                "col": "Concentric Peak Velocity [m/s]",
+                                "fmt": "{:.2f}",
+                            },
+                            {
+                                "label": "Mean Con Force",
+                                "col": "Concentric Mean Force [N]",
+                                "fmt": "{:.0f}",
+                            },
+                            {
+                                "label": "Force @ 0 Velocity",
+                                "col": "Force at Zero Velocity [N]",
+                                "fmt": "{:.0f}",
+                            },
+                            {
+                                "label": "Positive Impulse",
+                                "col": "Positive Impulse [N s]",
+                                "fmt": "{:.1f}",
+                            },
+                            {
+                                "label": "P1 Con Impulse",
+                                "col": "P1 Concentric Impulse [N s]",
+                                "fmt": "{:.1f}",
+                            },
+                            {
+                                "label": "P2 Con Impulse",
+                                "col": "P2 Concentric Impulse [N s]",
+                                "fmt": "{:.1f}",
+                            },
+                            {
+                                "label": "P2:P1 Impulse Ratio",
+                                "col": (
+                                    "P2 Concentric Impulse:P1 Concentric"
+                                    " Impulse"
+                                ),
+                                "fmt": "{:.2f}",
+                            },
                         ]
 
-                        raw_readiness_avg = compute_excel_readiness_score(cur_test_row, prev_test_row)
+                        raw_readiness_avg = compute_excel_readiness_score(
+                            cur_test_row, prev_test_row
+                        )
                         display_score = int(round(raw_readiness_avg))
 
-                        top_col1, top_col2, top_col3 = st.columns([1.2, 2.2, 1.6])
+                        top_col1, top_col2, top_col3 = st.columns(
+                            [1.2, 2.2, 1.6]
+                        )
                         with top_col1:
                             ath_card_html = f"""<div style="background:#4895DB; color:white; font-weight:900; font-size:18px; text-align:center; padding:8px 10px; border-radius:6px 6px 0 0;">{sel_cmj_ath}</div><div style="border:1px solid #E2E8F0; border-top:none; border-radius:0 0 6px 6px; padding:16px; background:white; display:flex; align-items:center; gap:16px;"><img src="{photo_val}" style="width:95px; height:95px; border-radius:8px; object-fit:contain; border:2px solid #FF8200;"><div style="font-size:14px; line-height:1.8; color:#1D1D1F;"><b>Position:</b> {pos_val}</div></div>"""
                             st.markdown(ath_card_html, unsafe_allow_html=True)
-                            comp_factor = st.selectbox("Comparison Factor", ["Individual", "Team", "Position"], key="cmj_dash_comp_sel")
+                            comp_factor = st.selectbox(
+                                "Comparison Factor",
+                                ["Individual", "Team", "Position"],
+                                key="cmj_dash_comp_sel",
+                            )
 
                         with top_col2:
                             table_rows_str = ""
                             for m_info in cmj_metric_defs:
                                 lbl = m_info["label"]
-                                col_name = m_info["col"] if m_info["col"] in cur_test_row else m_info.get("alt_col", m_info["col"])
+                                col_name = (
+                                    m_info["col"]
+                                    if m_info["col"] in cur_test_row
+                                    else m_info.get("alt_col", m_info["col"])
+                                )
                                 fmt = m_info["fmt"]
-                                c_val = float(cur_test_row.get(col_name, 0.0)) if col_name in cur_test_row and pd.notna(cur_test_row.get(col_name)) else 0.0
-                                b_val = float(base_test_row.get(col_name, 0.0)) if col_name in base_test_row and pd.notna(base_test_row.get(col_name)) else 0.0
-                                diff = ((c_val - b_val) / b_val * 100) if b_val > 0 else 0.0
-                                pct_color = "#137333" if diff >= 0 else "#D93025"
+                                c_val = (
+                                    float(cur_test_row.get(col_name, 0.0))
+                                    if col_name in cur_test_row
+                                    and pd.notna(cur_test_row.get(col_name))
+                                    else 0.0
+                                )
+                                b_val = (
+                                    float(base_test_row.get(col_name, 0.0))
+                                    if col_name in base_test_row
+                                    and pd.notna(base_test_row.get(col_name))
+                                    else 0.0
+                                )
+                                diff = (
+                                    ((c_val - b_val) / b_val * 100)
+                                    if b_val > 0
+                                    else 0.0
+                                )
+                                pct_color = (
+                                    "#137333" if diff >= 0 else "#D93025"
+                                )
                                 table_rows_str += f"""<tr><td style="text-align:left !important; padding-left:12px; font-weight:600;">{lbl}</td><td style="color:#64748B;">{fmt.format(b_val)}</td><td style="font-weight:800; background:#F0F7FF; border: 1px solid #3B82F6;">{fmt.format(c_val)}</td><td style="font-weight:800; color:{pct_color};">{diff:+.0f}%</td></tr>"""
-                            
+
                             full_table_html = f"""<div style="background:#4895DB; color:white; font-weight:900; font-size:14px; text-align:center; padding:6px; border-radius:6px 6px 0 0;">Countermovement Jump Performance</div><table class="scout-table" style="width:100%; border:1px solid #E2E8F0; border-top:none; background:white; border-collapse:collapse; margin-bottom:0;"><thead><tr style="background:#F8FAFC; color:#64748B; font-size:11px;"><th style="text-align:left !important; padding:6px 12px;">Metric</th><th style="padding:6px;">Baseline (Overall)</th><th style="padding:6px; background:#EBF5FF; color:#1E40AF;">Current</th><th style="padding:6px;">% Change</th></tr></thead><tbody>{table_rows_str}</tbody></table>"""
                             st.markdown(full_table_html, unsafe_allow_html=True)
 
                         with top_col3:
                             gauge_header = f"""<div style="background:#4895DB; color:white; font-weight:900; font-size:14px; text-align:center; padding:6px; border-radius:6px 6px 0 0;">Wellness Score<br><span style="font-size:11px; font-weight:600;">{sel_test_date_str}</span></div>"""
                             st.markdown(gauge_header, unsafe_allow_html=True)
-                            fig_gauge = create_wellness_gauge(display_score, height=230)
-                            st.plotly_chart(fig_gauge, use_container_width=True, config=LOCKED_CONFIG, key="cmj_wellness_gauge_ind")
+                            fig_gauge = create_wellness_gauge(
+                                display_score, height=230
+                            )
+                            st.plotly_chart(
+                                fig_gauge,
+                                use_container_width=True,
+                                config=LOCKED_CONFIG,
+                                key="cmj_wellness_gauge_ind",
+                            )
 
                         st.markdown("<br>", unsafe_allow_html=True)
-                        st.markdown(f'<div class="section-header">Countermovement Jump Performance Standards </div>', unsafe_allow_html=True)
+                        st.markdown(
+                            '<div class="section-header">Countermovement Jump'
+                            " Performance Standards </div>",
+                            unsafe_allow_html=True,
+                        )
                         chart_col, legend_col = st.columns([4.2, 1.1])
 
                         with chart_col:
                             bar_metrics_excel = [
-                                {"name": "Jump Height", "col": cmj_col, "invert": False},
-                                {"name": "Jump Momentum", "col": "Jump Momentum", "alt_col": "Take-off Momentum [kg m/s]", "invert": False},
-                                {"name": "Peak Velocity", "col": "Concentric Peak Velocity [m/s]", "invert": False},
-                                {"name": "Mean Con Force", "col": "Relative Mean Con Force", "alt_col": "Concentric Mean Force [N]", "invert": False},
-                                {"name": "Force @ 0 Velocity", "col": "Relative Force @ 0 Velo", "alt_col": "Force at Zero Velocity [N]", "invert": False},
-                                {"name": "Positive Impulse", "col": "Positive Impulse [N s]", "invert": False},
-                                {"name": "P1 Con Impulse", "col": "P1 Concentric Impulse [N s]", "invert": False},
-                                {"name": "P2 Con Impulse", "col": "P2 Concentric Impulse [N s]", "invert": False},
-                                {"name": "CM Depth", "col": "Adjusted CMD", "alt_col": "Countermovement Depth [cm]", "invert": False},
-                                {"name": "Time to Takeoff", "col": "Contraction Time [ms]", "alt_col": "Time to Takeoff [s]", "invert": True}
+                                {
+                                    "name": "Jump Height",
+                                    "col": cmj_col,
+                                    "invert": False,
+                                },
+                                {
+                                    "name": "Jump Momentum",
+                                    "col": "Jump Momentum",
+                                    "alt_col": "Take-off Momentum [kg m/s]",
+                                    "invert": False,
+                                },
+                                {
+                                    "name": "Peak Velocity",
+                                    "col": "Concentric Peak Velocity [m/s]",
+                                    "invert": False,
+                                },
+                                {
+                                    "name": "Mean Con Force",
+                                    "col": "Relative Mean Con Force",
+                                    "alt_col": "Concentric Mean Force [N]",
+                                    "invert": False,
+                                },
+                                {
+                                    "name": "Force @ 0 Velocity",
+                                    "col": "Relative Force @ 0 Velo",
+                                    "alt_col": "Force at Zero Velocity [N]",
+                                    "invert": False,
+                                },
+                                {
+                                    "name": "Positive Impulse",
+                                    "col": "Positive Impulse [N s]",
+                                    "invert": False,
+                                },
+                                {
+                                    "name": "P1 Con Impulse",
+                                    "col": "P1 Concentric Impulse [N s]",
+                                    "invert": False,
+                                },
+                                {
+                                    "name": "P2 Con Impulse",
+                                    "col": "P2 Concentric Impulse [N s]",
+                                    "invert": False,
+                                },
+                                {
+                                    "name": "CM Depth",
+                                    "col": "Adjusted CMD",
+                                    "alt_col": "Countermovement Depth [cm]",
+                                    "invert": False,
+                                },
+                                {
+                                    "name": "Time to Takeoff",
+                                    "col": "Contraction Time [ms]",
+                                    "alt_col": "Time to Takeoff [s]",
+                                    "invert": True,
+                                },
                             ]
 
                             if comp_factor == "Individual":
-                                ref_pool_df = raw_cmj_df[raw_cmj_df['Name'] == sel_cmj_ath]
+                                ref_pool_df = raw_cmj_df[
+                                    raw_cmj_df["Name"] == sel_cmj_ath
+                                ]
                                 title_prefix = "Individual"
                             elif comp_factor == "Position":
-                                pos_athletes = full_df_unfiltered[full_df_unfiltered['Position'] == pos_val]['Name'].unique()
-                                ref_pool_df = raw_cmj_df[raw_cmj_df['Name'].isin(pos_athletes)]
-                                if ref_pool_df.empty: ref_pool_df = raw_cmj_df
+                                pos_athletes = full_df_unfiltered[
+                                    full_df_unfiltered["Position"] == pos_val
+                                ]["Name"].unique()
+                                ref_pool_df = raw_cmj_df[
+                                    raw_cmj_df["Name"].isin(pos_athletes)
+                                ]
+                                if ref_pool_df.empty:
+                                    ref_pool_df = raw_cmj_df
                                 title_prefix = "Position"
                             else:
                                 ref_pool_df = raw_cmj_df
@@ -1187,18 +1384,42 @@ if check_password():
                             x_labels = []
                             for bm in bar_metrics_excel:
                                 x_labels.append(bm["name"])
-                                cname = bm["col"] if bm["col"] in cur_test_row else bm.get("alt_col", bm["col"])
-                                ath_v = abs(float(cur_test_row.get(cname, 0.0))) if cname in cur_test_row and pd.notna(cur_test_row.get(cname)) else 0.0
-                                if cname in ref_pool_df.columns and len(ref_pool_df[cname].dropna()) > 1:
-                                    valid_series = ref_pool_df[cname].dropna().abs()
+                                cname = (
+                                    bm["col"]
+                                    if bm["col"] in cur_test_row
+                                    else bm.get("alt_col", bm["col"])
+                                )
+                                ath_v = (
+                                    abs(float(cur_test_row.get(cname, 0.0)))
+                                    if cname in cur_test_row
+                                    and pd.notna(cur_test_row.get(cname))
+                                    else 0.0
+                                )
+                                if (
+                                    cname in ref_pool_df.columns
+                                    and len(ref_pool_df[cname].dropna()) > 1
+                                ):
+                                    valid_series = (
+                                        ref_pool_df[cname].dropna().abs()
+                                    )
                                     m_mean = valid_series.mean()
                                     m_std = valid_series.std(ddof=1)
                                     if m_std > 0:
-                                        z_val = -1.0 * ((ath_v - m_mean) / m_std) if bm["invert"] else (ath_v - m_mean) / m_std
+                                        z_val = (
+                                            -1.0 * ((ath_v - m_mean) / m_std)
+                                            if bm["invert"]
+                                            else (ath_v - m_mean) / m_std
+                                        )
                                         t_val = 50.0 + (z_val * 10.0)
-                                        t_scores.append(round(min(100.0, max(0.0, t_val)), 1))
-                                    else: t_scores.append(50.0)
-                                else: t_scores.append(50.0)
+                                        t_scores.append(
+                                            round(
+                                                min(100.0, max(0.0, t_val)), 1
+                                            )
+                                        )
+                                    else:
+                                        t_scores.append(50.0)
+                                else:
+                                    t_scores.append(50.0)
 
                             fig_bands = go.Figure()
                             bands = [
@@ -1210,23 +1431,128 @@ if check_password():
                                 {"y0": 55, "y1": 60, "color": "#C3E8A8"},
                                 {"y0": 60, "y1": 70, "color": "#81D350"},
                                 {"y0": 70, "y1": 80, "color": "#33A338"},
-                                {"y0": 80, "y1": 100, "color": "#1C7426"}
+                                {"y0": 80, "y1": 100, "color": "#1C7426"},
                             ]
-                            for b in bands: fig_bands.add_hrect(y0=b["y0"], y1=b["y1"], fillcolor=b["color"], line_width=0, opacity=1.0, layer="below")
-                            fig_bands.add_trace(go.Bar(x=x_labels, y=t_scores, marker=dict(color='#3A3D40', line=dict(color='#1A1C1E', width=1.5)), width=0.42, text=[f"<b>{val:.1f}</b>" for val in t_scores], textposition='inside', insidetextanchor='middle', textfont=dict(color='white', size=12), cliponaxis=False))
+                            for b in bands:
+                                fig_bands.add_hrect(
+                                    y0=b["y0"],
+                                    y1=b["y1"],
+                                    fillcolor=b["color"],
+                                    line_width=0,
+                                    opacity=1.0,
+                                    layer="below",
+                                )
+                            fig_bands.add_trace(
+                                go.Bar(
+                                    x=x_labels,
+                                    y=t_scores,
+                                    marker=dict(
+                                        color="#3A3D40",
+                                        line=dict(color="#1A1C1E", width=1.5),
+                                    ),
+                                    width=0.42,
+                                    text=[
+                                        f"<b>{val:.1f}</b>" for val in t_scores
+                                    ],
+                                    textposition="inside",
+                                    insidetextanchor="middle",
+                                    textfont=dict(color="white", size=12),
+                                    cliponaxis=False,
+                                )
+                            )
 
                             category_boxes = [
-                                {"x0": 0.55, "x1": 2.45, "text": "Speed", "bg": "#F8E2E2"},
-                                {"x0": 2.55, "x1": 6.45, "text": "Strength", "bg": "#EBF3DF"},
-                                {"x0": 6.55, "x1": 7.45, "text": "Power", "bg": "#D3E2F4"},
-                                {"x0": 7.55, "x1": 9.45, "text": "Jump Strategy", "bg": "#E6E1F2"}
+                                {
+                                    "x0": 0.55,
+                                    "x1": 2.45,
+                                    "text": "Speed",
+                                    "bg": "#F8E2E2",
+                                },
+                                {
+                                    "x0": 2.55,
+                                    "x1": 6.45,
+                                    "text": "Strength",
+                                    "bg": "#EBF3DF",
+                                },
+                                {
+                                    "x0": 6.55,
+                                    "x1": 7.45,
+                                    "text": "Power",
+                                    "bg": "#D3E2F4",
+                                },
+                                {
+                                    "x0": 7.55,
+                                    "x1": 9.45,
+                                    "text": "Jump Strategy",
+                                    "bg": "#E6E1F2",
+                                },
                             ]
                             for cb in category_boxes:
-                                fig_bands.add_shape(type="rect", xref="x", yref="paper", x0=cb["x0"], x1=cb["x1"], y0=-0.16, y1=-0.08, fillcolor=cb["bg"], line=dict(width=0), layer="above")
-                                fig_bands.add_annotation(xref="x", yref="paper", x=(cb["x0"] + cb["x1"]) / 2, y=-0.12, text=f"<b>{cb['text']}</b>", showarrow=False, font=dict(size=11, color="#111827"), align="center")
+                                fig_bands.add_shape(
+                                    type="rect",
+                                    xref="x",
+                                    yref="paper",
+                                    x0=cb["x0"],
+                                    x1=cb["x1"],
+                                    y0=-0.16,
+                                    y1=-0.08,
+                                    fillcolor=cb["bg"],
+                                    line=dict(width=0),
+                                    layer="above",
+                                )
+                                fig_bands.add_annotation(
+                                    xref="x",
+                                    yref="paper",
+                                    x=(cb["x0"] + cb["x1"]) / 2,
+                                    y=-0.12,
+                                    text=f"<b>{cb['text']}</b>",
+                                    showarrow=False,
+                                    font=dict(size=11, color="#111827"),
+                                    align="center",
+                                )
 
-                            fig_bands.update_layout(height=450, margin=dict(l=30, r=10, t=15, b=65), plot_bgcolor='white', paper_bgcolor='white', xaxis=dict(tickangle=0, tickfont=dict(size=10.5, weight='bold', color='#111827'), showgrid=False, showline=True, linecolor='#6B7280'), yaxis=dict(range=[0, 100], dtick=10, showgrid=False, showline=True, linecolor='#6B7280', title=dict(text=f"{title_prefix} T-Score Performance Rating", font=dict(size=12, weight='bold', color='#4B5563'))), showlegend=False)
-                            st.plotly_chart(fig_bands, use_container_width=True, config=LOCKED_CONFIG, key=f"cmj_standards_chart_{comp_factor}")
+                            fig_bands.update_layout(
+                                height=450,
+                                margin=dict(l=30, r=10, t=15, b=65),
+                                plot_bgcolor="white",
+                                paper_bgcolor="white",
+                                xaxis=dict(
+                                    tickangle=0,
+                                    tickfont=dict(
+                                        size=10.5,
+                                        weight="bold",
+                                        color="#111827",
+                                    ),
+                                    showgrid=False,
+                                    showline=True,
+                                    linecolor="#6B7280",
+                                ),
+                                yaxis=dict(
+                                    range=[0, 100],
+                                    dtick=10,
+                                    showgrid=False,
+                                    showline=True,
+                                    linecolor="#6B7280",
+                                    title=dict(
+                                        text=(
+                                            f"{title_prefix} T-Score"
+                                            " Performance Rating"
+                                        ),
+                                        font=dict(
+                                            size=12,
+                                            weight="bold",
+                                            color="#4B5563",
+                                        ),
+                                    ),
+                                ),
+                                showlegend=False,
+                            )
+                            st.plotly_chart(
+                                fig_bands,
+                                use_container_width=True,
+                                config=LOCKED_CONFIG,
+                                key=f"cmj_standards_chart_{comp_factor}",
+                            )
 
                         with legend_col:
                             legend_table_html = """<div style="background:#4895DB; color:white; font-weight:800; font-size:12px; text-align:center; padding:6px; border-radius:4px 4px 0 0;">Performance Bands<br><span style="font-size:10px; font-weight:600;">T-Score Rating</span></div><table style="width:100%; border-collapse:collapse; font-size:11px; text-align:center; font-weight:700;"><tr style="background:#1C7426; color:white;"><td style="padding:4px;">Excellent</td><td>> 80</td></tr><tr style="background:#33A338; color:white;"><td style="padding:4px;">Very Good</td><td>70 - 80</td></tr><tr style="background:#81D350; color:#111827;"><td style="padding:4px;">Good</td><td>60 - 70</td></tr><tr style="background:#C3E8A8; color:#111827;"><td style="padding:4px;">Above Avg.</td><td>55 - 60</td></tr><tr style="background:#FFFFFF; color:#111827; border-top:1px solid #E2E8F0; border-bottom:1px solid #E2E8F0;"><td style="padding:4px;">Average</td><td>45 - 55</td></tr><tr style="background:#F8A2A2; color:#111827;"><td style="padding:4px;">Below Avg.</td><td>40 - 45</td></tr><tr style="background:#F05656; color:white;"><td style="padding:4px;">Poor</td><td>30 - 40</td></tr><tr style="background:#E60000; color:white;"><td style="padding:4px;">Very Poor</td><td>20 - 30</td></tr><tr style="background:#A00000; color:white;"><td style="padding:4px;">Extremely Poor</td><td>< 20</td></tr></table>"""
@@ -1236,128 +1562,311 @@ if check_password():
                 # --- 2. ASYMMETRY & FAVORING ANALYSIS ------------------------------------
                 # -------------------------------------------------------------------------
                 elif sel_cmj_mode == "Asymmetry & Favoring":
-                    st.markdown('<div class="section-header">Bilateral CMJ Asymmetry & Performance Standards</div>', unsafe_allow_html=True)
-                    
-                    asym_c1, asym_c_season, asym_c2, asym_c3 = st.columns([1.3, 1.1, 1.1, 1.1])
+                    st.markdown(
+                        '<div class="section-header">Bilateral CMJ Asymmetry &'
+                        " Performance Standards</div>",
+                        unsafe_allow_html=True,
+                    )
+
+                    asym_c1, asym_c_season, asym_c2, asym_c3 = st.columns(
+                        [1.3, 1.1, 1.1, 1.1]
+                    )
                     with asym_c1:
-                        sel_asym_ath = st.selectbox("Select Athlete", master_athlete_list, key="cmj_asym_ath_sel")
-                    
-                    ath_cmj_asym_base = raw_cmj_df[raw_cmj_df['Name'] == sel_asym_ath].sort_values('Test Date')
-                    
+                        sel_asym_ath = st.selectbox(
+                            "Select Athlete",
+                            master_athlete_list,
+                            key="cmj_asym_ath_sel",
+                        )
+
+                    ath_cmj_asym_base = raw_cmj_df[
+                        raw_cmj_df["Name"] == sel_asym_ath
+                    ].sort_values("Test Date")
+
                     if ath_cmj_asym_base.empty:
                         st.info(f"No CMJ test logs found for {sel_asym_ath}.")
                     else:
-                        avail_seasons = ["All Seasons"] + [s for s in ["In-Season", "Pre-Season", "Spring", "Summer"] if s in ath_cmj_asym_base['Season'].unique()]
+                        avail_seasons = ["All Seasons"] + [
+                            s
+                            for s in [
+                                "In-Season",
+                                "Pre-Season",
+                                "Spring",
+                                "Summer",
+                            ]
+                            if s in ath_cmj_asym_base["Season"].unique()
+                        ]
                         with asym_c_season:
-                            sel_asym_season = st.selectbox("Season Filter", avail_seasons, index=0, key="cmj_asym_season_filter")
-                        
+                            sel_asym_season = st.selectbox(
+                                "Season Filter",
+                                avail_seasons,
+                                index=0,
+                                key="cmj_asym_season_filter",
+                            )
+
                         ath_cmj_asym = ath_cmj_asym_base.copy()
                         if sel_asym_season != "All Seasons":
-                            ath_cmj_asym = ath_cmj_asym[ath_cmj_asym['Season'] == sel_asym_season]
-                        
-                        if ath_cmj_asym.empty:
-                            st.info(f"No CMJ test logs found for {sel_asym_ath} in {sel_asym_season}.")
-                        else:
-                            asym_valid_dates = ath_cmj_asym['Test Date'].dropna().drop_duplicates().sort_values(ascending=False).dt.strftime('%m/%d/%y').tolist()
-                            with asym_c2:
-                                sel_asym_date_str = st.selectbox("Select Test Date", asym_valid_dates, index=0, key="cmj_asym_date_sel")
-                            with asym_c3:
-                                known_injury_side = st.selectbox("Known Injured / Re-hab Side", ["None / Unknown", "Left", "Right"], key="cmj_asym_injured_side")
+                            ath_cmj_asym = ath_cmj_asym[
+                                ath_cmj_asym["Season"] == sel_asym_season
+                            ]
 
-                            cur_asym_idx = ath_cmj_asym[ath_cmj_asym['Test Date'].dt.strftime('%m/%d/%y') == sel_asym_date_str].index[-1]
+                        if ath_cmj_asym.empty:
+                            st.info(
+                                f"No CMJ test logs found for {sel_asym_ath} in"
+                                f" {sel_asym_season}."
+                            )
+                        else:
+                            asym_valid_dates = (
+                                ath_cmj_asym["Test Date"]
+                                .dropna()
+                                .drop_duplicates()
+                                .sort_values(ascending=False)
+                                .dt.strftime("%m/%d/%y")
+                                .tolist()
+                            )
+                            with asym_c2:
+                                sel_asym_date_str = st.selectbox(
+                                    "Select Test Date",
+                                    asym_valid_dates,
+                                    index=0,
+                                    key="cmj_asym_date_sel",
+                                )
+                            with asym_c3:
+                                known_injury_side = st.selectbox(
+                                    "Known Injured / Re-hab Side",
+                                    ["None / Unknown", "Left", "Right"],
+                                    key="cmj_asym_injured_side",
+                                )
+
+                            cur_asym_idx = ath_cmj_asym[
+                                ath_cmj_asym["Test Date"].dt.strftime(
+                                    "%m/%d/%y"
+                                )
+                                == sel_asym_date_str
+                            ].index[-1]
                             cur_asym_row = ath_cmj_asym.loc[cur_asym_idx]
 
-                            bw_kg = float(cur_asym_row.get("BW [KG]", cur_asym_row.get("Body Weight [kg]", 80.0)))
+                            bw_kg = float(
+                                cur_asym_row.get(
+                                    "BW [KG]",
+                                    cur_asym_row.get(
+                                        "Body Weight [kg]", 80.0
+                                    ),
+                                )
+                            )
                             bw_n = bw_kg * 9.81
 
                             asym_metric_list = [
                                 {
                                     "label": "Eccentric Braking RFD",
-                                    "raw_val_col": "Eccentric Braking RFD [N/s]",
-                                    "alt_raw": ["Eccentric Braking RFD", "Braking RFD [N/s]", "Braking RFD"],
-                                    "asym_col": "Eccentric Braking RFD % (Asym) (%)",
-                                    "alt_asym": ["Eccentric Braking RFD (Asym) (%)", "Eccentric Braking RFD Asymmetry (%)", "Braking RFD (Asym) (%)"],
+                                    "raw_val_col": (
+                                        "Eccentric Braking RFD [N/s]"
+                                    ),
+                                    "alt_raw": [
+                                        "Eccentric Braking RFD",
+                                        "Braking RFD [N/s]",
+                                        "Braking RFD",
+                                    ],
+                                    "asym_col": (
+                                        "Eccentric Braking RFD % (Asym) (%)"
+                                    ),
+                                    "alt_asym": [
+                                        (
+                                            "Eccentric Braking RFD (Asym)"
+                                            " (%)"
+                                        ),
+                                        (
+                                            "Eccentric Braking RFD Asymmetry"
+                                            " (%)"
+                                        ),
+                                        "Braking RFD (Asym) (%)",
+                                    ],
                                     "phase": "Eccentric Braking RFD",
                                     "unit": "N/s",
                                     "fmt": "{:.0f}",
                                     "target_min": 4000.0,
                                     "target_max": 8000.0,
                                     "target_label": "4,000 - 8,000 N/s",
-                                    "desc": "Rate of force development as the athlete decelerates downward."
+                                    "desc": (
+                                        "Rate of force development as the"
+                                        " athlete decelerates downward."
+                                    ),
                                 },
                                 {
                                     "label": "Eccentric Deceleration RFD",
-                                    "raw_val_col": "Eccentric Deceleration RFD [N/s]",
-                                    "alt_raw": ["Eccentric Deceleration RFD", "Eccentric RFD [N/s]", "Eccentric RFD"],
-                                    "asym_col": "Eccentric Deceleration RFD % (Asym) (%)",
-                                    "alt_asym": ["Eccentric Deceleration RFD (Asym) (%)", "Eccentric RFD % (Asym) (%)", "Eccentric RFD (Asym) (%)"],
+                                    "raw_val_col": (
+                                        "Eccentric Deceleration RFD [N/s]"
+                                    ),
+                                    "alt_raw": [
+                                        "Eccentric Deceleration RFD",
+                                        "Eccentric RFD [N/s]",
+                                        "Eccentric RFD",
+                                    ],
+                                    "asym_col": (
+                                        "Eccentric Deceleration RFD % (Asym)"
+                                        " (%)"
+                                    ),
+                                    "alt_asym": [
+                                        (
+                                            "Eccentric Deceleration RFD (Asym)"
+                                            " (%)"
+                                        ),
+                                        "Eccentric RFD % (Asym) (%)",
+                                        "Eccentric RFD (Asym) (%)",
+                                    ],
                                     "phase": "Eccentric Deceleration RFD",
                                     "unit": "N/s",
                                     "fmt": "{:.0f}",
                                     "target_min": 4500.0,
                                     "target_max": 8500.0,
                                     "target_label": "4,500 - 8,500 N/s",
-                                    "desc": "Braking rate immediately prior to turnaround into upward drive."
+                                    "desc": (
+                                        "Braking rate immediately prior to"
+                                        " turnaround into upward drive."
+                                    ),
                                 },
                                 {
                                     "label": "Force at Zero Velocity",
                                     "raw_val_col": "Force at Zero Velocity [N]",
-                                    "alt_raw": ["Force at Zero Velocity", "Force @ 0 Velo", "Relative Force @ 0 Velo"],
-                                    "asym_col": "Force at Zero Velocity % (Asym) (%)",
-                                    "alt_asym": ["Force at Zero Velocity (Asym) (%)", "Force at Zero Velocity Asymmetry (%)", "Force @ 0 Velo (Asym) (%)"],
+                                    "alt_raw": [
+                                        "Force at Zero Velocity",
+                                        "Force @ 0 Velo",
+                                        "Relative Force @ 0 Velo",
+                                    ],
+                                    "asym_col": (
+                                        "Force at Zero Velocity % (Asym) (%)"
+                                    ),
+                                    "alt_asym": [
+                                        (
+                                            "Force at Zero Velocity (Asym)"
+                                            " (%)"
+                                        ),
+                                        (
+                                            "Force at Zero Velocity Asymmetry"
+                                            " (%)"
+                                        ),
+                                        "Force @ 0 Velo (Asym) (%)",
+                                    ],
                                     "phase": "Force at Zero Velocity",
                                     "unit": "N",
                                     "fmt": "{:.0f}",
                                     "target_min": round(bw_n * 2.2, 0),
                                     "target_max": round(bw_n * 2.6, 0),
-                                    "target_label": f"{bw_n*2.2:.0f} - {bw_n*2.6:.0f} N (2.2-2.6x BW)",
-                                    "desc": "Vertical load absorbed at the absolute bottom of the dip (v = 0)."
+                                    "target_label": (
+                                        f"{bw_n*2.2:.0f} - {bw_n*2.6:.0f} N"
+                                        " (2.2-2.6x BW)"
+                                    ),
+                                    "desc": (
+                                        "Vertical load absorbed at the absolute"
+                                        " bottom of the dip (v = 0)."
+                                    ),
                                 },
                                 {
                                     "label": "Concentric Mean Force",
                                     "raw_val_col": "Concentric Mean Force [N]",
-                                    "alt_raw": ["Concentric Mean Force", "Relative Mean Con Force", "Mean Concentric Force [N]"],
-                                    "asym_col": "Concentric Mean Force % (Asym) (%)",
-                                    "alt_asym": ["Concentric Mean Force (Asym) (%)", "Concentric Mean Force Asymmetry (%)"],
+                                    "alt_raw": [
+                                        "Concentric Mean Force",
+                                        "Relative Mean Con Force",
+                                        "Mean Concentric Force [N]",
+                                    ],
+                                    "asym_col": (
+                                        "Concentric Mean Force % (Asym) (%)"
+                                    ),
+                                    "alt_asym": [
+                                        "Concentric Mean Force (Asym) (%)",
+                                        (
+                                            "Concentric Mean Force Asymmetry"
+                                            " (%)"
+                                        ),
+                                    ],
                                     "phase": "Concentric Mean Force",
                                     "unit": "N",
                                     "fmt": "{:.0f}",
                                     "target_min": round(bw_n * 1.6, 0),
                                     "target_max": round(bw_n * 1.9, 0),
-                                    "target_label": f"{bw_n*1.6:.0f} - {bw_n*1.9:.0f} N (1.6-1.9x BW)",
-                                    "desc": "Average upward thrust produced across the propulsion phase."
+                                    "target_label": (
+                                        f"{bw_n*1.6:.0f} - {bw_n*1.9:.0f} N"
+                                        " (1.6-1.9x BW)"
+                                    ),
+                                    "desc": (
+                                        "Average upward thrust produced across"
+                                        " the propulsion phase."
+                                    ),
                                 },
                                 {
                                     "label": "Takeoff Peak Force",
                                     "raw_val_col": "Takeoff Peak Force [N]",
-                                    "alt_raw": ["Takeoff Peak Force", "Take-off Peak Force [N]", "Take-off Peak Force", "Peak Takeoff Force [N]", "Peak Takeoff Force", "Takeoff Force [N]", "Takeoff Force", "Concentric Peak Force [N]", "Concentric Peak Force"],
-                                    "asym_col": "Takeoff Peak Force % (Asym) (%)",
-                                    "alt_asym": ["Takeoff Peak Force (Asym) (%)", "Takeoff Peak Force [N] (Asym) (%)", "Take-off Peak Force % (Asym) (%)", "Take-off Peak Force (Asym) (%)", "Peak Takeoff Force % (Asym) (%)", "Takeoff Peak Force Asymmetry (%)", "Concentric Peak Force % (Asym) (%)"],
+                                    "alt_raw": [
+                                        "Takeoff Peak Force",
+                                        "Take-off Peak Force [N]",
+                                        "Take-off Peak Force",
+                                        "Peak Takeoff Force [N]",
+                                        "Peak Takeoff Force",
+                                        "Takeoff Force [N]",
+                                        "Takeoff Force",
+                                        "Concentric Peak Force [N]",
+                                        "Concentric Peak Force",
+                                    ],
+                                    "asym_col": (
+                                        "Takeoff Peak Force % (Asym) (%)"
+                                    ),
+                                    "alt_asym": [
+                                        "Takeoff Peak Force (Asym) (%)",
+                                        "Takeoff Peak Force [N] (Asym) (%)",
+                                        "Take-off Peak Force % (Asym) (%)",
+                                        "Take-off Peak Force (Asym) (%)",
+                                        "Peak Takeoff Force % (Asym) (%)",
+                                        "Takeoff Peak Force Asymmetry (%)",
+                                        "Concentric Peak Force % (Asym) (%)",
+                                    ],
                                     "phase": "Takeoff Peak Force",
                                     "unit": "N",
                                     "fmt": "{:.0f}",
                                     "target_min": round(bw_n * 2.0, 0),
                                     "target_max": round(bw_n * 2.5, 0),
-                                    "target_label": f"{bw_n*2.0:.0f} - {bw_n*2.5:.0f} N (2.0-2.5x BW)",
-                                    "desc": "Maximum explosive force spike generated before leaving the plates."
-                                }
+                                    "target_label": (
+                                        f"{bw_n*2.0:.0f} - {bw_n*2.5:.0f} N"
+                                        " (2.0-2.5x BW)"
+                                    ),
+                                    "desc": (
+                                        "Maximum explosive force spike"
+                                        " generated before leaving the plates."
+                                    ),
+                                },
                             ]
 
                             parsed_records = []
                             for item in asym_metric_list:
-                                raw_val_found = resolve_col_val(cur_asym_row, item["raw_val_col"], item.get("alt_raw", []))
+                                raw_val_found = resolve_col_val(
+                                    cur_asym_row,
+                                    item["raw_val_col"],
+                                    item.get("alt_raw", []),
+                                )
                                 raw_num_val = None
                                 if raw_val_found is not None:
                                     try:
-                                        cleaned_num = float(re.sub(r'[^0-9.]', '', str(raw_val_found)))
+                                        cleaned_num = float(
+                                            re.sub(
+                                                r"[^0-9.]",
+                                                "",
+                                                str(raw_val_found),
+                                            )
+                                        )
                                         if cleaned_num > 0:
                                             raw_num_val = cleaned_num
                                     except:
                                         raw_num_val = None
 
-                                if raw_num_val is not None and raw_num_val > 0:
+                                if (
+                                    raw_num_val is not None
+                                    and raw_num_val > 0
+                                ):
                                     if raw_num_val >= item["target_min"]:
-                                        out_status = "Optimal" if raw_num_val <= item["target_max"] * 1.25 else "Elite"
+                                        out_status = (
+                                            "Optimal"
+                                            if raw_num_val
+                                            <= item["target_max"] * 1.25
+                                            else "Elite"
+                                        )
                                         out_color = "#137333"
                                         out_bg = "#E6F4EA"
                                     else:
@@ -1369,21 +1878,31 @@ if check_password():
                                     out_color = "#64748B"
                                     out_bg = "#F1F5F9"
 
-                                raw_asym_found = resolve_col_val(cur_asym_row, item["asym_col"], item.get("alt_asym", []))
-                                parsed_signed_val, side_favored = parse_asym_val(raw_asym_found)
-                                
+                                raw_asym_found = resolve_col_val(
+                                    cur_asym_row,
+                                    item["asym_col"],
+                                    item.get("alt_asym", []),
+                                )
+                                parsed_signed_val, side_favored = (
+                                    parse_asym_val(raw_asym_found)
+                                )
+
                                 asym_status = "Symmetric (<10%)"
                                 if abs(parsed_signed_val) >= 15.0:
                                     asym_status = f"High Bias ({abs(parsed_signed_val):.1f}%)"
                                 elif abs(parsed_signed_val) >= 10.0:
                                     asym_status = f"Moderate Bias ({abs(parsed_signed_val):.1f}%)"
-                                
+
                                 parsed_records.append({
                                     "Phase / Metric": item["label"],
                                     "Phase": item["phase"],
                                     "Description": item["desc"],
                                     "Absolute_Val": raw_num_val,
-                                    "Formatted_Val": f"{item['fmt'].format(raw_num_val)} {item['unit']}" if raw_num_val is not None else "—",
+                                    "Formatted_Val": (
+                                        f"{item['fmt'].format(raw_num_val)} {item['unit']}"
+                                        if raw_num_val is not None
+                                        else "—"
+                                    ),
                                     "Target_Range": item["target_label"],
                                     "Output_Status": out_status,
                                     "Output_Color": out_color,
@@ -1391,217 +1910,549 @@ if check_password():
                                     "Signed_Val": parsed_signed_val,
                                     "Magnitude": abs(parsed_signed_val),
                                     "Favored": side_favored,
-                                    "Raw_Asym": str(raw_asym_found) if pd.notna(raw_asym_found) and str(raw_asym_found).strip() != "" else "0.0",
-                                    "Asym_Status": asym_status
+                                    "Raw_Asym": (
+                                        str(raw_asym_found)
+                                        if pd.notna(raw_asym_found)
+                                        and str(raw_asym_found).strip() != ""
+                                        else "0.0"
+                                    ),
+                                    "Asym_Status": asym_status,
                                 })
 
                             asym_table_df = pd.DataFrame(parsed_records)
 
-                            max_imbalance_row = asym_table_df.loc[asym_table_df["Magnitude"].idxmax()]
-                            
-                            r_count = sum(1 for r in parsed_records if r["Favored"] == "Right" and r["Magnitude"] >= 5.0)
-                            l_count = sum(1 for r in parsed_records if r["Favored"] == "Left" and r["Magnitude"] >= 5.0)
-                            
+                            max_imbalance_row = asym_table_df.loc[
+                                asym_table_df["Magnitude"].idxmax()
+                            ]
+
+                            r_count = sum(
+                                1
+                                for r in parsed_records
+                                if r["Favored"] == "Right"
+                                and r["Magnitude"] >= 5.0
+                            )
+                            l_count = sum(
+                                1
+                                for r in parsed_records
+                                if r["Favored"] == "Left"
+                                and r["Magnitude"] >= 5.0
+                            )
+
                             primary_favoring = "Balanced"
                             if r_count > l_count:
-                                primary_favoring = "Right Leg (Unloading Left)"
+                                primary_favoring = (
+                                    "Right Leg (Unloading Left)"
+                                )
                             elif l_count > r_count:
                                 primary_favoring = "Left Leg (Unloading Right)"
 
                             kpi_a1, kpi_a2 = st.columns(2)
-                            kpi_a1.metric("Dominant Favoring", primary_favoring, help="Limb consistently generating higher force across jump phases.")
-                            kpi_a2.metric("Peak Phase Imbalance", f"{max_imbalance_row['Phase']} ({max_imbalance_row['Magnitude']:.1f}% {max_imbalance_row['Favored'][0]})")
+                            kpi_a1.metric(
+                                "Dominant Favoring",
+                                primary_favoring,
+                                help=(
+                                    "Limb consistently generating higher force"
+                                    " across jump phases."
+                                ),
+                            )
+                            kpi_a2.metric(
+                                "Peak Phase Imbalance",
+                                (
+                                    f"{max_imbalance_row['Phase']}"
+                                    f" ({max_imbalance_row['Magnitude']:.1f}%"
+                                    f" {max_imbalance_row['Favored'][0]})"
+                                ),
+                            )
 
                             if known_injury_side != "None / Unknown":
-                                unloaded_side = "Left" if "Right" in primary_favoring else ("Right" if "Left" in primary_favoring else "None")
+                                unloaded_side = (
+                                    "Left"
+                                    if "Right" in primary_favoring
+                                    else (
+                                        "Right"
+                                        if "Left" in primary_favoring
+                                        else "None"
+                                    )
+                                )
                                 if unloaded_side == known_injury_side:
                                     diag_color = "#D93025"
                                     diag_bg = "#FCE8E6"
-                                    diag_text = f"<b>Compensatory Unloading Detected:</b> Athlete is meeting output standards overall but heavily offloading the injured <b>{known_injury_side}</b> side onto the healthy <b>{primary_favoring.split()[0]}</b> limb."
+                                    diag_text = (
+                                        "<b>Compensatory Unloading"
+                                        " Detected:</b> Athlete is meeting"
+                                        " output standards overall but heavily"
+                                        " offloading the injured"
+                                        f" <b>{known_injury_side}</b> side onto"
+                                        " the healthy"
+                                        f" <b>{primary_favoring.split()[0]}</b>"
+                                        " limb."
+                                    )
                                 elif unloaded_side != "None":
                                     diag_color = "#D97706"
                                     diag_bg = "#FEF3C7"
-                                    diag_text = f"<b>Observation:</b> Athlete is favoring the injured side (<b>{known_injury_side}</b>). Verify test mechanics or limb dominance compensation."
+                                    diag_text = (
+                                        "<b>Observation:</b> Athlete is"
+                                        " favoring the injured side"
+                                        f" (<b>{known_injury_side}</b>). Verify"
+                                        " test mechanics or limb dominance"
+                                        " compensation."
+                                    )
                                 else:
                                     diag_color = "#137333"
                                     diag_bg = "#E6F4EA"
-                                    diag_text = f"<b>Symmetric Strategy:</b> Jump mechanics show balanced loading across both limbs."
-                                
-                                st.markdown(f'<div style="background:{diag_bg}; border-left:5px solid {diag_color}; padding:10px 14px; border-radius:6px; margin: 15px 0; font-size:13px; color:#111827;">{diag_text}</div>', unsafe_allow_html=True)
+                                    diag_text = (
+                                        "<b>Symmetric Strategy:</b> Jump"
+                                        " mechanics show balanced loading"
+                                        " across both limbs."
+                                    )
+
+                                st.markdown(
+                                    f'<div style="background:{diag_bg};'
+                                    f" border-left:5px solid {diag_color};"
+                                    " padding:10px 14px; border-radius:6px;"
+                                    " margin: 15px 0; font-size:13px;"
+                                    f' color:#111827;">{diag_text}</div>',
+                                    unsafe_allow_html=True,
+                                )
 
                             fig_asym = go.Figure()
                             fig_asym.add_vrect(
-                                x0=-10, x1=10, 
-                                fillcolor="#E2E8F0", opacity=0.4, line_width=0, layer="below", 
-                                annotation_text="Symmetric Zone (±10%)", annotation_position="top left", 
-                                annotation_font_size=10, annotation_font_color="#64748B"
+                                x0=-10,
+                                x1=10,
+                                fillcolor="#E2E8F0",
+                                opacity=0.4,
+                                line_width=0,
+                                layer="below",
+                                annotation_text="Symmetric Zone (±10%)",
+                                annotation_position="top left",
+                                annotation_font_size=10,
+                                annotation_font_color="#64748B",
                             )
-                            
-                            bar_colors = ['#FF8200' if v > 0 else '#4895DB' for v in asym_table_df["Signed_Val"]]
-                            
-                            fig_asym.add_trace(go.Bar(
-                                y=asym_table_df["Phase / Metric"],
-                                x=asym_table_df["Signed_Val"],
-                                orientation='h',
-                                marker=dict(color=bar_colors, line=dict(color='#1E293B', width=1)),
-                                text=[f"<b>{r['Magnitude']:.1f}% {r['Favored'][0]}</b>" if r['Magnitude'] > 0 else "0%" for _, r in asym_table_df.iterrows()],
-                                textposition='outside',
-                                cliponaxis=False
-                            ))
 
-                            max_range = max(30.0, asym_table_df["Magnitude"].max() * 1.35)
+                            bar_colors = [
+                                "#FF8200" if v > 0 else "#4895DB"
+                                for v in asym_table_df["Signed_Val"]
+                            ]
+
+                            fig_asym.add_trace(
+                                go.Bar(
+                                    y=asym_table_df["Phase / Metric"],
+                                    x=asym_table_df["Signed_Val"],
+                                    orientation="h",
+                                    marker=dict(
+                                        color=bar_colors,
+                                        line=dict(color="#1E293B", width=1),
+                                    ),
+                                    text=[
+                                        (
+                                            f"<b>{r['Magnitude']:.1f}%"
+                                            f" {r['Favored'][0]}</b>"
+                                            if r["Magnitude"] > 0
+                                            else "0%"
+                                        )
+                                        for _, r in asym_table_df.iterrows()
+                                    ],
+                                    textposition="outside",
+                                    cliponaxis=False,
+                                )
+                            )
+
+                            max_range = max(
+                                30.0, asym_table_df["Magnitude"].max() * 1.35
+                            )
                             fig_asym.update_layout(
                                 height=320,
                                 template="simple_white",
-                                title=dict(text="<b>Current Test: Limb Loading Bias (← Left Favored | Right Favored →)</b>", font=dict(size=13, color="#1D1D1F")),
+                                title=dict(
+                                    text=(
+                                        "<b>Current Test: Limb Loading Bias (←"
+                                        " Left Favored | Right Favored →)</b>"
+                                    ),
+                                    font=dict(size=13, color="#1D1D1F"),
+                                ),
                                 margin=dict(l=20, r=40, t=40, b=20),
-                                xaxis=dict(range=[-max_range, max_range], ticksuffix="%", zeroline=True, zerolinewidth=2, zerolinecolor="#111827"),
-                                yaxis=dict(autorange="reversed")
+                                xaxis=dict(
+                                    range=[-max_range, max_range],
+                                    ticksuffix="%",
+                                    zeroline=True,
+                                    zerolinewidth=2,
+                                    zerolinecolor="#111827",
+                                ),
+                                yaxis=dict(autorange="reversed"),
                             )
-                            st.plotly_chart(fig_asym, use_container_width=True, config=LOCKED_CONFIG, key="cmj_asym_horizontal_bar")
+                            st.plotly_chart(
+                                fig_asym,
+                                use_container_width=True,
+                                config=LOCKED_CONFIG,
+                                key="cmj_asym_horizontal_bar",
+                            )
 
-                # =========================================================================
-                # --- LONGITUDINAL LIMB FAVORING HEATMAP ----------------------------------
-                # =========================================================================
-                st.markdown("<br>", unsafe_allow_html=True)
-                season_heatmap_label = f"({sel_asym_season})" if sel_asym_season != "All Seasons" else "(All Seasons)"
-                st.markdown(f"#### Longitudinal Limb Favoring Heatmap: {sel_asym_ath} {season_heatmap_label}")
-                            
-                trend_records = []
-                for _, test_row in ath_cmj_asym.iterrows():
-                    t_date = test_row['Test Date']
-                    t_date_str = pd.to_datetime(t_date).strftime('%m/%d/%y')
-                                
-                    for item in asym_metric_list:
-                        raw_asym_val = resolve_col_val(test_row, item["asym_col"], item.get("alt_asym", []))
-                        signed_v, fav_side = parse_asym_val(raw_asym_val)
-                        trend_records.append({
-                            "Date": t_date,
-                            "Date_Str": t_date_str,
-                            "Metric": item["label"],
-                            "Signed_Asymmetry": signed_v,
-                            "Magnitude": abs(signed_v),
-                            "Favored": fav_side
-                        })
-                            
-                trend_df = pd.DataFrame(trend_records).sort_values("Date")
-                            
-                if not trend_df.empty:
-                     metric_order = [m["label"] for m in asym_metric_list]
-                                
-                    pivot_asym = trend_df.pivot_table(
-                        index="Metric", 
-                        columns="Date_Str", 
-                        values="Signed_Asymmetry", 
-                        aggfunc="mean"
-                    ).reindex(metric_order).fillna(0.0)
-                                
-                    diverging_scale = [
-                        [0.00, "#1E40AF"],  # Dark Navy Blue (Heavy Left)
-                        [0.30, "#60A5FA"],  # Light Blue (Moderate Left)
-                        [0.45, "#F1F5F9"],  # Soft Neutral Gray (Balanced Zone)
-                        [0.55, "#F1F5F9"],  # Soft Neutral Gray (Balanced Zone)
-                        [0.70, "#FB923C"],  # Soft Orange (Moderate Right)
-                        [1.00, "#C2410C"]   # Dark Tennessee Orange (Heavy Right)
-                    ]
+                            # =========================================================================
+                            # --- LONGITUDINAL LIMB FAVORING HEATMAP ----------------------------------
+                            # =========================================================================
+                            st.markdown("<br>", unsafe_allow_html=True)
+                            season_heatmap_label = (
+                                f"({sel_asym_season})"
+                                if sel_asym_season != "All Seasons"
+                                else "(All Seasons)"
+                            )
+                            st.markdown(
+                                "#### Longitudinal Limb Favoring Heatmap:"
+                                f" {sel_asym_ath} {season_heatmap_label}"
+                            )
 
-                    fig_heat = go.Figure(data=go.Heatmap(
-                        z=pivot_asym.values,
-                        x=list(pivot_asym.columns),
-                        y=list(pivot_asym.index),
-                        colorscale=diverging_scale,
-                        zmid=0,
-                        zmin=-25,
-                        zmax=25,
-                        xgap=5,
-                        ygap=5,
-                        hoverinfo='none',
-                        colorbar=dict(
-                            title=dict(text="Limb Bias", font=dict(size=11, color="#64748B")),
-                            tickvals=[-20, -10, 0, 10, 20],
-                            ticktext=["Left (20%+)", "Left (10%)", "Balanced", "Right (10%)", "Right (20%+)"],
-                            len=0.9
-                        )
-                    ))
+                            trend_records = []
+                            for _, test_row in ath_cmj_asym.iterrows():
+                                t_date = test_row["Test Date"]
+                                t_date_str = pd.to_datetime(t_date).strftime(
+                                    "%m/%d/%y"
+                                )
 
-                    annotations = []
-                    for r_idx, metric in enumerate(pivot_asym.index):
-                        for c_idx, date_val in enumerate(pivot_asym.columns):
-                            val = pivot_asym.iloc[r_idx, c_idx]
-                            if abs(val) >= 0.1:
-                                side_char = "R" if val > 0 else "L"
-                                display_txt = f"{abs(val):.1f}% {side_char}"
-                            else:
-                                display_txt = "0.0%"
-                                        
-                            # Strict contrast: crisp white text on colored/dark cells, dark navy on light gray
-                            font_color = "#FFFFFF" if abs(val) >= 8.0 else "#0F172A"
-                                        
-                            annotations.append(dict(
-                                x=date_val,
-                                y=metric,
-                                text=f"<b>{display_txt}</b>",
-                                font=dict(size=13, color=font_color, family="Arial"),
-                                showarrow=False
-                            ))
+                                for item in asym_metric_list:
+                                    raw_asym_val = resolve_col_val(
+                                        test_row,
+                                        item["asym_col"],
+                                        item.get("alt_asym", []),
+                                    )
+                                    signed_v, fav_side = parse_asym_val(
+                                        raw_asym_val
+                                    )
+                                    trend_records.append({
+                                        "Date": t_date,
+                                        "Date_Str": t_date_str,
+                                        "Metric": item["label"],
+                                        "Signed_Asymmetry": signed_v,
+                                        "Magnitude": abs(signed_v),
+                                        "Favored": fav_side,
+                                    })
 
-                    fig_heat.update_layout(
-                        height=300,
-                        margin=dict(l=20, r=20, t=10, b=30),
-                        xaxis=dict(title=None, showgrid=False, tickfont=dict(size=12, color="#1D1D1F", weight="bold")),
-                        yaxis=dict(autorange="reversed", showgrid=False, tickfont=dict(size=11, weight="bold", color="#1D1D1F")),
-                        plot_bgcolor="white",
-                        paper_bgcolor="white",
-                        annotations=annotations
-                    )
-                    st.plotly_chart(fig_heat, use_container_width=True, config=LOCKED_CONFIG, key=f"asym_heatmap_{sel_asym_ath}_{sel_asym_season}")
+                            trend_df = pd.DataFrame(trend_records).sort_values(
+                                "Date"
+                            )
+
+                            if not trend_df.empty:
+                                metric_order = [
+                                    m["label"] for m in asym_metric_list
+                                ]
+
+                                pivot_asym = (
+                                    trend_df.pivot_table(
+                                        index="Metric",
+                                        columns="Date_Str",
+                                        values="Signed_Asymmetry",
+                                        aggfunc="mean",
+                                    )
+                                    .reindex(metric_order)
+                                    .fillna(0.0)
+                                )
+
+                                # Clean high-contrast diverging scale
+                                diverging_scale = [
+                                    [
+                                        0.00,
+                                        "#1E40AF",
+                                    ],  # Dark Navy Blue (Heavy Left)
+                                    [
+                                        0.30,
+                                        "#60A5FA",
+                                    ],  # Light Blue (Moderate Left)
+                                    [
+                                        0.45,
+                                        "#F1F5F9",
+                                    ],  # Soft Neutral Gray (Balanced)
+                                    [
+                                        0.55,
+                                        "#F1F5F9",
+                                    ],  # Soft Neutral Gray (Balanced)
+                                    [
+                                        0.70,
+                                        "#FB923C",
+                                    ],  # Soft Orange (Moderate Right)
+                                    [
+                                        1.00,
+                                        "#C2410C",
+                                    ],  # Dark Orange (Heavy Right)
+                                ]
+
+                                fig_heat = go.Figure(
+                                    data=go.Heatmap(
+                                        z=pivot_asym.values,
+                                        x=list(pivot_asym.columns),
+                                        y=list(pivot_asym.index),
+                                        colorscale=diverging_scale,
+                                        zmid=0,
+                                        zmin=-25,
+                                        zmax=25,
+                                        xgap=5,
+                                        ygap=5,
+                                        hoverinfo="none",
+                                        colorbar=dict(
+                                            title=dict(
+                                                text="Limb Bias",
+                                                font=dict(
+                                                    size=11, color="#64748B"
+                                                ),
+                                            ),
+                                            tickvals=[-20, -10, 0, 10, 20],
+                                            ticktext=[
+                                                "Left (20%+)",
+                                                "Left (10%)",
+                                                "Balanced",
+                                                "Right (10%)",
+                                                "Right (20%+)",
+                                            ],
+                                            len=0.9,
+                                        ),
+                                    )
+                                )
+
+                                # Single-layer annotations to avoid blurry double-text
+                                annotations = []
+                                for r_idx, metric in enumerate(
+                                    pivot_asym.index
+                                ):
+                                    for c_idx, date_val in enumerate(
+                                        pivot_asym.columns
+                                    ):
+                                        val = pivot_asym.iloc[r_idx, c_idx]
+                                        if abs(val) >= 0.1:
+                                            side_char = "R" if val > 0 else "L"
+                                            display_txt = (
+                                                f"{abs(val):.1f}% {side_char}"
+                                            )
+                                        else:
+                                            display_txt = "0.0%"
+
+                                        font_color = (
+                                            "#FFFFFF"
+                                            if abs(val) >= 8.0
+                                            else "#0F172A"
+                                        )
+
+                                        annotations.append(
+                                            dict(
+                                                x=date_val,
+                                                y=metric,
+                                                text=f"<b>{display_txt}</b>",
+                                                font=dict(
+                                                    size=13,
+                                                    color=font_color,
+                                                    family="Arial",
+                                                ),
+                                                showarrow=False,
+                                            )
+                                        )
+
+                                fig_heat.update_layout(
+                                    height=300,
+                                    margin=dict(l=20, r=20, t=10, b=30),
+                                    xaxis=dict(
+                                        title=None,
+                                        showgrid=False,
+                                        tickfont=dict(
+                                            size=12,
+                                            color="#1D1D1F",
+                                            weight="bold",
+                                        ),
+                                    ),
+                                    yaxis=dict(
+                                        autorange="reversed",
+                                        showgrid=False,
+                                        tickfont=dict(
+                                            size=11,
+                                            weight="bold",
+                                            color="#1D1D1F",
+                                        ),
+                                    ),
+                                    plot_bgcolor="white",
+                                    paper_bgcolor="white",
+                                    annotations=annotations,
+                                )
+                                st.plotly_chart(
+                                    fig_heat,
+                                    use_container_width=True,
+                                    config=LOCKED_CONFIG,
+                                    key=(
+                                        f"asym_heatmap_{sel_asym_ath}_{sel_asym_season}"
+                                    ),
+                                )
+
+                            st.markdown("<br>", unsafe_allow_html=True)
+                            st.markdown(
+                                "#### Combined Metric Values, Standards & Limb"
+                                " Asymmetry"
+                            )
+                            unified_tbl_html = """<table class="scout-table" style="width:100%; border:1px solid #E2E8F0; background:white;">
+                                <thead>
+                                    <tr style="background:#4895DB; color:white;">
+                                        <th style="text-align:left !important; padding-left:14px; width:30%;">Phase Metric</th>
+                                        <th style="width:14%;">Actual Total</th>
+                                        <th style="width:18%;">D1 Standard Target</th>
+                                        <th style="width:12%;">Output Standard</th>
+                                        <th style="width:13%;">Favored Limb</th>
+                                        <th style="width:13%;">Asymmetry %</th>
+                                    </tr>
+                                </thead>
+                                <tbody>"""
+                            for _, row in asym_table_df.iterrows():
+                                asym_badge_color = (
+                                    "#137333"
+                                    if "Symmetric" in row["Asym_Status"]
+                                    else (
+                                        "#D97706"
+                                        if "Moderate" in row["Asym_Status"]
+                                        else "#D93025"
+                                    )
+                                )
+                                asym_badge_bg = (
+                                    "#E6F4EA"
+                                    if "Symmetric" in row["Asym_Status"]
+                                    else (
+                                        "#FEF3C7"
+                                        if "Moderate" in row["Asym_Status"]
+                                        else "#FCE8E6"
+                                    )
+                                )
+                                favored_text_color = (
+                                    "#FF8200"
+                                    if row["Favored"] == "Right"
+                                    else (
+                                        "#4895DB"
+                                        if row["Favored"] == "Left"
+                                        else "#64748B"
+                                    )
+                                )
+
+                                unified_tbl_html += f"""<tr>
+                                    <td style="text-align:left !important; padding-left:14px; padding-top:8px; padding-bottom:8px;">
+                                        <div style="font-weight:800; font-size:12px; color:#111827;">{row['Phase / Metric']}</div>
+                                        <div style="font-size:10px; color:#64748B; line-height:1.2;">{row['Description']}</div>
+                                    </td>
+                                    <td style="font-weight:800; font-size:13px; color:#0F172A;">{row['Formatted_Val']}</td>
+                                    <td style="color:#64748B; font-weight:600; font-size:11px;">{row['Target_Range']}</td>
+                                    <td><span style="background:{row['Output_Bg']}; color:{row['Output_Color']}; padding:3px 8px; border-radius:10px; font-weight:700; font-size:11px;">{row['Output_Status']}</span></td>
+                                    <td style="font-weight:800; color:{favored_text_color};">{row['Favored']}</td>
+                                    <td><span style="background:{asym_badge_bg}; color:{asym_badge_color}; padding:3px 8px; border-radius:10px; font-weight:800; font-size:11px;">{row['Raw_Asym']}</span></td>
+                                </tr>"""
+                            unified_tbl_html += "</tbody></table>"
+                            st.markdown(unified_tbl_html, unsafe_allow_html=True)
 
                 # -------------------------------------------------------------------------
                 # --- 3. TEAM CMJ SUMMARY ------------------------------------------------
                 # -------------------------------------------------------------------------
                 elif sel_cmj_mode == "Team CMJ Summary":
                     st.markdown("### Team Wellness Score Overview")
-                    team_cmj_dates = raw_cmj_df['Test Date'].dropna().drop_duplicates().sort_values(ascending=False).dt.strftime('%m/%d/%y').tolist()
-                    
+                    team_cmj_dates = (
+                        raw_cmj_df["Test Date"]
+                        .dropna()
+                        .drop_duplicates()
+                        .sort_values(ascending=False)
+                        .dt.strftime("%m/%d/%y")
+                        .tolist()
+                    )
+
                     c_sum_d1, c_sum_d2 = st.columns([1.5, 2])
-                    with c_sum_d1: sel_team_cmj_date = st.selectbox("Evaluation Test Date", team_cmj_dates, index=0, key="team_cmj_eval_date")
-                    with c_sum_d2: team_pos_f = st.selectbox("Filter by Position", ["All Positions"] + sorted([p for p in full_df_unfiltered['Position'].unique() if p != "N/A"]), key="team_cmj_pos_filter")
+                    with c_sum_d1:
+                        sel_team_cmj_date = st.selectbox(
+                            "Evaluation Test Date",
+                            team_cmj_dates,
+                            index=0,
+                            key="team_cmj_eval_date",
+                        )
+                    with c_sum_d2:
+                        team_pos_f = st.selectbox(
+                            "Filter by Position",
+                            ["All Positions"]
+                            + sorted([
+                                p
+                                for p in full_df_unfiltered["Position"].unique()
+                                if p != "N/A"
+                            ]),
+                            key="team_cmj_pos_filter",
+                        )
 
                     team_cmj_rows = []
-                    for ath_name in sorted(raw_cmj_df['Name'].unique()):
-                        ath_sub_cmj = raw_cmj_df[raw_cmj_df['Name'] == ath_name].sort_values('Test Date')
-                        if ath_sub_cmj.empty: continue
-                        
-                        meta_row = full_df_unfiltered[full_df_unfiltered['Name'] == ath_name]
-                        pos_str = meta_row['Position'].iloc[0] if not meta_row.empty else "N/A"
-                        photo_url = meta_row['PhotoURL'].iloc[0] if not meta_row.empty else "https://www.w3schools.com/howto/img_avatar.png"
-                        if team_pos_f != "All Positions" and pos_str != team_pos_f: continue
-                            
-                        ath_date_match = ath_sub_cmj[ath_sub_cmj['Test Date'].dt.strftime('%m/%d/%y') == sel_team_cmj_date]
-                        if ath_date_match.empty: continue
-                            
+                    for ath_name in sorted(raw_cmj_df["Name"].unique()):
+                        ath_sub_cmj = raw_cmj_df[
+                            raw_cmj_df["Name"] == ath_name
+                        ].sort_values("Test Date")
+                        if ath_sub_cmj.empty:
+                            continue
+
+                        meta_row = full_df_unfiltered[
+                            full_df_unfiltered["Name"] == ath_name
+                        ]
+                        pos_str = (
+                            meta_row["Position"].iloc[0]
+                            if not meta_row.empty
+                            else "N/A"
+                        )
+                        photo_url = (
+                            meta_row["PhotoURL"].iloc[0]
+                            if not meta_row.empty
+                            else "https://www.w3schools.com/howto/img_avatar.png"
+                        )
+                        if (
+                            team_pos_f != "All Positions"
+                            and pos_str != team_pos_f
+                        ):
+                            continue
+
+                        ath_date_match = ath_sub_cmj[
+                            ath_sub_cmj["Test Date"].dt.strftime("%m/%d/%y")
+                            == sel_team_cmj_date
+                        ]
+                        if ath_date_match.empty:
+                            continue
+
                         target_row = ath_date_match.iloc[-1]
-                        
+
                         all_indices = list(ath_sub_cmj.index)
                         if target_row.name in all_indices:
                             cur_pos = all_indices.index(target_row.name)
                             prev_row = ath_sub_cmj.iloc[max(0, cur_pos - 1)]
-                        else: 
+                        else:
                             prev_row = target_row
-                        
-                        readiness_pct = int(round(compute_excel_readiness_score(target_row, prev_row)))
+
+                        readiness_pct = int(
+                            round(
+                                compute_excel_readiness_score(
+                                    target_row, prev_row
+                                )
+                            )
+                        )
                         z_color = get_readiness_color(readiness_pct)
-                        team_cmj_rows.append({"Athlete": ath_name, "PhotoURL": photo_url, "Position": pos_str, "Readiness %": readiness_pct, "Status_Color": z_color})
+                        team_cmj_rows.append({
+                            "Athlete": ath_name,
+                            "PhotoURL": photo_url,
+                            "Position": pos_str,
+                            "Readiness %": readiness_pct,
+                            "Status_Color": z_color,
+                        })
 
                     if team_cmj_rows:
-                        cmj_team_df = pd.DataFrame(team_cmj_rows).sort_values("Readiness %", ascending=False)
+                        cmj_team_df = pd.DataFrame(team_cmj_rows).sort_values(
+                            "Readiness %", ascending=False
+                        )
                         c_kpi1, c_kpi2, c_kpi3, c_kpi4 = st.columns(4)
-                        avg_team_readiness = cmj_team_df['Readiness %'].mean()
-                        peak_count = sum(1 for r in team_cmj_rows if r['Readiness %'] >= 90)
-                        fatigue_count = sum(1 for r in team_cmj_rows if r['Readiness %'] < 80)
-                        
-                        c_kpi1.metric("Athletes Evaluated", len(team_cmj_rows))
-                        c_kpi2.metric("Team Mean Wellness", f"{avg_team_readiness:.1f}%")
+                        avg_team_readiness = cmj_team_df["Readiness %"].mean()
+                        peak_count = sum(
+                            1
+                            for r in team_cmj_rows
+                            if r["Readiness %"] >= 90
+                        )
+                        fatigue_count = sum(
+                            1
+                            for r in team_cmj_rows
+                            if r["Readiness %"] < 80
+                        )
+
+                        c_kpi1.metric(
+                            "Athletes Evaluated", len(team_cmj_rows)
+                        )
+                        c_kpi2.metric(
+                            "Team Mean Wellness", f"{avg_team_readiness:.1f}%"
+                        )
                         c_kpi3.metric("Optimal (>=90%)", peak_count)
                         c_kpi4.metric("Fatigued (<80%)", fatigue_count)
 
@@ -1616,7 +2467,10 @@ if check_password():
                         team_tbl_html += "</tbody></table>"
                         st.markdown(team_tbl_html, unsafe_allow_html=True)
                     else:
-                        st.info(f"No Countermovement Jump testing records logged on {sel_team_cmj_date}.")
+                        st.info(
+                            "No Countermovement Jump testing records logged on"
+                            f" {sel_team_cmj_date}."
+                        )
                         
         # =========================================================================
         # --- HUB 2: MATCH PERFORMANCE --------------------------------------------
