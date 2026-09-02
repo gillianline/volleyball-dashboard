@@ -1744,39 +1744,35 @@ if check_password():
                             pre_str = f"{pre_h:.1f} in" if pre_h is not None else "—"
                             post_str = f"{post_h:.1f} in" if post_h is not None else "—"
                             
-                            table_rows_html += f"""
-                            <tr>
-                                <td style="font-weight: 800; text-align: left !important; padding-left: 14px;">{ath_name}</td>
-                                <td style="font-weight: 600; color: #64748B;">{pos_str}</td>
-                                <td style="font-weight: 800; color: #FF8200; font-size: 13px;">{int(row['Total Jumps'])}</td>
-                                <td style="font-weight: 600;">{row['Player Load']:.0f}</td>
-                                <td style="font-weight: 600;">{int(row['Explosive Efforts'])}</td>
-                                <td style="color: #475569; font-weight: 700;">{pre_str}</td>
-                                <td style="font-weight: 800; color: #0F172A;">{post_str}</td>
-                                <td>{delta_badge}</td>
-                            </tr>
-                            """
+                            table_rows_html += f"""<tr>
+<td style="font-weight: 800; text-align: left !important; padding-left: 14px;">{ath_name}</td>
+<td style="font-weight: 600; color: #64748B;">{pos_str}</td>
+<td style="font-weight: 800; color: #FF8200; font-size: 13px;">{int(row['Total Jumps'])}</td>
+<td style="font-weight: 600;">{row['Player Load']:.0f}</td>
+<td style="font-weight: 600;">{int(row['Explosive Efforts'])}</td>
+<td style="color: #475569; font-weight: 700;">{pre_str}</td>
+<td style="font-weight: 800; color: #0F172A;">{post_str}</td>
+<td>{delta_badge}</td>
+</tr>"""
                             
                         if table_rows_html:
-                            full_table_html = f"""
-                            <table class="scout-table" style="width: 100%; border: 1px solid #E2E8F0; background: white; margin-top: 15px; box-shadow: 0 1px 3px rgba(0,0,0,0.02);">
-                                <thead>
-                                    <tr style="background: #4895DB; color: white;">
-                                        <th style="text-align: left !important; padding-left: 14px;">Athlete</th>
-                                        <th>Position</th>
-                                        <th>Match Jumps</th>
-                                        <th>Match Load</th>
-                                        <th>Efforts</th>
-                                        <th>Pre-Match CMJ</th>
-                                        <th>Post-Match CMJ</th>
-                                        <th>Recovery Status</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {table_rows_html}
-                                </tbody>
-                            </table>
-                            """
+                            full_table_html = (
+                                '<table class="scout-table" style="width: 100%; border: 1px solid #E2E8F0; background: white; margin-top: 15px; box-shadow: 0 1px 3px rgba(0,0,0,0.02);">'
+                                '<thead>'
+                                '<tr style="background: #4895DB; color: white;">'
+                                '<th style="text-align: left !important; padding-left: 14px;">Athlete</th>'
+                                '<th>Position</th>'
+                                '<th>Match Jumps</th>'
+                                '<th>Match Load</th>'
+                                '<th>Efforts</th>'
+                                '<th>Pre-Match CMJ</th>'
+                                '<th>Post-Match CMJ</th>'
+                                '<th>Recovery Status</th>'
+                                '</tr>'
+                                '</thead>'
+                                f'<tbody>{table_rows_html}</tbody>'
+                                '</table>'
+                            )
                             st.markdown(full_table_html, unsafe_allow_html=True)
                         else:
                             st.info("No athlete match records found.")
