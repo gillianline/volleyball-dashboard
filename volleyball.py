@@ -2561,11 +2561,11 @@ if check_password():
                             unified_tbl_html += "</tbody></table>"
                             st.markdown(unified_tbl_html, unsafe_allow_html=True)
                         
-        # =========================================================================
+       # =========================================================================
         # --- HUB 2: MATCH PERFORMANCE --------------------------------------------
         # =========================================================================
         elif selected_hub == "Match Performance":
-            match_subtabs = ["Match Summary", "Match v. Practice"]
+            match_subtabs = ["Match Summary", "Match Practice Scores", "Match v. Practice"]
             if "match_subtab_radio" not in st.session_state or st.session_state["match_subtab_radio"] not in match_subtabs:
                 st.session_state["match_subtab_radio"] = match_subtabs[0]
 
@@ -2649,6 +2649,85 @@ if check_password():
                 else:
                     st.info("Please select at least one match from the dropdown above.")
 
+            # --- NEW TAB: MATCH PRACTICE SCORES ---
+            elif sel_match_tab == "Match Practice Scores":
+                match_t_sc = match_master.copy()
+                match_sessions = match_t_sc.sort_values('Date', ascending=False)['Session_Name'].dropna().unique().tolist()
+
+                if not match_sessions:
+                    st.info("No match session logs available for this season.")
+                else:
+                    c_mg1, c_mg2 = st.columns(2)
+                    with c_mg1:
+                        sel_match_session = st.selectbox("Match Selection", match_sessions, index=0, key="nav_sel_match_score_tab")
+                    with c_mg2:
+                        pos_f_match = st.selectbox("Position Filter", ["All Positions"] + sorted([p for p in match_t_sc['Position'].unique() if p != "N/A"]), key="nav_pos_match_score_tab")
+
+                    display_match_df = match_t_sc[match_t_sc['Session_Name'] == sel_match_session].copy()
+
+                    if not display_match_df.empty:
+                        if pos_f_match != "All Positions":
+                            display_match_df = display_match_df[display_match_df['Position'] == pos_f_match]
+
+                        match_athletes = sorted(display_match_df['Name'].unique())
+                        filtered_metrics_match = [m for m in all_metrics if m not in ['High Jumps', 'Moderate Jumps', 'High Intensity Movement']]
+
+                        for i in range(0, len(match_athletes), 2):
+                            cols = st.columns(2)
+                            for j in range(2):
+                                if i + j < len(match_athletes):
+                                    name = match_athletes[i + j]
+                                    p_session_row = display_match_df[display_match_df['Name'] == name].iloc[0]
+
+                                    # Athlete's all-time historical match dataset
+                                    p_match_hist = raw_match_df[raw_match_df['Name'] == name]
+
+                                    r_html = ""
+                                    t_grade = 0
+                                    c_metrics = 0
+
+                                    for k in filtered_metrics_match:
+                                        val = p_session_row[k]
+                                        # Max and Mean across all recorded matches
+                                        mx = p_match_hist[k].max() if (not p_match_hist.empty and k in p_match_hist.columns and p_match_hist[k].max() > 0) else 1.0
+                                        avg = p_match_hist[k].mean() if (not p_match_hist.empty and k in p_match_hist.columns and p_match_hist[k].mean() > 0) else 1.0
+
+                                        g = math.ceil((val / mx) * 100) if mx > 0 else 0
+                                        t_grade += g
+                                        c_metrics += 1
+
+                                        diff = (val - avg) / avg if avg != 0 else 0
+                                        h_class = "class='bg-highlight-red'" if abs(diff) > 0.10 else ""
+                                        arr_val = f"<span class='arrow-red'>{'↑' if diff > 0.10 else '↓'}</span>" if abs(diff) > 0.10 else ""
+                                        r_html += f"<tr><td>{k}</td><td {h_class}>{val:.1f} {arr_val}</td><td>{mx:.1f}</td><td>{g}</td></tr>"
+
+                                    sc_g = math.ceil(t_grade / c_metrics) if c_metrics > 0 else 0
+
+                                    with cols[j]:
+                                        st.markdown(f'''
+                                            <div style="border:1px solid #E5E5E7; border-radius:15px; padding:15px; margin-bottom:20px; background-color:white;">
+                                                <div style="display:flex; align-items:center; gap:10px;">
+                                                    <div style="flex:1.2; text-align:center;">
+                                                        <img src="{p_session_row['PhotoURL']}" class="gallery-photo">
+                                                        <p style="font-weight:bold; font-size:15px; margin-top:8px; color:#333;">{name}</p>
+                                                    </div>
+                                                    <div style="flex:3;">
+                                                        <table class="scout-table">
+                                                            <thead>
+                                                                <tr><th>Metric</th><th>Match Total</th><th>Match Max</th><th>Grade</th></tr>
+                                                            </thead>
+                                                            <tbody>{r_html}</tbody>
+                                                        </table>
+                                                    </div>
+                                                    <div style="flex:1; text-align:center;">
+                                                        <div style="background-color:{get_flipped_gradient(sc_g)}; color:white; padding:10px; border-radius:12px; font-size:32px; font-weight:900;">{sc_g}</div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ''', unsafe_allow_html=True)
+                    else:
+                        st.info("No athlete data found for this match.")
+
             elif sel_match_tab == "Match v. Practice":
                 df_t5 = df_master.copy()
                 match_t5 = match_master.copy()
@@ -2698,7 +2777,6 @@ if check_password():
                     st.markdown(overall_html + "</table>", unsafe_allow_html=True)
                 else:
                     st.info("Insufficient practice or match records available for comparison.")
-
 
         # =========================================================================
         # --- HUB 3: PRACTICE & DRILL PLANNING ------------------------------------
