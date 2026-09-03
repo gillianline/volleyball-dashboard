@@ -1767,7 +1767,7 @@ if check_password():
                                 '<th>Efforts</th>'
                                 '<th>Pre-Match CMJ</th>'
                                 '<th>Post-Match CMJ</th>'
-                                '<th>Recovery Status</th>'
+                                '<th>% Difference</th>'
                                 '</tr>'
                                 '</thead>'
                                 f'<tbody>{table_rows_html}</tbody>'
