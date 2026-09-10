@@ -2561,7 +2561,7 @@ if check_password():
         # --- HUB 2: MATCH PERFORMANCE --------------------------------------------
         # =========================================================================
         elif selected_hub == "Match Performance":
-            match_subtabs = ["Match Summary", "Match Practice Scores", "Match v. Practice"]
+            match_subtabs = ["Match Summary", "Match v. Match Practice Scores", "Match v. Practice"]
             if "match_subtab_radio" not in st.session_state or st.session_state["match_subtab_radio"] not in match_subtabs:
                 st.session_state["match_subtab_radio"] = match_subtabs[0]
 
@@ -2645,8 +2645,8 @@ if check_password():
                 else:
                     st.info("Please select at least one match from the dropdown above.")
 
-            # --- NEW TAB: MATCH PRACTICE SCORES ---
-            elif sel_match_tab == "Match Practice Scores":
+            # --- TAB: MATCH PRACTICE SCORES ---
+            elif sel_match_tab == "Match v. Match Practice Scores":
                 match_t_sc = match_master.copy()
                 match_sessions = match_t_sc.sort_values('Date', ascending=False)['Session_Name'].dropna().unique().tolist()
 
@@ -2678,13 +2678,25 @@ if check_password():
                                     # Athlete's all-time historical match dataset
                                     p_match_hist = raw_match_df[raw_match_df['Name'] == name]
 
+                                    # Precalculate highest scoring match across entire history
+                                    best_match_name = "N/A"
+                                    best_match_score = -1
+
+                                    if not p_match_hist.empty:
+                                        hist_maxes = {k: p_match_hist[k].max() if (k in p_match_hist.columns and p_match_hist[k].max() > 0) else 1.0 for k in filtered_metrics_match}
+                                        for _, h_row in p_match_hist.iterrows():
+                                            m_grades = [math.ceil((h_row.get(k, 0.0) / hist_maxes[k]) * 100) for k in filtered_metrics_match]
+                                            h_score = math.ceil(sum(m_grades) / len(m_grades)) if m_grades else 0
+                                            if h_score > best_match_score:
+                                                best_match_score = h_score
+                                                best_match_name = h_row.get('Session_Name', 'Unknown Match')
+
                                     r_html = ""
                                     t_grade = 0
                                     c_metrics = 0
 
                                     for k in filtered_metrics_match:
                                         val = p_session_row[k]
-                                        # Max and Mean across all recorded matches
                                         mx = p_match_hist[k].max() if (not p_match_hist.empty and k in p_match_hist.columns and p_match_hist[k].max() > 0) else 1.0
                                         avg = p_match_hist[k].mean() if (not p_match_hist.empty and k in p_match_hist.columns and p_match_hist[k].mean() > 0) else 1.0
 
@@ -2705,7 +2717,12 @@ if check_password():
                                                 <div style="display:flex; align-items:center; gap:10px;">
                                                     <div style="flex:1.2; text-align:center;">
                                                         <img src="{p_session_row['PhotoURL']}" class="gallery-photo">
-                                                        <p style="font-weight:bold; font-size:15px; margin-top:8px; color:#333;">{name}</p>
+                                                        <p style="font-weight:bold; font-size:15px; margin-top:8px; margin-bottom:4px; color:#333;">{name}</p>
+                                                        <div style="background-color:#F8FAFC; border:1px solid #E2E8F0; border-radius:8px; padding:6px 4px; font-size:11px; color:#475569; line-height:1.2;">
+                                                            <span style="font-size:10px; font-weight:800; color:#FF8200; text-transform:uppercase; display:block;">Highest Match</span>
+                                                            <b>{best_match_name}</b><br>
+                                                            <span style="font-weight:800; color:#1D1D1F; font-size:12px;">Score: {best_match_score}</span>
+                                                        </div>
                                                     </div>
                                                     <div style="flex:3;">
                                                         <table class="scout-table">
@@ -2717,6 +2734,7 @@ if check_password():
                                                     </div>
                                                     <div style="flex:1; text-align:center;">
                                                         <div style="background-color:{get_flipped_gradient(sc_g)}; color:white; padding:10px; border-radius:12px; font-size:32px; font-weight:900;">{sc_g}</div>
+                                                        <p style="margin-top:6px; font-size:10px; font-weight:800; color:#64748B; text-transform:uppercase;">Current Score</p>
                                                     </div>
                                                 </div>
                                             </div>
