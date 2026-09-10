@@ -2675,17 +2675,21 @@ if check_password():
                                     name = match_athletes[i + j]
                                     p_session_row = display_match_df[display_match_df['Name'] == name].iloc[0]
 
-                                    # Athlete's all-time historical match dataset
-                                    p_match_hist = raw_match_df[raw_match_df['Name'] == name]
+                                    # Athlete's match dataset restricted to the CURRENT active season
+                                    p_match_hist = match_master[match_master['Name'] == name]
 
-                                    # Precalculate highest scoring match across entire history
+                                    # Precalculate highest scoring match across the CURRENT season only
                                     best_match_name = "N/A"
                                     best_match_score = -1
 
                                     if not p_match_hist.empty:
-                                        hist_maxes = {k: p_match_hist[k].max() if (k in p_match_hist.columns and p_match_hist[k].max() > 0) else 1.0 for k in filtered_metrics_match}
+                                        # Season maximums for metric grading
+                                        season_maxes = {
+                                            k: p_match_hist[k].max() if (k in p_match_hist.columns and p_match_hist[k].max() > 0) else 1.0 
+                                            for k in filtered_metrics_match
+                                        }
                                         for _, h_row in p_match_hist.iterrows():
-                                            m_grades = [math.ceil((h_row.get(k, 0.0) / hist_maxes[k]) * 100) for k in filtered_metrics_match]
+                                            m_grades = [math.ceil((h_row.get(k, 0.0) / season_maxes[k]) * 100) for k in filtered_metrics_match]
                                             h_score = math.ceil(sum(m_grades) / len(m_grades)) if m_grades else 0
                                             if h_score > best_match_score:
                                                 best_match_score = h_score
@@ -2697,6 +2701,7 @@ if check_password():
 
                                     for k in filtered_metrics_match:
                                         val = p_session_row[k]
+                                        # Max and Mean across the current season's recorded matches
                                         mx = p_match_hist[k].max() if (not p_match_hist.empty and k in p_match_hist.columns and p_match_hist[k].max() > 0) else 1.0
                                         avg = p_match_hist[k].mean() if (not p_match_hist.empty and k in p_match_hist.columns and p_match_hist[k].mean() > 0) else 1.0
 
@@ -2719,7 +2724,7 @@ if check_password():
                                                         <img src="{p_session_row['PhotoURL']}" class="gallery-photo">
                                                         <p style="font-weight:bold; font-size:15px; margin-top:8px; margin-bottom:4px; color:#333;">{name}</p>
                                                         <div style="background-color:#F8FAFC; border:1px solid #E2E8F0; border-radius:8px; padding:6px 4px; font-size:11px; color:#475569; line-height:1.2;">
-                                                            <span style="font-size:10px; font-weight:800; color:#FF8200; text-transform:uppercase; display:block;">Highest Match</span>
+                                                            <span style="font-size:10px; font-weight:800; color:#FF8200; text-transform:uppercase; display:block;">Season Best Match</span>
                                                             <b>{best_match_name}</b><br>
                                                             <span style="font-weight:800; color:#1D1D1F; font-size:12px;">Score: {best_match_score}</span>
                                                         </div>
@@ -2727,7 +2732,7 @@ if check_password():
                                                     <div style="flex:3;">
                                                         <table class="scout-table">
                                                             <thead>
-                                                                <tr><th>Metric</th><th>Match Total</th><th>Match Max</th><th>Grade</th></tr>
+                                                                <tr><th>Metric</th><th>Match Total</th><th>Season Max</th><th>Grade</th></tr>
                                                             </thead>
                                                             <tbody>{r_html}</tbody>
                                                         </table>
