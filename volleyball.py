@@ -711,8 +711,9 @@ if check_password():
                         cur_h, cur_rsi = latest_cmj[cmj_col], latest_cmj[rsi_col]
                         p_diff_h = ((cur_h - base_h) / base_h * 100) if base_h > 0 else 0
                         p_diff_rsi = ((cur_rsi - base_rsi) / base_rsi * 100) if base_rsi > 0 else 0
-                        color_h = "#28a745" if cur_h >= base_h else "#dc3545"
-                        color_rsi = "#28a745" if cur_rsi >= base_rsi else "#dc3545"
+                        # Green if >= -5%, Amber/Yellow between -5% and -10%, Red if < -10%
+                        color_h = "#28a745" if p_diff_h >= -5.0 else "#d97706" if p_diff_h >= -10.0 else "#dc3545"
+                        color_rsi = "#28a745" if p_diff_rsi >= -5.0 else "#d97706" if p_diff_rsi >= -10.0 else "#dc3545"
 
                         sc1, sc2 = st.columns(2)
                         with sc1: st.markdown(f'<div style="text-align:center;"><div class="score-box" style="background-color:{color_h}; line-height:1.2; padding-top:15px; height:80px; width:100%;"><span style="font-size:18px;">{cur_h:.1f}</span><span style="font-size:10px; display:block; font-weight:bold; margin-top:2px;">CMJ HEIGHT</span></div></div>', unsafe_allow_html=True)
