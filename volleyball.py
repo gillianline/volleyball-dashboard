@@ -1204,59 +1204,65 @@ if check_password():
                         kpi_w4.metric("Avg Jump Load", f"{weekly_summary['Jump Load'].mean():.1f}")
                         kpi_w5.metric("Avg Est Distance", f"{int(weekly_summary['Estimated Distance (y)'].mean()):,} yd")
 
-                        # Build the Clean Table
-                        w_tbl_html = """
-                        <table class="weekly-cum-table" style="margin-top: 15px;">
-                            <thead>
-                                <tr>
-                                    <th style="width: 55px;">Athlete</th>
-                                    <th style="text-align: left !important; padding-left: 14px;">Name</th>
-                                    <th style="text-align: left !important;">Position</th>
-                                    <th>Sessions</th>
-                                    <th style="text-align: right !important; padding-right: 14px;">Total Jumps</th>
-                                    <th style="text-align: right !important; padding-right: 14px;">Jump Load</th>
-                                    <th style="text-align: right !important; padding-right: 14px;">Player Load</th>
-                                    <th style="text-align: right !important; padding-right: 14px;">Est Distance (yd)</th>
-                                    <th style="text-align: right !important; padding-right: 14px;">Explosive Efforts</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                        """
-
+                        # Build Row Fragments safely (no indentation bugs)
+                        rows_list = []
                         for _, row in weekly_summary.iterrows():
                             photo = row['PhotoURL'] if pd.notna(row['PhotoURL']) and str(row['PhotoURL']).strip() != '' else "https://www.w3schools.com/howto/img_avatar.png"
                             
-                            w_tbl_html += f"""
-                                <tr>
-                                    <td style="text-align: center;"><img src="{photo}" class="weekly-cum-photo"></td>
-                                    <td style="text-align: left !important; padding-left: 14px; font-weight: 800; font-size: 13px; color: #111827;">{row['Name']}</td>
-                                    <td style="text-align: left !important; font-weight: 600; color: #64748B;">{row['Position']}</td>
-                                    <td style="text-align: center; font-weight: 700; color: #4895DB;">{row['Sessions']}</td>
-                                    <td style="text-align: right !important; padding-right: 14px; font-weight: 800; color: #FF8200; font-size: 13px;">{int(row['Total Jumps']):,}</td>
-                                    <td style="text-align: right !important; padding-right: 14px; font-weight: 700;">{row['Jump Load']:.1f}</td>
-                                    <td style="text-align: right !important; padding-right: 14px; font-weight: 800; font-size: 13px; color: #111827;">{row['Player Load']:.1f}</td>
-                                    <td style="text-align: right !important; padding-right: 14px; font-weight: 600;">{int(row['Estimated Distance (y)']):,}</td>
-                                    <td style="text-align: right !important; padding-right: 14px; font-weight: 700;">{int(row['Explosive Efforts']):,}</td>
-                                </tr>
-                            """
+                            row_markup = (
+                                f'<tr>'
+                                f'<td style="text-align:center;"><img src="{photo}" class="gallery-photo" style="width:36px; height:36px; object-fit:cover; border-radius:50%; border:2px solid #FF8200;"></td>'
+                                f'<td style="text-align:left !important; padding-left:14px; font-weight:800; font-size:13px; color:#111827;">{row["Name"]}</td>'
+                                f'<td style="text-align:left !important; font-weight:600; color:#64748B;">{row["Position"]}</td>'
+                                f'<td style="text-align:center; font-weight:700; color:#4895DB;">{row["Sessions"]}</td>'
+                                f'<td style="text-align:right !important; padding-right:14px; font-weight:800; color:#FF8200; font-size:13px;">{int(row["Total Jumps"]):,}</td>'
+                                f'<td style="text-align:right !important; padding-right:14px; font-weight:700;">{row["Jump Load"]:.1f}</td>'
+                                f'<td style="text-align:right !important; padding-right:14px; font-weight:800; font-size:13px; color:#111827;">{row["Player Load"]:.1f}</td>'
+                                f'<td style="text-align:right !important; padding-right:14px; font-weight:600;">{int(row["Estimated Distance (y)"]):,}</td>'
+                                f'<td style="text-align:right !important; padding-right:14px; font-weight:700;">{int(row["Explosive Efforts"]):,}</td>'
+                                f'</tr>'
+                            )
+                            rows_list.append(row_markup)
 
-                        # Team Totals Footer Row
-                        w_tbl_html += f"""
-                                <tr style="background: #F8FAFC; border-top: 2px solid #CBD5E1; font-weight: 900; color: #111827;">
-                                    <td></td>
-                                    <td style="text-align: left !important; padding-left: 14px;">TEAM TOTAL</td>
-                                    <td style="text-align: left !important;">—</td>
-                                    <td style="text-align: center;">—</td>
-                                    <td style="text-align: right !important; padding-right: 14px; color: #FF8200; font-size: 13px;">{int(weekly_summary['Total Jumps'].sum()):,}</td>
-                                    <td style="text-align: right !important; padding-right: 14px;">{weekly_summary['Jump Load'].sum():.1f}</td>
-                                    <td style="text-align: right !important; padding-right: 14px; font-size: 13px;">{weekly_summary['Player Load'].sum():.1f}</td>
-                                    <td style="text-align: right !important; padding-right: 14px;">{int(weekly_summary['Estimated Distance (y)'].sum()):,}</td>
-                                    <td style="text-align: right !important; padding-right: 14px;">{int(weekly_summary['Explosive Efforts'].sum()):,}</td>
-                                </tr>
-                            </tbody>
-                        </table>
-                        """
-                        st.markdown(w_tbl_html, unsafe_allow_html=True)
+                        # Team Total Row
+                        team_total_markup = (
+                            f'<tr style="background:#F8FAFC; border-top:2px solid #CBD5E1; font-weight:900; color:#111827;">'
+                            f'<td></td>'
+                            f'<td style="text-align:left !important; padding-left:14px;">TEAM TOTAL</td>'
+                            f'<td style="text-align:left !important;">—</td>'
+                            f'<td style="text-align:center;">—</td>'
+                            f'<td style="text-align:right !important; padding-right:14px; color:#FF8200; font-size:13px;">{int(weekly_summary["Total Jumps"].sum()):,}</td>'
+                            f'<td style="text-align:right !important; padding-right:14px;">{weekly_summary["Jump Load"].sum():.1f}</td>'
+                            f'<td style="text-align:right !important; padding-right:14px; font-size:13px;">{weekly_summary["Player Load"].sum():.1f}</td>'
+                            f'<td style="text-align:right !important; padding-right:14px;">{int(weekly_summary["Estimated Distance (y)"].sum()):,}</td>'
+                            f'<td style="text-align:right !important; padding-right:14px;">{int(weekly_summary["Explosive Efforts"].sum()):,}</td>'
+                            f'</tr>'
+                        )
+
+                        tbody_contents = "".join(rows_list) + team_total_markup
+
+                        full_markup = (
+                            '<div style="overflow-x:auto; margin-top:15px; border:1px solid #E2E8F0; border-radius:10px; background:white;">'
+                            '<table class="scout-table" style="width:100%; border-collapse:collapse; margin-bottom:0;">'
+                            '<thead>'
+                            '<tr style="background-color:#4895DB; color:white;">'
+                            '<th style="width:55px;">Athlete</th>'
+                            '<th style="text-align:left !important; padding-left:14px;">Name</th>'
+                            '<th style="text-align:left !important;">Position</th>'
+                            '<th>Sessions</th>'
+                            '<th style="text-align:right !important; padding-right:14px;">Total Jumps</th>'
+                            '<th style="text-align:right !important; padding-right:14px;">Jump Load</th>'
+                            '<th style="text-align:right !important; padding-right:14px;">Player Load</th>'
+                            '<th style="text-align:right !important; padding-right:14px;">Est Distance (yd)</th>'
+                            '<th style="text-align:right !important; padding-right:14px;">Explosive Efforts</th>'
+                            '</tr>'
+                            '</thead>'
+                            f'<tbody>{tbody_contents}</tbody>'
+                            '</table>'
+                            '</div>'
+                        )
+
+                        st.markdown(full_markup, unsafe_allow_html=True)
                     
             elif sel_daily_tab == "Daily Combined Scores":
                 df_t2 = df_master.copy()
