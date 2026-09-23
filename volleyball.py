@@ -230,6 +230,49 @@ st.markdown("""
         margin-top: 6px;
         font-weight: 500;
     }
+    <style>
+    .weekly-cum-table {
+        width: 100%;
+        border-collapse: collapse;
+        background: #FFFFFF;
+        border: 1px solid #E2E8F0;
+        border-radius: 10px;
+        overflow: hidden;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+    }
+    .weekly-cum-table th {
+        background-color: #4895DB;
+        color: #FFFFFF;
+        font-weight: 800;
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        padding: 10px 8px;
+        border-bottom: 2px solid #FF8200;
+        text-align: center !important;
+    }
+    .weekly-cum-table td {
+        padding: 8px 10px;
+        border-bottom: 1px solid #F1F5F9;
+        font-size: 12px;
+        color: #1D1D1F;
+        vertical-align: middle;
+    }
+    .weekly-cum-table tbody tr:hover {
+        background-color: #F8FAFC !important;
+    }
+    .weekly-cum-photo {
+        width: 38px;
+        height: 38px;
+        border-radius: 50%;
+        object-fit: cover;
+        object-position: top center;
+        border: 2px solid #FF8200;
+        background-color: #FFFFFF;
+        display: block;
+        margin: 0 auto;
+    }
+</style>
     </style>
     """, unsafe_allow_html=True)
 
@@ -1133,7 +1176,7 @@ if check_password():
                             key="nav_pos_cum_week"
                         )
 
-                    # Filter by week
+                    # Filter by selected week
                     wk_data = df_wcum[df_wcum['Week'] == sel_wk].copy()
 
                     if pos_f_wk != "All Positions":
@@ -1142,7 +1185,6 @@ if check_password():
                     if wk_data.empty:
                         st.info(f"No records logged for Week {sel_wk}.")
                     else:
-                        # Exact 5 metrics + session count aggregation
                         agg_dict = {
                             'Session_Name': 'nunique',
                             'Total Jumps': 'sum',
@@ -1156,60 +1198,62 @@ if check_password():
                         weekly_summary.rename(columns={'Session_Name': 'Sessions'}, inplace=True)
                         weekly_summary = weekly_summary.sort_values('Player Load', ascending=False)
 
-                        # KPI Cards across the selected week
+                        # KPI Summary Metrics
                         kpi_w1, kpi_w2, kpi_w3, kpi_w4, kpi_w5 = st.columns(5)
                         kpi_w1.metric("Active Athletes", len(weekly_summary))
                         kpi_w2.metric("Avg Player Load", f"{weekly_summary['Player Load'].mean():.1f}")
-                        kpi_w3.metric("Avg Total Jumps", f"{int(weekly_summary['Total Jumps'].mean())}")
+                        kpi_w3.metric("Avg Total Jumps", f"{int(weekly_summary['Total Jumps'].mean()):,}")
                         kpi_w4.metric("Avg Jump Load", f"{weekly_summary['Jump Load'].mean():.1f}")
                         kpi_w5.metric("Avg Est Distance", f"{int(weekly_summary['Estimated Distance (y)'].mean()):,} yd")
 
-                        # Build HTML Table
+                        # Build the Clean Table
                         w_tbl_html = """
-                        <table class="scout-table" style="width: 100%; border: 1px solid #E2E8F0; background: white; margin-top: 15px; box-shadow: 0 1px 3px rgba(0,0,0,0.02);">
+                        <table class="weekly-cum-table" style="margin-top: 15px;">
                             <thead>
-                                <tr style="background: #4895DB; color: white;">
-                                    <th style="width: 50px;">Athlete</th>
+                                <tr>
+                                    <th style="width: 55px;">Athlete</th>
                                     <th style="text-align: left !important; padding-left: 14px;">Name</th>
-                                    <th>Position</th>
+                                    <th style="text-align: left !important;">Position</th>
                                     <th>Sessions</th>
-                                    <th>Total Jumps</th>
-                                    <th>Jump Load</th>
-                                    <th>Player Load</th>
-                                    <th>Est Distance (yd)</th>
-                                    <th>Explosive Efforts</th>
+                                    <th style="text-align: right !important; padding-right: 14px;">Total Jumps</th>
+                                    <th style="text-align: right !important; padding-right: 14px;">Jump Load</th>
+                                    <th style="text-align: right !important; padding-right: 14px;">Player Load</th>
+                                    <th style="text-align: right !important; padding-right: 14px;">Est Distance (yd)</th>
+                                    <th style="text-align: right !important; padding-right: 14px;">Explosive Efforts</th>
                                 </tr>
                             </thead>
                             <tbody>
                         """
 
                         for _, row in weekly_summary.iterrows():
+                            photo = row['PhotoURL'] if pd.notna(row['PhotoURL']) and str(row['PhotoURL']).strip() != '' else "https://www.w3schools.com/howto/img_avatar.png"
+                            
                             w_tbl_html += f"""
                                 <tr>
-                                    <td style="padding: 6px;"><img src="{row['PhotoURL']}" style="width: 36px; height: 36px; border-radius: 50%; object-fit: contain; border: 2px solid #FF8200; background: white;"></td>
+                                    <td style="text-align: center;"><img src="{photo}" class="weekly-cum-photo"></td>
                                     <td style="text-align: left !important; padding-left: 14px; font-weight: 800; font-size: 13px; color: #111827;">{row['Name']}</td>
-                                    <td style="font-weight: 600; color: #64748B;">{row['Position']}</td>
-                                    <td style="font-weight: 700; color: #4895DB;">{row['Sessions']}</td>
-                                    <td style="font-weight: 800; color: #FF8200; font-size: 13px;">{int(row['Total Jumps']):,}</td>
-                                    <td style="font-weight: 700;">{row['Jump Load']:.1f}</td>
-                                    <td style="font-weight: 800; font-size: 13px; color: #111827;">{row['Player Load']:.1f}</td>
-                                    <td style="font-weight: 600;">{int(row['Estimated Distance (y)']):,}</td>
-                                    <td style="font-weight: 700;">{int(row['Explosive Efforts']):,}</td>
+                                    <td style="text-align: left !important; font-weight: 600; color: #64748B;">{row['Position']}</td>
+                                    <td style="text-align: center; font-weight: 700; color: #4895DB;">{row['Sessions']}</td>
+                                    <td style="text-align: right !important; padding-right: 14px; font-weight: 800; color: #FF8200; font-size: 13px;">{int(row['Total Jumps']):,}</td>
+                                    <td style="text-align: right !important; padding-right: 14px; font-weight: 700;">{row['Jump Load']:.1f}</td>
+                                    <td style="text-align: right !important; padding-right: 14px; font-weight: 800; font-size: 13px; color: #111827;">{row['Player Load']:.1f}</td>
+                                    <td style="text-align: right !important; padding-right: 14px; font-weight: 600;">{int(row['Estimated Distance (y)']):,}</td>
+                                    <td style="text-align: right !important; padding-right: 14px; font-weight: 700;">{int(row['Explosive Efforts']):,}</td>
                                 </tr>
                             """
 
-                        # Team Totals footer row
+                        # Team Totals Footer Row
                         w_tbl_html += f"""
-                                <tr style="background: #F8FAFC; border-top: 2px solid #E2E8F0; font-weight: 900; color: #111827;">
+                                <tr style="background: #F8FAFC; border-top: 2px solid #CBD5E1; font-weight: 900; color: #111827;">
                                     <td></td>
                                     <td style="text-align: left !important; padding-left: 14px;">TEAM TOTAL</td>
-                                    <td>—</td>
-                                    <td>—</td>
-                                    <td style="color: #FF8200;">{int(weekly_summary['Total Jumps'].sum()):,}</td>
-                                    <td>{weekly_summary['Jump Load'].sum():.1f}</td>
-                                    <td>{weekly_summary['Player Load'].sum():.1f}</td>
-                                    <td>{int(weekly_summary['Estimated Distance (y)'].sum()):,}</td>
-                                    <td>{int(weekly_summary['Explosive Efforts'].sum()):,}</td>
+                                    <td style="text-align: left !important;">—</td>
+                                    <td style="text-align: center;">—</td>
+                                    <td style="text-align: right !important; padding-right: 14px; color: #FF8200; font-size: 13px;">{int(weekly_summary['Total Jumps'].sum()):,}</td>
+                                    <td style="text-align: right !important; padding-right: 14px;">{weekly_summary['Jump Load'].sum():.1f}</td>
+                                    <td style="text-align: right !important; padding-right: 14px; font-size: 13px;">{weekly_summary['Player Load'].sum():.1f}</td>
+                                    <td style="text-align: right !important; padding-right: 14px;">{int(weekly_summary['Estimated Distance (y)'].sum()):,}</td>
+                                    <td style="text-align: right !important; padding-right: 14px;">{int(weekly_summary['Explosive Efforts'].sum()):,}</td>
                                 </tr>
                             </tbody>
                         </table>
