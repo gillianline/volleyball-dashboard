@@ -604,7 +604,14 @@ if check_password():
         # --- HUB 1: DAILY MONITORING & WELLNESS ----------------------------------
         # =========================================================================
         if selected_hub == "Daily Monitoring & Wellness":
-            daily_subtabs = ["Individual Profile", "Practice Scores", "Daily Combined Scores", "Practice History", "CMJ Performance"]
+            daily_subtabs = [
+                "Individual Profile", 
+                "Practice Scores", 
+                "Player Compliance",        
+                "Daily Combined Scores", 
+                "Practice History", 
+                "CMJ Performance"
+            ]
             if selected_season == "Summer":
                 daily_subtabs.append("Spring Max vs Daily Combined")
 
@@ -612,7 +619,7 @@ if check_password():
                 st.session_state["daily_subtab_radio"] = daily_subtabs[0]
 
             sel_daily_tab = st.radio("Daily Sub Navigation", daily_subtabs, key="daily_subtab_radio", horizontal=True, label_visibility="collapsed")
-
+            
             if sel_daily_tab == "Individual Profile":
                 df_t0 = df_master.copy()
                 cmj_t0 = cmj_master.copy()
@@ -894,7 +901,129 @@ if check_password():
                                 
                                 sc_g = math.ceil(t_grade / c_metrics) if c_metrics > 0 else 0
                                 with cols[j]: st.markdown(f'<div style="border:1px solid #E5E5E7; border-radius:15px; padding:15px; margin-bottom:20px; background-color:white;"><div style="display:flex; align-items:center; gap:10px;"><div style="flex:1.2; text-align:center;"><img src="{p_session_row["PhotoURL"]}" class="gallery-photo"><p style="font-weight:bold; font-size:15px; margin-top:8px; color:#333;">{name}</p></div><div style="flex:3;"><table class="scout-table"><thead><tr><th>Metric</th><th>Total</th><th>30d Max</th><th>Grade</th></tr></thead><tbody>{r_html}</tbody></table></div><div style="flex:1; text-align:center;"><div style="background-color:{get_flipped_gradient(sc_g)}; color:white; padding:10px; border-radius:12px; font-size:32px; font-weight:900;">{sc_g}</div></div></div></div>', unsafe_allow_html=True)
+                                    
+            # --- TAB: PLAYER COMPLIANCE ---
+            elif sel_daily_tab == "Player Compliance":
+                df_comp = df_master.copy()
+                target_date_str = "2026-04-04"
+                tournament_label = "GT Spring Tournament 4-4-26"
+                
+                clean_session_list_comp = []
+                tourney_added_comp = False
+                for s in session_list:
+                    s_date_series = df_comp[df_comp['Session_Name'] == s]['Date']
+                    if not s_date_series.empty:
+                        s_date = pd.to_datetime(s_date_series.iloc[0]).strftime('%Y-%m-%d')
+                        if selected_season == "Spring" and s_date == target_date_str:
+                            if not tourney_added_comp:
+                                clean_session_list_comp.append(tournament_label)
+                                tourney_added_comp = True
+                        else:
+                            clean_session_list_comp.append(s)
+                    else:
+                        clean_session_list_comp.append(s)
 
+                if not clean_session_list_comp:
+                    clean_session_list_comp = [tournament_label] if selected_season == "Spring" else session_list
+
+                c_cp1, c_cp2 = st.columns(2)
+                with c_cp1:
+                    sel_session_comp = st.selectbox("Session Selection", clean_session_list_comp, index=0, key="nav_sel_comp_tab")
+                with c_cp2:
+                    pos_f_comp = st.selectbox("Position Filter", ["All Positions"] + sorted([p for p in df_comp['Position'].unique() if p != "N/A"]), key="nav_pos_comp_tab")
+
+                if selected_season == "Spring" and sel_session_comp == tournament_label:
+                    curr_date_comp = pd.to_datetime(target_date_str)
+                    comp_display_df = df_comp[df_comp['Date'].dt.date == curr_date_comp.date()].groupby(['Name', 'Position', 'PhotoURL']).sum(numeric_only=True).reset_index()
+                else:
+                    comp_display_df = df_comp[df_comp['Session_Name'] == sel_session_comp].copy()
+                    curr_date_comp = pd.to_datetime(comp_display_df['Date'].iloc[0]) if not comp_display_df.empty else pd.to_datetime("2026-08-06")
+
+                if comp_display_df is not None and not comp_display_df.empty:
+                    if pos_f_comp != "All Positions":
+                        comp_display_df = comp_display_df[comp_display_df['Position'] == pos_f_comp]
+
+                    comp_athletes = sorted(comp_display_df['Name'].unique())
+                    target_metrics = ['Player Load', 'Total Jumps', 'Estimated Distance (y)', 'Explosive Efforts']
+
+                    st.markdown('<div class="section-header">Practice Volume Compliance Cards</div>', unsafe_allow_html=True)
+
+                    for i in range(0, len(comp_athletes), 2):
+                        cols = st.columns(2)
+                        for j in range(2):
+                            if i + j < len(comp_athletes):
+                                name = comp_athletes[i + j]
+                                p_row = comp_display_df[comp_display_df['Name'] == name].iloc[0]
+                                p_full = full_df_unfiltered[full_df_unfiltered['Name'] == name]
+                                curr_order = p_row.get('Sheet_Order', float('inf'))
+
+                                # 30-day baseline ceiling window
+                                lb_baseline = p_full[
+                                    (p_full['Date'].dt.date >= curr_date_comp.date() - timedelta(days=30)) & 
+                                    (p_full['Date'].dt.date <= curr_date_comp.date()) &
+                                    (p_full['Sheet_Order'] <= curr_order)
+                                ]
+
+                                tile_html_list = []
+                                athlete_metric_pcts = []
+
+                                for m in target_metrics:
+                                    val = p_row.get(m, 0.0)
+                                    # Target based on 30-day max baseline
+                                    baseline_val = lb_baseline[m].max() if (not lb_baseline.empty and m in lb_baseline.columns and lb_baseline[m].max() > 0) else 1.0
+                                    
+                                    pct_compliance = (val / baseline_val) * 100.0 if baseline_val > 0 else 0.0
+                                    athlete_metric_pcts.append(pct_compliance)
+
+                                    fmt_val = f"{val:.0f}" if m in ['Total Jumps', 'Estimated Distance (y)', 'Explosive Efforts'] else f"{val:.1f}"
+                                    fmt_base = f"{baseline_val:.0f}" if m in ['Total Jumps', 'Estimated Distance (y)', 'Explosive Efforts'] else f"{baseline_val:.1f}"
+
+                                    tile_html_list.append(f"""
+                                        <div class="comp-tile">
+                                            <div class="comp-label">{m}</div>
+                                            <div class="comp-metric-val comp-metric-orange">{fmt_val}</div>
+                                            <div class="comp-subtext">{pct_compliance:.0f}% of 30d Max ({fmt_base})</div>
+                                        </div>
+                                    """)
+
+                                mean_comp = sum(athlete_metric_pcts) / len(athlete_metric_pcts) if athlete_metric_pcts else 0.0
+                                
+                                # Badge styling depending on workload compliance levels
+                                if mean_comp >= 85:
+                                    badge_color = "#137333"
+                                    badge_bg = "#E6F4EA"
+                                    badge_label = f"High Volume ({mean_comp:.0f}%)"
+                                elif mean_comp >= 60:
+                                    badge_color = "#D97706"
+                                    badge_bg = "#FEF3C7"
+                                    badge_label = f"Moderate Volume ({mean_comp:.0f}%)"
+                                else:
+                                    badge_color = "#D93025"
+                                    badge_bg = "#FCE8E6"
+                                    badge_label = f"Low Volume ({mean_comp:.0f}%)"
+
+                                card_markup = f"""
+                                <div class="comp-card-outer">
+                                    <div class="comp-card-top">
+                                        <div style="display: flex; align-items: center; gap: 12px;">
+                                            <img src="{p_row.get('PhotoURL', 'https://www.w3schools.com/howto/img_avatar.png')}" class="comp-athlete-photo" style="width:45px; height:45px;">
+                                            <div>
+                                                <div class="comp-card-title">{name}</div>
+                                                <div style="font-size:11px; font-weight:700; color:#64748B;">{p_row.get('Position', 'N/A')}</div>
+                                            </div>
+                                        </div>
+                                        <span class="comp-pill-badge" style="color: {badge_color}; background-color: {badge_bg};">{badge_label}</span>
+                                    </div>
+                                    <div class="comp-grid">
+                                        {''.join(tile_html_list)}
+                                    </div>
+                                </div>
+                                """
+                                with cols[j]:
+                                    st.markdown(card_markup, unsafe_allow_html=True)
+                else:
+                    st.info("No practice session data found for the selected session.")
+                    
             elif sel_daily_tab == "Daily Combined Scores":
                 df_t2 = df_master.copy()
                 valid_dates_sorted = df_t2[df_t2['Date'].notna()].sort_values('Date', ascending=False)['Date'].dt.strftime('%Y-%m-%d').unique().tolist()
