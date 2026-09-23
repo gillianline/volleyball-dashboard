@@ -679,7 +679,8 @@ if check_password():
             daily_subtabs = [
                 "Individual Profile", 
                 "Practice Scores", 
-                "Player Compliance",        
+                "Player Compliance",
+                "Weekly Cumulative",
                 "Daily Combined Scores", 
                 "Practice History", 
                 "CMJ Performance"
@@ -1110,6 +1111,110 @@ if check_password():
                             with cols[j]:
                                 st.markdown(card_html, unsafe_allow_html=True)
                                 
+            # --- TAB: WEEKLY CUMULATIVE ---
+            elif sel_daily_tab == "Weekly Cumulative":
+                df_wcum = df_master.copy()
+                st.markdown('<div class="section-header">Weekly Cumulative Practice Scores</div>', unsafe_allow_html=True)
+
+                if df_wcum.empty or 'Week' not in df_wcum.columns or df_wcum['Week'].dropna().empty:
+                    st.info("No recorded weekly practice data available for this season.")
+                else:
+                    avail_weeks = sorted([w for w in df_wcum['Week'].unique() if w > 0], reverse=True)
+                    if not avail_weeks:
+                        avail_weeks = sorted(df_wcum['Week'].unique(), reverse=True)
+
+                    c_wk1, c_wk2 = st.columns(2)
+                    with c_wk1:
+                        sel_wk = st.selectbox("Select Week", avail_weeks, index=0, key="nav_sel_cum_week")
+                    with c_wk2:
+                        pos_f_wk = st.selectbox(
+                            "Position Filter", 
+                            ["All Positions"] + sorted([p for p in df_wcum['Position'].unique() if p != "N/A"]), 
+                            key="nav_pos_cum_week"
+                        )
+
+                    # Filter by week
+                    wk_data = df_wcum[df_wcum['Week'] == sel_wk].copy()
+
+                    if pos_f_wk != "All Positions":
+                        wk_data = wk_data[wk_data['Position'] == pos_f_wk]
+
+                    if wk_data.empty:
+                        st.info(f"No records logged for Week {sel_wk}.")
+                    else:
+                        # Exact 5 metrics + session count aggregation
+                        agg_dict = {
+                            'Session_Name': 'nunique',
+                            'Total Jumps': 'sum',
+                            'Jump Load': 'sum',
+                            'Player Load': 'sum',
+                            'Estimated Distance (y)': 'sum',
+                            'Explosive Efforts': 'sum'
+                        }
+
+                        weekly_summary = wk_data.groupby(['Name', 'Position', 'PhotoURL']).agg(agg_dict).reset_index()
+                        weekly_summary.rename(columns={'Session_Name': 'Sessions'}, inplace=True)
+                        weekly_summary = weekly_summary.sort_values('Player Load', ascending=False)
+
+                        # KPI Cards across the selected week
+                        kpi_w1, kpi_w2, kpi_w3, kpi_w4, kpi_w5 = st.columns(5)
+                        kpi_w1.metric("Active Athletes", len(weekly_summary))
+                        kpi_w2.metric("Avg Player Load", f"{weekly_summary['Player Load'].mean():.1f}")
+                        kpi_w3.metric("Avg Total Jumps", f"{int(weekly_summary['Total Jumps'].mean())}")
+                        kpi_w4.metric("Avg Jump Load", f"{weekly_summary['Jump Load'].mean():.1f}")
+                        kpi_w5.metric("Avg Est Distance", f"{int(weekly_summary['Estimated Distance (y)'].mean()):,} yd")
+
+                        # Build HTML Table
+                        w_tbl_html = """
+                        <table class="scout-table" style="width: 100%; border: 1px solid #E2E8F0; background: white; margin-top: 15px; box-shadow: 0 1px 3px rgba(0,0,0,0.02);">
+                            <thead>
+                                <tr style="background: #4895DB; color: white;">
+                                    <th style="width: 50px;">Athlete</th>
+                                    <th style="text-align: left !important; padding-left: 14px;">Name</th>
+                                    <th>Position</th>
+                                    <th>Sessions</th>
+                                    <th>Total Jumps</th>
+                                    <th>Jump Load</th>
+                                    <th>Player Load</th>
+                                    <th>Est Distance (yd)</th>
+                                    <th>Explosive Efforts</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                        """
+
+                        for _, row in weekly_summary.iterrows():
+                            w_tbl_html += f"""
+                                <tr>
+                                    <td style="padding: 6px;"><img src="{row['PhotoURL']}" style="width: 36px; height: 36px; border-radius: 50%; object-fit: contain; border: 2px solid #FF8200; background: white;"></td>
+                                    <td style="text-align: left !important; padding-left: 14px; font-weight: 800; font-size: 13px; color: #111827;">{row['Name']}</td>
+                                    <td style="font-weight: 600; color: #64748B;">{row['Position']}</td>
+                                    <td style="font-weight: 700; color: #4895DB;">{row['Sessions']}</td>
+                                    <td style="font-weight: 800; color: #FF8200; font-size: 13px;">{int(row['Total Jumps']):,}</td>
+                                    <td style="font-weight: 700;">{row['Jump Load']:.1f}</td>
+                                    <td style="font-weight: 800; font-size: 13px; color: #111827;">{row['Player Load']:.1f}</td>
+                                    <td style="font-weight: 600;">{int(row['Estimated Distance (y)']):,}</td>
+                                    <td style="font-weight: 700;">{int(row['Explosive Efforts']):,}</td>
+                                </tr>
+                            """
+
+                        # Team Totals footer row
+                        w_tbl_html += f"""
+                                <tr style="background: #F8FAFC; border-top: 2px solid #E2E8F0; font-weight: 900; color: #111827;">
+                                    <td></td>
+                                    <td style="text-align: left !important; padding-left: 14px;">TEAM TOTAL</td>
+                                    <td>—</td>
+                                    <td>—</td>
+                                    <td style="color: #FF8200;">{int(weekly_summary['Total Jumps'].sum()):,}</td>
+                                    <td>{weekly_summary['Jump Load'].sum():.1f}</td>
+                                    <td>{weekly_summary['Player Load'].sum():.1f}</td>
+                                    <td>{int(weekly_summary['Estimated Distance (y)'].sum()):,}</td>
+                                    <td>{int(weekly_summary['Explosive Efforts'].sum()):,}</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                        """
+                        st.markdown(w_tbl_html, unsafe_allow_html=True)
                     
             elif sel_daily_tab == "Daily Combined Scores":
                 df_t2 = df_master.copy()
