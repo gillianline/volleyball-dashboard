@@ -1032,15 +1032,16 @@ if check_password():
                     </div>
                 ''', unsafe_allow_html=True)
 
-                # The metrics that comprise the Practice Score
+                # All 5 practice score metrics
                 ps_metrics = [
-                    {"label": "Player Load", "unit": ""},
-                    {"label": "Total Jumps", "unit": ""},
-                    {"label": "Estimated Distance (y)", "unit": "yd"},
-                    {"label": "Explosive Efforts", "unit": ""}
+                    {"label": "Total Jumps", "unit": "", "is_int": True},
+                    {"label": "Jump Load", "unit": "", "is_int": False},
+                    {"label": "Player Load", "unit": "", "is_int": False},
+                    {"label": "Estimated Distance (y)", "unit": "yd", "is_int": True},
+                    {"label": "Explosive Efforts", "unit": "", "is_int": True}
                 ]
 
-                # Render 2 cards per row
+                # Render across 2 columns
                 for idx in range(0, len(ps_metrics), 2):
                     cols = st.columns(2)
                     for j in range(2):
@@ -1068,12 +1069,13 @@ if check_password():
                             # % Peak Output
                             pct_peak = (recent_val / overall_max * 100.0) if overall_max > 0 else 0.0
 
-                            # Days badge formatting (Green if within 7 days, Red if older)
+                            # Badge formatting: green if within 7 days, red if older
                             pill_class = "bball-pill-green" if days_since_peak <= 7 else "bball-pill-red"
                             pill_text = f"{days_since_peak} Days" if days_since_peak != 1 else "1 Day"
 
-                            fmt_recent = f"{recent_val:.1f}" if m_name in ['Player Load'] else f"{recent_val:.0f}"
-                            fmt_max = f"{overall_max:.1f}" if m_name in ['Player Load'] else f"{overall_max:.0f}"
+                            # Metric number formatting
+                            fmt_recent = f"{recent_val:.0f}" if m_info["is_int"] else f"{recent_val:.1f}"
+                            fmt_max = f"{overall_max:.0f}" if m_info["is_int"] else f"{overall_max:.1f}"
 
                             card_html = f"""
                             <div class="bball-card-container">
@@ -1107,6 +1109,7 @@ if check_password():
                             """
                             with cols[j]:
                                 st.markdown(card_html, unsafe_allow_html=True)
+                                
                     
             elif sel_daily_tab == "Daily Combined Scores":
                 df_t2 = df_master.copy()
