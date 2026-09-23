@@ -230,7 +230,6 @@ st.markdown("""
         margin-top: 6px;
         font-weight: 500;
     }
-    <style>
     .weekly-cum-table {
         width: 100%;
         border-collapse: collapse;
@@ -272,7 +271,6 @@ st.markdown("""
         display: block;
         margin: 0 auto;
     }
-</style>
     </style>
     """, unsafe_allow_html=True)
 
