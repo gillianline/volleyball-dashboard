@@ -158,6 +158,78 @@ st.markdown("""
         .main .block-container { padding: 0 !important; max-width: 100% !important; }
         .scout-table td, p, span, div { color: #000000 !important; }
     }
+
+    /* --- EXACT BASKETBALL COMPLIANCE CARD CSS --- */
+    .bball-card-container {
+        background-color: #FFFFFF;
+        border: 1px solid #E2E8F0;
+        border-radius: 12px;
+        padding: 20px 24px;
+        margin-bottom: 24px;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+    }
+    .bball-card-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 18px;
+    }
+    .bball-card-title {
+        font-size: 18px;
+        font-weight: 800;
+        color: #0F172A;
+    }
+    .bball-pill-green {
+        background-color: #D1FADF;
+        color: #027A48;
+        font-size: 13px;
+        font-weight: 700;
+        padding: 4px 14px;
+        border-radius: 20px;
+    }
+    .bball-pill-red {
+        background-color: #FEE4E2;
+        color: #B42318;
+        font-size: 13px;
+        font-weight: 700;
+        padding: 4px 14px;
+        border-radius: 20px;
+    }
+    .bball-quad-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+    }
+    .bball-tile {
+        background-color: #F8FAFC;
+        border: 1px solid #E2E8F0;
+        border-radius: 10px;
+        padding: 16px 12px;
+        text-align: center;
+    }
+    .bball-tile-label {
+        font-size: 11px;
+        font-weight: 800;
+        color: #475569;
+        text-transform: uppercase;
+        letter-spacing: 0.6px;
+        margin-bottom: 6px;
+    }
+    .bball-tile-val {
+        font-size: 24px;
+        font-weight: 800;
+        color: #0F172A;
+        line-height: 1.1;
+    }
+    .bball-tile-orange {
+        color: #FF8200 !important;
+    }
+    .bball-tile-subtext {
+        font-size: 11px;
+        color: #94A3B8;
+        margin-top: 6px;
+        font-weight: 500;
+    }
     </style>
     """, unsafe_allow_html=True)
 
@@ -928,101 +1000,113 @@ if check_password():
 
                 c_cp1, c_cp2 = st.columns(2)
                 with c_cp1:
-                    sel_session_comp = st.selectbox("Session Selection", clean_session_list_comp, index=0, key="nav_sel_comp_tab")
+                    selected_athlete_comp = st.selectbox("Select Athlete", master_athlete_list, key="comp_ath_picker")
                 with c_cp2:
-                    pos_f_comp = st.selectbox("Position Filter", ["All Positions"] + sorted([p for p in df_comp['Position'].unique() if p != "N/A"]), key="nav_pos_comp_tab")
+                    sel_session_comp = st.selectbox("Evaluation Session", clean_session_list_comp, index=0, key="nav_sel_comp_tab")
+
+                meta_lookup = full_df_unfiltered[full_df_unfiltered['Name'] == selected_athlete_comp]
+                photo_url = meta_lookup['PhotoURL'].iloc[0] if not meta_lookup.empty else "https://www.w3schools.com/howto/img_avatar.png"
+                pos_str = meta_lookup['Position'].iloc[0] if not meta_lookup.empty else "N/A"
 
                 if selected_season == "Spring" and sel_session_comp == tournament_label:
                     curr_date_comp = pd.to_datetime(target_date_str)
-                    comp_display_df = df_comp[df_comp['Date'].dt.date == curr_date_comp.date()].groupby(['Name', 'Position', 'PhotoURL']).sum(numeric_only=True).reset_index()
+                    p_session_data = df_comp[(df_comp['Name'] == selected_athlete_comp) & (df_comp['Date'].dt.date == curr_date_comp.date())]
+                    p_curr_row = p_session_data.groupby(['Name', 'Position', 'PhotoURL']).sum(numeric_only=True).reset_index().iloc[0] if not p_session_data.empty else pd.Series()
                 else:
-                    comp_display_df = df_comp[df_comp['Session_Name'] == sel_session_comp].copy()
-                    curr_date_comp = pd.to_datetime(comp_display_df['Date'].iloc[0]) if not comp_display_df.empty else pd.to_datetime("2026-08-06")
+                    p_session_data = df_comp[(df_comp['Name'] == selected_athlete_comp) & (df_comp['Session_Name'] == sel_session_comp)]
+                    p_curr_row = p_session_data.iloc[0] if not p_session_data.empty else pd.Series()
+                    curr_date_comp = pd.to_datetime(p_curr_row['Date']) if not p_curr_row.empty else pd.to_datetime("2026-08-06")
 
-                if comp_display_df is not None and not comp_display_df.empty:
-                    if pos_f_comp != "All Positions":
-                        comp_display_df = comp_display_df[comp_display_df['Position'] == pos_f_comp]
+                # Athlete's full history up through this session
+                p_full = full_df_unfiltered[full_df_unfiltered['Name'] == selected_athlete_comp].copy()
+                curr_order = p_curr_row.get('Sheet_Order', float('inf'))
+                history_df = p_full[(p_full['Date'] <= curr_date_comp) & (p_full['Sheet_Order'] <= curr_order)].sort_values('Date')
 
-                    comp_athletes = sorted(comp_display_df['Name'].unique())
-                    target_metrics = ['Player Load', 'Total Jumps', 'Estimated Distance (y)', 'Explosive Efforts']
+                st.markdown(f'''
+                    <div style="display:flex; align-items:center; gap:16px; padding:12px 18px; background:#F8FAFC; border:1px solid #E2E8F0; border-radius:12px; margin-bottom:24px;">
+                        <img src="{photo_url}" style="width:55px; height:55px; border-radius:50%; border:3px solid #FF8200; object-fit:contain; background:white;">
+                        <div>
+                            <div style="font-size:20px; font-weight:900; color:#111827;">{selected_athlete_comp}</div>
+                            <div style="font-size:13px; font-weight:700; color:#64748B;">{pos_str} &bull; Practice Score Compliance Profile</div>
+                        </div>
+                    </div>
+                ''', unsafe_allow_html=True)
 
-                    st.markdown('<div class="section-header">Practice Volume Compliance Cards</div>', unsafe_allow_html=True)
+                # The metrics that comprise the Practice Score
+                ps_metrics = [
+                    {"label": "Player Load", "unit": ""},
+                    {"label": "Total Jumps", "unit": ""},
+                    {"label": "Estimated Distance (y)", "unit": "yd"},
+                    {"label": "Explosive Efforts", "unit": ""}
+                ]
 
-                    for i in range(0, len(comp_athletes), 2):
-                        cols = st.columns(2)
-                        for j in range(2):
-                            if i + j < len(comp_athletes):
-                                name = comp_athletes[i + j]
-                                p_row = comp_display_df[comp_display_df['Name'] == name].iloc[0]
-                                p_full = full_df_unfiltered[full_df_unfiltered['Name'] == name]
-                                curr_order = p_row.get('Sheet_Order', float('inf'))
+                # Render 2 cards per row
+                for idx in range(0, len(ps_metrics), 2):
+                    cols = st.columns(2)
+                    for j in range(2):
+                        if idx + j < len(ps_metrics):
+                            m_info = ps_metrics[idx + j]
+                            m_name = m_info["label"]
+                            u_str = f" {m_info['unit']}" if m_info["unit"] else ""
 
-                                # 30-day baseline ceiling window
-                                lb_baseline = p_full[
-                                    (p_full['Date'].dt.date >= curr_date_comp.date() - timedelta(days=30)) & 
-                                    (p_full['Date'].dt.date <= curr_date_comp.date()) &
-                                    (p_full['Sheet_Order'] <= curr_order)
-                                ]
+                            # Recent Value
+                            recent_val = float(p_curr_row.get(m_name, 0.0)) if not p_curr_row.empty else 0.0
+                            recent_date_str = curr_date_comp.strftime('%Y-%m-%d') if pd.notna(curr_date_comp) else "N/A"
 
-                                tile_html_list = []
-                                athlete_metric_pcts = []
+                            # Overall Max Value & Max Date
+                            if not history_df.empty and m_name in history_df.columns and history_df[m_name].max() > 0:
+                                max_row = history_df.loc[history_df[m_name].idxmax()]
+                                overall_max = float(max_row[m_name])
+                                max_date = pd.to_datetime(max_row['Date'])
+                                max_date_str = max_date.strftime('%Y-%m-%d')
+                                days_since_peak = max(0, (curr_date_comp.date() - max_date.date()).days)
+                            else:
+                                overall_max = recent_val if recent_val > 0 else 1.0
+                                max_date_str = recent_date_str
+                                days_since_peak = 0
 
-                                for m in target_metrics:
-                                    val = p_row.get(m, 0.0)
-                                    # Target based on 30-day max baseline
-                                    baseline_val = lb_baseline[m].max() if (not lb_baseline.empty and m in lb_baseline.columns and lb_baseline[m].max() > 0) else 1.0
-                                    
-                                    pct_compliance = (val / baseline_val) * 100.0 if baseline_val > 0 else 0.0
-                                    athlete_metric_pcts.append(pct_compliance)
+                            # % Peak Output
+                            pct_peak = (recent_val / overall_max * 100.0) if overall_max > 0 else 0.0
 
-                                    fmt_val = f"{val:.0f}" if m in ['Total Jumps', 'Estimated Distance (y)', 'Explosive Efforts'] else f"{val:.1f}"
-                                    fmt_base = f"{baseline_val:.0f}" if m in ['Total Jumps', 'Estimated Distance (y)', 'Explosive Efforts'] else f"{baseline_val:.1f}"
+                            # Days badge formatting (Green if within 7 days, Red if older)
+                            pill_class = "bball-pill-green" if days_since_peak <= 7 else "bball-pill-red"
+                            pill_text = f"{days_since_peak} Days" if days_since_peak != 1 else "1 Day"
 
-                                    tile_html_list.append(f"""
-                                        <div class="comp-tile">
-                                            <div class="comp-label">{m}</div>
-                                            <div class="comp-metric-val comp-metric-orange">{fmt_val}</div>
-                                            <div class="comp-subtext">{pct_compliance:.0f}% of 30d Max ({fmt_base})</div>
-                                        </div>
-                                    """)
+                            fmt_recent = f"{recent_val:.1f}" if m_name in ['Player Load'] else f"{recent_val:.0f}"
+                            fmt_max = f"{overall_max:.1f}" if m_name in ['Player Load'] else f"{overall_max:.0f}"
 
-                                mean_comp = sum(athlete_metric_pcts) / len(athlete_metric_pcts) if athlete_metric_pcts else 0.0
-                                
-                                # Badge styling depending on workload compliance levels
-                                if mean_comp >= 85:
-                                    badge_color = "#137333"
-                                    badge_bg = "#E6F4EA"
-                                    badge_label = f"High Volume ({mean_comp:.0f}%)"
-                                elif mean_comp >= 60:
-                                    badge_color = "#D97706"
-                                    badge_bg = "#FEF3C7"
-                                    badge_label = f"Moderate Volume ({mean_comp:.0f}%)"
-                                else:
-                                    badge_color = "#D93025"
-                                    badge_bg = "#FCE8E6"
-                                    badge_label = f"Low Volume ({mean_comp:.0f}%)"
-
-                                card_markup = f"""
-                                <div class="comp-card-outer">
-                                    <div class="comp-card-top">
-                                        <div style="display: flex; align-items: center; gap: 12px;">
-                                            <img src="{p_row.get('PhotoURL', 'https://www.w3schools.com/howto/img_avatar.png')}" class="comp-athlete-photo" style="width:45px; height:45px;">
-                                            <div>
-                                                <div class="comp-card-title">{name}</div>
-                                                <div style="font-size:11px; font-weight:700; color:#64748B;">{p_row.get('Position', 'N/A')}</div>
-                                            </div>
-                                        </div>
-                                        <span class="comp-pill-badge" style="color: {badge_color}; background-color: {badge_bg};">{badge_label}</span>
+                            card_html = f"""
+                            <div class="bball-card-container">
+                                <div class="bball-card-header">
+                                    <span class="bball-card-title">{m_name}</span>
+                                    <span class="{pill_class}">{pill_text}</span>
+                                </div>
+                                <div class="bball-quad-grid">
+                                    <div class="bball-tile">
+                                        <div class="bball-tile-label">RECENT</div>
+                                        <div class="bball-tile-val">{fmt_recent}{u_str}</div>
+                                        <div class="bball-tile-subtext">{recent_date_str}</div>
                                     </div>
-                                    <div class="comp-grid">
-                                        {''.join(tile_html_list)}
+                                    <div class="bball-tile">
+                                        <div class="bball-tile-label">OVERALL MAX</div>
+                                        <div class="bball-tile-val">{fmt_max}{u_str}</div>
+                                        <div class="bball-tile-subtext">{max_date_str}</div>
+                                    </div>
+                                    <div class="bball-tile">
+                                        <div class="bball-tile-label">% PEAK OUTPUT</div>
+                                        <div class="bball-tile-val bball-tile-orange">{pct_peak:.1f}%</div>
+                                        <div class="bball-tile-subtext">Recent vs. Peak</div>
+                                    </div>
+                                    <div class="bball-tile">
+                                        <div class="bball-tile-label">RECENCY STATUS</div>
+                                        <div class="bball-tile-val">{pill_text}</div>
+                                        <div class="bball-tile-subtext">Elapsed Threshold</div>
                                     </div>
                                 </div>
-                                """
-                                with cols[j]:
-                                    st.markdown(card_markup, unsafe_allow_html=True)
-                else:
-                    st.info("No practice session data found for the selected session.")
+                            </div>
+                            """
+                            with cols[j]:
+                                st.markdown(card_html, unsafe_allow_html=True)
                     
             elif sel_daily_tab == "Daily Combined Scores":
                 df_t2 = df_master.copy()
