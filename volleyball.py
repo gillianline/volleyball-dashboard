@@ -687,9 +687,7 @@ if check_password():
             {"label": "ECC RFD", "col": "Eccentric Deceleration RFD [N/s]", "alt_col": "Eccentric RFD [N/s]", "invert": False},
             {"label": "Force @ 0 Velo", "col": "Force at Zero Velocity [N]", "invert": False},
             {"label": "TTO", "col": "Contraction Time [ms]", "alt_col": "Time to Takeoff [s]", "invert": True},
-            {"label": "ECC Peak Velo", "col": "Eccentric Peak Velocity [m/s]", "invert": False},
-            {"label": "Ecc Peak Power", "col": "Eccentric Peak Power [W]", "invert": False},
-            {"label": "P2:P1 Con Impulse", "col": "P2 Concentric Impulse:P1 Concentric Impulse", "invert": True}
+            {"label": "P2:P1 Ratio", "col": "P2 Concentric Impulse:P1 Concentric Impulse", "invert": True}
         ]
 
         def compute_excel_readiness_score(curr_row, prev_row):
