@@ -695,21 +695,26 @@ if check_password():
             for rm in readiness_metrics_ref:
                 c_name = rm["col"] if rm["col"] in curr_row else rm.get("alt_col", rm["col"])
                 if c_name in curr_row and c_name in prev_row:
-                    t_val = abs(float(curr_row.get(c_name, 0.0)))
-                    s_val = abs(float(prev_row.get(c_name, 0.0)))
-                    if s_val > 0 and t_val > 0:
-                        if rm["invert"]:
-                            pct_diff = ((t_val - s_val) / s_val) * 100.0
-                            score = 100.0 - pct_diff
-                        else:
-                            pct_diff = ((t_val - s_val) / s_val) * 100.0
-                            score = 100.0 + pct_diff
-                        score = min(100.0, score)
-                        sub_scores.append(max(0.0, score))
+                    try:
+                        # Force extraction of just the numbers, matching the Team Summary logic
+                        t_val = abs(float(pd.to_numeric(str(curr_row.get(c_name, 0.0)).replace(r"[^0-9.-]", ""), errors="coerce")))
+                        s_val = abs(float(pd.to_numeric(str(prev_row.get(c_name, 0.0)).replace(r"[^0-9.-]", ""), errors="coerce")))
+                        
+                        if s_val > 0 and t_val > 0:
+                            if rm["invert"]:
+                                pct_diff = ((t_val - s_val) / s_val) * 100.0
+                                score = 100.0 - pct_diff
+                            else:
+                                pct_diff = ((t_val - s_val) / s_val) * 100.0
+                                score = 100.0 + pct_diff
+                            score = min(100.0, score)
+                            sub_scores.append(max(0.0, score))
+                    except Exception:
+                        continue # Safely skip if the data is genuinely missing, rather than crashing
+            
             if sub_scores:
                 return sum(sub_scores) / len(sub_scores)
             return 100.0
-
 
         # =========================================================================
         # --- HUB 1: DAILY MONITORING & WELLNESS ----------------------------------
