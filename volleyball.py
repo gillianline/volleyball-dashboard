@@ -682,21 +682,25 @@ if check_password():
 
         st.markdown('<div class="main-logo-container" style="text-align: center; margin-top: 10px; margin-bottom: 15px;"><img src="https://upload.wikimedia.org/wikipedia/commons/thumb/f/fc/Tennessee_Lady_Volunteers_logo.svg/1280px-Tennessee_Lady_Volunteers_logo.svg.png" width="120"><div style="color: #FF8200; font-size: 2rem; font-weight: 900; margin-top: 10px;">LADY VOLS VOLLEYBALL PERFORMANCE</div></div>', unsafe_allow_html=True)
 
-        readiness_metrics_ref = [
-            {"label": "mRSI", "col": "RSI-modified [m/s]", "invert": False},
-            {"label": "ECC RFD", "col": "Eccentric Deceleration RFD [N/s]", "alt_col": "Eccentric RFD [N/s]", "invert": False},
-            {"label": "Force @ 0 Velo", "col": "Force at Zero Velocity [N]", "invert": False},
-            {"label": "TTO", "col": "Contraction Time [ms]", "alt_col": "Time to Takeoff [s]", "invert": True},
-            {"label": "P2:P1 Ratio", "col": "P2 Concentric Impulse:P1 Concentric Impulse", "invert": True}
+        wellness_metrics_ref = [
+            {"label": "mRSI", "keys": ["rsi-modified", "rsi ["], "invert": False},
+            {"label": "ECC RFD", "keys": ["eccentric deceleration rfd", "eccentric braking rfd", "eccentric rfd"], "invert": False},
+            {"label": "Force @ 0 Velo", "keys": ["force at zero velocity", "force @ 0 velo"], "invert": False},
+            {"label": "TTO", "keys": ["contraction time", "time to takeoff", "time to take-off"], "invert": True},
+            {"label": "P2:P1 Ratio", "keys": ["p2 concentric impulse:p1", "p2:p1"], "invert": True}
         ]
 
         def compute_excel_readiness_score(curr_row, prev_row):
             sub_scores = []
-            for rm in readiness_metrics_ref:
-                c_name = rm["col"] if rm["col"] in curr_row else rm.get("alt_col", rm["col"])
-                if c_name in curr_row and c_name in prev_row:
+            cols = list(curr_row.keys()) if hasattr(curr_row, 'keys') else list(curr_row.index)
+            
+            for rm in wellness_metrics_ref:
+                # Fuzzy match the column name exactly like the Team Summary page
+                c_name = next((c for c in cols if any(k in c.lower() for k in rm["keys"])), None)
+                
+                if c_name and c_name in curr_row and c_name in prev_row:
                     try:
-                        # Force extraction of just the numbers, matching the Team Summary logic
+                        # Extract the values identically to the Team Summary
                         t_val = abs(float(pd.to_numeric(str(curr_row.get(c_name, 0.0)).replace(r"[^0-9.-]", ""), errors="coerce")))
                         s_val = abs(float(pd.to_numeric(str(prev_row.get(c_name, 0.0)).replace(r"[^0-9.-]", ""), errors="coerce")))
                         
@@ -710,7 +714,11 @@ if check_password():
                             score = min(100.0, score)
                             sub_scores.append(max(0.0, score))
                     except Exception:
-                        continue # Safely skip if the data is genuinely missing, rather than crashing
+                        continue 
+            
+            if sub_scores:
+                return sum(sub_scores) / len(sub_scores)
+            return 100.0
             
             if sub_scores:
                 return sum(sub_scores) / len(sub_scores)
