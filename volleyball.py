@@ -1930,7 +1930,7 @@ if check_password():
                             st.markdown(legend_table_html, unsafe_allow_html=True)
 
                 # -------------------------------------------------------------------------
-                # --- 2. TEAM CMJ SUMMARY ------------------------------------------------
+                # --- 2. TEAM CMJ SUMMARY -------------------------------------------------
                 # -------------------------------------------------------------------------
                 elif sel_cmj_mode == "Team CMJ Summary":
                     st.markdown("### Team Wellness Score Overview")
@@ -1964,6 +1964,16 @@ if check_password():
                         )
 
                     team_cmj_rows = []
+
+                    # Define metrics with fuzzy keys
+                    wellness_metrics_ref = [
+                        {"label": "mRSI", "keys": ["rsi-modified", "rsi ["], "invert": False},
+                        {"label": "ECC RFD", "keys": ["eccentric deceleration rfd", "eccentric braking rfd", "eccentric rfd"], "invert": False},
+                        {"label": "Force @ 0 Velo", "keys": ["force at zero velocity", "force @ 0 velo"], "invert": False},
+                        {"label": "TTO", "keys": ["contraction time", "time to takeoff", "time to take-off"], "invert": True},
+                        {"label": "P2:P1 Ratio", "keys": ["p2 concentric impulse:p1", "p2:p1"], "invert": True}
+                    ]
+
                     for ath_name in sorted(raw_cmj_df["Name"].unique()):
                         ath_sub_cmj = raw_cmj_df[
                             raw_cmj_df["Name"] == ath_name
@@ -1981,7 +1991,7 @@ if check_password():
                         )
                         photo_url = (
                             meta_row["PhotoURL"].iloc[0]
-                            if not meta_row.empty
+                            if not meta_row.empty and pd.notna(meta_row["PhotoURL"].iloc[0])
                             else "https://www.w3schools.com/howto/img_avatar.png"
                         )
                         if (
@@ -1998,6 +2008,7 @@ if check_password():
                             continue
 
                         target_row = ath_date_match.iloc[-1]
+                        cols = ath_sub_cmj.columns
 
                         all_indices = list(ath_sub_cmj.index)
                         if target_row.name in all_indices:
@@ -2006,63 +2017,113 @@ if check_password():
                         else:
                             prev_row = target_row
 
-                        readiness_pct = int(
-                            round(
-                                compute_excel_readiness_score(
-                                    target_row, prev_row
-                                )
-                            )
-                        )
+                        # Calculate metric percentages dynamically
+                        indiv_scores = {}
+                        sub_scores = []
+                        for rm in wellness_metrics_ref:
+                            # Fuzzy match column
+                            c_name = next((c for c in cols if any(k in c.lower() for k in rm["keys"])), None)
+                            lbl = rm["label"]
+                            
+                            if c_name and c_name in target_row and c_name in prev_row:
+                                try:
+                                    t_val = abs(float(pd.to_numeric(str(target_row.get(c_name, 0.0)).replace(r"[^0-9.-]", ""), errors="coerce")))
+                                    s_val = abs(float(pd.to_numeric(str(prev_row.get(c_name, 0.0)).replace(r"[^0-9.-]", ""), errors="coerce")))
+                                    if s_val > 0 and t_val > 0:
+                                        pct_diff = ((t_val - s_val) / s_val) * 100.0
+                                        score = (100.0 - pct_diff) if rm["invert"] else (100.0 + pct_diff)
+                                        score = max(0.0, min(100.0, score))
+                                        indiv_scores[lbl] = score
+                                        sub_scores.append(score)
+                                    else:
+                                        indiv_scores[lbl] = None
+                                except Exception:
+                                    indiv_scores[lbl] = None
+                            else:
+                                indiv_scores[lbl] = None
+
+                        readiness_pct = int(round(sum(sub_scores) / len(sub_scores))) if sub_scores else 100
                         z_color = get_readiness_color(readiness_pct)
-                        team_cmj_rows.append({
+
+                        def format_pct(val):
+                            return f"{int(round(val))}%" if val is not None else "-"
+                            
+                        def get_pct_color(val):
+                            if val is None: return "#1D1D1F"
+                            if val >= 90: return "#15803D"
+                            if val >= 80: return "#D97706"
+                            return "#B91C1C"
+
+                        row_dict = {
                             "Athlete": ath_name,
                             "PhotoURL": photo_url,
                             "Position": pos_str,
                             "Readiness %": readiness_pct,
                             "Status_Color": z_color,
-                        })
+                        }
+                        
+                        for rm in wellness_metrics_ref:
+                            lbl = rm["label"]
+                            row_dict[f"{lbl}_pct"] = format_pct(indiv_scores.get(lbl))
+                            row_dict[f"{lbl}_color"] = get_pct_color(indiv_scores.get(lbl))
+                            row_dict[f"{lbl}_raw"] = indiv_scores.get(lbl)
+
+                        team_cmj_rows.append(row_dict)
 
                     if team_cmj_rows:
-                        cmj_team_df = pd.DataFrame(team_cmj_rows).sort_values(
-                            "Readiness %", ascending=False
-                        )
+                        cmj_team_df = pd.DataFrame(team_cmj_rows).sort_values("Readiness %", ascending=False)
                         c_kpi1, c_kpi2, c_kpi3, c_kpi4 = st.columns(4)
                         avg_team_readiness = cmj_team_df["Readiness %"].mean()
-                        peak_count = sum(
-                            1
-                            for r in team_cmj_rows
-                            if r["Readiness %"] >= 90
-                        )
-                        fatigue_count = sum(
-                            1
-                            for r in team_cmj_rows
-                            if r["Readiness %"] < 80
-                        )
+                        peak_count = sum(1 for r in team_cmj_rows if r["Readiness %"] >= 90)
+                        fatigue_count = sum(1 for r in team_cmj_rows if r["Readiness %"] < 80)
 
-                        c_kpi1.metric(
-                            "Athletes Evaluated", len(team_cmj_rows)
-                        )
-                        c_kpi2.metric(
-                            "Team Mean Wellness", f"{avg_team_readiness:.1f}%"
-                        )
+                        c_kpi1.metric("Athletes Evaluated", len(team_cmj_rows))
+                        c_kpi2.metric("Team Mean Wellness", f"{avg_team_readiness:.1f}%")
                         c_kpi3.metric("Optimal (>=90%)", peak_count)
                         c_kpi4.metric("Fatigued (<80%)", fatigue_count)
 
-                        team_tbl_html = """<table class="scout-table" style="width:100%; border:1px solid #E2E8F0; background:white; margin-top:15px;"><thead><tr style="background:#4895DB; color:white;"><th style="width:60px;">Athlete</th><th style="text-align:left !important; padding-left:15px;">Name</th><th>Position</th><th>Wellness Score</th></tr></thead><tbody>"""
+                        # Build table headers dynamically
+                        active_metrics = [rm for rm in wellness_metrics_ref if cmj_team_df[f"{rm['label']}_raw"].notna().any()]
+                        headers_html = "".join([f"<th>{rm['label']}</th>" for rm in active_metrics])
+
+                        team_tbl_html = f'''<table class="scout-table" style="width:100%; border:1px solid #E2E8F0; background:white; margin-top:15px;">
+                        <thead>
+                            <tr style="background:#FF8200; color:white;">
+                                <th style="width:60px;">Photo</th>
+                                <th style="text-align:left !important; padding-left:15px;">Name</th>
+                                <th>Position</th>
+                                <th style="background:#4895DB; color:white;">Wellness Score</th>
+                                <th>Readiness Status</th>
+                                {headers_html}
+                            </tr>
+                        </thead><tbody>'''
+                        
                         for _, row in cmj_team_df.iterrows():
-                            team_tbl_html += f"""<tr>
+                            r_val = row["Readiness %"]
+                            status_text = "Optimal Readiness" if r_val >= 90 else ("Moderate Fatigue" if r_val >= 80 else "High Fatigue Risk")
+                            badge_bg = "#DCFCE7" if r_val >= 90 else ("#FEF3C7" if r_val >= 80 else "#FEE2E2")
+                            badge_fg = "#15803D" if r_val >= 90 else ("#B45309" if r_val >= 80 else "#B91C1C")
+
+                            cells_html = ""
+                            for rm in active_metrics:
+                                lbl = rm["label"]
+                                pct_val = row.get(f"{lbl}_pct")
+                                pct_color = row.get(f"{lbl}_color")
+                                cells_html += f"<td style='font-weight:800; color:{pct_color};'>{pct_val}</td>"
+
+                            team_tbl_html += f'''<tr style="border-bottom: 1px solid #E2E8F0;">
                                 <td style="padding:6px;"><img src="{row['PhotoURL']}" style="width:38px; height:38px; border-radius:50%; object-fit:contain; border:2px solid #FF8200;"></td>
                                 <td style="text-align:left !important; font-weight:800; padding-left:15px; font-size:13px;">{row['Athlete']}</td>
                                 <td style="font-weight:600; color:#4B5563;">{row['Position']}</td>
-                                <td style="font-weight:900; font-size:15px; color:{row['Status_Color']};">{row['Readiness %']}%</td>
-                            </tr>"""
+                                <td style="font-weight:900; font-size:15px; color:{row['Status_Color']}; background:#F8FAFC;">{r_val}%</td>
+                                <td><span style="background-color:{badge_bg}; color:{badge_fg}; padding:4px 10px; border-radius:12px; font-weight:700; font-size:0.75rem; white-space:nowrap;">{status_text}</span></td>
+                                {cells_html}
+                            </tr>'''
                         team_tbl_html += "</tbody></table>"
                         st.markdown(team_tbl_html, unsafe_allow_html=True)
                     else:
-                        st.info(
-                            "No Countermovement Jump testing records logged on"
-                            f" {sel_team_cmj_date}."
-                        )
+                        st.info(f"No Countermovement Jump testing records logged on {sel_team_cmj_date}.")
+                        
 
                 # -------------------------------------------------------------------------
                 # --- 3. MATCH V. CMJ RECOVERY -------------------------------------------
