@@ -2121,16 +2121,19 @@ if check_password():
                 # -------------------------------------------------------------------------
                 elif sel_cmj_mode == "Match v. CMJ Recovery":
                     st.markdown('<div class="section-header">Match Volume Demands vs. CMJ Jump Recovery</div>', unsafe_allow_html=True)
-                    
+            
                     match_rec_df = match_master.copy()
-                    
+                
                     if not match_rec_df.empty:
+                        # Extract unique sessions ordered by Date (most recent first) instead of alphabetically
+                        ordered_sessions = match_rec_df.sort_values('Date', ascending=False)['Session_Name'].dropna().unique().tolist()
+
                         c_m1, c_m2 = st.columns([1.5, 2])
                         with c_m1:
-                            sel_match_session = st.selectbox("Select Match Session", sorted(match_rec_df['Session_Name'].unique()), key="m_v_cmj_session_tab")
+                            sel_match_session = st.selectbox("Select Match Session", ordered_sessions, key="m_v_cmj_session_tab")
                         with c_m2:
                             sel_pos_m = st.selectbox("Position Filter", ["All Positions"] + sorted([p for p in match_rec_df['Position'].unique() if p != "N/A"]), key="m_v_cmj_pos_tab")
-                            
+                    
                         filtered_match = match_rec_df[match_rec_df['Session_Name'] == sel_match_session].copy()
                         if sel_pos_m != "All Positions":
                             filtered_match = filtered_match[filtered_match['Position'] == sel_pos_m]
