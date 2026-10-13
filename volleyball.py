@@ -2734,38 +2734,6 @@ if check_password():
                                     ],  # Dark Orange (Heavy Right)
                                 ]
 
-                                fig_heat = go.Figure(
-                                    data=go.Heatmap(
-                                        z=pivot_asym.values,
-                                        x=list(pivot_asym.columns),
-                                        y=list(pivot_asym.index),
-                                        colorscale=diverging_scale,
-                                        zmid=0,
-                                        zmin=-25,
-                                        zmax=25,
-                                        xgap=5,
-                                        ygap=5,
-                                        hoverinfo="none",
-                                        colorbar=dict(
-                                            title=dict(
-                                                text="Limb Bias",
-                                                font=dict(size=11, color="#64748B"),
-                                            ),
-                                            tickvals=[-20, -10, 0, 10, 20],
-                                            ticktext=[
-                                                "Left (20%+)",
-                                                "Left (10%)",
-                                                "Balanced",
-                                                "Right (10%)",
-                                                "Right (20%+)",
-                                            ],
-                                            len=0.9,
-                                        ),
-                                    )
-                                )
-
-                                # The entire annotations block has been deleted
-
                                 fig_heat.update_layout(
                                     height=300,
                                     margin=dict(l=20, r=20, t=10, b=30),
@@ -2790,14 +2758,14 @@ if check_password():
                                     plot_bgcolor="white",
                                     paper_bgcolor="white",
                                 )
+                                
                                 st.plotly_chart(
                                     fig_heat,
                                     use_container_width=True,
                                     config=LOCKED_CONFIG,
-                                    key=(
-                                        f"asym_heatmap_{sel_asym_ath}_{sel_asym_season}"
-                                    ),
+                                    key=f"asym_heatmap_{sel_asym_ath}_{sel_asym_season}_{sel_asym_date_str}",
                                 )
+                                
 
                                 annotations = []
                                 for r_idx, metric in enumerate(
