@@ -2321,26 +2321,12 @@ if check_password():
                             asym_metric_list = [
                                 {
                                     "label": "Eccentric Braking RFD",
-                                    "raw_val_col": (
-                                        "Eccentric Braking RFD [N/s]"
-                                    ),
-                                    "alt_raw": [
-                                        "Eccentric Braking RFD",
-                                        "Braking RFD [N/s]",
-                                        "Braking RFD",
-                                    ],
-                                    "asym_col": (
-                                        "Eccentric Braking RFD % (Asym) (%)"
-                                    ),
+                                    "raw_val_col": "Eccentric Braking RFD [N/s]",
+                                    "alt_raw": ["Eccentric Braking RFD", "Braking RFD [N/s]", "Braking RFD"],
+                                    "asym_col": "Eccentric Braking RFD % (Asym) (%)",
                                     "alt_asym": [
-                                        (
-                                            "Eccentric Braking RFD (Asym)"
-                                            " (%)"
-                                        ),
-                                        (
-                                            "Eccentric Braking RFD Asymmetry"
-                                            " (%)"
-                                        ),
+                                        "Eccentric Braking RFD (Asym) (%)",
+                                        "Eccentric Braking RFD Asymmetry (%)",
                                         "Braking RFD (Asym) (%)",
                                     ],
                                     "phase": "Eccentric Braking RFD",
@@ -2349,64 +2335,16 @@ if check_password():
                                     "target_min": 4000.0,
                                     "target_max": 8000.0,
                                     "target_label": "4,000 - 8,000 N/s",
-                                    "desc": (
-                                        "Rate of force development as the"
-                                        " athlete decelerates downward."
-                                    ),
-                                },
-                                {
-                                    "label": "Eccentric Deceleration RFD",
-                                    "raw_val_col": (
-                                        "Eccentric Deceleration RFD [N/s]"
-                                    ),
-                                    "alt_raw": [
-                                        "Eccentric Deceleration RFD",
-                                        "Eccentric RFD [N/s]",
-                                        "Eccentric RFD",
-                                    ],
-                                    "asym_col": (
-                                        "Eccentric Deceleration RFD % (Asym)"
-                                        " (%)"
-                                    ),
-                                    "alt_asym": [
-                                        (
-                                            "Eccentric Deceleration RFD (Asym)"
-                                            " (%)"
-                                        ),
-                                        "Eccentric RFD % (Asym) (%)",
-                                        "Eccentric RFD (Asym) (%)",
-                                    ],
-                                    "phase": "Eccentric Deceleration RFD",
-                                    "unit": "N/s",
-                                    "fmt": "{:.0f}",
-                                    "target_min": 4500.0,
-                                    "target_max": 8500.0,
-                                    "target_label": "4,500 - 8,500 N/s",
-                                    "desc": (
-                                        "Braking rate immediately prior to"
-                                        " turnaround into upward drive."
-                                    ),
+                                    "desc": "Rate of force development as the athlete decelerates downward.",
                                 },
                                 {
                                     "label": "Force at Zero Velocity",
                                     "raw_val_col": "Force at Zero Velocity [N]",
-                                    "alt_raw": [
-                                        "Force at Zero Velocity",
-                                        "Force @ 0 Velo",
-                                        "Relative Force @ 0 Velo",
-                                    ],
-                                    "asym_col": (
-                                        "Force at Zero Velocity % (Asym) (%)"
-                                    ),
+                                    "alt_raw": ["Force at Zero Velocity", "Force @ 0 Velo", "Relative Force @ 0 Velo"],
+                                    "asym_col": "Force at Zero Velocity % (Asym) (%)",
                                     "alt_asym": [
-                                        (
-                                            "Force at Zero Velocity (Asym)"
-                                            " (%)"
-                                        ),
-                                        (
-                                            "Force at Zero Velocity Asymmetry"
-                                            " (%)"
-                                        ),
+                                        "Force at Zero Velocity (Asym) (%)",
+                                        "Force at Zero Velocity Asymmetry (%)",
                                         "Force @ 0 Velo (Asym) (%)",
                                     ],
                                     "phase": "Force at Zero Velocity",
@@ -2414,71 +2352,36 @@ if check_password():
                                     "fmt": "{:.0f}",
                                     "target_min": round(bw_n * 2.2, 0),
                                     "target_max": round(bw_n * 2.6, 0),
-                                    "target_label": (
-                                        f"{bw_n*2.2:.0f} - {bw_n*2.6:.0f} N"
-                                        " (2.2-2.6x BW)"
-                                    ),
-                                    "desc": (
-                                        "Vertical load absorbed at the absolute"
-                                        " bottom of the dip (v = 0)."
-                                    ),
+                                    "target_label": f"{bw_n*2.2:.0f} - {bw_n*2.6:.0f} N (2.2-2.6x BW)",
+                                    "desc": "Vertical load absorbed at the absolute bottom of the dip (v = 0).",
                                 },
                                 {
                                     "label": "Concentric Mean Force",
                                     "raw_val_col": "Concentric Mean Force [N]",
-                                    "alt_raw": [
-                                        "Concentric Mean Force",
-                                        "Relative Mean Con Force",
-                                        "Mean Concentric Force [N]",
-                                    ],
-                                    "asym_col": (
-                                        "Concentric Mean Force % (Asym) (%)"
-                                    ),
-                                    "alt_asym": [
-                                        "Concentric Mean Force (Asym) (%)",
-                                        (
-                                            "Concentric Mean Force Asymmetry"
-                                            " (%)"
-                                        ),
-                                    ],
+                                    "alt_raw": ["Concentric Mean Force", "Relative Mean Con Force", "Mean Concentric Force [N]"],
+                                    "asym_col": "Concentric Mean Force % (Asym) (%)",
+                                    "alt_asym": ["Concentric Mean Force (Asym) (%)", "Concentric Mean Force Asymmetry (%)"],
                                     "phase": "Concentric Mean Force",
                                     "unit": "N",
                                     "fmt": "{:.0f}",
                                     "target_min": round(bw_n * 1.6, 0),
                                     "target_max": round(bw_n * 1.9, 0),
-                                    "target_label": (
-                                        f"{bw_n*1.6:.0f} - {bw_n*1.9:.0f} N"
-                                        " (1.6-1.9x BW)"
-                                    ),
-                                    "desc": (
-                                        "Average upward thrust produced across"
-                                        " the propulsion phase."
-                                    ),
+                                    "target_label": f"{bw_n*1.6:.0f} - {bw_n*1.9:.0f} N (1.6-1.9x BW)",
+                                    "desc": "Average upward thrust produced across the propulsion phase.",
                                 },
                                 {
                                     "label": "Takeoff Peak Force",
                                     "raw_val_col": "Takeoff Peak Force [N]",
                                     "alt_raw": [
-                                        "Takeoff Peak Force",
-                                        "Take-off Peak Force [N]",
-                                        "Take-off Peak Force",
-                                        "Peak Takeoff Force [N]",
-                                        "Peak Takeoff Force",
-                                        "Takeoff Force [N]",
-                                        "Takeoff Force",
-                                        "Concentric Peak Force [N]",
-                                        "Concentric Peak Force",
+                                        "Takeoff Peak Force", "Take-off Peak Force [N]", "Take-off Peak Force",
+                                        "Peak Takeoff Force [N]", "Peak Takeoff Force", "Takeoff Force [N]",
+                                        "Takeoff Force", "Concentric Peak Force [N]", "Concentric Peak Force",
                                     ],
-                                    "asym_col": (
-                                        "Takeoff Peak Force % (Asym) (%)"
-                                    ),
+                                    "asym_col": "Takeoff Peak Force % (Asym) (%)",
                                     "alt_asym": [
-                                        "Takeoff Peak Force (Asym) (%)",
-                                        "Takeoff Peak Force [N] (Asym) (%)",
-                                        "Take-off Peak Force % (Asym) (%)",
-                                        "Take-off Peak Force (Asym) (%)",
-                                        "Peak Takeoff Force % (Asym) (%)",
-                                        "Takeoff Peak Force Asymmetry (%)",
+                                        "Takeoff Peak Force (Asym) (%)", "Takeoff Peak Force [N] (Asym) (%)",
+                                        "Take-off Peak Force % (Asym) (%)", "Take-off Peak Force (Asym) (%)",
+                                        "Peak Takeoff Force % (Asym) (%)", "Takeoff Peak Force Asymmetry (%)",
                                         "Concentric Peak Force % (Asym) (%)",
                                     ],
                                     "phase": "Takeoff Peak Force",
@@ -2486,14 +2389,8 @@ if check_password():
                                     "fmt": "{:.0f}",
                                     "target_min": round(bw_n * 2.0, 0),
                                     "target_max": round(bw_n * 2.5, 0),
-                                    "target_label": (
-                                        f"{bw_n*2.0:.0f} - {bw_n*2.5:.0f} N"
-                                        " (2.0-2.5x BW)"
-                                    ),
-                                    "desc": (
-                                        "Maximum explosive force spike"
-                                        " generated before leaving the plates."
-                                    ),
+                                    "target_label": f"{bw_n*2.0:.0f} - {bw_n*2.5:.0f} N (2.0-2.5x BW)",
+                                    "desc": "Maximum explosive force spike generated before leaving the plates.",
                                 },
                             ]
 
@@ -2852,9 +2749,7 @@ if check_password():
                                         colorbar=dict(
                                             title=dict(
                                                 text="Limb Bias",
-                                                font=dict(
-                                                    size=11, color="#64748B"
-                                                ),
+                                                font=dict(size=11, color="#64748B"),
                                             ),
                                             tickvals=[-20, -10, 0, 10, 20],
                                             ticktext=[
@@ -2867,6 +2762,41 @@ if check_password():
                                             len=0.9,
                                         ),
                                     )
+                                )
+
+                                # The entire annotations block has been deleted
+
+                                fig_heat.update_layout(
+                                    height=300,
+                                    margin=dict(l=20, r=20, t=10, b=30),
+                                    xaxis=dict(
+                                        title=None,
+                                        showgrid=False,
+                                        tickfont=dict(
+                                            size=12,
+                                            color="#1D1D1F",
+                                            weight="bold",
+                                        ),
+                                    ),
+                                    yaxis=dict(
+                                        autorange="reversed",
+                                        showgrid=False,
+                                        tickfont=dict(
+                                            size=11,
+                                            weight="bold",
+                                            color="#1D1D1F",
+                                        ),
+                                    ),
+                                    plot_bgcolor="white",
+                                    paper_bgcolor="white",
+                                )
+                                st.plotly_chart(
+                                    fig_heat,
+                                    use_container_width=True,
+                                    config=LOCKED_CONFIG,
+                                    key=(
+                                        f"asym_heatmap_{sel_asym_ath}_{sel_asym_season}"
+                                    ),
                                 )
 
                                 annotations = []
