@@ -590,20 +590,59 @@ def load_all_data():
     except:
         thresh_df = None
         
-    # --- NEW: Process Raw Sensor Data to Spikes ---
+    # --- NEW: Spike Data Sheet ---
     try:
-        # Pass the Google Drive URL or local path of your raw Catapult export
-        raw_sensor_path = st.secrets["RAW_SENSOR_CSV_URL"] 
-        spike_df = process_raw_kinematics_to_spikes(raw_sensor_path)
+        raw_spike = pd.read_csv(st.secrets["SPIKE_SHEET_URL"])
+        raw_spike.columns = raw_spike.columns.str.strip()
+        raw_spike = clean_name_col(raw_spike)
+        
+        # 1. Clean the Dates (strips out the 18:00 time of day)
+        if 'Date/Time' in raw_spike.columns:
+            raw_spike['Date'] = pd.to_datetime(raw_spike['Date/Time'], errors='coerce').dt.normalize()
+        else:
+            raw_spike['Date'] = pd.to_datetime(raw_spike['Date'], errors='coerce').dt.normalize()
+            
+        # 2. Convert Raw Kinematics to Spikes inline
+        if 'Acceleration.up' in raw_spike.columns:
+            raw_spike['Abs.Up'] = pd.to_numeric(raw_spike['Acceleration.up'], errors='coerce').abs()
+            raw_spike['Abs.Fwd'] = pd.to_numeric(raw_spike['Acceleration.forward'], errors='coerce').abs()
+            
+            raw_spike = raw_spike.sort_values(['Name', 'Date']).reset_index(drop=True)
+            
+            # Find rolling peaks
+            raw_spike['local_max_up'] = raw_spike.groupby('Name')['Abs.Up'].transform(lambda x: x.rolling(10, center=True, min_periods=1).max())
+            raw_spike['local_max_fwd'] = raw_spike.groupby('Name')['Abs.Fwd'].transform(lambda x: x.rolling(10, center=True, min_periods=1).max())
+            
+            rot_cols = [c for c in ['Rotation.roll', 'Rotation.pitch', 'Rotation.yaw'] if c in raw_spike.columns]
+            if rot_cols:
+                raw_spike['max_rotation'] = raw_spike[rot_cols].apply(pd.to_numeric, errors='coerce').abs().max(axis=1)
+                raw_spike['local_max_rot'] = raw_spike.groupby('Name')['max_rotation'].transform(lambda x: x.rolling(10, center=True, min_periods=1).max())
+            else:
+                raw_spike['local_max_rot'] = 999.0
+                
+            # Filter for spike signature
+            raw_spike['is_spike'] = (
+                (raw_spike['Abs.Up'] == raw_spike['local_max_up']) & 
+                (raw_spike['Abs.Up'] >= 1.8) & 
+                (raw_spike['local_max_fwd'] >= 0.5) & 
+                (raw_spike['local_max_rot'] >= 150.0)
+            )
+            
+            # Aggregate to daily counts
+            spike_df = raw_spike[raw_spike['is_spike']].groupby(['Name', 'Date']).size().reset_index(name='Spike_Count')
+        else:
+            # Fallback if the sheet was already aggregated
+            spike_df = raw_spike.copy()
+            if 'Spike_Count' not in spike_df.columns:
+                spike_df['Spike_Count'] = 0
+                
         spike_df['Season'] = spike_df['Date'].apply(assign_season)
-    except:
+        
+    except Exception as e:
+        print(f"Spike Error: {e}")
         spike_df = pd.DataFrame(columns=['Name', 'Date', 'Spike_Count', 'Season'])
         
     return df.dropna(subset=['Date']), match_df.dropna(subset=['Date']), cmj_df, phase_df, thresh_df, ash_df, er_df, calf_df, hip_df, shoulder_df, spike_df
-        
-    # Updated return statement with spike_df
-    return df.dropna(subset=['Date']), match_df.dropna(subset=['Date']), cmj_df, phase_df, thresh_df, ash_df, er_df, calf_df, hip_df, shoulder_df, spike_df
-        
 
 
 # --- 4. EWMA ACWR COMPUTATION ENGINE ---
@@ -629,18 +668,27 @@ def compute_athlete_ewMA_calendar(df_player, metrics_list):
 # --- NEW: SHOULDER RISK ENGINE ---
 def compute_shoulder_risk_score(athlete_name, eval_date, df_spikes, df_ash, df_er):
     """Calculates a 0-100 risk index based on Spike Volume vs. ASH/ROM Capacity."""
-    week_ago = eval_date - timedelta(days=7)
-    recent_spikes = df_spikes[(df_spikes['Name'] == athlete_name) & 
-                              (df_spikes['Date'] > week_ago) & 
-                              (df_spikes['Date'] <= eval_date)]['Spike_Count'].sum() if 'Spike_Count' in df_spikes.columns else 0
+    week_ago = pd.to_datetime(eval_date) - timedelta(days=7)
     
-    past_ash = df_ash[(df_ash['Name'] == athlete_name) & (df_ash['Test Date'] <= eval_date)]
-    past_er = df_er[(df_er['Name'] == athlete_name) & (df_er['Test Date'] <= eval_date)]
+    # 1. Extract Spikes
+    if not df_spikes.empty and 'Spike_Count' in df_spikes.columns:
+        recent_spikes = df_spikes[(df_spikes['Name'] == athlete_name) & 
+                                  (pd.to_datetime(df_spikes['Date']) > week_ago) & 
+                                  (pd.to_datetime(df_spikes['Date']) <= pd.to_datetime(eval_date))]['Spike_Count'].sum()
+    else:
+        recent_spikes = 0
+    
+    # 2. Extract Capacity (Filtered for ISO-I)
+    past_ash = df_ash[(df_ash['Name'] == athlete_name) & 
+                      (pd.to_datetime(df_ash['Test Date']) <= pd.to_datetime(eval_date)) & 
+                      (df_ash['Isometric Type'].astype(str).str.contains('I', na=False, case=False))]
+                      
+    past_er = df_er[(df_er['Name'] == athlete_name) & 
+                    (pd.to_datetime(df_er['Test Date']) <= pd.to_datetime(eval_date))]
     
     if past_ash.empty or past_er.empty or recent_spikes == 0:
         return None, recent_spikes, 0, 0
         
-    # Get latest dominant arm metrics (Assuming Right hand dominant here)
     latest_ash_force = past_ash.iloc[-1].get('Peak Vertical Force [N] (R)', 0.0)
     latest_er_rom = past_er.iloc[-1].get('R Max ROM (°)', 0.0)
     
@@ -653,7 +701,6 @@ def compute_shoulder_risk_score(athlete_name, eval_date, df_spikes, df_ash, df_e
     
     return final_risk_score, recent_spikes, latest_ash_force, latest_er_rom
     
-
 # --- REUSABLE GAUGE GENERATOR FUNCTION ---
 def create_wellness_gauge(score_val, height=230):
     normalized = float(min(100, max(0, score_val)))
@@ -3559,9 +3606,9 @@ if check_password():
                 with c_sh1: 
                     sel_sh_ath = st.selectbox("Select Hitter", master_athlete_list, key="sh_risk_ath_sel")
                     
-                    # Compute Current Risk
+                    # Compute Current Risk (USING RAW DATAFRAMES TO IGNORE SEASON TOGGLE)
                     today = pd.to_datetime(df_master['Date'].max()) if not df_master.empty else pd.Timestamp.now()
-                    risk_score, d7_spikes, ash_f, er_r = compute_shoulder_risk_score(sel_sh_ath, today, spike_master, ash_master, er_master)
+                    risk_score, d7_spikes, ash_f, er_r = compute_shoulder_risk_score(sel_sh_ath, today, raw_spike_df, raw_ash_df, raw_er_df)
                     
                     if risk_score is not None:
                         # Invert color logic: High Risk = Red
@@ -3588,14 +3635,15 @@ if check_password():
                         
                         st.info(f"Target Date Window: 7 days leading up to {today.strftime('%m/%d/%Y')}")
                         with st.expander("View Raw Processed Spike DataFrame", expanded=True):
-                            st.write("If this table is empty, the raw CSV isn't catching the spikes or the names/dates don't match.")
-                            st.dataframe(spike_master)
+                            st.write("This table shows the dates where spikes were successfully processed.")
+                            st.dataframe(raw_spike_df)
 
                 with c_sh2:
-                    if not spike_master.empty and not ash_master.empty:
-                        ath_spikes = spike_master[spike_master['Name'] == sel_sh_ath].sort_values('Date')
-                        ath_ash = ash_master[(ash_master['Name'] == sel_sh_ath) & 
-                                             (ash_master['Isometric Type'].astype(str).str.contains('I', na=False))].sort_values('Test Date')
+                    if not raw_spike_df.empty:
+                        # USING RAW DATAFRAMES
+                        ath_spikes = raw_spike_df[raw_spike_df['Name'] == sel_sh_ath].sort_values('Date')
+                        ath_ash = raw_ash_df[(raw_ash_df['Name'] == sel_sh_ath) & 
+                                             (raw_ash_df['Isometric Type'].astype(str).str.contains('I', na=False))].sort_values('Test Date')
                         
                         if not ath_spikes.empty and not ath_ash.empty:
                             fig_sh = make_subplots(specs=[[{"secondary_y": True}]])
@@ -3620,7 +3668,7 @@ if check_password():
                             fig_sh.update_yaxes(title_text="ASH Peak Force (N)", secondary_y=True, showgrid=False)
                             
                             st.plotly_chart(fig_sh, use_container_width=True, config=LOCKED_CONFIG, key="shoulder_risk_chart")
-
+                            
         # =========================================================================
         # --- HUB 5: TESTING & BASELINES ------------------------------------------
         # =========================================================================
