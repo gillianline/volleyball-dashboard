@@ -665,9 +665,9 @@ def compute_athlete_ewMA_calendar(df_player, metrics_list):
         )
     return cal
 
-# --- NEW: SHOULDER RISK ENGINE ---
+# --- UPDATED: SHOULDER RISK ENGINE (Target ROM = 110°) ---
 def compute_shoulder_risk_score(athlete_name, eval_date, df_spikes, df_ash, df_er):
-    """Calculates a 0-100 risk index based on Spike Volume vs. ASH/ROM Capacity."""
+    """Calculates a 0-100 risk index based on Spike Volume vs. ASH/ROM Capacity (Target ROM: 110°)."""
     week_ago = pd.to_datetime(eval_date) - timedelta(days=7)
     
     # 1. Extract Spikes
@@ -695,8 +695,12 @@ def compute_shoulder_risk_score(athlete_name, eval_date, df_spikes, df_ash, df_e
     if latest_ash_force <= 0 or latest_er_rom <= 0: 
         return None, recent_spikes, latest_ash_force, latest_er_rom
 
-    # Load-to-Capacity Ratio
-    risk_index = (recent_spikes / (latest_ash_force * (latest_er_rom / 110.0))) * 1500
+    # 3. Updated Mobility Multiplier (Scaled to 110° target standard)
+    mobility_multiplier = (latest_er_rom / 110.0)
+    adjusted_capacity = latest_ash_force * mobility_multiplier
+
+    # 4. Load-to-Capacity Ratio & Scaling
+    risk_index = (recent_spikes / adjusted_capacity) * 1500
     final_risk_score = min(100.0, max(0.0, risk_index))
     
     return final_risk_score, recent_spikes, latest_ash_force, latest_er_rom
