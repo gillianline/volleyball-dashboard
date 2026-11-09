@@ -696,7 +696,7 @@ def compute_shoulder_risk_score(athlete_name, eval_date, df_spikes, df_ash, df_e
         return None, recent_spikes, latest_ash_force, latest_er_rom
 
     # Load-to-Capacity Ratio
-    risk_index = (recent_spikes / (latest_ash_force * (latest_er_rom / 100.0))) * 1500
+    risk_index = (recent_spikes / (latest_ash_force * (latest_er_rom / 110.0))) * 1500
     final_risk_score = min(100.0, max(0.0, risk_index))
     
     return final_risk_score, recent_spikes, latest_ash_force, latest_er_rom
