@@ -276,6 +276,76 @@ st.markdown("""
 
 
 # --- 2. PASSWORD & UTILITY FUNCTIONS ---
+import pandas as pd
+import numpy as np
+
+@st.cache_data(ttl=10)
+def process_raw_kinematics_to_spikes(csv_path):
+    """
+    Ingests raw Catapult sensor data and reverse-engineers Volleyball Spike Counts
+    based on vertical G-force, forward approach velocity, and rotational swing.
+    """
+    try:
+        # 1. Load the raw Catapult sensor export
+        # Note: adjust delimiter if your CSV uses tabs instead of commas
+        raw_df = pd.read_csv(csv_path) 
+        
+        # Ensure columns match Catapult formatting
+        raw_df = raw_df.rename(columns=lambda x: x.strip())
+        
+        # We need Date/Time to isolate daily sessions
+        raw_df['Timestamp'] = pd.to_datetime(raw_df['Date/Time'])
+        raw_df['Date'] = raw_df['Timestamp'].dt.date
+        
+        # Sort chronologically to ensure rolling windows work correctly
+        raw_df = raw_df.sort_values(['Name', 'Timestamp']).reset_index(drop=True)
+        
+        # 2. Define our Kinematic Thresholds (You can tweak these based on team averages)
+        MIN_VERTICAL_G = 2.5       # Minimum Acceleration.up to be considered a jump
+        MIN_FORWARD_G = 1.0        # Minimum Acceleration.forward to prove it was a moving approach (not a block)
+        MIN_ROTATION_DEG_S = 200.0 # Minimum trunk/arm rotation to prove an arm swing occurred
+        
+        # 3. Peak Detection (Rolling Windows)
+        # At 10Hz, a jump/swing sequence happens within ~1 second (10 rows). 
+        # We look for the absolute maximums within a rolling 1-second window.
+        
+        # Find local maximums for Vertical Jump
+        raw_df['local_max_up'] = raw_df.groupby('Name')['Acceleration.up'].transform(
+            lambda x: x.rolling(window=10, center=True, min_periods=1).max()
+        )
+        
+        # Find local maximums for Forward Approach & Rotation (using absolute values for rotation)
+        raw_df['local_max_fwd'] = raw_df.groupby('Name')['Acceleration.forward'].transform(
+            lambda x: x.rolling(window=10, center=True, min_periods=1).max()
+        )
+        raw_df['max_rotation'] = raw_df[['Rotation.roll', 'Rotation.pitch', 'Rotation.yaw']].abs().max(axis=1)
+        raw_df['local_max_rot'] = raw_df.groupby('Name')['max_rotation'].transform(
+            lambda x: x.rolling(window=10, center=True, min_periods=1).max()
+        )
+        
+        # 4. The Spike Boolean Mask
+        # A row is the "peak" of a spike IF:
+        # - The current upward acceleration matches the local maximum (it's the peak of the jump)
+        # - The vertical G-force is high enough
+        # - The forward G-force (approach) was high enough
+        # - The rotation (swing) was fast enough
+        raw_df['is_spike'] = (
+            (raw_df['Acceleration.up'] == raw_df['local_max_up']) & 
+            (raw_df['Acceleration.up'] >= MIN_VERTICAL_G) & 
+            (raw_df['local_max_fwd'] >= MIN_FORWARD_G) & 
+            (raw_df['local_max_rot'] >= MIN_ROTATION_DEG_S)
+        )
+        
+        # 5. Aggregate into Daily Spike Counts
+        spikes_df = raw_df[raw_df['is_spike']].groupby(['Name', 'Date']).size().reset_index(name='Spike_Count')
+        spikes_df['Date'] = pd.to_datetime(spikes_df['Date'])
+        
+        return spikes_df
+
+    except Exception as e:
+        print(f"Error processing raw sensor data: {e}")
+        return pd.DataFrame(columns=['Name', 'Date', 'Spike_Count'])
+        
 def check_password():
     def password_entered():
         if st.session_state["password"] == st.secrets["PASSWORD"]:
@@ -527,15 +597,16 @@ def load_all_data():
     except:
         thresh_df = None
         
-    # --- NEW: Spike Data Sheet ---
+    # --- NEW: Process Raw Sensor Data to Spikes ---
     try:
-        spike_df = pd.read_csv(st.secrets["SPIKE_SHEET_URL"])
-        spike_df.columns = spike_df.columns.str.strip()
-        spike_df = clean_name_col(spike_df)
-        spike_df['Date'] = pd.to_datetime(spike_df['Date'], errors='coerce')
+        # Pass the Google Drive URL or local path of your raw Catapult export
+        raw_sensor_path = st.secrets["RAW_SENSOR_CSV_URL"] 
+        spike_df = process_raw_kinematics_to_spikes(raw_sensor_path)
         spike_df['Season'] = spike_df['Date'].apply(assign_season)
     except:
         spike_df = pd.DataFrame(columns=['Name', 'Date', 'Spike_Count', 'Season'])
+        
+    return df.dropna(subset=['Date']), match_df.dropna(subset=['Date']), cmj_df, phase_df, thresh_df, ash_df, er_df, calf_df, hip_df, shoulder_df, spike_df
         
     # Updated return statement with spike_df
     return df.dropna(subset=['Date']), match_df.dropna(subset=['Date']), cmj_df, phase_df, thresh_df, ash_df, er_df, calf_df, hip_df, shoulder_df, spike_df
