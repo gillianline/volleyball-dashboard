@@ -3615,7 +3615,7 @@ if check_password():
                         r_color = "#15803D" if risk_score < 40 else "#D97706" if risk_score < 75 else "#B91C1C"
                         st.markdown(f'''
                             <div style="background:#F8FAFC; border:1px solid #E2E8F0; border-radius:12px; padding:20px; text-align:center;">
-                                <div style="font-size:12px; font-weight:800; color:#64748B; text-transform:uppercase;">7-Day Micro-Trauma Risk</div>
+                                <div style="font-size:12px; font-weight:800; color:#64748B; text-transform:uppercase;">7-Day Risk</div>
                                 <div style="font-size:42px; font-weight:900; color:{r_color};">{risk_score:.0f}/100</div>
                             </div>
                         ''', unsafe_allow_html=True)
