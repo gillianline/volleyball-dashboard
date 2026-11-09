@@ -3649,8 +3649,9 @@ if check_password():
                             fig_sh = make_subplots(specs=[[{"secondary_y": True}]])
                             
                             fig_sh.add_trace(go.Bar(
-                                x=ath_spikes['Date'], y=ath_spikes.get('Spike_Count', []), 
-                                name="Daily Spikes", marker_color='#4895DB', opacity=0.7
+                                x=ath_spikes['Date'], y=ath_spikes['Spike_Count'], 
+                                name="Daily Spikes", marker_color='#4895DB', opacity=0.7,
+                                width=86400000 # NEW: Forces the bar to be exactly 1 day wide in milliseconds
                             ), secondary_y=False)
                             
                             fig_sh.add_trace(go.Scatter(
