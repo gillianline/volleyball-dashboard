@@ -527,7 +527,19 @@ def load_all_data():
     except:
         thresh_df = None
         
-    return df.dropna(subset=['Date']), match_df.dropna(subset=['Date']), cmj_df, phase_df, thresh_df, ash_df, er_df, calf_df, hip_df, shoulder_df
+    # --- NEW: Spike Data Sheet ---
+    try:
+        spike_df = pd.read_csv(st.secrets["SPIKE_SHEET_URL"])
+        spike_df.columns = spike_df.columns.str.strip()
+        spike_df = clean_name_col(spike_df)
+        spike_df['Date'] = pd.to_datetime(spike_df['Date'], errors='coerce')
+        spike_df['Season'] = spike_df['Date'].apply(assign_season)
+    except:
+        spike_df = pd.DataFrame(columns=['Name', 'Date', 'Spike_Count', 'Season'])
+        
+    # Updated return statement with spike_df
+    return df.dropna(subset=['Date']), match_df.dropna(subset=['Date']), cmj_df, phase_df, thresh_df, ash_df, er_df, calf_df, hip_df, shoulder_df, spike_df
+        
 
 
 # --- 4. EWMA ACWR COMPUTATION ENGINE ---
@@ -549,6 +561,34 @@ def compute_athlete_ewMA_calendar(df_player, metrics_list):
             axis=1
         )
     return cal
+
+# --- NEW: SHOULDER RISK ENGINE ---
+def compute_shoulder_risk_score(athlete_name, eval_date, df_spikes, df_ash, df_er):
+    """Calculates a 0-100 risk index based on Spike Volume vs. ASH/ROM Capacity."""
+    week_ago = eval_date - timedelta(days=7)
+    recent_spikes = df_spikes[(df_spikes['Name'] == athlete_name) & 
+                              (df_spikes['Date'] > week_ago) & 
+                              (df_spikes['Date'] <= eval_date)]['Spike_Count'].sum() if 'Spike_Count' in df_spikes.columns else 0
+    
+    past_ash = df_ash[(df_ash['Name'] == athlete_name) & (df_ash['Test Date'] <= eval_date)]
+    past_er = df_er[(df_er['Name'] == athlete_name) & (df_er['Test Date'] <= eval_date)]
+    
+    if past_ash.empty or past_er.empty or recent_spikes == 0:
+        return None, recent_spikes, 0, 0
+        
+    # Get latest dominant arm metrics (Assuming Right hand dominant here)
+    latest_ash_force = past_ash.iloc[-1].get('Peak Vertical Force [N] (R)', 0.0)
+    latest_er_rom = past_er.iloc[-1].get('R Max ROM (°)', 0.0)
+    
+    if latest_ash_force <= 0 or latest_er_rom <= 0: 
+        return None, recent_spikes, latest_ash_force, latest_er_rom
+
+    # Load-to-Capacity Ratio
+    risk_index = (recent_spikes / (latest_ash_force * (latest_er_rom / 90.0))) * 1500
+    final_risk_score = min(100.0, max(0.0, risk_index))
+    
+    return final_risk_score, recent_spikes, latest_ash_force, latest_er_rom
+    
 
 # --- REUSABLE GAUGE GENERATOR FUNCTION ---
 def create_wellness_gauge(score_val, height=230):
@@ -643,7 +683,7 @@ if check_password():
     LOCKED_CONFIG = {'staticPlot': False, 'displayModeBar': False}
 
     try:
-        raw_df, raw_match_df, raw_cmj_df, raw_phase_df, thresh_df, raw_ash_df, raw_er_df, raw_calf_df, raw_hip_df, raw_shoulder_df = load_all_data()
+        raw_df, raw_match_df, raw_cmj_df, raw_phase_df, thresh_df, raw_ash_df, raw_er_df, raw_calf_df, raw_hip_df, raw_shoulder_df, raw_spike_df = load_all_data()
 
         # --- GLOBAL SIDEBAR ---
         st.sidebar.markdown("### Active Season")
@@ -686,6 +726,7 @@ if check_password():
         hip_master = raw_hip_df[raw_hip_df['Season'] == selected_season].copy()
         shoulder_master = raw_shoulder_df[raw_shoulder_df['Season'] == selected_season].copy()
         phase_master = raw_phase_df[raw_phase_df['Season'] == selected_season].copy()
+        spike_master = raw_spike_df[raw_spike_df['Season'] == selected_season].copy() if not raw_spike_df.empty else pd.DataFrame()
 
         session_list = df_master.sort_values('Date', ascending=False)['Session_Name'].dropna().unique().tolist() if not df_master.empty else []
 
@@ -3272,7 +3313,7 @@ if check_password():
         elif selected_hub == "Workload & ACWR":
             st.markdown('<div class="section-header">Acute:Chronic Workload Ratio (EWMA)</div>', unsafe_allow_html=True)
             
-            acwr_tabs_list = ["Team Workload Summary", "Individual"]
+            acwr_tabs_list = ["Team Workload Summary", "Individual", "Shoulder Capacity Risk"]
             if "acwr_active_subtab" not in st.session_state:
                 st.session_state.acwr_active_subtab = acwr_tabs_list[0]
                 
@@ -3445,7 +3486,70 @@ if check_password():
                         _, _, status_lbl = get_acwr_badge(r_val)
                         ind_metric_rows.append({"Metric": m, "Day Total": f"{target_row.get(m, 0.0):.1f}", "Acute (7d EWMA)": f"{a_ewma:.1f}", "Chronic (28d EWMA)": f"{c_ewma:.1f}", "ACWR Ratio": f"{r_val:.2f}", "Workload Zone": status_lbl})
                     st.dataframe(pd.DataFrame(ind_metric_rows), use_container_width=True, hide_index=True)
+                    
+            # --- NEW TAB: SHOULDER RISK ---
+            elif selected_acwr_tab == "Shoulder Capacity Risk":
+                st.markdown('<div class="section-header">Spike Kinematics vs. Shoulder Capacity</div>', unsafe_allow_html=True)
+                
+                c_sh1, c_sh2 = st.columns([1.5, 3])
+                with c_sh1: 
+                    sel_sh_ath = st.selectbox("Select Hitter", master_athlete_list, key="sh_risk_ath_sel")
+                    
+                    # Compute Current Risk
+                    today = pd.to_datetime(df_master['Date'].max()) if not df_master.empty else pd.Timestamp.now()
+                    risk_score, d7_spikes, ash_f, er_r = compute_shoulder_risk_score(sel_sh_ath, today, spike_master, ash_master, er_master)
+                    
+                    if risk_score is not None:
+                        # Invert color logic: High Risk = Red
+                        r_color = "#15803D" if risk_score < 40 else "#D97706" if risk_score < 75 else "#B91C1C"
+                        st.markdown(f'''
+                            <div style="background:#F8FAFC; border:1px solid #E2E8F0; border-radius:12px; padding:20px; text-align:center;">
+                                <div style="font-size:12px; font-weight:800; color:#64748B; text-transform:uppercase;">7-Day Micro-Trauma Risk</div>
+                                <div style="font-size:42px; font-weight:900; color:{r_color};">{risk_score:.0f}/100</div>
+                            </div>
+                        ''', unsafe_allow_html=True)
+                        
+                        st.write("<br>", unsafe_allow_html=True)
+                        sm1, sm2 = st.columns(2)
+                        sm1.metric("7-Day Spike Volume", int(d7_spikes))
+                        sm2.metric("Latest ASH ISO-I", f"{ash_f:.0f} N")
+                    else:
+                        st.info("Insufficient Catapult spike volume or VALD baseline data for this athlete.")
 
+                with c_sh2:
+                    # Longitudinal Dual-Axis Chart: Spikes vs ASH Force Decay
+                    if not spike_master.empty and not ash_master.empty:
+                        ath_spikes = spike_master[spike_master['Name'] == sel_sh_ath].sort_values('Date')
+                        ath_ash = ash_master[(ash_master['Name'] == sel_sh_ath) & 
+                                             (ash_master['Isometric Type'].astype(str).str.contains('I', na=False))].sort_values('Test Date')
+                        
+                        if not ath_spikes.empty and not ath_ash.empty:
+                            fig_sh = make_subplots(specs=[[{"secondary_y": True}]])
+                            
+                            # Bar chart for daily spikes
+                            fig_sh.add_trace(go.Bar(
+                                x=ath_spikes['Date'], y=ath_spikes.get('Spike_Count', []), 
+                                name="Daily Spikes", marker_color='#4895DB', opacity=0.7
+                            ), secondary_y=False)
+                            
+                            # Line chart for ASH Force Capacity overlay
+                            fig_sh.add_trace(go.Scatter(
+                                x=ath_ash['Test Date'], y=ath_ash['Peak Vertical Force [N] (R)'], 
+                                name="ASH Force Capacity (N)", mode='lines+markers', 
+                                line=dict(color='#FF8200', width=4), marker=dict(size=8, color='#FF8200')
+                            ), secondary_y=True)
+                            
+                            fig_sh.update_layout(
+                                height=350, template="simple_white", 
+                                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+                                margin=dict(l=0, r=0, t=30, b=0)
+                            )
+                            fig_sh.update_yaxes(title_text="Daily Spike Count", secondary_y=False)
+                            fig_sh.update_yaxes(title_text="ASH Peak Force (N)", secondary_y=True, showgrid=False)
+                            
+                            st.plotly_chart(fig_sh, use_container_width=True, config=LOCKED_CONFIG, key="shoulder_risk_chart")
+                        else:
+                            st.info("Wait for more spike and ASH data to generate the longitudinal overlay.")
 
         # =========================================================================
         # --- HUB 5: TESTING & BASELINES ------------------------------------------
