@@ -283,67 +283,60 @@ import numpy as np
 def process_raw_kinematics_to_spikes(csv_path):
     """
     Ingests raw Catapult sensor data and reverse-engineers Volleyball Spike Counts
-    based on vertical G-force, forward approach velocity, and rotational swing.
+    using absolute values to account for inverted device orientations.
     """
     try:
-        # 1. Load the raw Catapult sensor export
-        # Note: adjust delimiter if your CSV uses tabs instead of commas
-        raw_df = pd.read_csv(csv_path) 
+        raw_df = pd.read_csv(csv_path)
+        raw_df = raw_df.rename(columns=lambda x: str(x).strip())
         
-        # Ensure columns match Catapult formatting
-        raw_df = raw_df.rename(columns=lambda x: x.strip())
+        # 1. Bulletproof Name & Date Formatting
+        if 'Name' in raw_df.columns:
+            raw_df['Name'] = raw_df['Name'].astype(str).str.strip()
+            
+        if 'Date/Time' in raw_df.columns:
+            # .dt.normalize() strips the time of day so it matches your daily practice logs exactly
+            raw_df['Date'] = pd.to_datetime(raw_df['Date/Time'], errors='coerce').dt.normalize()
+        else:
+            return pd.DataFrame(columns=['Name', 'Date', 'Spike_Count'])
+            
+        raw_df = raw_df.sort_values(['Name', 'Date/Time']).reset_index(drop=True)
         
-        # We need Date/Time to isolate daily sessions
-        raw_df['Timestamp'] = pd.to_datetime(raw_df['Date/Time'])
-        raw_df['Date'] = raw_df['Timestamp'].dt.date
+        # 2. Relaxed Kinematic Thresholds (to ensure we catch data)
+        MIN_VERTICAL_G = 1.8       
+        MIN_FORWARD_G = 0.5        
+        MIN_ROTATION_DEG_S = 150.0 
         
-        # Sort chronologically to ensure rolling windows work correctly
-        raw_df = raw_df.sort_values(['Name', 'Timestamp']).reset_index(drop=True)
+        # 3. Absolute values (fixes athletes wearing the device upside down)
+        raw_df['Abs.Up'] = raw_df['Acceleration.up'].abs()
+        raw_df['Abs.Fwd'] = raw_df['Acceleration.forward'].abs()
         
-        # 2. Define our Kinematic Thresholds (You can tweak these based on team averages)
-        MIN_VERTICAL_G = 2.5       # Minimum Acceleration.up to be considered a jump
-        MIN_FORWARD_G = 1.0        # Minimum Acceleration.forward to prove it was a moving approach (not a block)
-        MIN_ROTATION_DEG_S = 200.0 # Minimum trunk/arm rotation to prove an arm swing occurred
+        # 4. Rolling Windows
+        raw_df['local_max_up'] = raw_df.groupby('Name')['Abs.Up'].transform(lambda x: x.rolling(10, center=True, min_periods=1).max())
+        raw_df['local_max_fwd'] = raw_df.groupby('Name')['Abs.Fwd'].transform(lambda x: x.rolling(10, center=True, min_periods=1).max())
         
-        # 3. Peak Detection (Rolling Windows)
-        # At 10Hz, a jump/swing sequence happens within ~1 second (10 rows). 
-        # We look for the absolute maximums within a rolling 1-second window.
-        
-        # Find local maximums for Vertical Jump
-        raw_df['local_max_up'] = raw_df.groupby('Name')['Acceleration.up'].transform(
-            lambda x: x.rolling(window=10, center=True, min_periods=1).max()
-        )
-        
-        # Find local maximums for Forward Approach & Rotation (using absolute values for rotation)
-        raw_df['local_max_fwd'] = raw_df.groupby('Name')['Acceleration.forward'].transform(
-            lambda x: x.rolling(window=10, center=True, min_periods=1).max()
-        )
-        raw_df['max_rotation'] = raw_df[['Rotation.roll', 'Rotation.pitch', 'Rotation.yaw']].abs().max(axis=1)
-        raw_df['local_max_rot'] = raw_df.groupby('Name')['max_rotation'].transform(
-            lambda x: x.rolling(window=10, center=True, min_periods=1).max()
-        )
-        
-        # 4. The Spike Boolean Mask
-        # A row is the "peak" of a spike IF:
-        # - The current upward acceleration matches the local maximum (it's the peak of the jump)
-        # - The vertical G-force is high enough
-        # - The forward G-force (approach) was high enough
-        # - The rotation (swing) was fast enough
+        rot_cols = [c for c in ['Rotation.roll', 'Rotation.pitch', 'Rotation.yaw'] if c in raw_df.columns]
+        if rot_cols:
+            raw_df['max_rotation'] = raw_df[rot_cols].abs().max(axis=1)
+            raw_df['local_max_rot'] = raw_df.groupby('Name')['max_rotation'].transform(lambda x: x.rolling(10, center=True, min_periods=1).max())
+        else:
+            raw_df['local_max_rot'] = 999.0 # Pass automatically if gyro data is missing
+            
+        # 5. Spike Logic
         raw_df['is_spike'] = (
-            (raw_df['Acceleration.up'] == raw_df['local_max_up']) & 
-            (raw_df['Acceleration.up'] >= MIN_VERTICAL_G) & 
+            (raw_df['Abs.Up'] == raw_df['local_max_up']) & 
+            (raw_df['Abs.Up'] >= MIN_VERTICAL_G) & 
             (raw_df['local_max_fwd'] >= MIN_FORWARD_G) & 
             (raw_df['local_max_rot'] >= MIN_ROTATION_DEG_S)
         )
         
-        # 5. Aggregate into Daily Spike Counts
+        # 6. Aggregate
         spikes_df = raw_df[raw_df['is_spike']].groupby(['Name', 'Date']).size().reset_index(name='Spike_Count')
         spikes_df['Date'] = pd.to_datetime(spikes_df['Date'])
         
         return spikes_df
 
     except Exception as e:
-        print(f"Error processing raw sensor data: {e}")
+        st.error(f"Kinematic Processing Error: {e}")
         return pd.DataFrame(columns=['Name', 'Date', 'Spike_Count'])
         
 def check_password():
@@ -3585,10 +3578,20 @@ if check_password():
                         sm1.metric("7-Day Spike Volume", int(d7_spikes))
                         sm2.metric("Latest ASH ISO-I", f"{ash_f:.0f} N")
                     else:
-                        st.info("Insufficient Catapult spike volume or VALD baseline data for this athlete.")
+                        st.warning(f"**Data missing for {sel_sh_ath} to calculate risk:**")
+                        
+                        # Diagnostic Output
+                        c_dbg1, c_dbg2, c_dbg3 = st.columns(3)
+                        c_dbg1.metric("7-Day Spikes", f"{int(d7_spikes)}")
+                        c_dbg2.metric("Latest ASH Force", f"{ash_f} N")
+                        c_dbg3.metric("Latest ER ROM", f"{er_r}°")
+                        
+                        st.info(f"Target Date Window: 7 days leading up to {today.strftime('%m/%d/%Y')}")
+                        with st.expander("View Raw Processed Spike DataFrame", expanded=True):
+                            st.write("If this table is empty, the raw CSV isn't catching the spikes or the names/dates don't match.")
+                            st.dataframe(spike_master)
 
                 with c_sh2:
-                    # Longitudinal Dual-Axis Chart: Spikes vs ASH Force Decay
                     if not spike_master.empty and not ash_master.empty:
                         ath_spikes = spike_master[spike_master['Name'] == sel_sh_ath].sort_values('Date')
                         ath_ash = ash_master[(ash_master['Name'] == sel_sh_ath) & 
@@ -3597,13 +3600,11 @@ if check_password():
                         if not ath_spikes.empty and not ath_ash.empty:
                             fig_sh = make_subplots(specs=[[{"secondary_y": True}]])
                             
-                            # Bar chart for daily spikes
                             fig_sh.add_trace(go.Bar(
                                 x=ath_spikes['Date'], y=ath_spikes.get('Spike_Count', []), 
                                 name="Daily Spikes", marker_color='#4895DB', opacity=0.7
                             ), secondary_y=False)
                             
-                            # Line chart for ASH Force Capacity overlay
                             fig_sh.add_trace(go.Scatter(
                                 x=ath_ash['Test Date'], y=ath_ash['Peak Vertical Force [N] (R)'], 
                                 name="ASH Force Capacity (N)", mode='lines+markers', 
@@ -3619,8 +3620,6 @@ if check_password():
                             fig_sh.update_yaxes(title_text="ASH Peak Force (N)", secondary_y=True, showgrid=False)
                             
                             st.plotly_chart(fig_sh, use_container_width=True, config=LOCKED_CONFIG, key="shoulder_risk_chart")
-                        else:
-                            st.info("Wait for more spike and ASH data to generate the longitudinal overlay.")
 
         # =========================================================================
         # --- HUB 5: TESTING & BASELINES ------------------------------------------
