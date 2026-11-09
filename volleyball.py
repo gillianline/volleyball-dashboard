@@ -3606,7 +3606,7 @@ if check_password():
                 with c_sh1: 
                     sel_sh_ath = st.selectbox("Select Hitter", master_athlete_list, key="sh_risk_ath_sel")
                     
-                    # Compute Current Risk (USING RAW DATAFRAMES TO IGNORE SEASON TOGGLE)
+                    # Compute Current Risk (USING RAW DATAFRAMES)
                     today = pd.to_datetime(df_master['Date'].max()) if not df_master.empty else pd.Timestamp.now()
                     risk_score, d7_spikes, ash_f, er_r = compute_shoulder_risk_score(sel_sh_ath, today, raw_spike_df, raw_ash_df, raw_er_df)
                     
@@ -3621,9 +3621,12 @@ if check_password():
                         ''', unsafe_allow_html=True)
                         
                         st.write("<br>", unsafe_allow_html=True)
-                        sm1, sm2 = st.columns(2)
-                        sm1.metric("7-Day Spike Volume", int(d7_spikes))
-                        sm2.metric("Latest ASH ISO-I", f"{ash_f:.0f} N")
+                        
+                        # UPDATED: 3 Columns to show all variables
+                        sm1, sm2, sm3 = st.columns(3)
+                        sm1.metric("7-Day Spikes", int(d7_spikes))
+                        sm2.metric("ASH ISO-I", f"{ash_f:.0f} N")
+                        sm3.metric("ER ROM", f"{er_r:.1f}°")
                     else:
                         st.warning(f"**Data missing for {sel_sh_ath} to calculate risk:**")
                         
@@ -3640,25 +3643,36 @@ if check_password():
 
                 with c_sh2:
                     if not raw_spike_df.empty:
-                        # USING RAW DATAFRAMES
+                        # Pull longitudinal data for all 3 metrics
                         ath_spikes = raw_spike_df[raw_spike_df['Name'] == sel_sh_ath].sort_values('Date')
                         ath_ash = raw_ash_df[(raw_ash_df['Name'] == sel_sh_ath) & 
                                              (raw_ash_df['Isometric Type'].astype(str).str.contains('I', na=False))].sort_values('Test Date')
+                        ath_er = raw_er_df[raw_er_df['Name'] == sel_sh_ath].sort_values('Test Date')
                         
                         if not ath_spikes.empty and not ath_ash.empty:
                             fig_sh = make_subplots(specs=[[{"secondary_y": True}]])
                             
+                            # 1. Bar chart for daily spikes (Left Axis)
                             fig_sh.add_trace(go.Bar(
-                                x=ath_spikes['Date'], y=ath_spikes['Spike_Count'], 
+                                x=ath_spikes['Date'], y=ath_spikes.get('Spike_Count', []), 
                                 name="Daily Spikes", marker_color='#4895DB', opacity=0.7,
-                                width=86400000 # NEW: Forces the bar to be exactly 1 day wide in milliseconds
+                                width=86400000 # Forces Plotly bar to be exactly 1 day wide
                             ), secondary_y=False)
                             
+                            # 2. Line chart for ASH Force Capacity overlay (Right Axis)
                             fig_sh.add_trace(go.Scatter(
                                 x=ath_ash['Test Date'], y=ath_ash['Peak Vertical Force [N] (R)'], 
-                                name="ASH Force Capacity (N)", mode='lines+markers', 
+                                name="ASH Force (N)", mode='lines+markers', 
                                 line=dict(color='#FF8200', width=4), marker=dict(size=8, color='#FF8200')
                             ), secondary_y=True)
+                            
+                            # 3. NEW: Line chart for ER ROM overlay (Right Axis)
+                            if not ath_er.empty:
+                                fig_sh.add_trace(go.Scatter(
+                                    x=ath_er['Test Date'], y=ath_er['R Max ROM (°)'], 
+                                    name="ER ROM (°)", mode='lines+markers', 
+                                    line=dict(color='#515154', width=2.5, dash='dot'), marker=dict(size=6, color='#515154')
+                                ), secondary_y=True)
                             
                             fig_sh.update_layout(
                                 height=350, template="simple_white", 
@@ -3666,7 +3680,7 @@ if check_password():
                                 margin=dict(l=0, r=0, t=30, b=0)
                             )
                             fig_sh.update_yaxes(title_text="Daily Spike Count", secondary_y=False)
-                            fig_sh.update_yaxes(title_text="ASH Peak Force (N)", secondary_y=True, showgrid=False)
+                            fig_sh.update_yaxes(title_text="Force (N) / ROM (°)", secondary_y=True, showgrid=False)
                             
                             st.plotly_chart(fig_sh, use_container_width=True, config=LOCKED_CONFIG, key="shoulder_risk_chart")
                             
