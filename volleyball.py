@@ -528,7 +528,7 @@ def load_all_data():
     except:
         thresh_df = None
 
-    # --- RAW SENSOR JUMP HEIGHT PARSER (DYNAMIC BASELINE) ---
+   # --- RAW SENSOR JUMP HEIGHT PARSER (METERS/SEC^2 SCALING) ---
     try:
         spike_url = st.secrets.get("SPIKE_SHEET_URL", None)
         if not spike_url:
@@ -551,15 +551,14 @@ def load_all_data():
             raw_spike = raw_spike.sort_values(['Name', 'Parsed_Time']).reset_index(drop=True)
             
             jump_records = []
-            # Group by athlete and session/date to calculate dynamic baseline per session
             for (name, date_val), group_df in raw_spike.groupby(['Name', 'Date']):
                 sub = group_df.sort_values('Parsed_Time').copy()
                 
-                # Dynamic threshold: median/resting baseline minus an unweighting drop
-                median_accel = sub['Acceleration.up'].median()
-                airborne_threshold = median_accel - 1.5 # Catches significant drop toward freefall
+                # In m/s^2, a significant drop below the mean/median indicates unweighting/flight
+                median_val = sub['Acceleration.up'].median()
+                threshold = median_val - 2.5 
                 
-                sub['is_airborne'] = sub['Acceleration.up'] < airborne_threshold
+                sub['is_airborne'] = sub['Acceleration.up'] < threshold
                 sub['jump_event'] = (sub['is_airborne'] != sub['is_airborne'].shift()).cumsum()
                 
                 for event_id, event_group in sub[sub['is_airborne']].groupby('jump_event'):
@@ -568,6 +567,7 @@ def load_all_data():
                         end_t = event_group['Parsed_Time'].iloc[-1]
                         flight_time = (end_t - start_t).total_seconds()
                         
+                        # Volleyball jump flight time typically ranges from 0.35s to 1.1s
                         if 0.30 <= flight_time <= 1.2:
                             h_meters = (9.81 * (flight_time ** 2)) / 8
                             h_inches = h_meters * 39.3701
