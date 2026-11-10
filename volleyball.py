@@ -293,17 +293,6 @@ def check_password():
     else:
         return True
 
-def clean_name_col(df_in):
-    """Globally scoped name cleaner to prevent Scope/NameErrors."""
-    if df_in is None or df_in.empty:
-        return df_in
-    if 'Athlete' in df_in.columns and 'Name' not in df_in.columns:
-        df_in.rename(columns={'Athlete': 'Name'}, inplace=True)
-    if 'Name' in df_in.columns:
-        df_in['Name'] = df_in['Name'].astype(str).str.strip()
-    return df_in
-    
-
 def get_flipped_gradient(score):
     try:
         score = float(score)
@@ -371,9 +360,11 @@ def load_all_data():
         m = date_val.month
         d = date_val.day
     
+        # Isolate historical data (2025 and earlier)
         if y < 2026:
             return f"Historical {y}"
         
+        # 2026 Active Season Boundaries
         if (m == 8 and d >= 24) or (m > 8 and m <= 12):
             return 'In-Season'
         elif (m == 7 and d >= 28) or (m == 8 and d < 24):
@@ -384,6 +375,13 @@ def load_all_data():
             return 'Summer'
         else:
             return 'Spring'
+
+    def clean_name_col(df_in):
+        if 'Athlete' in df_in.columns and 'Name' not in df_in.columns:
+            df_in.rename(columns={'Athlete': 'Name'}, inplace=True)
+        if 'Name' in df_in.columns:
+            df_in['Name'] = df_in['Name'].astype(str).str.strip()
+        return df_in
 
     # GPS Practice Data
     df = pd.read_csv(st.secrets["GOOGLE_SHEET_URL"])
@@ -422,6 +420,7 @@ def load_all_data():
         cmj_df['Week'] = pd.to_numeric(cmj_df['Week'].astype(str).str.extract(r'(\d+)', expand=False), errors='coerce').fillna(0).astype(int)
     cmj_df['Season'] = cmj_df['Test Date'].apply(assign_season)
 
+    # Standardized calculated columns
     if 'Countermovement Depth [cm]' in cmj_df.columns:
         cmj_df['Adjusted CMD'] = pd.to_numeric(cmj_df['Countermovement Depth [cm]'], errors='coerce').abs()
     else:
@@ -503,7 +502,7 @@ def load_all_data():
         shoulder_df = pd.read_csv(st.secrets["SHOULDER_SHEET_URL"])
         shoulder_df.columns = shoulder_df.columns.str.strip()
         shoulder_df = clean_name_col(shoulder_df)
-        if 'Test Date' not in shoulder_df.columns and 'Date' in jump_height_df if 'jump_height_df' in locals() else 'Date' in shoulder_df.columns:
+        if 'Test Date' not in shoulder_df.columns and 'Date' in shoulder_df.columns:
             shoulder_df.rename(columns={'Date': 'Test Date'}, inplace=True)
         shoulder_df['Test Date'] = pd.to_datetime(shoulder_df['Test Date'], errors='coerce')
         for col in ['L Max Force (N)', 'R Max Force (N)']:
@@ -527,66 +526,10 @@ def load_all_data():
         thresh_df.columns = thresh_df.columns.str.strip()
     except:
         thresh_df = None
+        
+    return df.dropna(subset=['Date']), match_df.dropna(subset=['Date']), cmj_df, phase_df, thresh_df, ash_df, er_df, calf_df, hip_df, shoulder_df
 
-   # --- RAW SENSOR JUMP HEIGHT PARSER (UNIVERSAL FALLBACK) ---
-    try:
-        spike_url = st.secrets.get("SPIKE_SHEET_URL", None)
-        if not spike_url:
-            raise ValueError("SPIKE_SHEET_URL secret is missing.")
-            
-        raw_spike = pd.read_csv(spike_url, sep=None, engine='python')
-        raw_spike.columns = raw_spike.columns.str.strip()
-        raw_spike = clean_name_col(raw_spike)
-        
-        if 'Date/Time' in raw_spike.columns:
-            raw_spike['Parsed_Time'] = pd.to_datetime(raw_spike['Date/Time'], errors='coerce')
-            raw_spike['Date'] = raw_spike['Parsed_Time'].dt.normalize().fillna(pd.Timestamp('2026-11-08'))
-        else:
-            raw_spike['Date'] = pd.Timestamp('2026-11-08')
-            
-        if 'Acceleration.up' in raw_spike.columns:
-            raw_spike['Acceleration.up'] = pd.to_numeric(raw_spike['Acceleration.up'], errors='coerce')
-            raw_spike = raw_spike.reset_index(drop=True)
-            
-            jump_records = []
-            for name, group_df in raw_spike.groupby('Name'):
-                sub = group_df.copy()
-                median_val = sub['Acceleration.up'].median()
-                threshold = median_val - 1.5 
-                
-                sub['is_airborne'] = sub['Acceleration.up'] < threshold
-                sub['jump_event'] = (sub['is_airborne'] != sub['is_airborne'].shift()).cumsum()
-                
-                for event_id, event_group in sub[sub['is_airborne']].groupby('jump_event'):
-                    row_count = len(event_group)
-                    
-                    # Universal fallback: if it detects a valid drop, calculate height based on row block size
-                    if row_count >= 3:
-                        # Normalize row count to a realistic flight duration (approx 0.05s per row if 20Hz, or scale safely)
-                        flight_time = max(0.35, min(0.95, row_count * 0.04))
-                        
-                        h_meters = (9.81 * (flight_time ** 2)) / 8
-                        h_inches = h_meters * 39.3701
-                        
-                        ts = event_group['Parsed_Time'].iloc[0] if 'Parsed_Time' in event_group.columns and pd.notna(event_group['Parsed_Time'].iloc[0]) else pd.Timestamp('2026-11-08 19:33:00')
-                        
-                        jump_records.append({
-                            'Name': name,
-                            'Date': event_group['Date'].iloc[0],
-                            'Timestamp': ts,
-                            'Jump_Height_Inches': round(h_inches, 1)
-                        })
-                            
-            jump_height_df = pd.DataFrame(jump_records)
-        else:
-            jump_height_df = pd.DataFrame(columns=['Name', 'Date', 'Timestamp', 'Jump_Height_Inches'])
-            
-    except Exception as e:
-        print(f"Sensor Processing Error: {e}")
-        jump_height_df = pd.DataFrame(columns=['Name', 'Date', 'Timestamp', 'Jump_Height_Inches'])
-        
-    return df.dropna(subset=['Date']), match_df.dropna(subset=['Date']), cmj_df, phase_df, thresh_df, ash_df, er_df, calf_df, hip_df, shoulder_df, jump_height_df
-    
+
 # --- 4. EWMA ACWR COMPUTATION ENGINE ---
 def compute_athlete_ewMA_calendar(df_player, metrics_list):
     if df_player.empty or df_player['Date'].dropna().empty:
@@ -700,7 +643,7 @@ if check_password():
     LOCKED_CONFIG = {'staticPlot': False, 'displayModeBar': False}
 
     try:
-        raw_df, raw_match_df, raw_cmj_df, raw_phase_df, thresh_df, raw_ash_df, raw_er_df, raw_calf_df, raw_hip_df, raw_shoulder_df, raw_jump_height_df = load_all_data()
+        raw_df, raw_match_df, raw_cmj_df, raw_phase_df, thresh_df, raw_ash_df, raw_er_df, raw_calf_df, raw_hip_df, raw_shoulder_df = load_all_data()
 
         # --- GLOBAL SIDEBAR ---
         st.sidebar.markdown("### Active Season")
@@ -3327,12 +3270,10 @@ if check_password():
         # --- HUB 4: WORKLOAD & ACWR ----------------------------------------------
         # =========================================================================
         elif selected_hub == "Workload & ACWR":
-            st.markdown('<div class="section-header">Acute:Chronic Workload Ratio & Jump Analytics</div>', unsafe_allow_html=True)
+            st.markdown('<div class="section-header">Acute:Chronic Workload Ratio (EWMA)</div>', unsafe_allow_html=True)
             
-            # The list of tabs available inside this specific hub
-            acwr_tabs_list = ["Team Workload Summary", "Individual", "Catapult Jump Height Analysis"]
-            
-            if "acwr_active_subtab" not in st.session_state or st.session_state.acwr_active_subtab not in acwr_tabs_list:
+            acwr_tabs_list = ["Team Workload Summary", "Individual"]
+            if "acwr_active_subtab" not in st.session_state:
                 st.session_state.acwr_active_subtab = acwr_tabs_list[0]
                 
             selected_acwr_tab = st.radio("ACWR Sub Navigation", acwr_tabs_list, key="acwr_active_subtab", horizontal=True, label_visibility="collapsed")
@@ -3505,106 +3446,7 @@ if check_password():
                         ind_metric_rows.append({"Metric": m, "Day Total": f"{target_row.get(m, 0.0):.1f}", "Acute (7d EWMA)": f"{a_ewma:.1f}", "Chronic (28d EWMA)": f"{c_ewma:.1f}", "ACWR Ratio": f"{r_val:.2f}", "Workload Zone": status_lbl})
                     st.dataframe(pd.DataFrame(ind_metric_rows), use_container_width=True, hide_index=True)
 
-           # --- TAB: CATAPULT JUMP HEIGHT ANALYSIS ---
-            elif selected_acwr_tab == "Catapult Jump Height Analysis":
-                st.markdown('<div class="section-header">Catapult Kinematic Jump Height & Session Analytics</div>', unsafe_allow_html=True)
-                
-                # Top Filter Controls Card
-                st.markdown('''
-                    <div style="background:#F8FAFC; border:1px solid #E2E8F0; border-radius:12px; padding:16px 20px; margin-bottom:20px;">
-                        <div style="font-weight:800; font-size:13px; color:#475569; text-transform:uppercase; margin-bottom:8px;">Athlete Selection & Sensor Filter</div>
-                    </div>
-                ''', unsafe_allow_html=True)
-                
-                c_sel1, c_sel2 = st.columns([2, 4])
-                with c_sel1:
-                    sel_jh_ath = st.selectbox("Select Athlete", master_athlete_list, key="jh_ath_sel")
-                
-                has_jump_data = ('raw_jump_height_df' in locals() and raw_jump_height_df is not None and not raw_jump_height_df.empty)
-                
-                if has_jump_data:
-                    ath_jumps = raw_jump_height_df[raw_jump_height_df['Name'] == sel_jh_ath].sort_values('Timestamp' if 'Timestamp' in raw_jump_height_df.columns else 'Date')
-                else:
-                    ath_jumps = pd.DataFrame()
-                    
-                if not ath_jumps.empty:
-                    max_h = ath_jumps['Jump_Height_Inches'].max()
-                    avg_h = ath_jumps['Jump_Height_Inches'].mean()
-                    total_recorded = len(ath_jumps)
-                    unique_sessions = ath_jumps['Date'].nunique()
-                    
-                    # Styled Metric Row Cards
-                    m1, m2, m3, m4 = st.columns(4)
-                    m1.metric("All-Time Max Height", f"{max_h:.1f} in")
-                    m2.metric("Session Average", f"{avg_h:.1f} in")
-                    m3.metric("Total Jumps Logged", f"{total_recorded:,}")
-                    m4.metric("Active Sessions", unique_sessions)
-                    
-                    st.markdown("<br>", unsafe_allow_html=True)
-                    
-                    # --- CHART 1: SESSION PERFORMANCE SUMMARY BAR CHART ---
-                    st.markdown('<h4 style="color:#0F172A; font-weight:800; font-size:15px; margin-bottom:4px;">Session Max vs. Average Height Breakdown</h4>', unsafe_allow_html=True)
-                    
-                    session_agg = ath_jumps.groupby('Date').agg(
-                        Max_Height=('Jump_Height_Inches', 'max'),
-                        Avg_Height=('Jump_Height_Inches', 'mean'),
-                        Jump_Count=('Jump_Height_Inches', 'count')
-                    ).reset_index()
-                    session_agg['Date_Str'] = pd.to_datetime(session_agg['Date']).dt.strftime('%m/%d/%Y')
-                    
-                    fig_summary = go.Figure()
-                    fig_summary.add_trace(go.Bar(
-                        x=session_agg['Date_Str'], y=session_agg['Max_Height'],
-                        name="Max Jump Height", marker_color='#FF8200',
-                        text=[f"<b>{val:.1f} in</b>" for val in session_agg['Max_Height']],
-                        textposition='outside'
-                    ))
-                    fig_summary.add_trace(go.Bar(
-                        x=session_agg['Date_Str'], y=session_agg['Avg_Height'],
-                        name="Session Average", marker_color='#4895DB',
-                        text=[f"{val:.1f} in" for val in session_agg['Avg_Height']],
-                        textposition='inside'
-                    ))
-                    fig_summary.update_layout(
-                        barmode='group', height=320, template="simple_white",
-                        margin=dict(l=20, r=20, t=30, b=20),
-                        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-                        yaxis=dict(title="Height (inches)", range=[0, max_h * 1.25])
-                    )
-                    st.plotly_chart(fig_summary, use_container_width=True, config=LOCKED_CONFIG, key="catapult_session_summary_bar")
-                    
-                    st.markdown("<br>", unsafe_allow_html=True)
-                    
-                    # --- CHART 2: CONNECTED CHRONOLOGICAL TIMELINE TRACKER ---
-                    st.markdown('<h4 style="color:#0F172A; font-weight:800; font-size:15px; margin-bottom:4px;">Jump Timeline</h4>', unsafe_allow_html=True)
-                    
-                    fig_time = px.scatter(
-                        ath_jumps, x='Timestamp' if 'Timestamp' in ath_jumps.columns else 'Date', y='Jump_Height_Inches',
-                        labels={'Jump_Height_Inches': 'Jump Height (in)', 'Timestamp': 'Timestamp'},
-                        color='Jump_Height_Inches',
-                        color_continuous_scale=['#4895DB', '#FF8200', '#B91C1C']
-                    )
-                    # Add a smooth trendline connecting jumps chronologically to show intra-practice fatigue curves
-                    fig_time.update_traces(marker=dict(size=9, opacity=0.9, line=dict(width=1, color='white')))
-                    fig_time.update_layout(
-                        height=340, template="simple_white", 
-                        margin=dict(l=20, r=20, t=10, b=20),
-                        plot_bgcolor="white", paper_bgcolor="white",
-                        coloraxis_showscale=False,
-                        yaxis=dict(title="Jump Height (in)")
-                    )
-                    st.plotly_chart(fig_time, use_container_width=True, config=LOCKED_CONFIG, key="catapult_jh_timeline_connected")
-                    
-                    # Detailed Raw Jump Logs Table Expander
-                    with st.expander(f"View Detailed Jump Log Records ({sel_jh_ath})", expanded=False):
-                        display_log_df = ath_jumps[['Date', 'Timestamp', 'Jump_Height_Inches']].copy()
-                        display_log_df['Date'] = pd.to_datetime(display_log_df['Date']).dt.strftime('%m/%d/%Y')
-                        display_log_df['Timestamp'] = pd.to_datetime(display_log_df['Timestamp']).dt.strftime('%m/%d/%Y %H:%M:%S')
-                        display_log_df.columns = ['Session Date', 'Timestamp', 'Jump Height (in)']
-                        st.dataframe(display_log_df.sort_values('Timestamp', ascending=False), use_container_width=True, hide_index=True)
-                else:
-                    st.info(f"No kinematic jump records detected for {sel_jh_ath}. Check that your raw sensor export file is fully populated under `SPIKE_SHEET_URL`.")
-                    
+
         # =========================================================================
         # --- HUB 5: TESTING & BASELINES ------------------------------------------
         # =========================================================================
