@@ -3576,7 +3576,7 @@ if check_password():
                     st.markdown("<br>", unsafe_allow_html=True)
                     
                     # --- CHART 2: CONNECTED CHRONOLOGICAL TIMELINE TRACKER ---
-                    st.markdown('<h4 style="color:#0F172A; font-weight:800; font-size:15px; margin-bottom:4px;">Intra-Session Jump Timeline & Fatigue Trend</h4>', unsafe_allow_html=True)
+                    st.markdown('<h4 style="color:#0F172A; font-weight:800; font-size:15px; margin-bottom:4px;">Jump Timeline</h4>', unsafe_allow_html=True)
                     
                     fig_time = px.scatter(
                         ath_jumps, x='Timestamp' if 'Timestamp' in ath_jumps.columns else 'Date', y='Jump_Height_Inches',
