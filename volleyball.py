@@ -3603,7 +3603,7 @@ if check_password():
                         display_log_df.columns = ['Session Date', 'Timestamp', 'Jump Height (in)']
                         st.dataframe(display_log_df.sort_values('Timestamp', ascending=False), use_container_width=True, hide_index=True)
                 else:
-                    st.info(f"⚠️ No kinematic jump records detected for {sel_jh_ath}. Check that your raw sensor export file is fully populated under `SPIKE_SHEET_URL`.")
+                    st.info(f"No kinematic jump records detected for {sel_jh_ath}. Check that your raw sensor export file is fully populated under `SPIKE_SHEET_URL`.")
                     
         # =========================================================================
         # --- HUB 5: TESTING & BASELINES ------------------------------------------
