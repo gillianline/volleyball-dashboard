@@ -3557,9 +3557,27 @@ if check_password():
                         fig_jh.update_layout(height=350, template="simple_white", margin=dict(l=20, r=20, t=40, b=20))
                         st.plotly_chart(fig_jh, use_container_width=True, config=LOCKED_CONFIG, key="catapult_jh_box")
                     else:
-                        st.info("⚠️ **Diagnostic View:** No jump events calculated.\n\n"
-                                "Open the **Raw Sensor File Diagnostic Inspector** above to check if your columns and names are loading correctly.")
+                        st.info("⚠️ **Diagnostic View:** No jump events calculated.")
+                        
+                        # Direct Inspection of Chelsea's raw rows to see her Acceleration.up data
+                        try:
+                            spike_url = st.secrets.get("SPIKE_SHEET_URL", None)
+                            if spike_url:
+                                df_debug = pd.read_csv(spike_url, sep=None, engine='python')
+                                df_debug = clean_name_col(df_debug)
+                                ath_debug = df_debug[df_debug['Name'] == sel_jh_ath]
                                 
+                                if not ath_debug.empty:
+                                    st.write(f"**Raw Data Sample for {sel_jh_ath} (First 10 rows):**")
+                                    st.dataframe(ath_debug[['Date/Time', 'Acceleration.up']].head(10))
+                                    
+                                    acc_up_numeric = pd.to_numeric(ath_debug['Acceleration.up'], errors='coerce')
+                                    st.write(f"**Acceleration.up Stats:** Min: {acc_up_numeric.min():.2f} | Max: {acc_up_numeric.max():.2f} | Mean: {acc_up_numeric.mean():.2f}")
+                                else:
+                                    st.error(f"Name '{sel_jh_ath}' from the dropdown did not match any name in the raw CSV file.")
+                        except Exception as dbg_e:
+                            st.write(f"Could not load debug view: {dbg_e}")
+                            
         # =========================================================================
         # --- HUB 5: TESTING & BASELINES ------------------------------------------
         # =========================================================================
