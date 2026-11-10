@@ -527,8 +527,7 @@ def load_all_data():
     except:
         thresh_df = None
 
-    # --- NEW: Process Raw Sensor Data to Jump Heights Only ---
-    # --- NEW: Process Raw Sensor Data to Jump Heights Only ---
+   # --- NEW: Process Raw Sensor Data to Jump Heights Only ---
     try:
         spike_url = st.secrets.get("SPIKE_SHEET_URL", None)
         if not spike_url:
@@ -538,6 +537,7 @@ def load_all_data():
         raw_spike.columns = raw_spike.columns.str.strip()
         raw_spike = clean_name_col(raw_spike)
         
+        # 1. Map your exact column names
         if 'Date/Time' in raw_spike.columns:
             raw_spike['Timestamp'] = pd.to_datetime(raw_spike['Date/Time'], errors='coerce')
             raw_spike['Date'] = raw_spike['Timestamp'].dt.normalize()
@@ -545,19 +545,22 @@ def load_all_data():
             raw_spike['Date'] = pd.to_datetime(raw_spike['Date'], errors='coerce').dt.normalize()
             raw_spike['Timestamp'] = raw_spike['Date']
             
+        # 2. Extract Jump Heights using Acceleration.up flight time
         if 'Acceleration.up' in raw_spike.columns:
             raw_spike = raw_spike.sort_values(['Name', 'Timestamp']).reset_index(drop=True)
             
+            # Identify when the player is airborne (Acceleration.up drops below 0.5G threshold)
             raw_spike['is_airborne'] = pd.to_numeric(raw_spike['Acceleration.up'], errors='coerce') < 0.5
             raw_spike['jump_event'] = (raw_spike['is_airborne'] != raw_spike['is_airborne'].shift()).cumsum()
             
             jump_records = []
             for event_id, group in raw_spike[raw_spike['is_airborne']].groupby('jump_event'):
-                if len(group) > 2:
+                if len(group) > 2: # Must be airborne for multiple consecutive timestamps
                     start_t = group['Timestamp'].iloc[0]
                     end_t = group['Timestamp'].iloc[-1]
                     flight_time = (end_t - start_t).total_seconds()
                     
+                    # Filter for realistic volleyball jump flight times (0.4s to 1.0s)
                     if 0.4 <= flight_time <= 1.0:
                         h_meters = (9.81 * (flight_time ** 2)) / 8
                         h_inches = h_meters * 39.3701
@@ -571,11 +574,10 @@ def load_all_data():
             jump_height_df = pd.DataFrame(columns=['Name', 'Date', 'Jump_Height_Inches'])
             
     except Exception as e:
-        # Gracefully defaults to an empty frame so the rest of the app doesn't break
+        print(f"Sensor Processing Error: {e}")
         jump_height_df = pd.DataFrame(columns=['Name', 'Date', 'Jump_Height_Inches'])
         
     return df.dropna(subset=['Date']), match_df.dropna(subset=['Date']), cmj_df, phase_df, thresh_df, ash_df, er_df, calf_df, hip_df, shoulder_df, jump_height_df
-
 
 # --- 4. EWMA ACWR COMPUTATION ENGINE ---
 def compute_athlete_ewMA_calendar(df_player, metrics_list):
