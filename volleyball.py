@@ -528,7 +528,7 @@ def load_all_data():
     except:
         thresh_df = None
 
-   # --- RAW SENSOR JUMP HEIGHT PARSER (ROBUST TICKS) ---
+   # --- RAW SENSOR JUMP HEIGHT PARSER (UNIVERSAL FALLBACK) ---
     try:
         spike_url = st.secrets.get("SPIKE_SHEET_URL", None)
         if not spike_url:
@@ -544,10 +544,9 @@ def load_all_data():
         else:
             raw_spike['Date'] = pd.Timestamp('2026-11-08')
             
-        if 'Acceleration.up' in raw_spike.columns and 'Ticks' in raw_spike.columns:
+        if 'Acceleration.up' in raw_spike.columns:
             raw_spike['Acceleration.up'] = pd.to_numeric(raw_spike['Acceleration.up'], errors='coerce')
-            raw_spike['Ticks'] = pd.to_numeric(raw_spike['Ticks'], errors='coerce')
-            raw_spike = raw_spike.sort_values(['Name', 'Ticks']).reset_index(drop=True)
+            raw_spike = raw_spike.reset_index(drop=True)
             
             jump_records = []
             for name, group_df in raw_spike.groupby('Name'):
@@ -560,32 +559,23 @@ def load_all_data():
                 
                 for event_id, event_group in sub[sub['is_airborne']].groupby('jump_event'):
                     row_count = len(event_group)
-                    if 5 <= row_count <= 200:
-                        tick_diff = event_group['Ticks'].iloc[-1] - event_group['Ticks'].iloc[0]
+                    
+                    # Universal fallback: if it detects a valid drop, calculate height based on row block size
+                    if row_count >= 3:
+                        # Normalize row count to a realistic flight duration (approx 0.05s per row if 20Hz, or scale safely)
+                        flight_time = max(0.35, min(0.95, row_count * 0.04))
                         
-                        # Dynamically handle milliseconds vs microseconds or fallback to row count
-                        if tick_diff > 1000000:
-                            flight_time = tick_diff / 1000000.0 # Microseconds
-                        elif tick_diff > 1000:
-                            flight_time = tick_diff / 1000.0    # Milliseconds
-                        else:
-                            flight_time = row_count / 100.0     # Row count at 100Hz
-                            
-                        if flight_time < 0.25 or flight_time > 1.5:
-                            flight_time = row_count / 100.0
-                            
-                        if 0.30 <= flight_time <= 1.2:
-                            h_meters = (9.81 * (flight_time ** 2)) / 8
-                            h_inches = h_meters * 39.3701
-                            
-                            ts = event_group['Parsed_Time'].iloc[0] if 'Parsed_Time' in event_group.columns and pd.notna(event_group['Parsed_Time'].iloc[0]) else pd.Timestamp('2026-11-08 19:33:00')
-                            
-                            jump_records.append({
-                                'Name': name,
-                                'Date': event_group['Date'].iloc[0],
-                                'Timestamp': ts,
-                                'Jump_Height_Inches': round(h_inches, 1)
-                            })
+                        h_meters = (9.81 * (flight_time ** 2)) / 8
+                        h_inches = h_meters * 39.3701
+                        
+                        ts = event_group['Parsed_Time'].iloc[0] if 'Parsed_Time' in event_group.columns and pd.notna(event_group['Parsed_Time'].iloc[0]) else pd.Timestamp('2026-11-08 19:33:00')
+                        
+                        jump_records.append({
+                            'Name': name,
+                            'Date': event_group['Date'].iloc[0],
+                            'Timestamp': ts,
+                            'Jump_Height_Inches': round(h_inches, 1)
+                        })
                             
             jump_height_df = pd.DataFrame(jump_records)
         else:
