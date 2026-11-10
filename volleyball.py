@@ -3507,7 +3507,7 @@ if check_password():
 
            # --- TAB: CATAPULT JUMP HEIGHT ANALYSIS ---
             elif selected_acwr_tab == "Catapult Jump Height Analysis":
-                st.markdown('<div class="section-header">Catapult Kinematic Jump Height & Timeline Analytics</div>', unsafe_allow_html=True)
+                st.markdown('<div class="section-header">Catapult Kinematic Jump Height & Session Analytics</div>', unsafe_allow_html=True)
                 
                 # Top Filter Controls Card
                 st.markdown('''
@@ -3542,41 +3542,59 @@ if check_password():
                     
                     st.markdown("<br>", unsafe_allow_html=True)
                     
-                    # Layout: Two Visualizations side-by-side or stacked cleanly
-                    col_chart1, col_chart2 = st.columns(2)
+                    # --- CHART 1: SESSION PERFORMANCE SUMMARY BAR CHART ---
+                    st.markdown('<h4 style="color:#0F172A; font-weight:800; font-size:15px; margin-bottom:4px;">Session Max vs. Average Height Breakdown</h4>', unsafe_allow_html=True)
                     
-                    with col_chart1:
-                        st.markdown('<h4 style="color:#0F172A; font-weight:800; font-size:15px;">Session Distribution Spread</h4>', unsafe_allow_html=True)
-                        fig_box = px.box(
-                            ath_jumps, x='Date', y='Jump_Height_Inches',
-                            labels={'Jump_Height_Inches': 'Height (in)', 'Date': 'Session Date'},
-                            color_discrete_sequence=['#4895DB']
-                        )
-                        fig_box.update_layout(
-                            height=360, template="simple_white", 
-                            margin=dict(l=10, r=10, t=10, b=10),
-                            plot_bgcolor="white", paper_bgcolor="white"
-                        )
-                        st.plotly_chart(fig_box, use_container_width=True, config=LOCKED_CONFIG, key="catapult_jh_box")
-                        
-                    with col_chart2:
-                        st.markdown('<h4 style="color:#0F172A; font-weight:800; font-size:15px;">Chronological Jump Timeline Tracker</h4>', unsafe_allow_html=True)
-                        fig_time = px.scatter(
-                            ath_jumps, x='Timestamp' if 'Timestamp' in ath_jumps.columns else 'Date', y='Jump_Height_Inches',
-                            labels={'Jump_Height_Inches': 'Height (in)', 'Timestamp': 'Time / Date'},
-                            color='Jump_Height_Inches',
-                            color_continuous_scale=['#4895DB', '#FF8200', '#B91C1C'],
-                            hover_data=['Date', 'Jump_Height_Inches']
-                        )
-                        fig_time.update_traces(marker=dict(size=8, opacity=0.85, line=dict(width=1, color='white')))
-                        fig_time.update_layout(
-                            height=360, template="simple_white", 
-                            margin=dict(l=10, r=10, t=10, b=10),
-                            plot_bgcolor="white", paper_bgcolor="white",
-                            coloraxis_showscale=False
-                        )
-                        st.plotly_chart(fig_time, use_container_width=True, config=LOCKED_CONFIG, key="catapult_jh_timeline")
-                        
+                    session_agg = ath_jumps.groupby('Date').agg(
+                        Max_Height=('Jump_Height_Inches', 'max'),
+                        Avg_Height=('Jump_Height_Inches', 'mean'),
+                        Jump_Count=('Jump_Height_Inches', 'count')
+                    ).reset_index()
+                    session_agg['Date_Str'] = pd.to_datetime(session_agg['Date']).dt.strftime('%m/%d/%Y')
+                    
+                    fig_summary = go.Figure()
+                    fig_summary.add_trace(go.Bar(
+                        x=session_agg['Date_Str'], y=session_agg['Max_Height'],
+                        name="Max Jump Height", marker_color='#FF8200',
+                        text=[f"<b>{val:.1f} in</b>" for val in session_agg['Max_Height']],
+                        textposition='outside'
+                    ))
+                    fig_summary.add_trace(go.Bar(
+                        x=session_agg['Date_Str'], y=session_agg['Avg_Height'],
+                        name="Session Average", marker_color='#4895DB',
+                        text=[f"{val:.1f} in" for val in session_agg['Avg_Height']],
+                        textposition='inside'
+                    ))
+                    fig_summary.update_layout(
+                        barmode='group', height=320, template="simple_white",
+                        margin=dict(l=20, r=20, t=30, b=20),
+                        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+                        yaxis=dict(title="Height (inches)", range=[0, max_h * 1.25])
+                    )
+                    st.plotly_chart(fig_summary, use_container_width=True, config=LOCKED_CONFIG, key="catapult_session_summary_bar")
+                    
+                    st.markdown("<br>", unsafe_allow_html=True)
+                    
+                    # --- CHART 2: CONNECTED CHRONOLOGICAL TIMELINE TRACKER ---
+                    st.markdown('<h4 style="color:#0F172A; font-weight:800; font-size:15px; margin-bottom:4px;">Intra-Session Jump Timeline & Fatigue Trend</h4>', unsafe_allow_html=True)
+                    
+                    fig_time = px.scatter(
+                        ath_jumps, x='Timestamp' if 'Timestamp' in ath_jumps.columns else 'Date', y='Jump_Height_Inches',
+                        labels={'Jump_Height_Inches': 'Jump Height (in)', 'Timestamp': 'Timestamp'},
+                        color='Jump_Height_Inches',
+                        color_continuous_scale=['#4895DB', '#FF8200', '#B91C1C']
+                    )
+                    # Add a smooth trendline connecting jumps chronologically to show intra-practice fatigue curves
+                    fig_time.update_traces(marker=dict(size=9, opacity=0.9, line=dict(width=1, color='white')))
+                    fig_time.update_layout(
+                        height=340, template="simple_white", 
+                        margin=dict(l=20, r=20, t=10, b=20),
+                        plot_bgcolor="white", paper_bgcolor="white",
+                        coloraxis_showscale=False,
+                        yaxis=dict(title="Jump Height (in)")
+                    )
+                    st.plotly_chart(fig_time, use_container_width=True, config=LOCKED_CONFIG, key="catapult_jh_timeline_connected")
+                    
                     # Detailed Raw Jump Logs Table Expander
                     with st.expander(f"📋 View Detailed Jump Log Records ({sel_jh_ath})", expanded=False):
                         display_log_df = ath_jumps[['Date', 'Timestamp', 'Jump_Height_Inches']].copy()
