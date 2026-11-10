@@ -533,7 +533,10 @@ def load_all_data():
         if not spike_url:
             raise ValueError("SPIKE_SHEET_URL secret is missing.")
             
-        raw_spike = pd.read_csv(spike_url)
+        # Automatically detects whether the CSV uses commas, tabs, or semicolons
+        raw_spike = pd.read_csv(spike_url, sep=None, engine='python')
+        
+        # Clean column names
         raw_spike.columns = raw_spike.columns.str.strip()
         raw_spike = clean_name_col(raw_spike)
         
