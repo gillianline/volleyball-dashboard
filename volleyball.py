@@ -3499,38 +3499,50 @@ if check_password():
             elif selected_acwr_tab == "Catapult Jump Height Analysis":
                 st.markdown('<div class="section-header">In-Session Kinematic Jump Heights (Physics-Derived)</div>', unsafe_allow_html=True)
                 
-                if 'raw_jump_height_df' in locals() and not raw_jump_height_df.empty:
-                    jh_c1, jh_c2 = st.columns([1.5, 3])
-                    with jh_c1:
-                        sel_jh_ath = st.selectbox("Select Athlete", master_athlete_list, key="jh_ath_sel")
+                # Always render the selectors so you can interact with the tab
+                jh_c1, jh_c2 = st.columns([1.5, 3])
+                with jh_c1:
+                    sel_jh_ath = st.selectbox("Select Athlete", master_athlete_list, key="jh_ath_sel")
+                    
+                    # Check if dataframe exists and has data
+                    has_jump_data = ('raw_jump_height_df' in locals() and raw_jump_height_df is not None and not raw_jump_height_df.empty)
+                    
+                    if has_jump_data:
                         ath_jumps = raw_jump_height_df[raw_jump_height_df['Name'] == sel_jh_ath].sort_values('Date')
+                    else:
+                        ath_jumps = pd.DataFrame()
                         
-                        if not ath_jumps.empty:
-                            max_h = ath_jumps['Jump_Height_Inches'].max()
-                            avg_h = ath_jumps['Jump_Height_Inches'].mean()
-                            total_recorded = len(ath_jumps)
-                            
-                            st.metric("All-Time Max Flight Jump", f"{max_h:.1f} in")
-                            st.metric("Session Average Height", f"{avg_h:.1f} in")
-                            st.metric("Total Jumps Captured", total_recorded)
-                        else:
-                            st.info(f"No recorded jump heights found for {sel_jh_ath}.")
-                            
-                    with jh_c2:
-                        if not ath_jumps.empty:
-                            fig_jh = px.box(
-                                ath_jumps, x='Date', y='Jump_Height_Inches',
-                                title=f"<b>{sel_jh_ath} — Flight-Time Jump Height Distribution</b>",
-                                labels={'Jump_Height_Inches': 'Jump Height (in)', 'Date': 'Session Date'}
-                            )
-                            fig_jh.update_layout(height=350, template="simple_white", margin=dict(l=20, r=20, t=40, b=20))
-                            st.plotly_chart(fig_jh, use_container_width=True, config=LOCKED_CONFIG, key="catapult_jh_box")
-                        else:
-                            st.info("Upload raw sensor files containing vertical acceleration metrics to view distribution boxplots.")
-                else:
-                    st.info("No raw Catapult sensor jump data loaded. Ensure your raw sensor URL secret is active.")
-
-
+                    if not ath_jumps.empty:
+                        max_h = ath_jumps['Jump_Height_Inches'].max()
+                        avg_h = ath_jumps['Jump_Height_Inches'].mean()
+                        total_recorded = len(ath_jumps)
+                        
+                        st.metric("All-Time Max Flight Jump", f"{max_h:.1f} in")
+                        st.metric("Session Average Height", f"{avg_h:.1f} in")
+                        st.metric("Total Jumps Captured", total_recorded)
+                    else:
+                        st.warning(f"No kinematic jump heights found for {sel_jh_ath}.")
+                        
+                with jh_c2:
+                    if not ath_jumps.empty:
+                        fig_jh = px.box(
+                            ath_jumps, x='Date', y='Jump_Height_Inches',
+                            title=f"<b>{sel_jh_ath} — Flight-Time Jump Height Distribution</b>",
+                            labels={'Jump_Height_Inches': 'Jump Height (in)', 'Date': 'Session Date'}
+                        )
+                        fig_jh.update_layout(height=350, template="simple_white", margin=dict(l=20, r=20, t=40, b=20))
+                        st.plotly_chart(fig_jh, use_container_width=True, config=LOCKED_CONFIG, key="catapult_jh_box")
+                    else:
+                        st.info("**Diagnostic View:** No jump data processed for this athlete.\n\n"
+                                "Possible reasons:\n"
+                                "1. The `SPIKE_SHEET_URL` secret is missing or empty.\n"
+                                "2. The CSV does not contain an `'Acceleration.up'` column.\n"
+                                "3. The athlete's name in the raw CSV does not match `master_athlete_list`.")
+                        
+                        if has_jump_data:
+                            with st.expander("Inspect Raw Jump DataFrame"):
+                                st.dataframe(raw_jump_height_df.head(20))
+                                
         # =========================================================================
         # --- HUB 5: TESTING & BASELINES ------------------------------------------
         # =========================================================================
