@@ -528,7 +528,7 @@ def load_all_data():
     except:
         thresh_df = None
 
-   # --- RAW SENSOR JUMP HEIGHT PARSER (RELAXED ROW-COUNT) ---
+   # --- RAW SENSOR JUMP HEIGHT PARSER (WITH TIMESTAMPS) ---
     try:
         spike_url = st.secrets.get("SPIKE_SHEET_URL", None)
         if not spike_url:
@@ -542,6 +542,7 @@ def load_all_data():
             raw_spike['Parsed_Time'] = pd.to_datetime(raw_spike['Date/Time'], errors='coerce')
             raw_spike['Date'] = raw_spike['Parsed_Time'].dt.normalize().fillna(pd.Timestamp('2026-11-08'))
         else:
+            raw_spike['Parsed_Time'] = pd.to_datetime(pd.Timestamp('2026-11-08'))
             raw_spike['Date'] = pd.Timestamp('2026-11-08')
             
         if 'Acceleration.up' in raw_spike.columns:
@@ -551,8 +552,6 @@ def load_all_data():
             jump_records = []
             for name, group_df in raw_spike.groupby('Name'):
                 sub = group_df.copy()
-                
-                # Check absolute drops in vertical acceleration
                 median_val = sub['Acceleration.up'].median()
                 threshold = median_val - 1.5 
                 
@@ -561,28 +560,26 @@ def load_all_data():
                 
                 for event_id, event_group in sub[sub['is_airborne']].groupby('jump_event'):
                     row_count = len(event_group)
-                    
-                    # Expanded range to catch 10Hz or 100Hz exports safely (5 to 150 rows)
                     if 5 <= row_count <= 150:
-                        # Estimate duration assuming standard 100Hz (or adjust if 10Hz)
                         flight_time = row_count / 100.0 
-                        if flight_time < 0.3: flight_time = 0.45 # Fallback baseline for short blocks
+                        if flight_time < 0.3: flight_time = 0.45
                         
                         h_meters = (9.81 * (flight_time ** 2)) / 8
                         h_inches = h_meters * 39.3701
                         jump_records.append({
                             'Name': name,
                             'Date': event_group['Date'].iloc[0],
+                            'Timestamp': event_group['Parsed_Time'].iloc[0],
                             'Jump_Height_Inches': round(h_inches, 1)
                         })
                             
             jump_height_df = pd.DataFrame(jump_records)
         else:
-            jump_height_df = pd.DataFrame(columns=['Name', 'Date', 'Jump_Height_Inches'])
+            jump_height_df = pd.DataFrame(columns=['Name', 'Date', 'Timestamp', 'Jump_Height_Inches'])
             
     except Exception as e:
         print(f"Sensor Processing Error: {e}")
-        jump_height_df = pd.DataFrame(columns=['Name', 'Date', 'Jump_Height_Inches'])
+        jump_height_df = pd.DataFrame(columns=['Name', 'Date', 'Timestamp', 'Jump_Height_Inches'])
         
     return df.dropna(subset=['Date']), match_df.dropna(subset=['Date']), cmj_df, phase_df, thresh_df, ash_df, er_df, calf_df, hip_df, shoulder_df, jump_height_df
     
@@ -3506,62 +3503,86 @@ if check_password():
 
            # --- TAB: CATAPULT JUMP HEIGHT ANALYSIS ---
             elif selected_acwr_tab == "Catapult Jump Height Analysis":
-                st.markdown('<div class="section-header">In-Session Kinematic Jump Heights (Physics-Derived)</div>', unsafe_allow_html=True)
+                st.markdown('<div class="section-header">Catapult Kinematic Jump Height & Timeline Analytics</div>', unsafe_allow_html=True)
                 
-                # Render the athlete selector FIRST so 'sel_jh_ath' is defined
-                jh_c1, jh_c2 = st.columns([1.5, 3])
-                with jh_c1:
+                # Top Filter Controls Card
+                st.markdown('''
+                    <div style="background:#F8FAFC; border:1px solid #E2E8F0; border-radius:12px; padding:16px 20px; margin-bottom:20px;">
+                        <div style="font-weight:800; font-size:13px; color:#475569; text-transform:uppercase; margin-bottom:8px;">Athlete Selection & Sensor Filter</div>
+                    </div>
+                ''', unsafe_allow_html=True)
+                
+                c_sel1, c_sel2 = st.columns([2, 4])
+                with c_sel1:
                     sel_jh_ath = st.selectbox("Select Athlete", master_athlete_list, key="jh_ath_sel")
                 
-                # --- LIVE DEBUG COUNTER (Placed after selector initialization) ---
-                try:
-                    spike_url = st.secrets.get("SPIKE_SHEET_URL", None)
-                    if spike_url:
-                        dbg_raw = pd.read_csv(spike_url, sep=None, engine='python')
-                        dbg_raw.columns = dbg_raw.columns.str.strip()
-                        dbg_raw = clean_name_col(dbg_raw)
-                        ath_dbg = dbg_raw[dbg_raw['Name'] == sel_jh_ath] if 'Name' in dbg_raw.columns else pd.DataFrame()
-                        
-                        if not ath_dbg.empty and 'Acceleration.up' in ath_dbg.columns:
-                            acc_vals = pd.to_numeric(ath_dbg['Acceleration.up'], errors='coerce')
-                            med = acc_vals.median()
-                            thresh = med - 1.5 
-                            airborne_rows = acc_vals[acc_vals < thresh]
-                            st.info(f"🔍 **Debug Info for {sel_jh_ath}:** Median Accel: {med:.2f} | Threshold (-1.5): {thresh:.2f} | Rows falling below threshold: {len(airborne_rows)}")
-                except Exception as d_err:
-                    st.warning(f"Debug check failed: {d_err}")
-
-                with jh_c1:
-                    has_jump_data = ('raw_jump_height_df' in locals() and raw_jump_height_df is not None and not raw_jump_height_df.empty)
+                has_jump_data = ('raw_jump_height_df' in locals() and raw_jump_height_df is not None and not raw_jump_height_df.empty)
+                
+                if has_jump_data:
+                    ath_jumps = raw_jump_height_df[raw_jump_height_df['Name'] == sel_jh_ath].sort_values('Timestamp' if 'Timestamp' in raw_jump_height_df.columns else 'Date')
+                else:
+                    ath_jumps = pd.DataFrame()
                     
-                    if has_jump_data:
-                        ath_jumps = raw_jump_height_df[raw_jump_height_df['Name'] == sel_jh_ath].sort_values('Date')
-                    else:
-                        ath_jumps = pd.DataFrame()
-                        
-                    if not ath_jumps.empty:
-                        max_h = ath_jumps['Jump_Height_Inches'].max()
-                        avg_h = ath_jumps['Jump_Height_Inches'].mean()
-                        total_recorded = len(ath_jumps)
-                        
-                        st.metric("All-Time Max Flight Jump", f"{max_h:.1f} in")
-                        st.metric("Session Average Height", f"{avg_h:.1f} in")
-                        st.metric("Total Jumps Captured", total_recorded)
-                    else:
-                        st.warning(f"No kinematic jump heights found for {sel_jh_ath}.")
-                        
-                with jh_c2:
-                    if not ath_jumps.empty:
-                        fig_jh = px.box(
+                if not ath_jumps.empty:
+                    max_h = ath_jumps['Jump_Height_Inches'].max()
+                    avg_h = ath_jumps['Jump_Height_Inches'].mean()
+                    total_recorded = len(ath_jumps)
+                    unique_sessions = ath_jumps['Date'].nunique()
+                    
+                    # Styled Metric Row Cards
+                    m1, m2, m3, m4 = st.columns(4)
+                    m1.metric("All-Time Max Height", f"{max_h:.1f} in")
+                    m2.metric("Session Average", f"{avg_h:.1f} in")
+                    m3.metric("Total Jumps Logged", f"{total_recorded:,}")
+                    m4.metric("Active Sessions", unique_sessions)
+                    
+                    st.markdown("<br>", unsafe_allow_html=True)
+                    
+                    # Layout: Two Visualizations side-by-side or stacked cleanly
+                    col_chart1, col_chart2 = st.columns(2)
+                    
+                    with col_chart1:
+                        st.markdown('<h4 style="color:#0F172A; font-weight:800; font-size:15px;">Session Distribution Spread</h4>', unsafe_allow_html=True)
+                        fig_box = px.box(
                             ath_jumps, x='Date', y='Jump_Height_Inches',
-                            title=f"<b>{sel_jh_ath} — Flight-Time Jump Height Distribution</b>",
-                            labels={'Jump_Height_Inches': 'Jump Height (in)', 'Date': 'Session Date'}
+                            labels={'Jump_Height_Inches': 'Height (in)', 'Date': 'Session Date'},
+                            color_discrete_sequence=['#4895DB']
                         )
-                        fig_jh.update_layout(height=350, template="simple_white", margin=dict(l=20, r=20, t=40, b=20))
-                        st.plotly_chart(fig_jh, use_container_width=True, config=LOCKED_CONFIG, key="catapult_jh_box")
-                    else:
-                        st.info("⚠️ **Diagnostic View:** Check the debug box above. It will tell us exactly how many raw rows drop below Chelsea's acceleration threshold.")
+                        fig_box.update_layout(
+                            height=360, template="simple_white", 
+                            margin=dict(l=10, r=10, t=10, b=10),
+                            plot_bgcolor="white", paper_bgcolor="white"
+                        )
+                        st.plotly_chart(fig_box, use_container_width=True, config=LOCKED_CONFIG, key="catapult_jh_box")
                         
+                    with col_chart2:
+                        st.markdown('<h4 style="color:#0F172A; font-weight:800; font-size:15px;">Chronological Jump Timeline Tracker</h4>', unsafe_allow_html=True)
+                        fig_time = px.scatter(
+                            ath_jumps, x='Timestamp' if 'Timestamp' in ath_jumps.columns else 'Date', y='Jump_Height_Inches',
+                            labels={'Jump_Height_Inches': 'Height (in)', 'Timestamp': 'Time / Date'},
+                            color='Jump_Height_Inches',
+                            color_continuous_scale=['#4895DB', '#FF8200', '#B91C1C'],
+                            hover_data=['Date', 'Jump_Height_Inches']
+                        )
+                        fig_time.update_traces(marker=dict(size=8, opacity=0.85, line=dict(width=1, color='white')))
+                        fig_time.update_layout(
+                            height=360, template="simple_white", 
+                            margin=dict(l=10, r=10, t=10, b=10),
+                            plot_bgcolor="white", paper_bgcolor="white",
+                            coloraxis_showscale=False
+                        )
+                        st.plotly_chart(fig_time, use_container_width=True, config=LOCKED_CONFIG, key="catapult_jh_timeline")
+                        
+                    # Detailed Raw Jump Logs Table Expander
+                    with st.expander(f"📋 View Detailed Jump Log Records ({sel_jh_ath})", expanded=False):
+                        display_log_df = ath_jumps[['Date', 'Timestamp', 'Jump_Height_Inches']].copy()
+                        display_log_df['Date'] = pd.to_datetime(display_log_df['Date']).dt.strftime('%m/%d/%Y')
+                        display_log_df['Timestamp'] = pd.to_datetime(display_log_df['Timestamp']).dt.strftime('%m/%d/%Y %H:%M:%S')
+                        display_log_df.columns = ['Session Date', 'Timestamp', 'Jump Height (in)']
+                        st.dataframe(display_log_df.sort_values('Timestamp', ascending=False), use_container_width=True, hide_index=True)
+                else:
+                    st.info(f"⚠️ No kinematic jump records detected for {sel_jh_ath}. Check that your raw sensor export file is fully populated under `SPIKE_SHEET_URL`.")
+                    
         # =========================================================================
         # --- HUB 5: TESTING & BASELINES ------------------------------------------
         # =========================================================================
