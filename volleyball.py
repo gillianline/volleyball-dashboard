@@ -3503,26 +3503,27 @@ if check_password():
                         ind_metric_rows.append({"Metric": m, "Day Total": f"{target_row.get(m, 0.0):.1f}", "Acute (7d EWMA)": f"{a_ewma:.1f}", "Chronic (28d EWMA)": f"{c_ewma:.1f}", "ACWR Ratio": f"{r_val:.2f}", "Workload Zone": status_lbl})
                     st.dataframe(pd.DataFrame(ind_metric_rows), use_container_width=True, hide_index=True)
 
-            # --- TAB: CATAPULT JUMP HEIGHT ANALYSIS ---
+           # --- TAB: CATAPULT JUMP HEIGHT ANALYSIS ---
             elif selected_acwr_tab == "Catapult Jump Height Analysis":
                 st.markdown('<div class="section-header">In-Session Kinematic Jump Heights (Physics-Derived)</div>', unsafe_allow_html=True)
                 
-                # Diagnostic Data Inspector Expander
-                with st.expander("🛠️ Raw Sensor File Diagnostic Inspector", expanded=False):
-                    try:
-                        spike_url = st.secrets.get("SPIKE_SHEET_URL", None)
-                        if spike_url:
-                            test_raw = pd.read_csv(spike_url, sep=None, engine='python')
-                            st.success(f"Successfully connected to secret URL! Total rows: {len(test_raw)}")
-                            st.write("Columns found in your CSV:", list(test_raw.columns))
-                            if 'Name' in test_raw.columns:
-                                st.write("Unique athlete names in raw sensor file:", test_raw['Name'].dropna().unique().tolist())
-                            else:
-                                st.error("⚠️ 'Name' column not found in raw CSV. Check column headers.")
-                        else:
-                            st.error("⚠️ SPIKE_SHEET_URL secret is missing from secrets.toml.")
-                    except Exception as e:
-                        st.error(f"Failed to read raw CSV file: {e}")
+                # --- LIVE DEBUG COUNTER ---
+                try:
+                    spike_url = st.secrets.get("SPIKE_SHEET_URL", None)
+                    if spike_url:
+                        dbg_raw = pd.read_csv(spike_url, sep=None, engine='python')
+                        dbg_raw.columns = dbg_raw.columns.str.strip()
+                        dbg_raw = clean_name_col(dbg_raw)
+                        ath_dbg = dbg_raw[dbg_raw['Name'] == sel_jh_ath] if 'Name' in dbg_raw.columns else pd.DataFrame()
+                        
+                        if not ath_dbg.empty and 'Acceleration.up' in ath_dbg.columns:
+                            acc_vals = pd.to_numeric(ath_dbg['Acceleration.up'], errors='coerce')
+                            med = acc_vals.median()
+                            thresh = med - 1.5 # Relaxed threshold to test
+                            airborne_rows = acc_vals[acc_vals < thresh]
+                            st.info(f"🔍 **Debug Info for {sel_jh_ath}:** Median Accel: {med:.2f} | Threshold (-1.5): {thresh:.2f} | Rows falling below threshold: {len(airborne_rows)}")
+                except Exception as d_err:
+                    st.warning(f"Debug check failed: {d_err}")
 
                 # Always render the selectors
                 jh_c1, jh_c2 = st.columns([1.5, 3])
@@ -3557,26 +3558,7 @@ if check_password():
                         fig_jh.update_layout(height=350, template="simple_white", margin=dict(l=20, r=20, t=40, b=20))
                         st.plotly_chart(fig_jh, use_container_width=True, config=LOCKED_CONFIG, key="catapult_jh_box")
                     else:
-                        st.info("⚠️ **Diagnostic View:** No jump events calculated.")
-                        
-                        # Direct Inspection of Chelsea's raw rows to see her Acceleration.up data
-                        try:
-                            spike_url = st.secrets.get("SPIKE_SHEET_URL", None)
-                            if spike_url:
-                                df_debug = pd.read_csv(spike_url, sep=None, engine='python')
-                                df_debug = clean_name_col(df_debug)
-                                ath_debug = df_debug[df_debug['Name'] == sel_jh_ath]
-                                
-                                if not ath_debug.empty:
-                                    st.write(f"**Raw Data Sample for {sel_jh_ath} (First 10 rows):**")
-                                    st.dataframe(ath_debug[['Date/Time', 'Acceleration.up']].head(10))
-                                    
-                                    acc_up_numeric = pd.to_numeric(ath_debug['Acceleration.up'], errors='coerce')
-                                    st.write(f"**Acceleration.up Stats:** Min: {acc_up_numeric.min():.2f} | Max: {acc_up_numeric.max():.2f} | Mean: {acc_up_numeric.mean():.2f}")
-                                else:
-                                    st.error(f"Name '{sel_jh_ath}' from the dropdown did not match any name in the raw CSV file.")
-                        except Exception as dbg_e:
-                            st.write(f"Could not load debug view: {dbg_e}")
+                        st.info("⚠️ **Diagnostic View:** Look at the debug box above. If 'Rows falling below threshold' is **0**, it means Chelsea's acceleration numbers never drop below that threshold, or the data needs a different filter.")
                             
         # =========================================================================
         # --- HUB 5: TESTING & BASELINES ------------------------------------------
