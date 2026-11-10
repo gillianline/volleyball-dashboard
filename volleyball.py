@@ -528,7 +528,7 @@ def load_all_data():
     except:
         thresh_df = None
 
-   # --- RAW SENSOR JUMP HEIGHT PARSER (ROW-COUNT METHOD) ---
+   # --- RAW SENSOR JUMP HEIGHT PARSER (RELAXED ROW-COUNT) ---
     try:
         spike_url = st.secrets.get("SPIKE_SHEET_URL", None)
         if not spike_url:
@@ -552,9 +552,9 @@ def load_all_data():
             for name, group_df in raw_spike.groupby('Name'):
                 sub = group_df.copy()
                 
-                # In m/s^2, identify unweighting/flight drops
+                # Check absolute drops in vertical acceleration
                 median_val = sub['Acceleration.up'].median()
-                threshold = median_val - 2.5
+                threshold = median_val - 1.5 
                 
                 sub['is_airborne'] = sub['Acceleration.up'] < threshold
                 sub['jump_event'] = (sub['is_airborne'] != sub['is_airborne'].shift()).cumsum()
@@ -562,10 +562,11 @@ def load_all_data():
                 for event_id, event_group in sub[sub['is_airborne']].groupby('jump_event'):
                     row_count = len(event_group)
                     
-                    # Assuming standard 100Hz Catapult export (100 rows per second)
-                    # A volleyball jump flight time of 0.35s to 1.1s equals 35 to 110 consecutive rows
-                    if 35 <= row_count <= 110:
-                        flight_time = row_count / 100.0 # Convert rows to exact seconds
+                    # Expanded range to catch 10Hz or 100Hz exports safely (5 to 150 rows)
+                    if 5 <= row_count <= 150:
+                        # Estimate duration assuming standard 100Hz (or adjust if 10Hz)
+                        flight_time = row_count / 100.0 
+                        if flight_time < 0.3: flight_time = 0.45 # Fallback baseline for short blocks
                         
                         h_meters = (9.81 * (flight_time ** 2)) / 8
                         h_inches = h_meters * 39.3701
@@ -3507,7 +3508,12 @@ if check_password():
             elif selected_acwr_tab == "Catapult Jump Height Analysis":
                 st.markdown('<div class="section-header">In-Session Kinematic Jump Heights (Physics-Derived)</div>', unsafe_allow_html=True)
                 
-                # --- LIVE DEBUG COUNTER ---
+                # Render the athlete selector FIRST so 'sel_jh_ath' is defined
+                jh_c1, jh_c2 = st.columns([1.5, 3])
+                with jh_c1:
+                    sel_jh_ath = st.selectbox("Select Athlete", master_athlete_list, key="jh_ath_sel")
+                
+                # --- LIVE DEBUG COUNTER (Placed after selector initialization) ---
                 try:
                     spike_url = st.secrets.get("SPIKE_SHEET_URL", None)
                     if spike_url:
@@ -3519,17 +3525,13 @@ if check_password():
                         if not ath_dbg.empty and 'Acceleration.up' in ath_dbg.columns:
                             acc_vals = pd.to_numeric(ath_dbg['Acceleration.up'], errors='coerce')
                             med = acc_vals.median()
-                            thresh = med - 1.5 # Relaxed threshold to test
+                            thresh = med - 1.5 
                             airborne_rows = acc_vals[acc_vals < thresh]
                             st.info(f"🔍 **Debug Info for {sel_jh_ath}:** Median Accel: {med:.2f} | Threshold (-1.5): {thresh:.2f} | Rows falling below threshold: {len(airborne_rows)}")
                 except Exception as d_err:
                     st.warning(f"Debug check failed: {d_err}")
 
-                # Always render the selectors
-                jh_c1, jh_c2 = st.columns([1.5, 3])
                 with jh_c1:
-                    sel_jh_ath = st.selectbox("Select Athlete", master_athlete_list, key="jh_ath_sel")
-                    
                     has_jump_data = ('raw_jump_height_df' in locals() and raw_jump_height_df is not None and not raw_jump_height_df.empty)
                     
                     if has_jump_data:
@@ -3558,8 +3560,8 @@ if check_password():
                         fig_jh.update_layout(height=350, template="simple_white", margin=dict(l=20, r=20, t=40, b=20))
                         st.plotly_chart(fig_jh, use_container_width=True, config=LOCKED_CONFIG, key="catapult_jh_box")
                     else:
-                        st.info("⚠️ **Diagnostic View:** Look at the debug box above. If 'Rows falling below threshold' is **0**, it means Chelsea's acceleration numbers never drop below that threshold, or the data needs a different filter.")
-                            
+                        st.info("⚠️ **Diagnostic View:** Check the debug box above. It will tell us exactly how many raw rows drop below Chelsea's acceleration threshold.")
+                        
         # =========================================================================
         # --- HUB 5: TESTING & BASELINES ------------------------------------------
         # =========================================================================
