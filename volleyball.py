@@ -293,6 +293,17 @@ def check_password():
     else:
         return True
 
+def clean_name_col(df_in):
+    """Globally scoped name cleaner to prevent Scope/NameErrors."""
+    if df_in is None or df_in.empty:
+        return df_in
+    if 'Athlete' in df_in.columns and 'Name' not in df_in.columns:
+        df_in.rename(columns={'Athlete': 'Name'}, inplace=True)
+    if 'Name' in df_in.columns:
+        df_in['Name'] = df_in['Name'].astype(str).str.strip()
+    return df_in
+    
+
 def get_flipped_gradient(score):
     try:
         score = float(score)
@@ -373,13 +384,6 @@ def load_all_data():
             return 'Summer'
         else:
             return 'Spring'
-
-    def clean_name_col(df_in):
-        if 'Athlete' in df_in.columns and 'Name' not in df_in.columns:
-            df_in.rename(columns={'Athlete': 'Name'}, inplace=True)
-        if 'Name' in df_in.columns:
-            df_in['Name'] = df_in['Name'].astype(str).str.strip()
-        return df_in
 
     # GPS Practice Data
     df = pd.read_csv(st.secrets["GOOGLE_SHEET_URL"])
