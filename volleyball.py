@@ -3596,7 +3596,7 @@ if check_password():
                     st.plotly_chart(fig_time, use_container_width=True, config=LOCKED_CONFIG, key="catapult_jh_timeline_connected")
                     
                     # Detailed Raw Jump Logs Table Expander
-                    with st.expander(f"📋 View Detailed Jump Log Records ({sel_jh_ath})", expanded=False):
+                    with st.expander(f"View Detailed Jump Log Records ({sel_jh_ath})", expanded=False):
                         display_log_df = ath_jumps[['Date', 'Timestamp', 'Jump_Height_Inches']].copy()
                         display_log_df['Date'] = pd.to_datetime(display_log_df['Date']).dt.strftime('%m/%d/%Y')
                         display_log_df['Timestamp'] = pd.to_datetime(display_log_df['Timestamp']).dt.strftime('%m/%d/%Y %H:%M:%S')
