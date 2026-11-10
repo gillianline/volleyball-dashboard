@@ -360,11 +360,9 @@ def load_all_data():
         m = date_val.month
         d = date_val.day
     
-        # Isolate historical data (2025 and earlier)
         if y < 2026:
             return f"Historical {y}"
         
-        # 2026 Active Season Boundaries
         if (m == 8 and d >= 24) or (m > 8 and m <= 12):
             return 'In-Season'
         elif (m == 7 and d >= 28) or (m == 8 and d < 24):
@@ -420,7 +418,6 @@ def load_all_data():
         cmj_df['Week'] = pd.to_numeric(cmj_df['Week'].astype(str).str.extract(r'(\d+)', expand=False), errors='coerce').fillna(0).astype(int)
     cmj_df['Season'] = cmj_df['Test Date'].apply(assign_season)
 
-    # Standardized calculated columns
     if 'Countermovement Depth [cm]' in cmj_df.columns:
         cmj_df['Adjusted CMD'] = pd.to_numeric(cmj_df['Countermovement Depth [cm]'], errors='coerce').abs()
     else:
@@ -502,7 +499,7 @@ def load_all_data():
         shoulder_df = pd.read_csv(st.secrets["SHOULDER_SHEET_URL"])
         shoulder_df.columns = shoulder_df.columns.str.strip()
         shoulder_df = clean_name_col(shoulder_df)
-        if 'Test Date' not in shoulder_df.columns and 'Date' in shoulder_df.columns:
+        if 'Test Date' not in shoulder_df.columns and 'Date' in jump_height_df if 'jump_height_df' in locals() else 'Date' in shoulder_df.columns:
             shoulder_df.rename(columns={'Date': 'Test Date'}, inplace=True)
         shoulder_df['Test Date'] = pd.to_datetime(shoulder_df['Test Date'], errors='coerce')
         for col in ['L Max Force (N)', 'R Max Force (N)']:
@@ -527,7 +524,7 @@ def load_all_data():
     except:
         thresh_df = None
 
-   # --- FIXED: Process Raw Sensor Data to Jump Heights Only ---
+    # --- RAW SENSOR JUMP HEIGHT PARSER ---
     try:
         spike_url = st.secrets.get("SPIKE_SHEET_URL", None)
         if not spike_url:
@@ -537,35 +534,30 @@ def load_all_data():
         raw_spike.columns = raw_spike.columns.str.strip()
         raw_spike = clean_name_col(raw_spike)
         
-        # 1. Clean Timestamp safely
+        # Explicitly parse the Date/Time string column
         if 'Date/Time' in raw_spike.columns:
-            raw_spike['Timestamp'] = pd.to_datetime(raw_spike['Date/Time'], errors='coerce')
-        elif 'Timestamp' in raw_spike.columns:
-            raw_spike['Timestamp'] = pd.to_datetime(raw_spike['Timestamp'], errors='coerce')
+            raw_spike['Parsed_Time'] = pd.to_datetime(raw_spike['Date/Time'], errors='coerce')
         else:
-            raw_spike['Timestamp'] = pd.to_datetime(raw_spike.iloc[:, 3], errors='coerce')
+            raw_spike['Parsed_Time'] = pd.to_datetime(raw_spike.iloc[:, 3], errors='coerce')
             
-        raw_spike['Date'] = raw_spike['Timestamp'].dt.normalize()
-        raw_spike = raw_spike.dropna(subset=['Timestamp', 'Name'])
+        raw_spike['Date'] = raw_spike['Parsed_Time'].dt.normalize()
+        raw_spike = raw_spike.dropna(subset=['Parsed_Time', 'Name'])
         
-        # 2. Extract Jump Heights using Acceleration.up flight time
         if 'Acceleration.up' in raw_spike.columns:
-            # CRITICAL FIX: Explicitly convert to numeric so comparisons work
             raw_spike['Acceleration.up'] = pd.to_numeric(raw_spike['Acceleration.up'], errors='coerce')
-            raw_spike = raw_spike.sort_values(['Name', 'Timestamp']).reset_index(drop=True)
+            raw_spike = raw_spike.sort_values(['Name', 'Parsed_Time']).reset_index(drop=True)
             
-            # Identify airborne state (unweighted threshold < 0.8G)
+            # Flight phase extraction
             raw_spike['is_airborne'] = raw_spike['Acceleration.up'] < 0.8
             raw_spike['jump_event'] = (raw_spike['is_airborne'] != raw_spike['is_airborne'].shift()).cumsum()
             
             jump_records = []
             for event_id, group in raw_spike[raw_spike['is_airborne']].groupby('jump_event'):
                 if len(group) >= 2:
-                    start_t = group['Timestamp'].iloc.min()
-                    end_t = group['Timestamp'].iloc.max()
+                    start_t = group['Parsed_Time'].iloc[0]
+                    end_t = group['Parsed_Time'].iloc[-1]
                     flight_time = (end_t - start_t).total_seconds()
                     
-                    # Filter for volleyball flight times (0.35s to 1.1s)
                     if 0.35 <= flight_time <= 1.1:
                         h_meters = (9.81 * (flight_time ** 2)) / 8
                         h_inches = h_meters * 39.3701
@@ -584,7 +576,6 @@ def load_all_data():
         
     return df.dropna(subset=['Date']), match_df.dropna(subset=['Date']), cmj_df, phase_df, thresh_df, ash_df, er_df, calf_df, hip_df, shoulder_df, jump_height_df
     
-
 # --- 4. EWMA ACWR COMPUTATION ENGINE ---
 def compute_athlete_ewMA_calendar(df_player, metrics_list):
     if df_player.empty or df_player['Date'].dropna().empty:
