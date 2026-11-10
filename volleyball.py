@@ -528,8 +528,13 @@ def load_all_data():
         thresh_df = None
 
     # --- NEW: Process Raw Sensor Data to Jump Heights Only ---
+    # --- NEW: Process Raw Sensor Data to Jump Heights Only ---
     try:
-        raw_spike = pd.read_csv(st.secrets["SPIKE_SHEET_URL"])
+        spike_url = st.secrets.get("SPIKE_SHEET_URL", None)
+        if not spike_url:
+            raise ValueError("SPIKE_SHEET_URL secret is missing.")
+            
+        raw_spike = pd.read_csv(spike_url)
         raw_spike.columns = raw_spike.columns.str.strip()
         raw_spike = clean_name_col(raw_spike)
         
@@ -543,7 +548,6 @@ def load_all_data():
         if 'Acceleration.up' in raw_spike.columns:
             raw_spike = raw_spike.sort_values(['Name', 'Timestamp']).reset_index(drop=True)
             
-            # --- PHYSICS JUMP HEIGHT EXTRACTION ---
             raw_spike['is_airborne'] = pd.to_numeric(raw_spike['Acceleration.up'], errors='coerce') < 0.5
             raw_spike['jump_event'] = (raw_spike['is_airborne'] != raw_spike['is_airborne'].shift()).cumsum()
             
@@ -554,7 +558,6 @@ def load_all_data():
                     end_t = group['Timestamp'].iloc[-1]
                     flight_time = (end_t - start_t).total_seconds()
                     
-                    # Filter for realistic volleyball jump flight times (0.4s to 1.0s)
                     if 0.4 <= flight_time <= 1.0:
                         h_meters = (9.81 * (flight_time ** 2)) / 8
                         h_inches = h_meters * 39.3701
@@ -568,7 +571,7 @@ def load_all_data():
             jump_height_df = pd.DataFrame(columns=['Name', 'Date', 'Jump_Height_Inches'])
             
     except Exception as e:
-        print(f"Sensor Processing Error: {e}")
+        # Gracefully defaults to an empty frame so the rest of the app doesn't break
         jump_height_df = pd.DataFrame(columns=['Name', 'Date', 'Jump_Height_Inches'])
         
     return df.dropna(subset=['Date']), match_df.dropna(subset=['Date']), cmj_df, phase_df, thresh_df, ash_df, er_df, calf_df, hip_df, shoulder_df, jump_height_df
