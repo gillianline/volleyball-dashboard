@@ -3316,11 +3316,13 @@ if check_password():
         elif selected_hub == "Workload & ACWR":
             st.markdown('<div class="section-header">Acute:Chronic Workload Ratio & Jump Analytics</div>', unsafe_allow_html=True)
             
+            # The list of tabs available inside this specific hub
             acwr_tabs_list = ["Team Workload Summary", "Individual", "Catapult Jump Height Analysis"]
-            if "acwr_active_subtab" not in st.session_state:
+            
+            if "acwr_active_subtab" not in st.session_state or st.session_state.acwr_active_subtab not in acwr_tabs_list:
                 st.session_state.acwr_active_subtab = acwr_tabs_list[0]
                 
-            selected_acwr_tab = st.radio("ACWR Sub Navigation", acwr_tabs_list, key="acwr_active_subtab", horizontal=True, label_visibility="collapsed")
+            selected_acwr_tab = st.radio("ACWR Sub Navigation", acwr_tabs_list, key="acwr_active_subtab", horizontal=True, label_visibility="collapsed"
             
             if selected_acwr_tab == "Team Workload Summary":
                 valid_acwr_dates = sorted(raw_df['Date'].dropna().unique(), reverse=True)
