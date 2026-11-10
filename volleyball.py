@@ -3512,12 +3512,28 @@ if check_password():
             elif selected_acwr_tab == "Catapult Jump Height Analysis":
                 st.markdown('<div class="section-header">In-Session Kinematic Jump Heights (Physics-Derived)</div>', unsafe_allow_html=True)
                 
-                # Always render the selectors so you can interact with the tab
+                # Diagnostic Data Inspector Expander
+                with st.expander("🛠️ Raw Sensor File Diagnostic Inspector", expanded=False):
+                    try:
+                        spike_url = st.secrets.get("SPIKE_SHEET_URL", None)
+                        if spike_url:
+                            test_raw = pd.read_csv(spike_url, sep=None, engine='python')
+                            st.success(f"Successfully connected to secret URL! Total rows: {len(test_raw)}")
+                            st.write("Columns found in your CSV:", list(test_raw.columns))
+                            if 'Name' in test_raw.columns:
+                                st.write("Unique athlete names in raw sensor file:", test_raw['Name'].dropna().unique().tolist())
+                            else:
+                                st.error("⚠️ 'Name' column not found in raw CSV. Check column headers.")
+                        else:
+                            st.error("⚠️ SPIKE_SHEET_URL secret is missing from secrets.toml.")
+                    except Exception as e:
+                        st.error(f"Failed to read raw CSV file: {e}")
+
+                # Always render the selectors
                 jh_c1, jh_c2 = st.columns([1.5, 3])
                 with jh_c1:
                     sel_jh_ath = st.selectbox("Select Athlete", master_athlete_list, key="jh_ath_sel")
                     
-                    # Check if dataframe exists and has data
                     has_jump_data = ('raw_jump_height_df' in locals() and raw_jump_height_df is not None and not raw_jump_height_df.empty)
                     
                     if has_jump_data:
@@ -3546,15 +3562,8 @@ if check_password():
                         fig_jh.update_layout(height=350, template="simple_white", margin=dict(l=20, r=20, t=40, b=20))
                         st.plotly_chart(fig_jh, use_container_width=True, config=LOCKED_CONFIG, key="catapult_jh_box")
                     else:
-                        st.info("**Diagnostic View:** No jump data processed for this athlete.\n\n"
-                                "Possible reasons:\n"
-                                "1. The `SPIKE_SHEET_URL` secret is missing or empty.\n"
-                                "2. The CSV does not contain an `'Acceleration.up'` column.\n"
-                                "3. The athlete's name in the raw CSV does not match `master_athlete_list`.")
-                        
-                        if has_jump_data:
-                            with st.expander("Inspect Raw Jump DataFrame"):
-                                st.dataframe(raw_jump_height_df.head(20))
+                        st.info("⚠️ **Diagnostic View:** No jump events calculated.\n\n"
+                                "Open the **Raw Sensor File Diagnostic Inspector** above to check if your columns and names are loading correctly.")
                                 
         # =========================================================================
         # --- HUB 5: TESTING & BASELINES ------------------------------------------
