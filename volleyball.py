@@ -527,50 +527,45 @@ def load_all_data():
     except:
         thresh_df = None
 
-   # --- NEW: Process Raw Sensor Data to Jump Heights Only ---
+   # --- FIXED: Process Raw Sensor Data to Jump Heights Only ---
     try:
         spike_url = st.secrets.get("SPIKE_SHEET_URL", None)
         if not spike_url:
             raise ValueError("SPIKE_SHEET_URL secret is missing.")
             
-        # Automatically detects whether the CSV uses commas, tabs, or semicolons
         raw_spike = pd.read_csv(spike_url, sep=None, engine='python')
-        
-        # Clean column names
         raw_spike.columns = raw_spike.columns.str.strip()
         raw_spike = clean_name_col(raw_spike)
         
-        # 1. Bulletproof Timestamp & Date Mapping
+        # 1. Clean Timestamp safely
         if 'Date/Time' in raw_spike.columns:
             raw_spike['Timestamp'] = pd.to_datetime(raw_spike['Date/Time'], errors='coerce')
         elif 'Timestamp' in raw_spike.columns:
             raw_spike['Timestamp'] = pd.to_datetime(raw_spike['Timestamp'], errors='coerce')
         else:
-            # Fallback if neither exists
-            raw_spike['Timestamp'] = pd.to_datetime(raw_spike.iloc[:, 2], errors='coerce')
+            raw_spike['Timestamp'] = pd.to_datetime(raw_spike.iloc[:, 3], errors='coerce')
             
         raw_spike['Date'] = raw_spike['Timestamp'].dt.normalize()
-        
-        # Drop rows where timestamp or name failed to parse
         raw_spike = raw_spike.dropna(subset=['Timestamp', 'Name'])
         
         # 2. Extract Jump Heights using Acceleration.up flight time
         if 'Acceleration.up' in raw_spike.columns:
+            # CRITICAL FIX: Explicitly convert to numeric so comparisons work
             raw_spike['Acceleration.up'] = pd.to_numeric(raw_spike['Acceleration.up'], errors='coerce')
             raw_spike = raw_spike.sort_values(['Name', 'Timestamp']).reset_index(drop=True)
             
-            # Adjusted threshold to reliably catch the unweighted flight phase
+            # Identify airborne state (unweighted threshold < 0.8G)
             raw_spike['is_airborne'] = raw_spike['Acceleration.up'] < 0.8
             raw_spike['jump_event'] = (raw_spike['is_airborne'] != raw_spike['is_airborne'].shift()).cumsum()
             
             jump_records = []
             for event_id, group in raw_spike[raw_spike['is_airborne']].groupby('jump_event'):
-                if len(group) >= 2: # Must be airborne for multiple consecutive timestamps
-                    start_t = group['Timestamp'].iloc[0]
-                    end_t = group['Timestamp'].iloc[-1]
+                if len(group) >= 2:
+                    start_t = group['Timestamp'].iloc.min()
+                    end_t = group['Timestamp'].iloc.max()
                     flight_time = (end_t - start_t).total_seconds()
                     
-                    # Filter for realistic volleyball jump flight times (0.35s to 1.1s)
+                    # Filter for volleyball flight times (0.35s to 1.1s)
                     if 0.35 <= flight_time <= 1.1:
                         h_meters = (9.81 * (flight_time ** 2)) / 8
                         h_inches = h_meters * 39.3701
