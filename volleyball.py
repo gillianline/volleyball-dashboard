@@ -528,7 +528,7 @@ def load_all_data():
     except:
         thresh_df = None
 
-   # --- RAW SENSOR JUMP HEIGHT PARSER (METERS/SEC^2 SCALING) ---
+   # --- RAW SENSOR JUMP HEIGHT PARSER (ROW-COUNT METHOD) ---
     try:
         spike_url = st.secrets.get("SPIKE_SHEET_URL", None)
         if not spike_url:
@@ -540,42 +540,40 @@ def load_all_data():
         
         if 'Date/Time' in raw_spike.columns:
             raw_spike['Parsed_Time'] = pd.to_datetime(raw_spike['Date/Time'], errors='coerce')
+            raw_spike['Date'] = raw_spike['Parsed_Time'].dt.normalize().fillna(pd.Timestamp('2026-11-08'))
         else:
-            raw_spike['Parsed_Time'] = pd.to_datetime(raw_spike.iloc[:, 3], errors='coerce')
+            raw_spike['Date'] = pd.Timestamp('2026-11-08')
             
-        raw_spike['Date'] = raw_spike['Parsed_Time'].dt.normalize()
-        raw_spike = raw_spike.dropna(subset=['Parsed_Time', 'Name'])
-        
         if 'Acceleration.up' in raw_spike.columns:
             raw_spike['Acceleration.up'] = pd.to_numeric(raw_spike['Acceleration.up'], errors='coerce')
-            raw_spike = raw_spike.sort_values(['Name', 'Parsed_Time']).reset_index(drop=True)
+            raw_spike = raw_spike.reset_index(drop=True)
             
             jump_records = []
-            for (name, date_val), group_df in raw_spike.groupby(['Name', 'Date']):
-                sub = group_df.sort_values('Parsed_Time').copy()
+            for name, group_df in raw_spike.groupby('Name'):
+                sub = group_df.copy()
                 
-                # In m/s^2, a significant drop below the mean/median indicates unweighting/flight
+                # In m/s^2, identify unweighting/flight drops
                 median_val = sub['Acceleration.up'].median()
-                threshold = median_val - 2.5 
+                threshold = median_val - 2.5
                 
                 sub['is_airborne'] = sub['Acceleration.up'] < threshold
                 sub['jump_event'] = (sub['is_airborne'] != sub['is_airborne'].shift()).cumsum()
                 
                 for event_id, event_group in sub[sub['is_airborne']].groupby('jump_event'):
-                    if len(event_group) >= 2:
-                        start_t = event_group['Parsed_Time'].iloc[0]
-                        end_t = event_group['Parsed_Time'].iloc[-1]
-                        flight_time = (end_t - start_t).total_seconds()
+                    row_count = len(event_group)
+                    
+                    # Assuming standard 100Hz Catapult export (100 rows per second)
+                    # A volleyball jump flight time of 0.35s to 1.1s equals 35 to 110 consecutive rows
+                    if 35 <= row_count <= 110:
+                        flight_time = row_count / 100.0 # Convert rows to exact seconds
                         
-                        # Volleyball jump flight time typically ranges from 0.35s to 1.1s
-                        if 0.30 <= flight_time <= 1.2:
-                            h_meters = (9.81 * (flight_time ** 2)) / 8
-                            h_inches = h_meters * 39.3701
-                            jump_records.append({
-                                'Name': name,
-                                'Date': date_val,
-                                'Jump_Height_Inches': round(h_inches, 1)
-                            })
+                        h_meters = (9.81 * (flight_time ** 2)) / 8
+                        h_inches = h_meters * 39.3701
+                        jump_records.append({
+                            'Name': name,
+                            'Date': event_group['Date'].iloc[0],
+                            'Jump_Height_Inches': round(h_inches, 1)
+                        })
                             
             jump_height_df = pd.DataFrame(jump_records)
         else:
