@@ -528,7 +528,7 @@ def load_all_data():
     except:
         thresh_df = None
 
-    # --- RAW SENSOR JUMP HEIGHT PARSER ---
+    # --- RAW SENSOR JUMP HEIGHT PARSER (DYNAMIC BASELINE) ---
     try:
         spike_url = st.secrets.get("SPIKE_SHEET_URL", None)
         if not spike_url:
@@ -538,7 +538,6 @@ def load_all_data():
         raw_spike.columns = raw_spike.columns.str.strip()
         raw_spike = clean_name_col(raw_spike)
         
-        # Explicitly parse the Date/Time string column
         if 'Date/Time' in raw_spike.columns:
             raw_spike['Parsed_Time'] = pd.to_datetime(raw_spike['Date/Time'], errors='coerce')
         else:
@@ -551,25 +550,33 @@ def load_all_data():
             raw_spike['Acceleration.up'] = pd.to_numeric(raw_spike['Acceleration.up'], errors='coerce')
             raw_spike = raw_spike.sort_values(['Name', 'Parsed_Time']).reset_index(drop=True)
             
-            # Flight phase extraction
-            raw_spike['is_airborne'] = raw_spike['Acceleration.up'] < 0.8
-            raw_spike['jump_event'] = (raw_spike['is_airborne'] != raw_spike['is_airborne'].shift()).cumsum()
-            
             jump_records = []
-            for event_id, group in raw_spike[raw_spike['is_airborne']].groupby('jump_event'):
-                if len(group) >= 2:
-                    start_t = group['Parsed_Time'].iloc[0]
-                    end_t = group['Parsed_Time'].iloc[-1]
-                    flight_time = (end_t - start_t).total_seconds()
-                    
-                    if 0.35 <= flight_time <= 1.1:
-                        h_meters = (9.81 * (flight_time ** 2)) / 8
-                        h_inches = h_meters * 39.3701
-                        jump_records.append({
-                            'Name': group['Name'].iloc[0],
-                            'Date': start_t.normalize(),
-                            'Jump_Height_Inches': round(h_inches, 1)
-                        })
+            # Group by athlete and session/date to calculate dynamic baseline per session
+            for (name, date_val), group_df in raw_spike.groupby(['Name', 'Date']):
+                sub = group_df.sort_values('Parsed_Time').copy()
+                
+                # Dynamic threshold: median/resting baseline minus an unweighting drop
+                median_accel = sub['Acceleration.up'].median()
+                airborne_threshold = median_accel - 1.5 # Catches significant drop toward freefall
+                
+                sub['is_airborne'] = sub['Acceleration.up'] < airborne_threshold
+                sub['jump_event'] = (sub['is_airborne'] != sub['is_airborne'].shift()).cumsum()
+                
+                for event_id, event_group in sub[sub['is_airborne']].groupby('jump_event'):
+                    if len(event_group) >= 2:
+                        start_t = event_group['Parsed_Time'].iloc[0]
+                        end_t = event_group['Parsed_Time'].iloc[-1]
+                        flight_time = (end_t - start_t).total_seconds()
+                        
+                        if 0.30 <= flight_time <= 1.2:
+                            h_meters = (9.81 * (flight_time ** 2)) / 8
+                            h_inches = h_meters * 39.3701
+                            jump_records.append({
+                                'Name': name,
+                                'Date': date_val,
+                                'Jump_Height_Inches': round(h_inches, 1)
+                            })
+                            
             jump_height_df = pd.DataFrame(jump_records)
         else:
             jump_height_df = pd.DataFrame(columns=['Name', 'Date', 'Jump_Height_Inches'])
