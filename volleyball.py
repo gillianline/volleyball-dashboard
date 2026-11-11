@@ -643,13 +643,15 @@ class CatapultAPIClient:
         self.api_key = api_key.strip()
         self.region = region.lower().strip()
         
-        # Official Catapult OpenField Connect API v6 Regional Endpoints
-        host_map = {
-            "us": "https://connect-us.catapultsports.com/api/v6",
-            "eu": "https://connect-eu.catapultsports.com/api/v6",
-            "au": "https://connect-au.catapultsports.com/api/v6"
-        }
-        self.base_url = host_map.get(self.region, host_map["us"])
+        # Candidate Catapult OpenField API gateways for US / Regional accounts
+        self.candidate_urls = [
+            f"https://connect-{self.region}.catapultsports.com/api/v6",
+            f"https://connect-{self.region}.catapultsports.com/api/v4",
+            f"https://{self.region}.catapultsports.com/api/v6",
+            f"https://{self.region}.catapultsports.com/api/v4",
+            f"https://backend-{self.region}.openfield.catapultsports.com/api/v6"
+        ]
+        self.base_url = self.candidate_urls[0]
         self.headers = {
             "Authorization": f"Bearer {self.api_key}",
             "Accept": "application/json",
@@ -657,31 +659,43 @@ class CatapultAPIClient:
         }
 
     def get_activities(self) -> tuple[pd.DataFrame, str]:
-        url = f"{self.base_url}/activities"
-        response = requests.get(url, headers=self.headers, timeout=15)
-        
-        # Automatic fallback to /api/v4 if the account is on v4
-        if response.status_code == 404:
-            self.base_url = self.base_url.replace("/api/v6", "/api/v4")
-            url = f"{self.base_url}/activities"
-            response = requests.get(url, headers=self.headers, timeout=15)
-
-        if response.status_code == 200:
-            data = response.json()
-            df_act = pd.DataFrame(data) if isinstance(data, list) else pd.DataFrame(data.get("data", []))
-            return df_act, "OK"
-        return pd.DataFrame(), f"HTTP {response.status_code}: {response.text[:150]}"
+        last_status = "No response"
+        for candidate in self.candidate_urls:
+            url = f"{candidate}/activities"
+            try:
+                response = requests.get(url, headers=self.headers, timeout=15)
+                if response.status_code == 200:
+                    self.base_url = candidate
+                    data = response.json()
+                    df_act = pd.DataFrame(data) if isinstance(data, list) else pd.DataFrame(data.get("data", []))
+                    return df_act, f"OK ({candidate})"
+                else:
+                    last_status = f"HTTP {response.status_code} at {candidate}: {response.text[:120]}"
+            except Exception as e:
+                last_status = f"Error at {candidate}: {e}"
+                
+        return pd.DataFrame(), last_status
 
     def get_activity_stats(self, activity_id: str) -> pd.DataFrame:
         url = f"{self.base_url}/stats"
+        # Catapult Connect API expects "values" as a list inside "filters"
         payload = {
-            "filters": [{"name": "activity_id", "comparison": "=", "value": activity_id}],
-            "group_by": ["athlete"],
+            "filters": [
+                {
+                    "name": "activity_id",
+                    "comparison": "=",
+                    "values": [str(activity_id)]
+                }
+            ],
+            "group_by": ["athlete", "activity"],
             "parameters": [
-                "total_player_load", 
-                "ima_jump_count_low", 
-                "ima_jump_count_med", 
-                "ima_jump_count_high", 
+                "athlete_name",
+                "activity_name",
+                "date",
+                "total_player_load",
+                "ima_jump_count_low",
+                "ima_jump_count_med",
+                "ima_jump_count_high",
                 "explosive_efforts"
             ],
             "source": "cached_stats"
@@ -691,15 +705,14 @@ class CatapultAPIClient:
             data = response.json()
             return pd.DataFrame(data) if isinstance(data, list) else pd.DataFrame(data.get("data", []))
         return pd.DataFrame()
-        
 
-@st.cache_data(ttl=1800)
-def fetch_catapult_cloud_swings(start_date_str: str, end_date_str: str) -> tuple[pd.DataFrame, str]:
+
+@st.cache_data(ttl=600)
+def fetch_catapult_cloud_swings(start_date_str: str, end_date_str: str, cache_version: str = "v2") -> tuple[pd.DataFrame, str]:
     """Pulls live Catapult activity summaries and returns (DataFrame, status_message)."""
     api_key = None
     region = "us"
 
-    # Check both [catapult] section and top-level CATAPULT_API_KEY
     if "catapult" in st.secrets and "api_key" in st.secrets["catapult"]:
         api_key = st.secrets["catapult"]["api_key"]
         region = st.secrets["catapult"].get("region", "us")
@@ -708,7 +721,7 @@ def fetch_catapult_cloud_swings(start_date_str: str, end_date_str: str) -> tuple
         region = st.secrets.get("CATAPULT_REGION", "us")
 
     if not api_key:
-        return pd.DataFrame(), "No API key found in st.secrets (add [catapult] api_key or CATAPULT_API_KEY)."
+        return pd.DataFrame(), "No API key found in st.secrets."
 
     try:
         client = CatapultAPIClient(api_key=api_key, region=region)
@@ -743,11 +756,10 @@ def fetch_catapult_cloud_swings(start_date_str: str, end_date_str: str) -> tuple
 
             combined["Total Jumps"] = combined["High Jumps"] + combined["Moderate Jumps"] + combined["Low Jumps"]
             combined["Jump Load"] = (combined["High Jumps"] * 3.0) + (combined["Moderate Jumps"] * 2.0) + (combined["Low Jumps"] * 1.0)
-            return combined, f"Synced {len(frames)} recent Catapult OpenField sessions."
-        return pd.DataFrame(), "Activities found, but no athlete stats returned for those sessions."
+            return combined, f"Synced {len(frames)} recent sessions via {client.base_url}"
+        return pd.DataFrame(), f"Found {len(acts)} activities ({status_msg}), but /stats returned 0 athlete rows."
     except Exception as e:
         return pd.DataFrame(), f"API Connection Error: {e}"
-
 
 def build_injury_prediction_matrix(df_gps, df_er, df_ash, athlete_name):
     """
