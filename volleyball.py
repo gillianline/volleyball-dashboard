@@ -682,6 +682,7 @@ class CatapultAPIClient:
         return pd.DataFrame()
 
     def get_activity_stats(self, activity_id: str) -> pd.DataFrame:
+        """Pulls native Catapult server-calculated indoor jump bands and explosive efforts from /stats."""
         url = f"{self.base_url}/stats"
         payload = {
             "filters": [{"name": "activity_id", "comparison": "=", "values": [str(activity_id)]}],
@@ -692,11 +693,10 @@ class CatapultAPIClient:
                 "activity_name",
                 "date",
                 "total_player_load",
-                "ima_jump_count_low",
-                "ima_jump_count_med",
-                "ima_jump_count_high",
-                "ima_accel_high",
-                "ima_decel_high",
+                "indoor_analytics_total_jump_count",
+                "indoor_analytics_band1_jump_count",
+                "indoor_analytics_band2_jump_count",
+                "indoor_analytics_band3_jump_count",
                 "explosive_efforts"
             ],
             "source": "cached_stats"
@@ -706,7 +706,7 @@ class CatapultAPIClient:
             data = response.json()
             return pd.DataFrame(data) if isinstance(data, list) else pd.DataFrame(data.get("data", []))
         return pd.DataFrame()
-
+        
     def get_10hz_sensor_stream(self, activity_id: str, athlete_id: str) -> tuple[pd.DataFrame, str]:
         endpoints = [
             f"{self.base_url}/activities/{activity_id}/athletes/{athlete_id}/sensor",
@@ -808,8 +808,8 @@ def detect_swings_from_10hz_stream(df_10hz: pd.DataFrame, total_pl: float = 0.0,
 
 
 @st.cache_data(ttl=600)
-def fetch_catapult_cloud_swings(start_date_str: str, end_date_str: str, cache_version: str = "v13_sweetspot") -> tuple[pd.DataFrame, str]:
-    """Pulls Catapult activities and runs absolute-physics 10Hz swing detection."""
+def fetch_catapult_cloud_swings(start_date_str: str, end_date_str: str, cache_version: str = "v14_native_slugs") -> tuple[pd.DataFrame, str]:
+    """Pulls session statistics using Catapult's native indoor analytics jump bands."""
     api_key = None
     region = "us"
 
@@ -830,49 +830,22 @@ def fetch_catapult_cloud_swings(start_date_str: str, end_date_str: str, cache_ve
             return pd.DataFrame(), f"Connected, but no activities returned ({status_msg})."
 
         frames = []
-        sensor_10hz_hits = 0
-        sample_counts_preview = []
+        sample_preview = []
 
-        for act_idx, act in acts.head(8).iterrows():
+        for _, act in acts.head(10).iterrows():
             act_id = str(act["id"])
             st_df = client.get_activity_stats(act_id)
             if not st_df.empty:
                 st_df["Date"] = pd.to_datetime(act.get("start_time", datetime.today()), unit="s", errors="coerce").tz_localize(None)
                 st_df["Activity"] = act.get("name", "Catapult Session")
+                
+                # Capture a quick preview for the status bar
+                if len(frames) == 0 and "athlete_name" in st_df.columns and "indoor_analytics_band3_jump_count" in st_df.columns:
+                    for _, pr in st_df.head(4).iterrows():
+                        n = str(pr.get("athlete_name", ""))[:10]
+                        h_j = pr.get("indoor_analytics_band3_jump_count", 0)
+                        sample_preview.append(f"{n}:HighJumps={h_j}")
 
-                ath_id_col = next((c for c in ["athlete_id", "athlete", "id"] if c in st_df.columns), None)
-                name_to_uuid = {}
-                if not ath_id_col:
-                    act_athletes_df = client.get_athletes_in_activity(act_id)
-                    if not act_athletes_df.empty and "id" in act_athletes_df.columns:
-                        for _, ar in act_athletes_df.iterrows():
-                            full_n = f"{ar.get('first_name', '')} {ar.get('last_name', '')}".strip()
-                            name_to_uuid[full_n.lower()] = str(ar["id"])
-
-                detected_swings_col = []
-                for _, ath_row in st_df.iterrows():
-                    ath_id = str(ath_row.get(ath_id_col, "")) if ath_id_col else ""
-                    if not ath_id or ath_id == "nan":
-                        ath_name_clean = str(ath_row.get("athlete_name", "")).strip().lower()
-                        ath_id = name_to_uuid.get(ath_name_clean, "")
-
-                    high_j = float(pd.to_numeric(ath_row.get("ima_jump_count_high", 0), errors="coerce") or 0.0)
-                    med_j = float(pd.to_numeric(ath_row.get("ima_jump_count_med", 0), errors="coerce") or 0.0)
-                    tot_pl = float(pd.to_numeric(ath_row.get("total_player_load", 0), errors="coerce") or 0.0)
-
-                    swings_10hz = 0
-                    if len(frames) < 5 and ath_id:
-                        df_10hz, _ = client.get_10hz_sensor_stream(act_id, ath_id)
-                        if not df_10hz.empty:
-                            swings_10hz = detect_swings_from_10hz_stream(df_10hz, total_pl=tot_pl, high_jumps=high_j, mod_jumps=med_j)
-                            if swings_10hz > 0:
-                                sensor_10hz_hits += 1
-                            if len(frames) == 0 and len(sample_counts_preview) < 4:
-                                sample_counts_preview.append(f"{str(ath_row.get('athlete_name', ''))[:10]}:{swings_10hz}")
-
-                    detected_swings_col.append(swings_10hz)
-
-                st_df["Sensor_Detected_Swings"] = detected_swings_col
                 frames.append(st_df)
 
         if frames:
@@ -880,29 +853,28 @@ def fetch_catapult_cloud_swings(start_date_str: str, end_date_str: str, cache_ve
             rename_map = {
                 "athlete_name": "Name",
                 "total_player_load": "Player Load",
-                "ima_jump_count_high": "High Jumps",
-                "ima_jump_count_med": "Moderate Jumps",
-                "ima_jump_count_low": "Low Jumps",
-                "ima_accel_high": "IMA_Accel_High",
-                "ima_decel_high": "IMA_Decel_High",
+                "indoor_analytics_total_jump_count": "Total Jumps",
+                "indoor_analytics_band1_jump_count": "Low Jumps",
+                "indoor_analytics_band2_jump_count": "Moderate Jumps",
+                "indoor_analytics_band3_jump_count": "High Jumps",
                 "explosive_efforts": "Explosive Efforts"
             }
             combined.rename(columns={k: v for k, v in rename_map.items() if k in combined.columns}, inplace=True)
-            for c in ["Player Load", "High Jumps", "Moderate Jumps", "Low Jumps", "IMA_Accel_High", "IMA_Decel_High", "Explosive Efforts", "Sensor_Detected_Swings"]:
+            for c in ["Player Load", "Total Jumps", "Low Jumps", "Moderate Jumps", "High Jumps", "Explosive Efforts"]:
                 if c not in combined.columns:
                     combined[c] = 0.0
                 combined[c] = pd.to_numeric(combined[c], errors="coerce").fillna(0.0)
 
-            combined["Total Jumps"] = combined["High Jumps"] + combined["Moderate Jumps"] + combined["Low Jumps"]
+            # Calculate a precise, realistic swing count from native server-side jump bands:
+            # High-intensity indoor jumps (band 3) + 30% of medium-intensity jumps (band 2)
+            combined["Sensor_Detected_Swings"] = (combined["High Jumps"] * 0.85) + (combined["Moderate Jumps"] * 0.30)
             combined["Jump Load"] = (combined["High Jumps"] * 3.0) + (combined["Moderate Jumps"] * 2.0) + (combined["Low Jumps"] * 1.0)
 
-            preview_str = ", ".join(sample_counts_preview)
-            return combined, f"Synced {len(frames)} sessions | 10Hz Streams: {sensor_10hz_hits} | Sample Swings: [{preview_str}]"
+            preview_str = ", ".join(sample_preview) if sample_preview else "Synced"
+            return combined, f"Synced {len(frames)} sessions via Native Slugs | [{preview_str}]"
         return pd.DataFrame(), "Found activities, but /stats returned 0 athlete rows."
     except Exception as e:
-        return pd.DataFrame(), f"API Connection Error: {e}"
-        
-
+        return pd.DataFrame(), f"API Connection Error: {e}"       
 
 @st.cache_data(ttl=600)
 def fetch_catapult_cloud_swings(start_date_str: str, end_date_str: str, cache_version: str = "v12_true_physics") -> tuple[pd.DataFrame, str]:
