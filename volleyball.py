@@ -1017,11 +1017,20 @@ def build_injury_prediction_matrix(df_gps, df_er, df_ash, athlete_name):
         worst_ash_drop = min(row['ASH_Drop_R_%'], row['ASH_Drop_L_%'])
         worst_er_drop = min(row['ER_Drop_R_%'], row['ER_Drop_L_%'])
 
-        # Collect narrative drivers
-        if sw_acwr > 1.50:
+        # --- ADD THIS: Single-day spike check ---
+        daily_swings = row['Est_Swings']
+        chronic_baseline = row['Est_Swings_Chronic'] if row['Est_Swings_Chronic'] > 0 else 1.0
+        single_day_ratio = daily_swings / chronic_baseline
+
+        is_single_day_spike = (single_day_ratio > 2.5) or (daily_swings > 55.0)
+
+        if is_single_day_spike:
+            drivers.append(f"Single-Day Volume Spike ({int(daily_swings)} swings)")
+        elif sw_acwr > 1.50:
             drivers.append(f"High Swing Spike (ACWR {sw_acwr:.2f})")
         elif sw_acwr > 1.30:
             drivers.append(f"Elevated Swing Volume (ACWR {sw_acwr:.2f})")
+        # ----------------------------------------
 
         if worst_ash_drop <= -15.0:
             drivers.append(f"ASH Force Deficit ({worst_ash_drop:+.1f}%)")
@@ -1033,20 +1042,14 @@ def build_injury_prediction_matrix(df_gps, df_er, df_ash, athlete_name):
         elif worst_er_drop <= -5.0:
             drivers.append(f"Tight ER ROM ({worst_er_drop:+.1f}%)")
 
-        # --- DYNAMIC 0-100 SCORE CALCULATION ---
-        # 1. Workload contribution (scaled by ACWR magnitude)
-        workload_pts = min(40.0, max(0.0, (sw_acwr - 1.0) * 50.0)) if sw_acwr > 1.0 else 0.0
-        
-        # 2. Strength deficit contribution (scaled by % drop)
+        # Dynamic score calculation including single-day spike penalty
+        workload_pts = min(40.0, max(0.0, (single_day_ratio - 1.0) * 30.0 + ((sw_acwr - 1.0) * 20.0))) if (single_day_ratio > 1.0 or sw_acwr > 1.0) else 0.0
         ash_pts = min(35.0, abs(min(0.0, worst_ash_drop)) * 2.0)
-        
-        # 3. Mobility restriction contribution (scaled by % drop)
         rom_pts = min(25.0, abs(min(0.0, worst_er_drop)) * 2.5)
 
         total_score = min(100.0, workload_pts + ash_pts + rom_pts)
 
-        # Tier assignment based on dynamic score
-        if total_score >= 60.0 or (sw_acwr > 1.50 and (worst_ash_drop <= -15.0 or worst_er_drop <= -10.0)):
+        if total_score >= 60.0 or is_single_day_spike or (sw_acwr > 1.50 and (worst_ash_drop <= -15.0 or worst_er_drop <= -10.0)):
             tier = "High Risk"
         elif total_score >= 35.0 or sw_acwr > 1.30 or worst_ash_drop <= -8.0 or worst_er_drop <= -5.0:
             tier = "Moderate Risk"
