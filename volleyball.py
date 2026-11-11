@@ -4002,7 +4002,7 @@ if check_password():
                     if not prediction_df.empty:
                         latest_row = prediction_df.iloc[-1]
                         c1, c2, c3, c4 = st.columns(4)
-                            c1.metric("Current Risk Score", f"{latest_row['Shoulder_Risk_Score']:.0f} / 100", latest_row['Risk_Status'])
+                        c1.metric("Current Risk Score", f"{latest_row['Shoulder_Risk_Score']:.0f} / 100", latest_row['Risk_Status'])
                         c2.metric("Est. Swings (7d Avg)", f"{latest_row['Est_Swings_Acute']:.1f}", f"ACWR: {latest_row['Est_Swings_ACWR']:.2f}")
                         c3.metric("ASH Force Drop (R/L)", f"{min(latest_row['ASH_Drop_R_%'], latest_row['ASH_Drop_L_%']):+.1f}%")
                         c4.metric("ER ROM Drop (R/L)", f"{min(latest_row['ER_Drop_R_%'], latest_row['ER_Drop_L_%']):+.1f}%")
