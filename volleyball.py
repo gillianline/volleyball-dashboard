@@ -3904,7 +3904,7 @@ if check_password():
                     r_bg = "#FCE8E6" if risk_val >= 60 else ("#FEF3C7" if risk_val >= 35 else "#E6F4EA")
 
                     k_s1, k_s2, k_s3, k_s4 = st.columns(4)
-                    k_s1.metric("Latest Est. Swings", f"{int(latest_r['Est_Swings'])}", help="Derived from High-Band Jumps + 50% Moderate Jumps")
+                    k_s1.metric("Latest Est. Swings", f"{int(latest_r['Est_Swings'])}")
                     k_s2.metric("Swing ACWR (7:28d)", f"{latest_r['Est_Swings_ACWR']:.2f}")
                     k_s3.metric("Latest ASH Force (L / R)", f"{latest_r['Peak Vertical Force [N] (L)']:.0f}N / {latest_r['Peak Vertical Force [N] (R)']:.0f}N")
                     with k_s4:
