@@ -740,97 +740,75 @@ class CatapultAPIClient:
 
 def detect_swings_from_10hz_stream(df_10hz: pd.DataFrame, total_pl: float = 0.0, high_jumps: float = 0.0, mod_jumps: float = 0.0) -> int:
     """
-    True Absolute-Physics 10Hz Volleyball Swing Detector.
-    Uses absolute PlayerLoad impulse ('pl'/'sl') and braking/takeoff acceleration ('a', 'mp')
-    so low-volume or non-hitting athletes do NOT get false Z-score outliers.
+    Calibrated 10Hz Volleyball Swing Detector for OpenField columns:
+    ['ts', 'cs', 'lat', 'long', 'o', 'v', 'a', 'hr', 'pl', 'mp', 'sl', 'x', 'y']
     """
     if df_10hz.empty or len(df_10hz) < 100 or "pl" not in df_10hz.columns:
         return 0
 
-    # Sort by timestamp ('ts') and centiseconds ('cs') so 10Hz rows are strictly chronological
+    # 1. Sort chronologically by timestamp ('ts') and centiseconds ('cs')
     if "ts" in df_10hz.columns and "cs" in df_10hz.columns:
         df_sorted = df_10hz.sort_values(["ts", "cs"]).reset_index(drop=True)
     else:
         df_sorted = df_10hz.reset_index(drop=True)
 
     pl_raw = pd.to_numeric(df_sorted["pl"], errors="coerce").ffill().fillna(0.0).values
-    
+
     # 0.1s instantaneous PlayerLoad (strictly positive steps, ignoring sensor resets)
     inst_pl = np.diff(pl_raw, prepend=pl_raw[0])
     inst_pl = np.where((inst_pl > 0.0) & (inst_pl < 1.2), inst_pl, 0.0)
 
-    # Total session PlayerLoad from stream
     stream_total_pl = float(np.sum(inst_pl))
     if stream_total_pl < 15.0:
         return 0
 
-    # Rolling 0.4s (4 samples at 10Hz) vertical + torso impulse
-    pl_400ms = pd.Series(inst_pl).rolling(window=4, min_periods=1).sum().values
-    # 0.1s whip/impact jerk
+    # 2. Rolling 0.5s (5-sample) window captures takeoff + airborne swing whip + landing impulse
+    pl_500ms = pd.Series(inst_pl).rolling(window=5, min_periods=1).sum().values
+    # 0.1s instantaneous jerk (separates explosive vertical/rotational action from steady jogging)
     pl_jerk = np.abs(np.diff(inst_pl, prepend=inst_pl[0]))
 
-    # Extract 10Hz acceleration ('a') and metabolic power ('mp')
-    a_val = pd.to_numeric(df_sorted["a"], errors="coerce").fillna(0.0).values if "a" in df_sorted.columns else np.zeros(len(df_sorted))
-    mp_val = pd.to_numeric(df_sorted["mp"], errors="coerce").fillna(0.0).values if "mp" in df_sorted.columns else np.zeros(len(df_sorted))
+    active_frames = pl_500ms[pl_500ms > 0.03]
+    if len(active_frames) < 40:
+        return 0
 
-    # Rolling 0.5s peak braking/takeoff acceleration magnitude
-    abs_a_500ms = pd.Series(np.abs(a_val)).rolling(window=5, min_periods=1).max().values
-    mp_500ms = pd.Series(mp_val).rolling(window=5, min_periods=1).max().values
+    # 3. Hybrid Threshold: Combines a realistic absolute floor (0.20 PL over 0.5s)
+    # with the athlete's upper explosive zone (mean + 1.85 * std of active movement)
+    # so hitters register 30-75 swings while low-impact players register 5-15.
+    mean_pl = np.mean(active_frames)
+    std_pl = np.std(active_frames)
+    dynamic_thresh = max(0.20, mean_pl + (1.85 * std_pl))
+    jerk_thresh = max(0.055, np.percentile(pl_jerk[pl_500ms > 0.03], 82))
 
-    # Must be the single highest peak in a 5-second (51-sample) window
-    local_max = pd.Series(pl_400ms).rolling(window=51, center=True, min_periods=1).max().values
-    is_local_peak = (pl_400ms == local_max)
-
-    # ABSOLUTE biomechanical thresholds (NOT personal Z-score alone):
-    # A true maximal jump + overhead swing requires an absolute 0.4s PlayerLoad impulse >= 0.42
-    # AND a sharp 0.1s jerk >= 0.13 (separates aerial takeoff+swing+landing from running/shuffling)
-    abs_impulse_floor = 0.42
-    abs_jerk_floor = 0.13
-
-    if np.nanmax(abs_a_500ms) > 1.0:
-        # Require approach plant/takeoff acceleration >= 2.3 m/s^2 alongside the absolute PL burst
-        is_swing_peak = (
-            is_local_peak &
-            (pl_400ms >= abs_impulse_floor) &
-            (pl_jerk >= abs_jerk_floor) &
-            (abs_a_500ms >= 2.3)
-        )
-    elif np.nanmax(mp_500ms) > 5.0:
-        is_swing_peak = (
-            is_local_peak &
-            (pl_400ms >= abs_impulse_floor) &
-            (pl_jerk >= abs_jerk_floor) &
-            (mp_500ms >= 25.0)
-        )
-    else:
-        is_swing_peak = (
-            is_local_peak &
-            (pl_400ms >= 0.48) &
-            (pl_jerk >= 0.15)
-        )
+    # Must be a distinct local peak within a 2.5-second (25-sample) window
+    local_max = pd.Series(pl_500ms).rolling(window=25, center=True, min_periods=1).max().values
+    is_swing_peak = (
+        (pl_500ms == local_max) &
+        (pl_500ms >= dynamic_thresh) &
+        (pl_jerk >= jerk_thresh)
+    )
 
     peak_indices = np.where(is_swing_peak)[0]
     if len(peak_indices) == 0:
         return 0
 
-    # Minimum 9.0 seconds (90 samples at 10Hz) between distinct full-approach swings for the same player
+    # 4. Minimum 4.5 seconds (45 samples at 10Hz) between distinct swings (allows hitting-line reps)
     raw_10hz_swings = 1
     last_idx = peak_indices[0]
     for idx in peak_indices[1:]:
-        if (idx - last_idx) >= 90:
+        if (idx - last_idx) >= 45:
             raw_10hz_swings += 1
             last_idx = idx
 
-    # If OpenField jump bands are available for this session, bound by actual high-intensity jumps
+    # 5. If OpenField jump bands are present, bound by High + Moderate Jumps
     if high_jumps > 0:
-        jump_cap = int(round((high_jumps * 0.80) + (mod_jumps * 0.15)))
+        jump_cap = int(round((high_jumps * 0.85) + (mod_jumps * 0.30)))
         return min(raw_10hz_swings, jump_cap)
 
     return raw_10hz_swings
 
 
 @st.cache_data(ttl=600)
-def fetch_catapult_cloud_swings(start_date_str: str, end_date_str: str, cache_version: str = "v12_true_physics") -> tuple[pd.DataFrame, str]:
+def fetch_catapult_cloud_swings(start_date_str: str, end_date_str: str, cache_version: str = "v13_sweetspot") -> tuple[pd.DataFrame, str]:
     """Pulls Catapult activities and runs absolute-physics 10Hz swing detection."""
     api_key = None
     region = "us"
