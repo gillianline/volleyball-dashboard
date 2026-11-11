@@ -3932,23 +3932,6 @@ if check_password():
                 st.markdown('<div class="section-header">Volleyball Swing Volume & Shoulder Injury Prediction</div>', unsafe_allow_html=True)
                 
                 c_sh1, c_sh2 = st.columns([2, 2])
-                with st.expander("Inspect Available Catapult OpenField API Parameters"):
-                    if st.button("List My OpenField Parameters"):
-                        api_k = st.secrets["catapult"]["api_key"]
-                        r_p = requests.get(
-                            "https://connect-us.catapultsports.com/api/v6/parameters",
-                            headers={"Authorization": f"Bearer {api_k}", "Accept": "application/json"}
-                        )
-                        if r_p.status_code == 200:
-                            p_df = pd.DataFrame(r_p.json())
-                            # Filter to jump, ima, load, or swing related parameters
-                            if "name" in p_df.columns and "slug" in p_df.columns:
-                                rel = p_df[p_df["name"].astype(str).str.lower().str.contains("jump|ima|load|accel|spike|swing|impact|effort", na=False)]
-                                st.dataframe(rel[["name", "slug", "id"]], use_container_width=True)
-                            else:
-                                st.write(p_df.head(50))
-                        else:
-                            st.error(f"HTTP {r_p.status_code}: {r_p.text}")
                 with c_sh1:
                     sel_sh_ath = st.selectbox("Select Athlete", master_athlete_list, key="sh_risk_ath_sel")
                 with c_sh2:
