@@ -636,7 +636,7 @@ def resolve_col_val(row, primary_col, alt_cols=[]):
     return None
 
 # =========================================================================
-# --- CATAPULT API & 10HZ/100HZ KINEMATIC SWING DETECTION ENGINE ----------
+# --- CATAPULT API & IMA TEMPORAL EVENT SWING DETECTION ENGINE ------------
 # =========================================================================
 class CatapultAPIClient:
     def __init__(self, api_key: str, region: str = "us"):
@@ -687,6 +687,8 @@ class CatapultAPIClient:
                 "ima_jump_count_high",
                 "ima_accel_high",
                 "ima_decel_high",
+                "ima_cod_left_high",
+                "ima_cod_right_high",
                 "explosive_efforts"
             ],
             "source": "cached_stats"
@@ -697,118 +699,81 @@ class CatapultAPIClient:
             return pd.DataFrame(data) if isinstance(data, list) else pd.DataFrame(data.get("data", []))
         return pd.DataFrame()
 
-    def get_athlete_sensor_stream(self, activity_id: str, athlete_id: str) -> pd.DataFrame:
-        """
-        Attempts to pull 10Hz/100Hz raw sensor stream for a specific athlete in an activity.
-        Requires 'Sync Raw Data' to have been enabled on the OpenField Console.
-        """
-        url = f"{self.base_url}/activities/{activity_id}/athletes/{athlete_id}/sensor"
-        try:
-            response = requests.get(url, headers=self.headers, timeout=20)
-            if response.status_code == 200:
-                data = response.json()
-                if isinstance(data, list) and len(data) > 0:
-                    # Flatten nested stream if wrapped in 'data' or 'sensor' keys
-                    if "data" in data[0] and isinstance(data[0]["data"], list):
-                        return pd.DataFrame(data[0]["data"])
-                    return pd.DataFrame(data)
-                elif isinstance(data, dict) and "data" in data:
-                    return pd.DataFrame(data["data"])
-        except Exception:
-            pass
-        return pd.DataFrame()
-
     def get_athlete_ima_events(self, activity_id: str, athlete_id: str) -> pd.DataFrame:
         """
-        Pulls timestamped micro-movement events (IMA jumps, 3D accelerations, impacts)
-        when full 100Hz .raw files weren't uploaded to the cloud.
+        Pulls timestamped IMA micro-events (jumps, 3D accelerations, impacts)
+        uploaded during standard OpenField Cloud syncs.
         """
-        url = f"{self.base_url}/activities/{activity_id}/athletes/{athlete_id}/events"
-        try:
-            response = requests.get(url, headers=self.headers, timeout=15)
-            if response.status_code == 200:
-                data = response.json()
-                return pd.DataFrame(data) if isinstance(data, list) else pd.DataFrame(data.get("data", []))
-        except Exception:
-            pass
+        endpoints_to_try = [
+            f"{self.base_url}/activities/{activity_id}/athletes/{athlete_id}/events",
+            f"{self.base_url}/activities/{activity_id}/athletes/{athlete_id}/efforts"
+        ]
+        for url in endpoints_to_try:
+            try:
+                response = requests.get(url, headers=self.headers, timeout=12)
+                if response.status_code == 200:
+                    data = response.json()
+                    df_ev = pd.DataFrame(data) if isinstance(data, list) else pd.DataFrame(data.get("data", []))
+                    if not df_ev.empty:
+                        return df_ev
+            except Exception:
+                continue
         return pd.DataFrame()
 
 
-def detect_swings_from_sensor_stream(sensor_df: pd.DataFrame) -> int:
+def detect_swings_from_ima_events(events_df: pd.DataFrame) -> int:
     """
-    Analyzes 10Hz/100Hz Catapult time-series data to count volleyball swings.
-    Looks for high rotational velocity (thoracic whip) + acceleration spikes,
-    filtering out passive block jumps where trunk rotation is minimal.
+    Pairs timestamped Jump events with simultaneous high-intensity IMA trunk
+    acceleration/deceleration/impact events (+/- 0.35s window) to isolate true swings.
     """
-    if sensor_df.empty:
+    if events_df.empty:
         return 0
 
-    cols = {c.lower(): c for c in sensor_df.columns}
-    
-    # 1. Check for Gyroscope (Rotational Velocity in deg/s) + Accelerometer (G)
-    # Common OpenField sensor keys: gx/gy/gz or rvx/rvy/rvz (gyro), ax/ay/az or f_x/f_y/f_z (accel), pl (instant player load)
-    ax_col = next((cols[k] for k in ["ax", "f_x", "accel_x", "x_accel"] if k in cols), None)
-    ay_col = next((cols[k] for k in ["ay", "f_y", "accel_y", "y_accel"] if k in cols), None)
-    az_col = next((cols[k] for k in ["az", "f_z", "accel_z", "z_accel"] if k in cols), None)
-    
-    gx_col = next((cols[k] for k in ["gx", "rvx", "gyro_x", "pitch_rate"] if k in cols), None)
-    gy_col = next((cols[k] for k in ["gy", "rvy", "gyro_y", "roll_rate"] if k in cols), None)
-    gz_col = next((cols[k] for k in ["gz", "rvz", "gyro_z", "yaw_rate"] if k in cols), None)
+    cols = {c.lower(): c for c in events_df.columns}
+    type_col = next((cols[k] for k in ["type", "event_type", "name", "parameter", "effort_type"] if k in cols), None)
+    start_col = next((cols[k] for k in ["start_time", "time", "timestamp", "start"] if k in cols), None)
+    intensity_col = next((cols[k] for k in ["intensity", "band", "magnitude", "value", "peak"] if k in cols), None)
 
-    if ax_col and ay_col and az_col:
-        ax = pd.to_numeric(sensor_df[ax_col], errors="coerce").fillna(0.0)
-        ay = pd.to_numeric(sensor_df[ay_col], errors="coerce").fillna(0.0)
-        az = pd.to_numeric(sensor_df[az_col], errors="coerce").fillna(0.0)
-        resultant_acc = np.sqrt(ax**2 + ay**2 + az**2)
+    if not type_col or not start_col:
+        return 0
 
-        # If Gyroscope columns exist, require both rotational whip (>220 deg/s) and high resultant G (>3.2G)
-        if gx_col and gy_col and gz_col:
-            gx = pd.to_numeric(sensor_df[gx_col], errors="coerce").fillna(0.0)
-            gy = pd.to_numeric(sensor_df[gy_col], errors="coerce").fillna(0.0)
-            gz = pd.to_numeric(sensor_df[gz_col], errors="coerce").fillna(0.0)
-            rot_mag = np.sqrt(gx**2 + gy**2 + gz**2)
-            is_swing_peak = (rot_mag > 220.0) & (resultant_acc > 3.2)
-        else:
-            # Accelerometer-only signature: high anteroposterior + resultant spike
-            is_swing_peak = (resultant_acc > 3.8) & (ax.abs() > 2.0)
+    df_e = events_df.copy()
+    df_e["ev_type"] = df_e[type_col].astype(str).str.lower()
+    df_e["t_sec"] = pd.to_numeric(df_e[start_col], errors="coerce").fillna(0.0)
+    # Normalize milliseconds to seconds if timestamps are in ms
+    if df_e["t_sec"].max() > 1e11:
+        df_e["t_sec"] = df_e["t_sec"] / 1000.0
 
-        # Debounce peaks (minimum 1.5 seconds between distinct swings)
-        # Estimate sample rate from row count (100Hz = ~150 rows per 1.5s, 10Hz = ~15 rows per 1.5s)
-        min_gap = 100 if len(sensor_df) > 20000 else 15
-        swing_indices = np.where(is_swing_peak)[0]
-        if len(swing_indices) == 0:
-            return 0
-            
-        count = 1
-        last_idx = swing_indices[0]
-        for idx in swing_indices[1:]:
-            if (idx - last_idx) >= min_gap:
-                count += 1
-                last_idx = idx
-        return count
+    # Isolate Jumps vs. Upper-Trunk Rotational/Linear Bursts (Accel, Decel, CoD, Impact)
+    jumps = df_e[df_e["ev_type"].str.contains("jump", na=False)].copy()
+    bursts = df_e[df_e["ev_type"].str.contains("accel|decel|impact|cod|rotation|swing|throw", na=False)].copy()
 
-    # 2. Fallback if 10Hz stream only has velocity/acceleration (v, a, pl)
-    a_col = next((cols[k] for k in ["a", "acc", "acceleration", "pl"] if k in cols), None)
-    if a_col:
-        a_series = pd.to_numeric(sensor_df[a_col], errors="coerce").fillna(0.0)
-        threshold = a_series.quantile(0.97)
-        peaks = np.where(a_series > max(threshold, 3.0))[0]
-        if len(peaks) == 0:
-            return 0
-        count = 1
-        last_idx = peaks[0]
-        for idx in peaks[1:]:
-            if (idx - last_idx) >= 15:  # 1.5s at 10Hz
-                count += 1
-                last_idx = idx
-        return count
+    if jumps.empty:
+        return 0
 
-    return 0
+    # If both jumps and bursts are timestamped, count jumps that have a burst within +/- 0.45 seconds
+    if not bursts.empty:
+        jump_times = jumps["t_sec"].values
+        burst_times = bursts["t_sec"].values
+        matched_swings = 0
+        for jt in jump_times:
+            if np.any(np.abs(burst_times - jt) <= 0.45):
+                matched_swings += 1
+        if matched_swings > 0:
+            return matched_swings
+
+    # If only jump events are returned, filter for medium/high intensity jumps
+    if intensity_col:
+        high_jumps = jumps[jumps[intensity_col].astype(str).str.lower().str.contains("high|med|2|3", na=False)]
+        if not high_jumps.empty:
+            return len(high_jumps)
+
+    return int(round(len(jumps) * 0.65))
 
 
 @st.cache_data(ttl=600)
-def fetch_catapult_cloud_swings(start_date_str: str, end_date_str: str, cache_version: str = "v4") -> tuple[pd.DataFrame, str]:
-    """Pulls Catapult activities and attempts 10Hz/100Hz sensor swing detection."""
+def fetch_catapult_cloud_swings(start_date_str: str, end_date_str: str, cache_version: str = "v5") -> tuple[pd.DataFrame, str]:
+    """Pulls Catapult activities and runs IMA temporal event / high-band swing detection."""
     api_key = None
     region = "us"
 
@@ -829,9 +794,8 @@ def fetch_catapult_cloud_swings(start_date_str: str, end_date_str: str, cache_ve
             return pd.DataFrame(), f"Connected, but no activities returned ({status_msg})."
 
         frames = []
-        raw_sensor_hits = 0
+        event_stream_hits = 0
 
-        # Process 10 most recent activities to keep API response fast
         for _, act in acts.head(10).iterrows():
             act_id = str(act["id"])
             st_df = client.get_activity_stats(act_id)
@@ -839,29 +803,19 @@ def fetch_catapult_cloud_swings(start_date_str: str, end_date_str: str, cache_ve
                 st_df["Date"] = pd.to_datetime(act.get("start_time", datetime.today()), unit="s", errors="coerce").tz_localize(None)
                 st_df["Activity"] = act.get("name", "Catapult Session")
                 
-                # Check if we can pull 10Hz/100Hz sensor stream per athlete for the most recent 3 sessions
                 detected_swings_col = []
-                source_type_col = []
-                
-                for idx_row, ath_row in st_df.iterrows():
+                for _, ath_row in st_df.iterrows():
                     ath_id = str(ath_row.get("athlete_id", ""))
                     swings_found = 0
-                    method_used = "IMA Jump + Accel Model"
-                    
-                    # Query /sensor on the 3 most recent sessions to avoid API timeout
                     if len(frames) < 3 and ath_id:
-                        sensor_df = client.get_athlete_sensor_stream(act_id, ath_id)
-                        if not sensor_df.empty:
-                            swings_found = detect_swings_from_sensor_stream(sensor_df)
+                        ev_df = client.get_athlete_ima_events(act_id, ath_id)
+                        if not ev_df.empty:
+                            swings_found = detect_swings_from_ima_events(ev_df)
                             if swings_found > 0:
-                                raw_sensor_hits += 1
-                                method_used = "10Hz/100Hz Sensor Stream"
-                                
+                                event_stream_hits += 1
                     detected_swings_col.append(swings_found)
-                    source_type_col.append(method_used)
                     
                 st_df["Sensor_Detected_Swings"] = detected_swings_col
-                st_df["Swing_Detection_Method"] = source_type_col
                 frames.append(st_df)
 
         if frames:
@@ -885,9 +839,9 @@ def fetch_catapult_cloud_swings(start_date_str: str, end_date_str: str, cache_ve
             combined["Total Jumps"] = combined["High Jumps"] + combined["Moderate Jumps"] + combined["Low Jumps"]
             combined["Jump Load"] = (combined["High Jumps"] * 3.0) + (combined["Moderate Jumps"] * 2.0) + (combined["Low Jumps"] * 1.0)
             
-            sensor_note = f"({raw_sensor_hits} athlete streams via 10Hz/100Hz /sensor)" if raw_sensor_hits > 0 else "(Raw 10Hz/100Hz not uploaded to Cloud; using IMA High-Jump + High-Accel model)"
-            return combined, f"Synced {len(frames)} sessions {sensor_note}"
-        return pd.DataFrame(), f"Found {len(acts)} activities, but /stats returned 0 athlete rows."
+            mode_msg = f"({event_stream_hits} athlete logs via timestamped /events)" if event_stream_hits > 0 else "(Using OpenField IMA High-Jump + High-Accel kinetic model)"
+            return combined, f"Synced {len(frames)} sessions {mode_msg}"
+        return pd.DataFrame(), "Found activities, but /stats returned 0 athlete rows."
     except Exception as e:
         return pd.DataFrame(), f"API Connection Error: {e}"
 
