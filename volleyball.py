@@ -3973,18 +3973,7 @@ if check_password():
                     rom_view['Baseline ER ROM (L/R)'] = f"{base_er_l:.1f}° / {base_er_r:.1f}°"
                     rom_view['Recent ER ROM (L/R)'] = disp_cols.apply(lambda r: f"{r['L Max ROM (°)']:.1f}° ({r['ER_Drop_L_%']:+.1f}%) / {r['R Max ROM (°)']:.1f}° ({r['ER_Drop_R_%']:+.1f}%)", axis=1)
                     
-                    rom_view['Flagged Drivers'] = disp_cols['Primary_Drivers']
-
-                    def color_drivers(val):
-                        if isinstance(val, str) and val != "Normal Load & Screening":
-                            return 'color: #B91C1C; font-weight: bold;'
-                        return 'color: #64748B;'
-
-                    styled_rom = rom_view.style.map(
-                        color_drivers, subset=['Flagged Drivers']
-                    )
-
-                    st.dataframe(styled_rom, use_container_width=True, hide_index=True)
+                    st.dataframe(rom_view, use_container_width=True, hide_index=True)
                     
         # =========================================================================
         # --- HUB 5: TESTING & BASELINES ------------------------------------------
