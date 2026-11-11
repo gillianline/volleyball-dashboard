@@ -3878,7 +3878,7 @@ if check_password():
                 with c_sh1:
                     sel_sh_ath = st.selectbox("Select Athlete", master_athlete_list, key="sh_risk_ath_sel")
                 with c_sh2:
-                    sync_live = st.checkbox("Sync Live Catapult API Swings (if configured in secrets.toml)", value=False, key="sh_sync_api_toggle")
+                    sync_live = st.checkbox("Sync Live Catapult API Swings", value=False, key="sh_sync_api_toggle")
 
                 source_gps_df = raw_df.copy()
                 if sync_live:
