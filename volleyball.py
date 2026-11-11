@@ -1061,6 +1061,11 @@ if check_password():
     try:
         raw_df, raw_match_df, raw_cmj_df, raw_phase_df, thresh_df, raw_ash_df, raw_er_df, raw_calf_df, raw_hip_df, raw_shoulder_df = load_all_data()
 
+        # --- MAP RAW SCREENING DATAFRAMES ---
+        ash_df = raw_ash_df.copy()
+        er_df = raw_er_df.copy()
+        cmj_df = raw_cmj_df.copy()
+        
         # --- GLOBAL SIDEBAR ---
         st.sidebar.markdown("### Active Season")
         view_seasons = ["In-Season", "Pre-Season", "Spring", "Summer"]
