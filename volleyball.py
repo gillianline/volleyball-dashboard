@@ -3893,9 +3893,9 @@ if check_password():
                         mask = source_gps_df.apply(lambda r: (str(r['Name']).strip(), pd.to_datetime(r['Date']).normalize()) not in live_keys, axis=1)
                         
                         source_gps_df = pd.concat([source_gps_df[mask], live_cat_df], ignore_index=True)
-                        st.caption(f"Live API Active: {api_status}")
-                    else:
-                        st.caption(f"Fallback to Google Sheets: {api_status}")
+                        #st.caption(f"Live API Active: {api_status}")
+                    #else:
+                        #st.caption(f"Fallback to Google Sheets: {api_status}")
                         
 
                 pred_df = build_injury_prediction_matrix(source_gps_df, raw_er_df, raw_ash_df, sel_sh_ath)
