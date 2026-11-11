@@ -3958,7 +3958,6 @@ if check_password():
                         'Primary_Drivers': 'Flagged Drivers'
                     })
                     
-                    # Build a gorgeous, streamlined HTML table with clean color pills
                     table_html = """
                     <div style="overflow-x:auto; border:1px solid #E2E8F0; border-radius:10px; background:white; margin-top:10px;">
                     <table class="scout-table" style="width:100%; border-collapse:collapse; margin-bottom:0;">
@@ -4005,6 +4004,8 @@ if check_password():
                         """
                     
                     table_html += "</tbody></table></div>"
+                    
+                    # CRITICAL: unsafe_allow_html=True ensures Streamlit renders the HTML cleanly instead of showing raw tags
                     st.markdown(table_html, unsafe_allow_html=True)
                     
         # =========================================================================
