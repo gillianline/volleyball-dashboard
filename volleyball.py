@@ -528,6 +528,7 @@ def load_all_data():
     except:
         thresh_df = None
         
+        
     return df.dropna(subset=['Date']), match_df.dropna(subset=['Date']), cmj_df, phase_df, thresh_df, ash_df, er_df, calf_df, hip_df, shoulder_df
 
 
@@ -3873,33 +3874,34 @@ if check_password():
 
             elif selected_acwr_tab == "Shoulder Injury Risk":
                 st.subheader("Volleyball Shoulder Injury Risk & Screening Dashboard")
-        
+                
                 # Sub-tabs for Team Overview vs Individual Deep Dive
                 risk_sub_tab1, risk_sub_tab2 = st.tabs(["Team Overview By Date", "Individual Athlete Deep-Dive"])
-        
+                
                 # -------------------------------------------------------------------------
                 # SUB-TAB 1: TEAM OVERVIEW BY DATE (Date Picker + Color-Coded Table)
                 # -------------------------------------------------------------------------
                 with risk_sub_tab1:
                     st.markdown("### Team Session Summary & Screening Status")
-            
+                    
                     all_gps_df, _ = fetch_catapult_cloud_swings("2026-08-01", datetime.today().strftime('%Y-%m-%d'))
                     if all_gps_df.empty:
                         all_gps_df = raw_df.copy()
-                
+                        
                     all_gps_df['Date'] = pd.to_datetime(all_gps_df['Date']).dt.normalize()
                     available_dates = sorted(all_gps_df['Date'].dropna().unique(), reverse=True)
-            
+                    
                     if len(available_dates) > 0:
                         selected_date = st.selectbox(
                             "Select Practice / Match Date:", 
                             options=available_dates, 
-                            format_func=lambda d: pd.to_datetime(d).strftime('%A, %B %d, %Y')
+                            format_func=lambda d: pd.to_datetime(d).strftime('%A, %B %d, %Y'),
+                            key="team_risk_date_sel"
                         )
-                
+                        
                         team_day_rows = []
                         unique_athletes = all_gps_df['Name'].dropna().unique()
-                
+                        
                         for ath in unique_athletes:
                             mat = build_injury_prediction_matrix(all_gps_df, er_df, ash_df, ath)
                             if not mat.empty:
@@ -3912,10 +3914,10 @@ if check_password():
                                     latest_r = mat.iloc[-1].to_dict()
                                     latest_r['Name'] = ath
                                     team_day_rows.append(latest_r)
-                
+                        
                         if team_day_rows:
                             df_team_day = pd.DataFrame(team_day_rows)
-                    
+                            
                             display_cols = [
                                 'Name', 'Risk_Status', 'Shoulder_Risk_Score', 
                                 'Est_Swings', 'Est_Swings_ACWR', 
@@ -3925,7 +3927,7 @@ if check_password():
                             ]
                             existing_disp = [c for c in display_cols if c in df_team_day.columns]
                             df_view = df_team_day[existing_disp].copy()
-                    
+                            
                             df_view.rename(columns={
                                 'Name': 'Athlete Name',
                                 'Risk_Status': 'Status',
@@ -3938,7 +3940,7 @@ if check_password():
                                 'ER_Drop_L_%': 'ER ROM (L %)',
                                 'Primary_Drivers': 'Key Drivers'
                             }, inplace=True)
-                    
+                            
                             def color_risk_and_flags(val):
                                 if isinstance(val, str):
                                     if "High Risk" in val:
@@ -3966,7 +3968,7 @@ if check_password():
                                 'ER ROM (R %)': '{:+.1f}%',
                                 'ER ROM (L %)': '{:+.1f}%'
                             })
-                    
+                            
                             st.dataframe(styled_table, use_container_width=True)
                         else:
                             st.info("No athlete screening records found for this date.")
@@ -4012,7 +4014,7 @@ if check_password():
                         chart_data = prediction_df.set_index('Date')[['Shoulder_Risk_Score']].copy()
                         chart_data['Scaled_ACWR'] = prediction_df.set_index('Date')['Est_Swings_ACWR'] * 20
                         st.line_chart(chart_data)
-                
+                        
                         st.markdown("#### Full Screening & Load History")
                         st.dataframe(prediction_df[['Date', 'Risk_Status', 'Shoulder_Risk_Score', 'Est_Swings', 'Est_Swings_ACWR', 'ASH_Drop_R_%', 'ASH_Drop_L_%', 'ER_Drop_R_%', 'ER_Drop_L_%', 'Primary_Drivers']], use_container_width=True)
                     else:
