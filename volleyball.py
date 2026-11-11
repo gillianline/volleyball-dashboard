@@ -957,39 +957,48 @@ def build_injury_prediction_matrix(df_gps, df_er, df_ash, athlete_name):
 
     merged = cal[cal['Date'].isin(daily['Date'])].copy().sort_values('Date')
 
+    # --- ASH ROLLING AVERAGE BASELINE ---
     if not ash_ath.empty:
         ash_i = ash_ath[ash_ath['Isometric Type'].astype(str).str.contains('I', case=False, na=False)].copy()
         if ash_i.empty:
             ash_i = ash_ath.copy()
         ash_i = ash_i.sort_values('Test Date')
-        base_ash_r = ash_i['Peak Vertical Force [N] (R)'].iloc[0] if len(ash_i) > 0 else 100.0
-        base_ash_l = ash_i['Peak Vertical Force [N] (L)'].iloc[0] if len(ash_i) > 0 else 100.0
-
+        
+        # Merge screening data first so we can compute rolling averages
         merged = pd.merge_asof(
             merged,
-            ash_i[['Test Date', 'Peak Vertical Force [N] (L)', 'Peak Vertical Force [N] (R)', 'Peak Vertical Force [N] (Asym)(%)']],
+            ash_i[['Test Date', 'Peak Vertical Force [N] (L)', 'Peak Vertical Force [N] (R)']],
             left_on='Date', right_on='Test Date', direction='backward'
         )
-        merged['ASH_Drop_R_%'] = np.where(base_ash_r > 0, ((merged['Peak Vertical Force [N] (R)'] - base_ash_r) / base_ash_r) * 100.0, 0.0)
-        merged['ASH_Drop_L_%'] = np.where(base_ash_l > 0, ((merged['Peak Vertical Force [N] (L)'] - base_ash_l) / base_ash_l) * 100.0, 0.0)
+        
+        # Compute a 30-day rolling average baseline for ASH force (min 1 period fallback)
+        merged['Base_ASH_R'] = merged['Peak Vertical Force [N] (R)'].rolling(window=30, min_periods=1).mean()
+        merged['Base_ASH_L'] = merged['Peak Vertical Force [N] (L)'].rolling(window=30, min_periods=1).mean()
+        
+        merged['ASH_Drop_R_%'] = np.where(merged['Base_ASH_R'] > 0, ((merged['Peak Vertical Force [N] (R)'] - merged['Base_ASH_R']) / merged['Base_ASH_R']) * 100.0, 0.0)
+        merged['ASH_Drop_L_%'] = np.where(merged['Base_ASH_L'] > 0, ((merged['Peak Vertical Force [N] (L)'] - merged['Base_ASH_L']) / merged['Base_ASH_L']) * 100.0, 0.0)
     else:
         merged['Peak Vertical Force [N] (L)'] = 0.0
         merged['Peak Vertical Force [N] (R)'] = 0.0
         merged['ASH_Drop_R_%'] = 0.0
         merged['ASH_Drop_L_%'] = 0.0
 
+    # --- ER ROM ROLLING AVERAGE BASELINE ---
     if not er_ath.empty:
         er_sorted = er_ath.sort_values('Test Date')
-        base_er_r = er_sorted['R Max ROM (°)'].iloc[0] if len(er_sorted) > 0 else 110.0
-        base_er_l = er_sorted['L Max ROM (°)'].iloc[0] if len(er_sorted) > 0 else 110.0
-
+        
         merged = pd.merge_asof(
             merged,
-            er_sorted[['Test Date', 'L Max ROM (°)', 'R Max ROM (°)', 'ROM Asymmetry (%)']],
+            er_sorted[['Test Date', 'L Max ROM (°)', 'R Max ROM (°)']],
             left_on='Date', right_on='Test Date', direction='backward', suffixes=('', '_ER')
         )
-        merged['ER_Drop_R_%'] = np.where(base_er_r > 0, ((merged['R Max ROM (°)'] - base_er_r) / base_er_r) * 100.0, 0.0)
-        merged['ER_Drop_L_%'] = np.where(base_er_l > 0, ((merged['L Max ROM (°)'] - base_er_l) / base_er_l) * 100.0, 0.0)
+        
+        # Compute a 30-day rolling average baseline for ROM
+        merged['Base_ER_R'] = merged['R Max ROM (°)'].rolling(window=30, min_periods=1).mean()
+        merged['Base_ER_L'] = merged['L Max ROM (°)'].rolling(window=30, min_periods=1).mean()
+        
+        merged['ER_Drop_R_%'] = np.where(merged['Base_ER_R'] > 0, ((merged['R Max ROM (°)'] - merged['Base_ER_R']) / merged['Base_ER_R']) * 100.0, 0.0)
+        merged['ER_Drop_L_%'] = np.where(merged['Base_ER_L'] > 0, ((merged['L Max ROM (°)'] - merged['Base_ER_L']) / merged['Base_ER_L']) * 100.0, 0.0)
     else:
         merged['L Max ROM (°)'] = 0.0
         merged['R Max ROM (°)'] = 0.0
