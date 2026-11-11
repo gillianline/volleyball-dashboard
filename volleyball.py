@@ -745,91 +745,85 @@ class CatapultAPIClient:
         return pd.DataFrame(), last_status
 
 
-def detect_swings_from_10hz_stream(df_10hz: pd.DataFrame) -> int:
+def detect_swings_from_10hz_stream(df_10hz: pd.DataFrame, max_jump_bound: float = 0.0) -> int:
     """
-    Detects volleyball hitting/serving swings from 10Hz Catapult sensor data.
-    Works both Indoors (using 10Hz PlayerLoad 'pl' / inertial derivative bursts when GPS 'v' is 0)
-    and Outdoors/LPS (using velocity + acceleration + PlayerLoad).
+    Precision 10Hz Volleyball Swing Detector calibrated for Catapult OpenField columns:
+    ['ts', 'cs', 'lat', 'long', 'o', 'v', 'a', 'hr', 'pl', 'mp', 'sl', 'x', 'y']
     """
-    if df_10hz.empty or len(df_10hz) < 20:
+    if df_10hz.empty or len(df_10hz) < 30:
         return 0
-
-    cols = {c.lower(): c for c in df_10hz.columns}
-    v_col = next((cols[k] for k in ["v", "vel", "velocity", "speed", "o_v", "lps_v"] if k in cols), None)
-    a_col = next((cols[k] for k in ["a", "acc", "acceleration", "o_a", "lps_a", "ima_a"] if k in cols), None)
-    pl_col = next((cols[k] for k in ["pl", "player_load", "playerload", "inst_pl", "pl_slow", "pl_2d"] if k in cols), None)
-    o_col = next((cols[k] for k in ["o", "odometer", "dist", "distance"] if k in cols), None)
 
     n_rows = len(df_10hz)
 
-    # 1. Extract 10Hz PlayerLoad (the primary indoor accelerometer signal at 10Hz)
-    if pl_col:
-        pl_raw = pd.to_numeric(df_10hz[pl_col], errors="coerce").ffill().fillna(0.0).values
-        # In OpenField v6 /sensor, 'pl' is cumulative over the session. Take the 0.1s (10Hz) rate of change:
+    # 1. Instantaneous 10Hz PlayerLoad ('pl' is cumulative in OpenField, so diff gives 0.1s load)
+    if "pl" in df_10hz.columns:
+        pl_raw = pd.to_numeric(df_10hz["pl"], errors="coerce").ffill().fillna(0.0).values
         if np.nanmax(pl_raw) > 10.0 and pl_raw[-1] >= pl_raw[0]:
             inst_pl = np.clip(np.diff(pl_raw, prepend=pl_raw[0]), 0.0, None)
         else:
             inst_pl = np.clip(pl_raw, 0.0, None)
     else:
-        inst_pl = np.zeros(n_rows)
-
-    # 2. Extract 10Hz Velocity (from 'v' or 0.1s derivative of odometer 'o')
-    if v_col:
-        v = pd.to_numeric(df_10hz[v_col], errors="coerce").fillna(0.0).values
-    elif o_col:
-        o_raw = pd.to_numeric(df_10hz[o_col], errors="coerce").ffill().fillna(0.0).values
-        v = np.clip(np.diff(o_raw, prepend=o_raw[0]) * 10.0, 0.0, 12.0)
-    else:
-        v = np.zeros(n_rows)
-
-    # 3. Extract 10Hz Acceleration
-    if a_col:
-        a = pd.to_numeric(df_10hz[a_col], errors="coerce").fillna(0.0).values
-    else:
-        a = np.gradient(v, 0.1)
-
-    # Smooth instantaneous 10Hz PlayerLoad over a 0.3s (3-sample) rolling window to capture full jump+swing impulse
-    pl_300ms = pd.Series(inst_pl).rolling(window=3, min_periods=1).sum().values
-    # Rate of change of 10Hz PlayerLoad (jerk/whip indicator during arm swing + plant)
-    pl_jerk = np.abs(np.diff(inst_pl, prepend=inst_pl[0]))
-
-    active_mask = pl_300ms > 0.01
-    if np.sum(active_mask) < 10:
         return 0
 
-    active_impulses = pl_300ms[active_mask]
+    # 2. Extract 10Hz Velocity ('v') or derive from local court ('x', 'y') / odometer ('o')
+    v = pd.to_numeric(df_10hz["v"], errors="coerce").fillna(0.0).values if "v" in df_10hz.columns else np.zeros(n_rows)
+    if np.nanmax(v) < 0.5 and "x" in df_10hz.columns and "y" in df_10hz.columns:
+        x_val = pd.to_numeric(df_10hz["x"], errors="coerce").ffill().fillna(0.0).values
+        y_val = pd.to_numeric(df_10hz["y"], errors="coerce").ffill().fillna(0.0).values
+        step_dist = np.sqrt(np.diff(x_val, prepend=x_val[0])**2 + np.diff(y_val, prepend=y_val[0])**2)
+        v = np.clip(step_dist * 10.0, 0.0, 12.0)
+
+    # 3. Extract 10Hz Acceleration ('a') and Metabolic Power ('mp')
+    a = pd.to_numeric(df_10hz["a"], errors="coerce").fillna(0.0).values if "a" in df_10hz.columns else np.gradient(v, 0.1)
+    mp = pd.to_numeric(df_10hz["mp"], errors="coerce").fillna(0.0).values if "mp" in df_10hz.columns else np.zeros(n_rows)
+
+    # 4. Compute 0.4s (4-sample) Vertical/Torso PlayerLoad Impulse & 0.1s Whip Jerk
+    pl_400ms = pd.Series(inst_pl).rolling(window=4, min_periods=1).sum().values
+    pl_jerk = np.abs(np.diff(inst_pl, prepend=inst_pl[0]))
+
+    active_mask = pl_400ms > 0.015
+    if np.sum(active_mask) < 15:
+        return 0
+
+    active_impulses = pl_400ms[active_mask]
     active_jerks = pl_jerk[active_mask]
 
-    # Case A: Positioning (LPS or GPS) is active (max velocity > 1.5 m/s)
-    if np.nanmax(v) > 1.5:
-        peak_approach_v = pd.Series(v).rolling(window=6, min_periods=1).max().values
-        pl_thresh = np.percentile(active_impulses, 86)
+    # Dynamic athlete-specific thresholds for explosive aerial + torso whip action
+    impulse_thresh = np.percentile(active_impulses, 92)
+    jerk_thresh = np.percentile(active_jerks, 89)
+
+    # If velocity/court coordinates ('v' or 'x'/'y') are active, require approach speed or braking plant
+    if np.nanmax(v) > 1.2:
+        approach_v_600ms = pd.Series(v).rolling(window=6, min_periods=1).max().values
+        plant_decel_300ms = pd.Series(np.abs(a)).rolling(window=3, min_periods=1).max().values
         is_swing_frame = (
-            (pl_300ms >= pl_thresh) &
-            ((peak_approach_v >= 1.6) | (np.abs(a) >= 2.0))
+            (pl_400ms >= impulse_thresh) &
+            (pl_jerk >= jerk_thresh) &
+            ((approach_v_600ms >= 1.4) | (plant_decel_300ms >= 1.8))
         )
-    # Case B: Indoor Gym (GPS velocity/lat/long are 0; 10Hz PlayerLoad 'pl' carries the 3D accelerometer load)
     else:
-        # A volleyball approach + jump + overhead swing produces a 0.3s PlayerLoad impulse in the top ~8%
-        # of active frames AND a sharp 0.1s jerk spike (separating explosive swing/takeoff from steady running)
-        impulse_thresh = np.percentile(active_impulses, 91)
-        jerk_thresh = np.percentile(active_jerks, 88)
-        is_swing_frame = (pl_300ms >= impulse_thresh) & (pl_jerk >= jerk_thresh)
+        # Pure indoor inertial mode (using 'pl' and 'mp')
+        mp_active = mp[mp > 0]
+        mp_thresh = np.percentile(mp_active, 85) if len(mp_active) > 15 else 0.0
+        is_swing_frame = (pl_400ms >= impulse_thresh) & (pl_jerk >= jerk_thresh) & (mp >= mp_thresh)
 
     candidate_indices = np.where(is_swing_frame)[0]
     if len(candidate_indices) == 0:
         return 0
 
-    # Debounce at 10Hz: minimum 30 samples (3.0 seconds) between distinct volleyball attack/serve swings
+    # Debounce at 10Hz: minimum 35 samples (3.5 seconds) between distinct volleyball attack/serve swings
     swing_count = 1
     last_idx = candidate_indices[0]
     for idx in candidate_indices[1:]:
-        if (idx - last_idx) >= 30:
+        if (idx - last_idx) >= 35:
             swing_count += 1
             last_idx = idx
 
-    return swing_count
+    # Physiological ceiling: an athlete's aerial attack/serve swings cannot exceed High + Moderate Jumps
+    if max_jump_bound > 0:
+        swing_count = min(swing_count, int(round(max_jump_bound)))
 
+    return swing_count
 
 @st.cache_data(ttl=600)
 def fetch_catapult_cloud_swings(start_date_str: str, end_date_str: str, cache_version: str = "v8_10hz_indoor") -> tuple[pd.DataFrame, str]:
@@ -888,7 +882,9 @@ def fetch_catapult_cloud_swings(start_date_str: str, end_date_str: str, cache_ve
                             # Print ALL columns returned by the 10Hz stream so we see the exact schema
                             sensor_diag = f"10Hz cols={list(df_10hz.columns)}"
                         if not df_10hz.empty:
-                            swings_10hz = detect_swings_from_10hz_stream(df_10hz)
+                            high_j = float(pd.to_numeric(ath_row.get("ima_jump_count_high", 0), errors="coerce") or 0)
+                            med_j = float(pd.to_numeric(ath_row.get("ima_jump_count_med", 0), errors="coerce") or 0)
+                            swings_10hz = detect_swings_from_10hz_stream(df_10hz, max_jump_bound=(high_j + med_j))
                             if swings_10hz > 0:
                                 sensor_10hz_hits += 1
 
