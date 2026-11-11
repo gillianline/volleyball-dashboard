@@ -1033,31 +1033,34 @@ def build_injury_prediction_matrix(df_gps, df_er, df_ash, athlete_name):
         elif worst_er_drop <= -5.0:
             drivers.append(f"Tight ER ROM ({worst_er_drop:+.1f}%)")
 
-        # Independent Clinical Threshold Rules
-        is_high_workload = (sw_acwr > 1.50)
-        is_high_clinical = (worst_ash_drop <= -15.0) or (worst_er_drop <= -10.0)
+        # --- DYNAMIC 0-100 SCORE CALCULATION ---
+        # 1. Workload contribution (scaled by ACWR magnitude)
+        workload_pts = min(40.0, max(0.0, (sw_acwr - 1.0) * 50.0)) if sw_acwr > 1.0 else 0.0
+        
+        # 2. Strength deficit contribution (scaled by % drop)
+        ash_pts = min(35.0, abs(min(0.0, worst_ash_drop)) * 2.0)
+        
+        # 3. Mobility restriction contribution (scaled by % drop)
+        rom_pts = min(25.0, abs(min(0.0, worst_er_drop)) * 2.5)
 
-        is_mod_workload = (sw_acwr > 1.30)
-        is_mod_clinical = (worst_ash_drop <= -8.0) or (worst_er_drop <= -5.0)
+        total_score = min(100.0, workload_pts + ash_pts + rom_pts)
 
-        if is_high_workload and is_high_clinical:
+        # Tier assignment based on dynamic score
+        if total_score >= 60.0 or (sw_acwr > 1.50 and (worst_ash_drop <= -15.0 or worst_er_drop <= -10.0)):
             tier = "High Risk"
-            score = 75.0  # Representative indicator value for metrics/charts
-        elif is_mod_workload or is_mod_clinical or (sw_acwr > 1.15):
+        elif total_score >= 35.0 or sw_acwr > 1.30 or worst_ash_drop <= -8.0 or worst_er_drop <= -5.0:
             tier = "Moderate Risk"
-            score = 45.0
         else:
             tier = "Low / Optimal"
-            score = 15.0
 
-        risk_scores.append(score)
+        risk_scores.append(round(total_score, 1))
         risk_tiers.append(tier)
         risk_drivers.append(", ".join(drivers) if drivers else "Normal Load & Screening")
 
     merged['Shoulder_Risk_Score'] = risk_scores
     merged['Risk_Status'] = risk_tiers
     merged['Primary_Drivers'] = risk_drivers
-
+    
     return merged
 
 # --- 5. EXECUTION BLOCK CONTEXT ---
