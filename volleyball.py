@@ -3733,10 +3733,19 @@ if check_password():
                 if sync_live:
                     live_cat_df, api_status = fetch_catapult_cloud_swings("2026-08-01", datetime.today().strftime('%Y-%m-%d'))
                     if not live_cat_df.empty:
-                        source_gps_df = pd.concat([source_gps_df, live_cat_df], ignore_index=True)
+                        live_cat_df['Name'] = live_cat_df['Name'].astype(str).str.strip()
+                        live_cat_df['Date'] = pd.to_datetime(live_cat_df['Date']).dt.normalize()
+                        
+                        # Remove any existing rows in source_gps_df that match the (Name, Date) of the live API data
+                        # so we don't double-count practices already in the Google Sheet
+                        live_keys = set(zip(live_cat_df['Name'], live_cat_df['Date']))
+                        mask = source_gps_df.apply(lambda r: (str(r['Name']).strip(), pd.to_datetime(r['Date']).normalize()) not in live_keys, axis=1)
+                        
+                        source_gps_df = pd.concat([source_gps_df[mask], live_cat_df], ignore_index=True)
                         st.caption(f"Live API Active: {api_status}")
                     else:
                         st.caption(f"Fallback to Google Sheets: {api_status}")
+                        
 
                 pred_df = build_injury_prediction_matrix(source_gps_df, raw_er_df, raw_ash_df, sel_sh_ath)
 
