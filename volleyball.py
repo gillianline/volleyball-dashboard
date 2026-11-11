@@ -3958,22 +3958,54 @@ if check_password():
                         'Primary_Drivers': 'Flagged Drivers'
                     })
                     
-                    def color_risk_zones_and_drivers(val):
-                        if isinstance(val, str):
-                            if "High Risk" in val:
-                                return 'background-color: #ff4d4d; color: white; font-weight: bold;'
-                            elif "Moderate Risk" in val:
-                                return 'background-color: #ffcc00; color: black; font-weight: bold;'
-                            elif "Low / Optimal" in val:
-                                return 'background-color: #2eb82e; color: white;'
-                            elif any(w in val.lower() for w in ["spike", "deficit", "restricted", "fatigue", "tight"]):
-                                return 'background-color: #FCE8E6; color: #D93025; font-weight: bold;'
-                        return ''
-
-                    styled_indiv_table = final_view.style.map(
-                        color_risk_zones_and_drivers, subset=['Risk Zone', 'Flagged Drivers']
-                    )
-                    st.dataframe(styled_indiv_table, use_container_width=True, hide_index=True)
+                    # Build a gorgeous, streamlined HTML table with clean color pills
+                    table_html = """
+                    <div style="overflow-x:auto; border:1px solid #E2E8F0; border-radius:10px; background:white; margin-top:10px;">
+                    <table class="scout-table" style="width:100%; border-collapse:collapse; margin-bottom:0;">
+                        <thead>
+                            <tr style="background-color:#4895DB; color:white;">
+                                <th style="padding:10px 8px;">Date</th>
+                                <th style="padding:10px 8px;">Est. Swings</th>
+                                <th style="padding:10px 8px;">Swing ACWR</th>
+                                <th style="padding:10px 8px;">Player Load</th>
+                                <th style="padding:10px 8px;">ASH (L/R)</th>
+                                <th style="padding:10px 8px;">ER ROM (L/R)</th>
+                                <th style="padding:10px 8px;">Risk Score</th>
+                                <th style="padding:10px 8px;">Risk Zone</th>
+                                <th style="text-align:left !important; padding-left:14px;">Flagged Drivers</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                    """
+                    
+                    for _, row in final_view.iterrows():
+                        zone = str(row['Risk Zone'])
+                        if "High Risk" in zone:
+                            badge_bg, badge_fg = "#FEE2E2", "#B91C1C"
+                        elif "Moderate Risk" in zone:
+                            badge_bg, badge_fg = "#FEF3C7", "#B45309"
+                        else:
+                            badge_bg, badge_fg = "#DCFCE7", "#15803D"
+                            
+                        drivers = str(row['Flagged Drivers'])
+                        driver_style = "color: #B91C1C; font-weight: 700;" if drivers != "Normal Load & Screening" else "color: #64748B;"
+                        
+                        table_html += f"""
+                            <tr style="border-bottom: 1px solid #F1F5F9;">
+                                <td style="padding:8px; font-weight:600;">{row['Date']}</td>
+                                <td style="padding:8px; font-weight:700;">{row['Est. Swings']}</td>
+                                <td style="padding:8px; font-weight:700;">{row['Swing ACWR']}</td>
+                                <td style="padding:8px;">{row['Player Load']}</td>
+                                <td style="padding:8px; font-size:10.5px;">{row['ASH (L/R)']}</td>
+                                <td style="padding:8px; font-size:10.5px;">{row['ER ROM (L/R)']}</td>
+                                <td style="padding:8px; font-weight:800;">{row['Risk Score']:.0f}</td>
+                                <td style="padding:8px;"><span style="background-color:{badge_bg}; color:{badge_fg}; padding:3px 10px; border-radius:12px; font-weight:700; font-size:11px; white-space:nowrap;">{zone}</span></td>
+                                <td style="text-align:left !important; padding-left:14px; padding-right:10px; font-size:11px; {driver_style}">{drivers}</td>
+                            </tr>
+                        """
+                    
+                    table_html += "</tbody></table></div>"
+                    st.markdown(table_html, unsafe_allow_html=True)
                     
         # =========================================================================
         # --- HUB 5: TESTING & BASELINES ------------------------------------------
