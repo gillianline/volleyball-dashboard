@@ -3904,7 +3904,7 @@ if check_password():
                     r_bg = "#FCE8E6" if risk_val >= 60 else ("#FEF3C7" if risk_val >= 35 else "#E6F4EA")
 
                     k_s1, k_s2, k_s3, k_s4 = st.columns(4)
-                    k_s1.metric("Latest Est. Swings", f"{int(latest_r['Est_Swings'])}")
+                    k_s1.metric("Latest Est. Swings", f"{int(latest_r['Est_Swings'])}", help="Derived from High-Band Jumps + 50% Moderate Jumps")
                     k_s2.metric("Swing ACWR (7:28d)", f"{latest_r['Est_Swings_ACWR']:.2f}")
                     k_s3.metric("Latest ASH Force (L / R)", f"{latest_r['Peak Vertical Force [N] (L)']:.0f}N / {latest_r['Peak Vertical Force [N] (R)']:.0f}N")
                     with k_s4:
@@ -3963,21 +3963,7 @@ if check_password():
                     ash_view['Baseline ASH (L/R)'] = f"{base_ash_l:.0f}N / {base_ash_r:.0f}N"
                     ash_view['Recent ASH (L/R)'] = disp_cols.apply(lambda r: f"{r['Peak Vertical Force [N] (L)']:.0f}N ({r['ASH_Drop_L_%']:+.1f}%) / {r['Peak Vertical Force [N] (R)']:.0f}N ({r['ASH_Drop_R_%']:+.1f}%)", axis=1)
                     
-                    ash_view['Risk Score'] = disp_cols['Shoulder_Risk_Score']
-                    ash_view['Risk Zone'] = disp_cols['Risk_Status']
-                    
-                    def color_risk_zones(val):
-                        if isinstance(val, str):
-                            if "High Risk" in val:
-                                return 'background-color: #FEE2E2; color: #B91C1C; font-weight: bold;'
-                            elif "Moderate Risk" in val:
-                                return 'background-color: #FEF3C7; color: #B45309; font-weight: bold;'
-                            elif "Low / Optimal" in val:
-                                return 'background-color: #DCFCE7; color: #15803D; font-weight: bold;'
-                        return ''
-
-                    styled_ash = ash_view.style.map(color_risk_zones, subset=['Risk Zone']).format({'Risk Score': '{:.0f}'})
-                    st.dataframe(styled_ash, use_container_width=True, hide_index=True)
+                    st.dataframe(ash_view, use_container_width=True, hide_index=True)
 
                     # --- TABLE 2: EXTERNAL ROTATION ROM SCREENING ---
                     st.markdown("#### 2. External Rotation (ER) Range of Motion Log")
@@ -3987,8 +3973,6 @@ if check_password():
                     rom_view['Baseline ER ROM (L/R)'] = f"{base_er_l:.1f}° / {base_er_r:.1f}°"
                     rom_view['Recent ER ROM (L/R)'] = disp_cols.apply(lambda r: f"{r['L Max ROM (°)']:.1f}° ({r['ER_Drop_L_%']:+.1f}%) / {r['R Max ROM (°)']:.1f}° ({r['ER_Drop_R_%']:+.1f}%)", axis=1)
                     
-                    rom_view['Risk Score'] = disp_cols['Shoulder_Risk_Score']
-                    rom_view['Risk Zone'] = disp_cols['Risk_Status']
                     rom_view['Flagged Drivers'] = disp_cols['Primary_Drivers']
 
                     def color_drivers(val):
@@ -3997,12 +3981,8 @@ if check_password():
                         return 'color: #64748B;'
 
                     styled_rom = rom_view.style.map(
-                        color_risk_zones, subset=['Risk Zone']
-                    ).map(
                         color_drivers, subset=['Flagged Drivers']
-                    ).format({
-                        'Risk Score': '{:.0f}'
-                    })
+                    )
 
                     st.dataframe(styled_rom, use_container_width=True, hide_index=True)
                     
