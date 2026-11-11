@@ -3875,23 +3875,38 @@ if check_password():
             elif selected_acwr_tab == "Shoulder Injury Risk":
                 st.markdown('<div class="section-header">Volleyball Swing Volume & Shoulder Injury Prediction</div>', unsafe_allow_html=True)
                 
-                c_sh1, c_sh2 = st.columns([2, 2])
+                # --- AUTOMATIC BACKGROUND API SYNC ON LOAD ---
+                if "auto_synced_catapult" not in st.session_state:
+                    with st.spinner("Syncing live Catapult API swing data..."):
+                        live_cat_df, api_status = fetch_catapult_cloud_swings("2026-08-01", datetime.today().strftime('%Y-%m-%d'))
+                        if not live_cat_df.empty:
+                            live_cat_df['Name'] = live_cat_df['Name'].astype(str).str.strip()
+                            live_cat_df['Date'] = pd.to_datetime(live_cat_df['Date']).dt.normalize()
+                            st.session_state['synced_live_cat_df'] = live_cat_df
+                        else:
+                            st.session_state['synced_live_cat_df'] = pd.DataFrame()
+                    st.session_state['auto_synced_catapult'] = True
+
+                c_sh1, c_sh2 = st.columns([3, 1])
                 with c_sh1:
                     sel_sh_ath = st.selectbox("Select Athlete", master_athlete_list, key="sh_risk_ath_sel")
                 with c_sh2:
-                    sync_live = st.checkbox("Sync Live Catapult API Swings", value=False, key="sh_sync_api_toggle")
+                    # Optional manual refresh button in case you want to pull fresh data mid-session
+                    if st.button("Refresh API Sync", use_container_width=True):
+                        live_cat_df, _ = fetch_catapult_cloud_swings("2026-08-01", datetime.today().strftime('%Y-%m-%d'))
+                        if not live_cat_df.empty:
+                            live_cat_df['Name'] = live_cat_df['Name'].astype(str).str.strip()
+                            live_cat_df['Date'] = pd.to_datetime(live_cat_df['Date']).dt.normalize()
+                            st.session_state['synced_live_cat_df'] = live_cat_df
+                        st.rerun()
 
                 source_gps_df = raw_df.copy()
-                if sync_live:
-                    live_cat_df, api_status = fetch_catapult_cloud_swings("2026-08-01", datetime.today().strftime('%Y-%m-%d'))
-                    if not live_cat_df.empty:
-                        live_cat_df['Name'] = live_cat_df['Name'].astype(str).str.strip()
-                        live_cat_df['Date'] = pd.to_datetime(live_cat_df['Date']).dt.normalize()
-                        
-                        live_keys = set(zip(live_cat_df['Name'], live_cat_df['Date']))
-                        mask = source_gps_df.apply(lambda r: (str(r['Name']).strip(), pd.to_datetime(r['Date']).normalize()) not in live_keys, axis=1)
-                        
-                        source_gps_df = pd.concat([source_gps_df[mask], live_cat_df], ignore_index=True)
+                live_cat_data = st.session_state.get('synced_live_cat_df', pd.DataFrame())
+                
+                if not live_cat_data.empty:
+                    live_keys = set(zip(live_cat_data['Name'], live_cat_data['Date']))
+                    mask = source_gps_df.apply(lambda r: (str(r['Name']).strip(), pd.to_datetime(r['Date']).normalize()) not in live_keys, axis=1)
+                    source_gps_df = pd.concat([source_gps_df[mask], live_cat_data], ignore_index=True)
 
                 pred_df = build_injury_prediction_matrix(source_gps_df, raw_er_df, raw_ash_df, sel_sh_ath)
 
