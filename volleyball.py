@@ -3900,7 +3900,6 @@ if check_password():
                 with c_sh1:
                     sel_sh_ath = st.selectbox("Select Athlete", master_athlete_list, key="sh_risk_ath_sel")
                 with c_sh2:
-                    # Optional manual refresh button in case you want to pull fresh data mid-session
                     if st.button("Refresh API Sync", use_container_width=True):
                         live_cat_df, _ = fetch_catapult_cloud_swings("2026-08-01", datetime.today().strftime('%Y-%m-%d'))
                         if not live_cat_df.empty:
@@ -3929,7 +3928,7 @@ if check_password():
                     r_bg = "#FCE8E6" if risk_val >= 60 else ("#FEF3C7" if risk_val >= 35 else "#E6F4EA")
 
                     k_s1, k_s2, k_s3, k_s4 = st.columns(4)
-                    k_s1.metric("Latest Est. Swings", f"{int(np.ceil(latest_r['Est_Swings']))}")
+                    k_s1.metric("Latest Est. Swings", f"{int(np.ceil(latest_r['Est_Swings']))}", help="Derived from High-Band Jumps + 50% Moderate Jumps")
                     k_s2.metric("Swing ACWR (7:28d)", f"{latest_r['Est_Swings_ACWR']:.2f}")
                     k_s3.metric("Latest ASH Force (L / R)", f"{latest_r['Peak Vertical Force [N] (L)']:.0f}N / {latest_r['Peak Vertical Force [N] (R)']:.0f}N")
                     with k_s4:
@@ -3966,39 +3965,31 @@ if check_password():
                     fig_sh_pred.update_yaxes(title_text="Injury Risk Score (0-100)", range=[0, 105], secondary_y=True, showgrid=False)
                     st.plotly_chart(fig_sh_pred, use_container_width=True, config=LOCKED_CONFIG, key=f"sh_risk_chart_{sel_sh_ath}")
 
-                    # Extract initial baselines for this specific athlete
-                    ath_ash_raw = raw_ash_df[raw_ash_df['Name'] == sel_sh_ath].sort_values('Test Date')
-                    base_ash_l = ath_ash_raw['Peak Vertical Force [N] (L)'].iloc[0] if not ath_ash_raw.empty else 0.0
-                    base_ash_r = ath_ash_raw['Peak Vertical Force [N] (R)'].iloc[0] if not ath_ash_raw.empty else 0.0
-                    
-                    ath_er_raw = raw_er_df[raw_er_df['Name'] == sel_sh_ath].sort_values('Test Date')
-                    base_er_l = ath_er_raw['L Max ROM (°)'].iloc[0] if not ath_er_raw.empty else 0.0
-                    base_er_r = ath_er_raw['R Max ROM (°)'].iloc[0] if not ath_er_raw.empty else 0.0
-
                     disp_cols = pred_df.tail(15).sort_values('Date', ascending=False).copy()
                     disp_cols['Date'] = disp_cols['Date'].dt.strftime('%Y-%m-%d')
-                    # Use np.ceil to round up all fractional swing counts to whole integers
                     disp_cols['Est_Swings'] = np.ceil(disp_cols['Est_Swings']).astype(int)
                     disp_cols['Est_Swings_ACWR'] = disp_cols['Est_Swings_ACWR'].map('{:.2f}'.format)
                     
-                    # --- TABLE 1: ASH SHOULDER STRENGTH SCREENING ---
+                    # --- TABLE 1: ASH SHOULDER STRENGTH SCREENING (Cleaned: No Baseline Column) ---
                     st.markdown("#### 1. ASH Shoulder Isometric Strength Log")
                     ash_view = disp_cols[['Date', 'Est_Swings', 'Est_Swings_ACWR']].copy()
                     ash_view.rename(columns={'Est_Swings': 'Est. Swings', 'Est_Swings_ACWR': 'Swing ACWR'}, inplace=True)
                     
-                    ash_view['Baseline ASH (L/R)'] = f"{base_ash_l:.0f}N / {base_ash_r:.0f}N"
-                    ash_view['Recent ASH (L/R)'] = disp_cols.apply(lambda r: f"{r['Peak Vertical Force [N] (L)']:.0f}N ({r['ASH_Drop_L_%']:+.1f}%) / {r['Peak Vertical Force [N] (R)']:.0f}N ({r['ASH_Drop_R_%']:+.1f}%)", axis=1)
-                    
+                    ash_view['Recent ASH (L/R)'] = disp_cols.apply(
+                        lambda r: f"{r['Peak Vertical Force [N] (L)']:.0f}N ({r['ASH_Drop_L_%']:+.1f}%) / {r['Peak Vertical Force [N] (R)']:.0f}N ({r['ASH_Drop_R_%']:+.1f}%)", 
+                        axis=1
+                    )
                     st.dataframe(ash_view, use_container_width=True, hide_index=True)
 
-                    # --- TABLE 2: EXTERNAL ROTATION ROM SCREENING ---
+                    # --- TABLE 2: EXTERNAL ROTATION ROM SCREENING (Cleaned: No Baseline Column) ---
                     st.markdown("#### 2. External Rotation (ER) Range of Motion Log")
                     rom_view = disp_cols[['Date', 'Est_Swings', 'Est_Swings_ACWR']].copy()
                     rom_view.rename(columns={'Est_Swings': 'Est. Swings', 'Est_Swings_ACWR': 'Swing ACWR'}, inplace=True)
                     
-                    rom_view['Baseline ER ROM (L/R)'] = f"{base_er_l:.1f}° / {base_er_r:.1f}°"
-                    rom_view['Recent ER ROM (L/R)'] = disp_cols.apply(lambda r: f"{r['L Max ROM (°)']:.1f}° ({r['ER_Drop_L_%']:+.1f}%) / {r['R Max ROM (°)']:.1f}° ({r['ER_Drop_R_%']:+.1f}%)", axis=1)
-                    
+                    rom_view['Recent ER ROM (L/R)'] = disp_cols.apply(
+                        lambda r: f"{r['L Max ROM (°)']:.1f}° ({r['ER_Drop_L_%']:+.1f}%) / {r['R Max ROM (°)']:.1f}° ({r['ER_Drop_R_%']:+.1f}%)", 
+                        axis=1
+                    )
                     st.dataframe(rom_view, use_container_width=True, hide_index=True)
                     
         # =========================================================================
