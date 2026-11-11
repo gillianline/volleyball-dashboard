@@ -974,8 +974,8 @@ def fetch_catapult_cloud_swings(start_date_str: str, end_date_str: str, cache_ve
 
 def build_injury_prediction_matrix(df_gps, df_er, df_ash, athlete_name):
     """
-    Combines actual OpenField High Jumps, Jump Load, and Player Load with
-    ASH ISO-I and External Rotation (ER) ROM tests to predict shoulder injury risk.
+    Volleyball-Specific Injury Prediction Matrix using position-tailored
+    aerial loading multipliers and reliable OpenField session metrics.
     """
     gps_ath = df_gps[df_gps['Name'] == athlete_name].copy()
     er_ath = df_er[df_er['Name'] == athlete_name].copy()
@@ -984,23 +984,31 @@ def build_injury_prediction_matrix(df_gps, df_er, df_ash, athlete_name):
     if gps_ath.empty:
         return pd.DataFrame()
 
-    # Deduplicate same-day records
+    # Deduplicate same-day practice records cleanly
     gps_ath['Date'] = pd.to_datetime(gps_ath['Date']).dt.normalize()
     daily = gps_ath.groupby('Date')[['Player Load', 'Total Jumps', 'Moderate Jumps', 'High Jumps', 'Jump Load', 'Explosive Efforts']].max().reset_index().sort_values('Date')
 
-    # Use actual High Jumps if populated in the sheet/API; otherwise use Jump Load / Total Jumps
-    # We keep the column named 'Est_Swings' so your existing Hub 4 UI table/chart doesn't break,
-    # but it now reflects actual High-Intensity Aerial Efforts (High Jumps + 35% Mod Jumps).
-    daily['Est_Swings'] = np.where(
-        (daily['High Jumps'] + daily['Moderate Jumps']) > 0,
-        daily['High Jumps'] + (daily['Moderate Jumps'] * 0.35),
-        daily['Total Jumps']
-    )
+    # Position-specific volleyball hitting multipliers based on real court demands
+    pos_str = str(gps_ath['Position'].dropna().iloc[0]).upper() if 'Position' in gps_ath.columns and not gps_ath['Position'].dropna().empty else "OH"
+    
+    if any(p in pos_str for p in ["DS", "LIBERO", "L/DS", "DEF"]):
+        # Liberos / DS: Minimal aerial load, mainly jump serves / emergency back-row sets
+        daily['Est_Swings'] = daily['High Jumps'] * 0.2
+    elif "SET" in pos_str or pos_str == "S":
+        # Setters: High jump volume (setting), but low hitting volume (dumps/serves only)
+        daily['Est_Swings'] = (daily['High Jumps'] * 0.15) + (daily['Moderate Jumps'] * 0.05)
+    elif any(p in pos_str for p in ["MB", "MID"]):
+        # Middles: High total jump volume due to blocking, but lower relative attack swings per jump than pins
+        daily['Est_Swings'] = (daily['High Jumps'] * 0.55) + (daily['Moderate Jumps'] * 0.15)
+    else:
+        # Pin Hitters (OH / OPP / RS): Primary offensive terminal attackers
+        daily['Est_Swings'] = (daily['High Jumps'] * 0.85) + (daily['Moderate Jumps'] * 0.25)
 
     min_d, max_d = daily['Date'].min(), daily['Date'].max()
     full_idx = pd.date_range(start=min_d, end=max_d, freq='D')
     cal = daily.set_index('Date').reindex(full_idx).fillna(0.0).reset_index().rename(columns={'index': 'Date'})
 
+    # Calculate 7-day Acute and 28-day Chronic EWMA for Swings, Player Load, and Jump Load
     for col in ['Est_Swings', 'Player Load', 'Jump Load']:
         cal[f'{col}_Acute'] = cal[col].ewm(span=7, adjust=False).mean()
         cal[f'{col}_Chronic'] = cal[col].ewm(span=28, adjust=False).mean()
@@ -1059,18 +1067,16 @@ def build_injury_prediction_matrix(df_gps, df_er, df_ash, athlete_name):
         score = 0.0
         drivers = []
 
-        # 1. Aerial / Jump Workload Spike Component (Max 40 pts)
         sw_acwr = row['Est_Swings_ACWR']
         if sw_acwr > 1.50:
             score += 40.0
-            drivers.append(f"High Aerial Jump Spike (ACWR {sw_acwr:.2f})")
+            drivers.append(f"High Swing Spike (ACWR {sw_acwr:.2f})")
         elif sw_acwr > 1.30:
             score += 25.0
-            drivers.append(f"Elevated Aerial Volume (ACWR {sw_acwr:.2f})")
+            drivers.append(f"Elevated Swing Volume (ACWR {sw_acwr:.2f})")
         elif sw_acwr > 1.15:
             score += 10.0
 
-        # 2. ASH Isometric Force Drop Component (Max 35 pts)
         worst_ash_drop = min(row['ASH_Drop_R_%'], row['ASH_Drop_L_%'])
         min_ash_force = min(row['Peak Vertical Force [N] (R)'], row['Peak Vertical Force [N] (L)'])
         if worst_ash_drop <= -15.0 or (0 < min_ash_force < 90):
@@ -1080,7 +1086,6 @@ def build_injury_prediction_matrix(df_gps, df_er, df_ash, athlete_name):
             score += 20.0
             drivers.append(f"Moderate ASH Fatigue ({worst_ash_drop:+.1f}%)")
 
-        # 3. ER ROM Restriction Component (Max 25 pts)
         worst_er_drop = min(row['ER_Drop_R_%'], row['ER_Drop_L_%'])
         min_er_rom = min(row['R Max ROM (°)'], row['L Max ROM (°)'])
         if worst_er_drop <= -10.0 or (0 < min_er_rom < 90):
