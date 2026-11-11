@@ -640,101 +640,70 @@ def resolve_col_val(row, primary_col, alt_cols=[]):
 # =========================================================================
 def detect_swings_from_10hz_stream(df_10hz: pd.DataFrame, high_jumps: float = 0.0, mod_jumps: float = 0.0) -> int:
     """
-    Precision 10Hz Volleyball Swing Detector calibrated for NCAA D1 hitting volumes.
-    Isolates true attack/serve swings from general court movement and block jumps.
+    Precision 10Hz Volleyball Swing Detector for OpenField columns:
+    ['ts', 'cs', 'lat', 'long', 'o', 'v', 'a', 'hr', 'pl', 'mp', 'sl', 'x', 'y']
     """
-    if df_10hz.empty or len(df_10hz) < 50:
+    if df_10hz.empty or len(df_10hz) < 100:
         return 0
 
-    n_rows = len(df_10hz)
-
-    # 1. Instantaneous 10Hz PlayerLoad ('pl' is cumulative in OpenField, so diff gives 0.1s load)
-    if "pl" in df_10hz.columns:
-        pl_raw = pd.to_numeric(df_10hz["pl"], errors="coerce").ffill().fillna(0.0).values
-        if np.nanmax(pl_raw) > 10.0 and pl_raw[-1] >= pl_raw[0]:
-            inst_pl = np.clip(np.diff(pl_raw, prepend=pl_raw[0]), 0.0, None)
-        else:
-            inst_pl = np.clip(pl_raw, 0.0, None)
-    else:
+    # 1. Properly convert cumulative 'pl' into 0.1s instantaneous PlayerLoad
+    if "pl" not in df_10hz.columns:
         return 0
 
-    # 2. Extract 10Hz Velocity ('v') or derive from local court ('x', 'y')
-    v = pd.to_numeric(df_10hz["v"], errors="coerce").fillna(0.0).values if "v" in df_10hz.columns else np.zeros(n_rows)
-    if np.nanmax(v) < 0.5 and "x" in df_10hz.columns and "y" in df_10hz.columns:
-        x_val = pd.to_numeric(df_10hz["x"], errors="coerce").ffill().fillna(0.0).values
-        y_val = pd.to_numeric(df_10hz["y"], errors="coerce").ffill().fillna(0.0).values
-        step_dist = np.sqrt(np.diff(x_val, prepend=x_val[0])**2 + np.diff(y_val, prepend=y_val[0])**2)
-        v = np.clip(step_dist * 10.0, 0.0, 12.0)
+    pl_raw = pd.to_numeric(df_10hz["pl"], errors="coerce").fillna(0.0).values
+    # In Catapult 10Hz sensor streams, 'pl' is cumulative. Always take positive 0.1s diffs,
+    # and cap at 1.5 per 0.1s to ignore sensor-docking spikes.
+    inst_pl = np.diff(pl_raw, prepend=pl_raw[0])
+    inst_pl = np.where((inst_pl > 0.0) & (inst_pl < 1.5), inst_pl, 0.0)
 
-    # 3. Extract 10Hz Acceleration ('a') and Metabolic Power ('mp')
-    a = pd.to_numeric(df_10hz["a"], errors="coerce").fillna(0.0).values if "a" in df_10hz.columns else np.gradient(v, 0.1)
-    mp = pd.to_numeric(df_10hz["mp"], errors="coerce").fillna(0.0).values if "mp" in df_10hz.columns else np.zeros(n_rows)
+    # 2. Sum instantaneous PlayerLoad over a 0.4s (4-sample) window (takeoff + arm swing impulse)
+    pl_400ms = pd.Series(inst_pl).rolling(window=4, min_periods=1).sum().values
 
-    # 4. Compute 0.3s (3-sample) Vertical/Torso Impulse and 0.1s Whip Jerk
-    pl_300ms = pd.Series(inst_pl).rolling(window=3, min_periods=1).sum().values
-    pl_jerk = np.abs(np.diff(inst_pl, prepend=inst_pl[0]))
-
-    # Require a strict local peak over a 1.1-second window (5 samples before and after)
-    local_max_pl = pd.Series(pl_300ms).rolling(window=11, center=True, min_periods=1).max().values
-    is_local_peak = (pl_300ms == local_max_pl) & (pl_300ms > 0.08)
-
-    active_mask = pl_300ms > 0.02
-    if np.sum(active_mask) < 30:
+    # Filter to active court movement frames only
+    active_frames = pl_400ms[pl_400ms > 0.02]
+    if len(active_frames) < 50:
         return 0
 
-    active_impulses = pl_300ms[active_mask]
-    active_jerks = pl_jerk[active_mask]
+    # 3. Require a true 3.2-sigma outlier burst above the athlete's active court movement
+    mean_pl = np.mean(active_frames)
+    std_pl = np.std(active_frames)
+    if std_pl <= 0:
+        return 0
 
-    # Strict 97.5th percentile + absolute biomechanical floor so low-intensity drills don't false-trigger
-    impulse_thresh = max(np.percentile(active_impulses, 97.5), 0.22)
-    jerk_thresh = max(np.percentile(active_jerks, 96.0), 0.09)
+    z_thresh = mean_pl + (3.2 * std_pl)
 
-    if np.nanmax(v) > 1.2:
-        approach_v_600ms = pd.Series(v).rolling(window=6, min_periods=1).max().values
-        plant_decel_300ms = pd.Series(np.abs(a)).rolling(window=3, min_periods=1).max().values
-        is_swing_frame = (
-            is_local_peak &
-            (pl_300ms >= impulse_thresh) &
-            (pl_jerk >= jerk_thresh) &
-            ((approach_v_600ms >= 1.8) | (plant_decel_300ms >= 2.2))
-        )
+    # Also check 10Hz acceleration ('a') or metabolic power ('mp') for approach plant confirmation
+    a_val = np.abs(pd.to_numeric(df_10hz["a"], errors="coerce").fillna(0.0).values) if "a" in df_10hz.columns else np.zeros(len(df_10hz))
+    a_peak_500ms = pd.Series(a_val).rolling(window=5, min_periods=1).max().values
+
+    # Must be the highest peak in a 3-second (31-sample) window
+    local_max = pd.Series(pl_400ms).rolling(window=31, center=True, min_periods=1).max().values
+    is_swing_peak = (pl_400ms == local_max) & (pl_400ms >= z_thresh)
+
+    if np.nanmax(a_peak_500ms) > 1.0:
+        is_swing_peak = is_swing_peak & (a_peak_500ms >= np.percentile(a_peak_500ms[a_peak_500ms > 0], 80))
+
+    peak_indices = np.where(is_swing_peak)[0]
+    if len(peak_indices) == 0:
+        raw_10hz_swings = 0
     else:
-        mp_active = mp[mp > 0]
-        mp_thresh = np.percentile(mp_active, 94.0) if len(mp_active) > 20 else 0.0
-        is_swing_frame = (
-            is_local_peak &
-            (pl_300ms >= impulse_thresh) &
-            (pl_jerk >= jerk_thresh) &
-            (mp >= mp_thresh)
-        )
-
-    candidate_indices = np.where(is_swing_frame)[0]
-    if len(candidate_indices) == 0:
-        raw_10hz_count = 0
-    else:
-        # Minimum 5.5 seconds (55 samples at 10Hz) between distinct attack/serve swings for the same player
-        raw_10hz_count = 1
-        last_idx = candidate_indices[0]
-        for idx in candidate_indices[1:]:
-            if (idx - last_idx) >= 55:
-                raw_10hz_count += 1
+        # Minimum 8.0 seconds (80 samples at 10Hz) between distinct full-approach swings
+        raw_10hz_swings = 1
+        last_idx = peak_indices[0]
+        for idx in peak_indices[1:]:
+            if (idx - last_idx) >= 80:
+                raw_10hz_swings += 1
                 last_idx = idx
 
-    # 5. Anchor to the athlete's actual OpenField IMA Jump Envelope:
-    # A volleyball player's true attack/jump-serve swings come from High Jumps + a fraction of Moderate Jumps
-    # (since ~35-50% of total jumps in practice are blocks, transition hops, or setting jumps).
-    if (high_jumps + mod_jumps) > 0:
-        biomech_jump_swings = (high_jumps * 0.85) + (mod_jumps * 0.35)
-        max_possible_swings = high_jumps + (mod_jumps * 0.60)
-        if raw_10hz_count > 0:
-            # Blend 10Hz kinetic peak count with the IMA high-jump envelope and cap at physical max
-            calibrated_swings = min(max_possible_swings, (raw_10hz_count * 0.5) + (biomech_jump_swings * 0.5))
-            return int(round(calibrated_swings))
-        else:
-            return int(round(biomech_jump_swings))
+    # 4. Cap by High-Intensity Jumps if OpenField Jump Bands are present
+    # (In volleyball, maximal swings occur on High Jumps + a small fraction of Moderate Jumps)
+    if high_jumps > 0:
+        jump_cap = int(round((high_jumps * 0.80) + (mod_jumps * 0.15)))
+        if raw_10hz_swings > 0:
+            return min(raw_10hz_swings, jump_cap)
+        return jump_cap
 
-    return int(round(raw_10hz_count))
-
+    return min(raw_10hz_swings, 65)
 
 @st.cache_data(ttl=600)
 def fetch_catapult_cloud_swings(start_date_str: str, end_date_str: str, cache_version: str = "v9_calibrated") -> tuple[pd.DataFrame, str]:
@@ -924,7 +893,7 @@ def fetch_catapult_cloud_swings(start_date_str: str, end_date_str: str, cache_ve
 
 def build_injury_prediction_matrix(df_gps, df_er, df_ash, athlete_name):
     """
-    Combines Catapult Swing/Jump Volume & Player Load with ASH and ER ROM tests
+    Combines deduplicated Catapult 10Hz Swing Volume & Player Load with ASH and ER ROM tests
     to calculate a 0-100 Shoulder Injury Risk Score.
     """
     gps_ath = df_gps[df_gps['Name'] == athlete_name].copy()
@@ -937,20 +906,35 @@ def build_injury_prediction_matrix(df_gps, df_er, df_ash, athlete_name):
     if 'Sensor_Detected_Swings' not in gps_ath.columns:
         gps_ath['Sensor_Detected_Swings'] = 0.0
 
-    # Priority 1: Calibrated 10Hz Sensor Stream Swings
-    # Priority 2: 85% of High Jumps + 30% of Moderate Jumps (filters out block/setting jumps)
-    # Priority 3: 40% of Total Jumps for older sheets without jump bands
+    # Determine athlete position to prevent non-hitters (Libero/DS/Setter) from getting hitter jump ratios
+    pos_str = str(gps_ath['Position'].dropna().iloc[0]).upper() if 'Position' in gps_ath.columns and not gps_ath['Position'].dropna().empty else "HITTER"
+    if any(p in pos_str for p in ["DS", "LIBERO", "L/DS", "DEF"]):
+        jump_to_swing_ratio = 0.08  # Mostly jump serves / back-row emergency attacks
+    elif "SET" in pos_str or pos_str == "S":
+        jump_to_swing_ratio = 0.12  # Setters jump to set, only swing on dumps/serves
+    elif "MB" in pos_str or "MID" in pos_str:
+        jump_to_swing_ratio = 0.25  # Middles jump heavily to block; ~25% of total jumps are actual swings
+    else:
+        jump_to_swing_ratio = 0.32  # Pin hitters (OH / OPP / RS): ~32% of total jumps are full attack/serve swings
+
+    # Calculate row-level swings:
+    # Priority 1: 10Hz Sensor Stream Swings
+    # Priority 2: High Jumps * 0.75 + Moderate Jumps * 0.15 (if Jump Bands exist)
+    # Priority 3: Total Jumps * position-specific ratio
     gps_ath['Est_Swings'] = np.where(
         gps_ath['Sensor_Detected_Swings'] > 0,
         gps_ath['Sensor_Detected_Swings'],
         np.where(
-            (gps_ath['High Jumps'] + gps_ath['Moderate Jumps']) > 0,
-            (gps_ath['High Jumps'] * 0.85) + (gps_ath['Moderate Jumps'] * 0.30),
-            gps_ath['Total Jumps'] * 0.40
+            gps_ath['High Jumps'] > 0,
+            (gps_ath['High Jumps'] * 0.75) + (gps_ath['Moderate Jumps'] * 0.15),
+            gps_ath['Total Jumps'] * jump_to_swing_ratio
         )
     )
 
-    daily = gps_ath.groupby('Date')[['Player Load', 'Total Jumps', 'High Jumps', 'Jump Load', 'Est_Swings']].sum().reset_index().sort_values('Date')
+    # CRITICAL FIX: Deduplicate same-day rows (e.g., if Google Sheet + Live API both have the same practice date)
+    # Taking .max() per Date prevents double-counting when Live API is merged with Google Sheets!
+    gps_ath['Date'] = pd.to_datetime(gps_ath['Date']).dt.normalize()
+    daily = gps_ath.groupby('Date')[['Player Load', 'Total Jumps', 'High Jumps', 'Jump Load', 'Est_Swings']].max().reset_index().sort_values('Date')
 
     # Calculate 7-day Acute and 28-day Chronic EWMA for Swings and Player Load
     min_d, max_d = daily['Date'].min(), daily['Date'].max()
@@ -1008,10 +992,6 @@ def build_injury_prediction_matrix(df_gps, df_er, df_ash, athlete_name):
 
     merged.fillna(0.0, inplace=True)
 
-    # Compute Composite Shoulder Injury Risk Score (0-100 scale)
-    # 40% weight: Swing ACWR spike (>1.30)
-    # 35% weight: ASH Peak Force drop (>10% drop from baseline or <100N)
-    # 25% weight: ER ROM deficit (<100 deg or >10% drop from baseline)
     risk_scores = []
     risk_tiers = []
     risk_drivers = []
@@ -1020,7 +1000,6 @@ def build_injury_prediction_matrix(df_gps, df_er, df_ash, athlete_name):
         score = 0.0
         drivers = []
 
-        # 1. Swing Workload Spike Component (Max 40 pts)
         sw_acwr = row['Est_Swings_ACWR']
         if sw_acwr > 1.50:
             score += 40.0
@@ -1031,7 +1010,6 @@ def build_injury_prediction_matrix(df_gps, df_er, df_ash, athlete_name):
         elif sw_acwr > 1.15:
             score += 10.0
 
-        # 2. ASH Isometric Force Drop Component (Max 35 pts)
         worst_ash_drop = min(row['ASH_Drop_R_%'], row['ASH_Drop_L_%'])
         min_ash_force = min(row['Peak Vertical Force [N] (R)'], row['Peak Vertical Force [N] (L)'])
         if worst_ash_drop <= -15.0 or (0 < min_ash_force < 90):
@@ -1041,7 +1019,6 @@ def build_injury_prediction_matrix(df_gps, df_er, df_ash, athlete_name):
             score += 20.0
             drivers.append(f"Moderate ASH Fatigue ({worst_ash_drop:+.1f}%)")
 
-        # 3. ER ROM Restriction Component (Max 25 pts)
         worst_er_drop = min(row['ER_Drop_R_%'], row['ER_Drop_L_%'])
         min_er_rom = min(row['R Max ROM (°)'], row['L Max ROM (°)'])
         if worst_er_drop <= -10.0 or (0 < min_er_rom < 90):
