@@ -3947,8 +3947,16 @@ if check_password():
                     disp_cols['Est_Swings'] = disp_cols['Est_Swings'].round(0).astype(int)
                     disp_cols['Est_Swings_ACWR'] = disp_cols['Est_Swings_ACWR'].map('{:.2f}'.format)
                     disp_cols['Player Load'] = disp_cols['Player Load'].map('{:.1f}'.format)
-                    disp_cols['ASH (L/R)'] = disp_cols.apply(lambda r: f"{r['Peak Vertical Force [N] (L)']:.0f}N / {r['Peak Vertical Force [N] (R)']:.0f}N", axis=1)
-                    disp_cols['ER ROM (L/R)'] = disp_cols.apply(lambda r: f"{r['L Max ROM (°)']:.1f}° / {r['R Max ROM (°)']:.1f}°", axis=1)
+                    
+                    # Formatted strings combining actual test scores with their % drop from baseline
+                    disp_cols['ASH (L/R)'] = disp_cols.apply(
+                        lambda r: f"{r['Peak Vertical Force [N] (L)']:.0f}N ({r['ASH_Drop_L_%']:+.1f}%) / {r['Peak Vertical Force [N] (R)']:.0f}N ({r['ASH_Drop_R_%']:+.1f}%)", 
+                        axis=1
+                    )
+                    disp_cols['ER ROM (L/R)'] = disp_cols.apply(
+                        lambda r: f"{r['L Max ROM (°)']:.1f}° ({r['ER_Drop_L_%']:+.1f}%) / {r['R Max ROM (°)']:.1f}° ({r['ER_Drop_R_%']:+.1f}%)", 
+                        axis=1
+                    )
                     
                     final_view = disp_cols[['Date', 'Est_Swings', 'Est_Swings_ACWR', 'Player Load', 'ASH (L/R)', 'ER ROM (L/R)', 'Shoulder_Risk_Score', 'Risk_Status', 'Primary_Drivers']].rename(columns={
                         'Est_Swings': 'Est. Swings',
