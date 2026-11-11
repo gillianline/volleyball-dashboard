@@ -3491,7 +3491,7 @@ if check_password():
             st.markdown('<div class="section-header">Acute:Chronic Workload Ratio (EWMA)</div>', unsafe_allow_html=True)
             
             acwr_tabs_list = ["Team Workload Summary", "Individual", "Shoulder Injury Risk"]
-            if "acwr_active_subtab" not in st.session_state:
+            if "acwr_active_subtab" not in st.session_state or st.session_state.acwr_active_subtab not in acwr_tabs_list:
                 st.session_state.acwr_active_subtab = acwr_tabs_list[0]
                 
             selected_acwr_tab = st.radio("ACWR Sub Navigation", acwr_tabs_list, key="acwr_active_subtab", horizontal=True, label_visibility="collapsed")
@@ -3518,17 +3518,21 @@ if check_password():
                     for ath in sorted(raw_df['Name'].unique()):
                         ath_all = raw_df[raw_df['Name'] == ath]
                         pos_str = ath_all['Position'].iloc[0] if not ath_all.empty else "N/A"
-                        if team_pos_filter != "All Positions" and pos_str != team_pos_filter: continue
+                        if team_pos_filter != "All Positions" and pos_str != team_pos_filter:
+                            continue
                             
                         if hide_inactive_last_week:
                             ath_recent_7d = ath_all[(ath_all['Date'] >= week_start_window) & (ath_all['Date'] <= eval_date_obj)]
-                            if ath_recent_7d.empty or (ath_recent_7d[metrics_to_score].sum().sum() == 0): continue
+                            if ath_recent_7d.empty or (ath_recent_7d[metrics_to_score].sum().sum() == 0):
+                                continue
                             
                         ath_cal = compute_athlete_ewMA_calendar(ath_all, metrics_to_score)
-                        if ath_cal.empty: continue
+                        if ath_cal.empty:
+                            continue
                             
                         cal_point = ath_cal[ath_cal['Date'] <= eval_date_obj]
-                        if cal_point.empty: continue
+                        if cal_point.empty:
+                            continue
                             
                         target_row = cal_point.iloc[-1]
                         comp_acwr = sum([target_row.get(f'{m}_ACWR', 0.0) for m in metrics_to_score]) / len(metrics_to_score)
@@ -3563,7 +3567,8 @@ if check_password():
                             <th>Position</th>
                             <th>Practice Score ACWR</th>
                             <th>Workload Zone</th>"""
-                        for m in metrics_to_score: table_html += f"<th>{m}</th>"
+                        for m in metrics_to_score:
+                            table_html += f"<th>{m}</th>"
                         table_html += "</tr></thead><tbody>"
                         
                         for _, r in team_summary_df.iterrows():
@@ -3588,7 +3593,8 @@ if check_password():
             elif selected_acwr_tab == "Individual":
                 c_ind1, c_ind2, c_ind3 = st.columns([1.5, 1.5, 1.5])
                 valid_all_dates_str = [d.strftime('%Y-%m-%d') for d in sorted(raw_df['Date'].dropna().unique(), reverse=True)]
-                with c_ind3: sel_ind_date_str = st.selectbox("Select Snapshot Date", valid_all_dates_str, index=0, key="acwr_ind_date_sel")
+                with c_ind3:
+                    sel_ind_date_str = st.selectbox("Select Snapshot Date", valid_all_dates_str, index=0, key="acwr_ind_date_sel")
                 
                 sel_ind_date = pd.to_datetime(sel_ind_date_str)
                 week_start_ind = sel_ind_date - timedelta(days=6)
@@ -3596,11 +3602,15 @@ if check_password():
                 active_athletes_for_date = []
                 for ath_name in sorted(raw_df['Name'].unique()):
                     ath_sub = raw_df[(raw_df['Name'] == ath_name) & (raw_df['Date'] >= week_start_ind) & (raw_df['Date'] <= sel_ind_date)]
-                    if not ath_sub.empty and ath_sub[metrics_to_score].sum().sum() > 0: active_athletes_for_date.append(ath_name)
-                if not active_athletes_for_date: active_athletes_for_date = sorted(raw_df['Name'].unique())
+                    if not ath_sub.empty and ath_sub[metrics_to_score].sum().sum() > 0:
+                        active_athletes_for_date.append(ath_name)
+                if not active_athletes_for_date:
+                    active_athletes_for_date = sorted(raw_df['Name'].unique())
 
-                with c_ind1: sel_ind_ath = st.selectbox("Select Active Athlete", active_athletes_for_date, key="acwr_ind_ath_sel")
-                with c_ind2: sel_ind_metric = st.selectbox("Select Practice Score Metric", metrics_to_score, index=0, key="acwr_ind_metric_sel")
+                with c_ind1:
+                    sel_ind_ath = st.selectbox("Select Active Athlete", active_athletes_for_date, key="acwr_ind_ath_sel")
+                with c_ind2:
+                    sel_ind_metric = st.selectbox("Select Practice Score Metric", metrics_to_score, index=0, key="acwr_ind_metric_sel")
                 
                 ath_all_ind = raw_df[raw_df['Name'] == sel_ind_ath].copy()
                 meta_lookup = full_df_unfiltered[full_df_unfiltered['Name'] == sel_ind_ath]
@@ -3663,8 +3673,8 @@ if check_password():
                         _, _, status_lbl = get_acwr_badge(r_val)
                         ind_metric_rows.append({"Metric": m, "Day Total": f"{target_row.get(m, 0.0):.1f}", "Acute (7d EWMA)": f"{a_ewma:.1f}", "Chronic (28d EWMA)": f"{c_ewma:.1f}", "ACWR Ratio": f"{r_val:.2f}", "Workload Zone": status_lbl})
                     st.dataframe(pd.DataFrame(ind_metric_rows), use_container_width=True, hide_index=True)
-                    
-             elif selected_acwr_tab == "Shoulder Injury Risk":
+
+            elif selected_acwr_tab == "Shoulder Injury Risk":
                 st.markdown('<div class="section-header">Volleyball Swing Volume & Shoulder Injury Prediction</div>', unsafe_allow_html=True)
                 
                 c_sh1, c_sh2 = st.columns([2, 2])
@@ -3707,7 +3717,6 @@ if check_password():
 
                     st.markdown(f'<div class="info-box"><b>Primary Risk Drivers ({latest_r["Date"].strftime("%m/%d/%Y")}):</b> {latest_r["Primary_Drivers"]}</div>', unsafe_allow_html=True)
 
-                    # Longitudinal Chart: Swing Volume vs. ASH Force & Shoulder Risk Score
                     fig_sh_pred = make_subplots(specs=[[{"secondary_y": True}]])
                     fig_sh_pred.add_trace(
                         go.Bar(x=pred_df['Date'], y=pred_df['Est_Swings'], name="Est. Swings (Hitting Volume)", marker_color='#4895DB', opacity=0.45),
@@ -3731,7 +3740,6 @@ if check_password():
                     fig_sh_pred.update_yaxes(title_text="Injury Risk Score (0-100)", range=[0, 105], secondary_y=True, showgrid=False)
                     st.plotly_chart(fig_sh_pred, use_container_width=True, config=LOCKED_CONFIG, key=f"sh_risk_chart_{sel_sh_ath}")
 
-                    # Recent 15-Session Breakdown Table
                     st.markdown("#### Recent 15 Sessions: Swing Workload & Shoulder Screening Log")
                     disp_cols = pred_df.tail(15).sort_values('Date', ascending=False).copy()
                     disp_cols['Date'] = disp_cols['Date'].dt.strftime('%Y-%m-%d')
@@ -3749,8 +3757,7 @@ if check_password():
                         'Primary_Drivers': 'Flagged Drivers'
                     })
                     st.dataframe(final_view, use_container_width=True, hide_index=True)
-                
-
+                    
         # =========================================================================
         # --- HUB 5: TESTING & BASELINES ------------------------------------------
         # =========================================================================
