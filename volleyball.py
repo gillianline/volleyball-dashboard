@@ -640,21 +640,28 @@ def resolve_col_val(row, primary_col, alt_cols=[]):
 # =========================================================================
 class CatapultAPIClient:
     def __init__(self, api_key: str, region: str = "us"):
-        self.api_key = api_key
-        self.base_url = f"https://{region}-openfield.catapultsports.com/api/v1"
+        self.api_key = api_key.strip()
+        # OpenField Cloud regional API base URLs (us, eu, au)
+        host_map = {
+            "us": "https://backend-us.openfield.catapultsports.com/api/v1",
+            "eu": "https://backend-eu.openfield.catapultsports.com/api/v1",
+            "au": "https://backend-au.openfield.catapultsports.com/api/v1"
+        }
+        self.base_url = host_map.get(region.lower().strip(), host_map["us"])
         self.headers = {
             "Authorization": f"Bearer {self.api_key}",
-            "Accept": "application/json"
+            "Accept": "application/json",
+            "Content-Type": "application/json"
         }
 
-    def get_activities(self, start_date: str, end_date: str) -> pd.DataFrame:
+    def get_activities(self) -> tuple[pd.DataFrame, str]:
         url = f"{self.base_url}/activities"
-        params = {"start_date": start_date, "end_date": end_date}
-        response = requests.get(url, headers=self.headers, params=params, timeout=15)
+        response = requests.get(url, headers=self.headers, timeout=15)
         if response.status_code == 200:
             data = response.json()
-            return pd.DataFrame(data) if isinstance(data, list) else pd.DataFrame(data.get("data", []))
-        return pd.DataFrame()
+            df_act = pd.DataFrame(data) if isinstance(data, list) else pd.DataFrame(data.get("data", []))
+            return df_act, "OK"
+        return pd.DataFrame(), f"HTTP {response.status_code}: {response.text[:150]}"
 
     def get_activity_stats(self, activity_id: str) -> pd.DataFrame:
         url = f"{self.base_url}/stats"
@@ -672,31 +679,43 @@ class CatapultAPIClient:
         }
         response = requests.post(url, headers=self.headers, json=payload, timeout=15)
         if response.status_code == 200:
-            return pd.DataFrame(response.json())
+            data = response.json()
+            return pd.DataFrame(data) if isinstance(data, list) else pd.DataFrame(data.get("data", []))
         return pd.DataFrame()
 
+
 @st.cache_data(ttl=1800)
-def fetch_catapult_cloud_swings(start_date_str: str, end_date_str: str) -> pd.DataFrame:
-    """Pulls live Catapult activity summaries if API credentials exist in secrets.toml."""
-    if "catapult" not in st.secrets or "api_key" not in st.secrets["catapult"]:
-        return pd.DataFrame()
+def fetch_catapult_cloud_swings(start_date_str: str, end_date_str: str) -> tuple[pd.DataFrame, str]:
+    """Pulls live Catapult activity summaries and returns (DataFrame, status_message)."""
+    api_key = None
+    region = "us"
+
+    # Check both [catapult] section and top-level CATAPULT_API_KEY
+    if "catapult" in st.secrets and "api_key" in st.secrets["catapult"]:
+        api_key = st.secrets["catapult"]["api_key"]
+        region = st.secrets["catapult"].get("region", "us")
+    elif "CATAPULT_API_KEY" in st.secrets:
+        api_key = st.secrets["CATAPULT_API_KEY"]
+        region = st.secrets.get("CATAPULT_REGION", "us")
+
+    if not api_key:
+        return pd.DataFrame(), "No API key found in st.secrets (add [catapult] api_key or CATAPULT_API_KEY)."
+
     try:
-        client = CatapultAPIClient(
-            api_key=st.secrets["catapult"]["api_key"],
-            region=st.secrets["catapult"].get("region", "us")
-        )
-        acts = client.get_activities(start_date_str, end_date_str)
+        client = CatapultAPIClient(api_key=api_key, region=region)
+        acts, status_msg = client.get_activities()
         if acts.empty or "id" not in acts.columns:
-            return pd.DataFrame()
-        
+            return pd.DataFrame(), f"Connected, but no activities returned ({status_msg})."
+
         frames = []
+        # Pull stats for the 15 most recent sessions
         for _, act in acts.head(15).iterrows():
             st_df = client.get_activity_stats(str(act["id"]))
             if not st_df.empty:
-                st_df["Date"] = pd.to_datetime(act.get("start_time", datetime.today()), unit="s", errors="coerce")
+                st_df["Date"] = pd.to_datetime(act.get("start_time", datetime.today()), unit="s", errors="coerce").tz_localize(None)
                 st_df["Activity"] = act.get("name", "Catapult Session")
                 frames.append(st_df)
-        
+
         if frames:
             combined = pd.concat(frames, ignore_index=True)
             rename_map = {
@@ -704,15 +723,21 @@ def fetch_catapult_cloud_swings(start_date_str: str, end_date_str: str) -> pd.Da
                 "total_player_load": "Player Load",
                 "ima_jump_count_high": "High Jumps",
                 "ima_jump_count_med": "Moderate Jumps",
+                "ima_jump_count_low": "Low Jumps",
                 "explosive_efforts": "Explosive Efforts"
             }
             combined.rename(columns={k: v for k, v in rename_map.items() if k in combined.columns}, inplace=True)
-            if "High Jumps" in combined.columns and "Moderate Jumps" in combined.columns:
-                combined["Est_Swing_Count"] = combined["High Jumps"] + (combined["Moderate Jumps"] * 0.5)
-            return combined
-        return pd.DataFrame()
-    except Exception:
-        return pd.DataFrame()
+            for c in ["Player Load", "High Jumps", "Moderate Jumps", "Low Jumps", "Explosive Efforts"]:
+                if c not in combined.columns:
+                    combined[c] = 0.0
+                combined[c] = pd.to_numeric(combined[c], errors="coerce").fillna(0.0)
+
+            combined["Total Jumps"] = combined["High Jumps"] + combined["Moderate Jumps"] + combined["Low Jumps"]
+            combined["Jump Load"] = (combined["High Jumps"] * 3.0) + (combined["Moderate Jumps"] * 2.0) + (combined["Low Jumps"] * 1.0)
+            return combined, f"Synced {len(frames)} recent Catapult OpenField sessions."
+        return pd.DataFrame(), "Activities found, but no athlete stats returned for those sessions."
+    except Exception as e:
+        return pd.DataFrame(), f"API Connection Error: {e}"
 
 
 def build_injury_prediction_matrix(df_gps, df_er, df_ash, athlete_name):
@@ -3685,11 +3710,12 @@ if check_password():
 
                 source_gps_df = raw_df.copy()
                 if sync_live:
-                    live_cat_df = fetch_catapult_cloud_swings("2026-08-01", datetime.today().strftime('%Y-%m-%d'))
+                    live_cat_df, api_status = fetch_catapult_cloud_swings("2026-08-01", datetime.today().strftime('%Y-%m-%d'))
                     if not live_cat_df.empty:
-                        st.caption("Live Catapult OpenField API session data merged.")
+                        source_gps_df = pd.concat([source_gps_df, live_cat_df], ignore_index=True)
+                        st.caption(f"Live API Active: {api_status}")
                     else:
-                        st.caption("Using primary Google Sheets Catapult dataset (No live API token detected in secrets.toml).")
+                        st.caption(f"Fallback to Google Sheets: {api_status}")
 
                 pred_df = build_injury_prediction_matrix(source_gps_df, raw_er_df, raw_ash_df, sel_sh_ath)
 
