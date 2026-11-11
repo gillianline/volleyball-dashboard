@@ -3871,7 +3871,7 @@ if check_password():
                         ind_metric_rows.append({"Metric": m, "Day Total": f"{target_row.get(m, 0.0):.1f}", "Acute (7d EWMA)": f"{a_ewma:.1f}", "Chronic (28d EWMA)": f"{c_ewma:.1f}", "ACWR Ratio": f"{r_val:.2f}", "Workload Zone": status_lbl})
                     st.dataframe(pd.DataFrame(ind_metric_rows), use_container_width=True, hide_index=True)
 
-             elif selected_acwr_tab == "Shoulder Injury Risk":
+            elif selected_acwr_tab == "Shoulder Injury Risk":
                 st.subheader("Volleyball Shoulder Injury Risk & Screening Dashboard")
         
                 # Sub-tabs for Team Overview vs Individual Deep Dive
