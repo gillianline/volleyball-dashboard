@@ -3942,23 +3942,35 @@ if check_password():
                     st.plotly_chart(fig_sh_pred, use_container_width=True, config=LOCKED_CONFIG, key=f"sh_risk_chart_{sel_sh_ath}")
 
                     st.markdown("#### Recent 15 Sessions: Swing Workload & Shoulder Screening Log")
+                    
+                    # Extract initial baseline values for this specific athlete
+                    ath_ash_raw = raw_ash_df[raw_ash_df['Name'] == sel_sh_ath].sort_values('Test Date')
+                    base_ash_l = ath_ash_raw['Peak Vertical Force [N] (L)'].iloc[0] if not ath_ash_raw.empty else 0.0
+                    base_ash_r = ath_ash_raw['Peak Vertical Force [N] (R)'].iloc[0] if not ath_ash_raw.empty else 0.0
+                    
+                    ath_er_raw = raw_er_df[raw_er_df['Name'] == sel_sh_ath].sort_values('Test Date')
+                    base_er_l = ath_er_raw['L Max ROM (°)'].iloc[0] if not ath_er_raw.empty else 0.0
+                    base_er_r = ath_er_raw['R Max ROM (°)'].iloc[0] if not ath_er_raw.empty else 0.0
+
                     disp_cols = pred_df.tail(15).sort_values('Date', ascending=False).copy()
                     disp_cols['Date'] = disp_cols['Date'].dt.strftime('%Y-%m-%d')
                     disp_cols['Est_Swings'] = disp_cols['Est_Swings'].round(0).astype(int)
                     disp_cols['Est_Swings_ACWR'] = disp_cols['Est_Swings_ACWR'].map('{:.2f}'.format)
                     disp_cols['Player Load'] = disp_cols['Player Load'].map('{:.1f}'.format)
                     
-                    # Formatted strings combining actual test scores with their % drop from baseline
-                    disp_cols['ASH (L/R)'] = disp_cols.apply(
-                        lambda r: f"{r['Peak Vertical Force [N] (L)']:.0f}N ({r['ASH_Drop_L_%']:+.1f}%) / {r['Peak Vertical Force [N] (R)']:.0f}N ({r['ASH_Drop_R_%']:+.1f}%)", 
-                        axis=1
-                    )
-                    disp_cols['ER ROM (L/R)'] = disp_cols.apply(
-                        lambda r: f"{r['L Max ROM (°)']:.1f}° ({r['ER_Drop_L_%']:+.1f}%) / {r['R Max ROM (°)']:.1f}° ({r['ER_Drop_R_%']:+.1f}%)", 
-                        axis=1
-                    )
+                    # Separate Baseline and Recent columns
+                    disp_cols['Baseline ASH (L/R)'] = f"{base_ash_l:.0f}N / {base_ash_r:.0f}N"
+                    disp_cols['Recent ASH (L/R)'] = disp_cols.apply(lambda r: f"{r['Peak Vertical Force [N] (L)']:.0f}N / {r['Peak Vertical Force [N] (R)']:.0f}N", axis=1)
                     
-                    final_view = disp_cols[['Date', 'Est_Swings', 'Est_Swings_ACWR', 'Player Load', 'ASH (L/R)', 'ER ROM (L/R)', 'Shoulder_Risk_Score', 'Risk_Status', 'Primary_Drivers']].rename(columns={
+                    disp_cols['Baseline ER ROM (L/R)'] = f"{base_er_l:.1f}° / {base_er_r:.1f}°"
+                    disp_cols['Recent ER ROM (L/R)'] = disp_cols.apply(lambda r: f"{r['L Max ROM (°)']:.1f}° / {r['R Max ROM (°)']:.1f}°", axis=1)
+                    
+                    final_view = disp_cols[[
+                        'Date', 'Est_Swings', 'Est_Swings_ACWR', 'Player Load', 
+                        'Baseline ASH (L/R)', 'Recent ASH (L/R)', 
+                        'Baseline ER ROM (L/R)', 'Recent ER ROM (L/R)', 
+                        'Shoulder_Risk_Score', 'Risk_Status', 'Primary_Drivers'
+                    ]].rename(columns={
                         'Est_Swings': 'Est. Swings',
                         'Est_Swings_ACWR': 'Swing ACWR',
                         'Shoulder_Risk_Score': 'Risk Score',
