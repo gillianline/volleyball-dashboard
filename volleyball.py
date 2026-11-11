@@ -706,7 +706,7 @@ def detect_swings_from_10hz_stream(df_10hz: pd.DataFrame, high_jumps: float = 0.
     return min(raw_10hz_swings, 65)
 
 @st.cache_data(ttl=600)
-def fetch_catapult_cloud_swings(start_date_str: str, end_date_str: str, cache_version: str = "v9_calibrated") -> tuple[pd.DataFrame, str]:
+def fetch_catapult_cloud_swings(start_date_str: str, end_date_str: str, cache_version: str = "v10_fixed") -> tuple[pd.DataFrame, str]:
     """Pulls Catapult activities and runs calibrated 10Hz + IMA Jump Envelope swing detection."""
     api_key = None
     region = "us"
