@@ -901,8 +901,10 @@ def fetch_catapult_cloud_swings(start_date_str: str, end_date_str: str, cache_ve
 
 def build_injury_prediction_matrix(df_gps, df_er, df_ash, athlete_name):
     """
-    Combines Catapult jump data and calculated swings with ASH and ER ROM tests
-    to calculate a robust 0-100 Shoulder Injury Risk Score.
+    Evaluates shoulder injury risk tiers based on independent clinical rules:
+    - High Risk: Swing ACWR > 1.50 AND (ASH Drop > 15% OR ER ROM Drop > 10%)
+    - Moderate Risk: Swing ACWR > 1.30 OR ASH Drop > 8% OR ER ROM Drop > 5%
+    - Low / Optimal: Normal workload and screening profile
     """
     gps_ath = df_gps[df_gps['Name'] == athlete_name].copy()
     er_ath = df_er[df_er['Name'] == athlete_name].copy()
@@ -931,7 +933,6 @@ def build_injury_prediction_matrix(df_gps, df_er, df_ash, athlete_name):
     else:
         swing_multiplier = 0.85
 
-    # Fallback calculation if Sensor_Detected_Swings is zero for any reason
     gps_ath['Est_Swings'] = np.where(
         gps_ath['Sensor_Detected_Swings'] > 0,
         gps_ath['Sensor_Detected_Swings'],
@@ -1002,46 +1003,46 @@ def build_injury_prediction_matrix(df_gps, df_er, df_ash, athlete_name):
     risk_drivers = []
 
     for _, row in merged.iterrows():
-        score = 0.0
         drivers = []
-
         sw_acwr = row['Est_Swings_ACWR']
+        worst_ash_drop = min(row['ASH_Drop_R_%'], row['ASH_Drop_L_%'])
+        worst_er_drop = min(row['ER_Drop_R_%'], row['ER_Drop_L_%'])
+
+        # Collect narrative drivers
         if sw_acwr > 1.50:
-            score += 40.0
             drivers.append(f"High Swing Spike (ACWR {sw_acwr:.2f})")
         elif sw_acwr > 1.30:
-            score += 25.0
             drivers.append(f"Elevated Swing Volume (ACWR {sw_acwr:.2f})")
-        elif sw_acwr > 1.15:
-            score += 10.0
 
-        worst_ash_drop = min(row['ASH_Drop_R_%'], row['ASH_Drop_L_%'])
-        min_ash_force = min(row['Peak Vertical Force [N] (R)'], row['Peak Vertical Force [N] (L)'])
-        if worst_ash_drop <= -15.0 or (0 < min_ash_force < 90):
-            score += 35.0
+        if worst_ash_drop <= -15.0:
             drivers.append(f"ASH Force Deficit ({worst_ash_drop:+.1f}%)")
-        elif worst_ash_drop <= -8.0 or (0 < min_ash_force < 100):
-            score += 20.0
+        elif worst_ash_drop <= -8.0:
             drivers.append(f"Moderate ASH Fatigue ({worst_ash_drop:+.1f}%)")
 
-        worst_er_drop = min(row['ER_Drop_R_%'], row['ER_Drop_L_%'])
-        min_er_rom = min(row['R Max ROM (°)'], row['L Max ROM (°)'])
-        if worst_er_drop <= -10.0 or (0 < min_er_rom < 90):
-            score += 25.0
-            drivers.append(f"Restricted ER ROM ({min_er_rom:.0f}°)")
-        elif worst_er_drop <= -5.0 or (0 < min_er_rom < 105):
-            score += 15.0
-            drivers.append(f"Tight ER ROM ({min_er_rom:.0f}°)")
+        if worst_er_drop <= -10.0:
+            drivers.append(f"Restricted ER ROM ({worst_er_drop:+.1f}%)")
+        elif worst_er_drop <= -5.0:
+            drivers.append(f"Tight ER ROM ({worst_er_drop:+.1f}%)")
 
-        final_s = min(100.0, round(score, 0))
-        risk_scores.append(final_s)
-        if final_s >= 60:
-            risk_tiers.append("High Risk")
-        elif final_s >= 35:
-            risk_tiers.append("Moderate Risk")
+        # Independent Clinical Threshold Rules
+        is_high_workload = (sw_acwr > 1.50)
+        is_high_clinical = (worst_ash_drop <= -15.0) or (worst_er_drop <= -10.0)
+
+        is_mod_workload = (sw_acwr > 1.30)
+        is_mod_clinical = (worst_ash_drop <= -8.0) or (worst_er_drop <= -5.0)
+
+        if is_high_workload and is_high_clinical:
+            tier = "High Risk"
+            score = 75.0  # Representative indicator value for metrics/charts
+        elif is_mod_workload or is_mod_clinical or (sw_acwr > 1.15):
+            tier = "Moderate Risk"
+            score = 45.0
         else:
-            risk_tiers.append("Low / Optimal")
-            
+            tier = "Low / Optimal"
+            score = 15.0
+
+        risk_scores.append(score)
+        risk_tiers.append(tier)
         risk_drivers.append(", ".join(drivers) if drivers else "Normal Load & Screening")
 
     merged['Shoulder_Risk_Score'] = risk_scores
