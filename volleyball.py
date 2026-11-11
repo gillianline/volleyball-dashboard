@@ -641,13 +641,15 @@ def resolve_col_val(row, primary_col, alt_cols=[]):
 class CatapultAPIClient:
     def __init__(self, api_key: str, region: str = "us"):
         self.api_key = api_key.strip()
-        # OpenField Cloud regional API base URLs (us, eu, au)
+        self.region = region.lower().strip()
+        
+        # Official Catapult OpenField Connect API v6 Regional Endpoints
         host_map = {
-            "us": "https://backend-us.openfield.catapultsports.com/api/v1",
-            "eu": "https://backend-eu.openfield.catapultsports.com/api/v1",
-            "au": "https://backend-au.openfield.catapultsports.com/api/v1"
+            "us": "https://connect-us.catapultsports.com/api/v6",
+            "eu": "https://connect-eu.catapultsports.com/api/v6",
+            "au": "https://connect-au.catapultsports.com/api/v6"
         }
-        self.base_url = host_map.get(region.lower().strip(), host_map["us"])
+        self.base_url = host_map.get(self.region, host_map["us"])
         self.headers = {
             "Authorization": f"Bearer {self.api_key}",
             "Accept": "application/json",
@@ -657,6 +659,13 @@ class CatapultAPIClient:
     def get_activities(self) -> tuple[pd.DataFrame, str]:
         url = f"{self.base_url}/activities"
         response = requests.get(url, headers=self.headers, timeout=15)
+        
+        # Automatic fallback to /api/v4 if the account is on v4
+        if response.status_code == 404:
+            self.base_url = self.base_url.replace("/api/v6", "/api/v4")
+            url = f"{self.base_url}/activities"
+            response = requests.get(url, headers=self.headers, timeout=15)
+
         if response.status_code == 200:
             data = response.json()
             df_act = pd.DataFrame(data) if isinstance(data, list) else pd.DataFrame(data.get("data", []))
@@ -666,7 +675,7 @@ class CatapultAPIClient:
     def get_activity_stats(self, activity_id: str) -> pd.DataFrame:
         url = f"{self.base_url}/stats"
         payload = {
-            "filter": [{"name": "activity_id", "comparison": "=", "value": activity_id}],
+            "filters": [{"name": "activity_id", "comparison": "=", "value": activity_id}],
             "group_by": ["athlete"],
             "parameters": [
                 "total_player_load", 
@@ -682,7 +691,7 @@ class CatapultAPIClient:
             data = response.json()
             return pd.DataFrame(data) if isinstance(data, list) else pd.DataFrame(data.get("data", []))
         return pd.DataFrame()
-
+        
 
 @st.cache_data(ttl=1800)
 def fetch_catapult_cloud_swings(start_date_str: str, end_date_str: str) -> tuple[pd.DataFrame, str]:
