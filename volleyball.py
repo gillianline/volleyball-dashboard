@@ -808,7 +808,7 @@ def detect_swings_from_10hz_stream(df_10hz: pd.DataFrame, total_pl: float = 0.0,
 
 
 @st.cache_data(ttl=600)
-def fetch_catapult_cloud_swings(start_date_str: str, end_date_str: str, cache_version: str = "v16_bulletproof") -> tuple[pd.DataFrame, str]:
+def fetch_catapult_cloud_swings(start_date_str: str, end_date_str: str, cache_version: str = "v17_fix_timestamp") -> tuple[pd.DataFrame, str]:
     """Pulls session statistics and safely maps native Catapult indoor jump bands."""
     api_key = None
     region = "us"
@@ -834,14 +834,19 @@ def fetch_catapult_cloud_swings(start_date_str: str, end_date_str: str, cache_ve
             act_id = str(act["id"])
             st_df = client.get_activity_stats(act_id)
             if not st_df.empty:
-                st_df["Date"] = pd.to_datetime(act.get("start_time", datetime.today()), unit="s", errors="coerce").dt.normalize()
+                # Safe scalar conversion for activity start time
+                raw_time = act.get("start_time", datetime.today())
+                dt_val = pd.to_datetime(raw_time, unit="s", errors="coerce") if isinstance(raw_time, (int, float)) else pd.to_datetime(raw_time, errors="coerce")
+                if pd.isna(dt_val):
+                    dt_val = pd.datetime.today()
+                
+                st_df["Date"] = dt_val.normalize()
                 st_df["Activity"] = act.get("name", "Catapult Session")
                 frames.append(st_df)
 
         if frames:
             combined_raw = pd.concat(frames, ignore_index=True)
             
-            # Map possible API column names flexibly
             col_map = {
                 "athlete_name": "Name",
                 "total_player_load": "Player Load",
@@ -856,22 +861,18 @@ def fetch_catapult_cloud_swings(start_date_str: str, end_date_str: str, cache_ve
                 "explosive_efforts": "Explosive Efforts"
             }
             combined_raw.rename(columns={k: v for k, v in col_map.items() if k in combined_raw.columns}, inplace=True)
-            
             combined_raw['Name'] = combined_raw['Name'].astype(str).str.strip()
             
-            # Ensure numeric conversion for all metric columns
             for c in ["Player Load", "Total Jumps", "Low Jumps", "Moderate Jumps", "High Jumps", "Explosive Efforts"]:
                 if c not in combined_raw.columns:
                     combined_raw[c] = 0.0
                 combined_raw[c] = pd.to_numeric(combined_raw[c], errors="coerce").fillna(0.0)
 
-            # If High Jumps or Moderate Jumps are missing from band stats, distribute Total Jumps reasonably
             mask_zero_bands = (combined_raw["High Jumps"] == 0) & (combined_raw["Moderate Jumps"] == 0) & (combined_raw["Total Jumps"] > 0)
             if mask_zero_bands.any():
                 combined_raw.loc[mask_zero_bands, "High Jumps"] = combined_raw.loc[mask_zero_bands, "Total Jumps"] * 0.40
                 combined_raw.loc[mask_zero_bands, "Moderate Jumps"] = combined_raw.loc[mask_zero_bands, "Total Jumps"] * 0.35
 
-            # Aggregate full-day totals by Athlete and Date across multiple drills/periods
             daily_agg = combined_raw.groupby(['Name', 'Date'], as_index=False).agg({
                 'Player Load': 'sum',
                 'Total Jumps': 'sum',
@@ -882,7 +883,6 @@ def fetch_catapult_cloud_swings(start_date_str: str, end_date_str: str, cache_ve
                 'Activity': 'last'
             })
 
-            # Calculate robust volleyball attack swings (High Jumps + 30% Moderate Jumps)
             daily_agg["Sensor_Detected_Swings"] = (daily_agg["High Jumps"] * 0.85) + (daily_agg["Moderate Jumps"] * 0.30)
             daily_agg["Jump Load"] = (daily_agg["High Jumps"] * 3.0) + (daily_agg["Moderate Jumps"] * 2.0) + (daily_agg["Low Jumps"] * 1.0)
 
