@@ -1,5 +1,6 @@
 import math
 import re
+import requests
 from datetime import datetime, timedelta
 import numpy as np
 import pandas as pd
@@ -634,6 +635,223 @@ def resolve_col_val(row, primary_col, alt_cols=[]):
                 return row[matched_key]
     return None
 
+# =========================================================================
+# --- CATAPULT API & SHOULDER INJURY PREDICTION ENGINE --------------------
+# =========================================================================
+class CatapultAPIClient:
+    def __init__(self, api_key: str, region: str = "us"):
+        self.api_key = api_key
+        self.base_url = f"https://{region}-openfield.catapultsports.com/api/v1"
+        self.headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Accept": "application/json"
+        }
+
+    def get_activities(self, start_date: str, end_date: str) -> pd.DataFrame:
+        url = f"{self.base_url}/activities"
+        params = {"start_date": start_date, "end_date": end_date}
+        response = requests.get(url, headers=self.headers, params=params, timeout=15)
+        if response.status_code == 200:
+            data = response.json()
+            return pd.DataFrame(data) if isinstance(data, list) else pd.DataFrame(data.get("data", []))
+        return pd.DataFrame()
+
+    def get_activity_stats(self, activity_id: str) -> pd.DataFrame:
+        url = f"{self.base_url}/stats"
+        payload = {
+            "filter": [{"name": "activity_id", "comparison": "=", "value": activity_id}],
+            "group_by": ["athlete"],
+            "parameters": [
+                "total_player_load", 
+                "ima_jump_count_low", 
+                "ima_jump_count_med", 
+                "ima_jump_count_high", 
+                "explosive_efforts"
+            ],
+            "source": "cached_stats"
+        }
+        response = requests.post(url, headers=self.headers, json=payload, timeout=15)
+        if response.status_code == 200:
+            return pd.DataFrame(response.json())
+        return pd.DataFrame()
+
+@st.cache_data(ttl=1800)
+def fetch_catapult_cloud_swings(start_date_str: str, end_date_str: str) -> pd.DataFrame:
+    """Pulls live Catapult activity summaries if API credentials exist in secrets.toml."""
+    if "catapult" not in st.secrets or "api_key" not in st.secrets["catapult"]:
+        return pd.DataFrame()
+    try:
+        client = CatapultAPIClient(
+            api_key=st.secrets["catapult"]["api_key"],
+            region=st.secrets["catapult"].get("region", "us")
+        )
+        acts = client.get_activities(start_date_str, end_date_str)
+        if acts.empty or "id" not in acts.columns:
+            return pd.DataFrame()
+        
+        frames = []
+        for _, act in acts.head(15).iterrows():
+            st_df = client.get_activity_stats(str(act["id"]))
+            if not st_df.empty:
+                st_df["Date"] = pd.to_datetime(act.get("start_time", datetime.today()), unit="s", errors="coerce")
+                st_df["Activity"] = act.get("name", "Catapult Session")
+                frames.append(st_df)
+        
+        if frames:
+            combined = pd.concat(frames, ignore_index=True)
+            rename_map = {
+                "athlete_name": "Name",
+                "total_player_load": "Player Load",
+                "ima_jump_count_high": "High Jumps",
+                "ima_jump_count_med": "Moderate Jumps",
+                "explosive_efforts": "Explosive Efforts"
+            }
+            combined.rename(columns={k: v for k, v in rename_map.items() if k in combined.columns}, inplace=True)
+            if "High Jumps" in combined.columns and "Moderate Jumps" in combined.columns:
+                combined["Est_Swing_Count"] = combined["High Jumps"] + (combined["Moderate Jumps"] * 0.5)
+            return combined
+        return pd.DataFrame()
+    except Exception:
+        return pd.DataFrame()
+
+
+def build_injury_prediction_matrix(df_gps, df_er, df_ash, athlete_name):
+    """
+    Combines Catapult Swing/Jump Volume & Player Load with ASH and ER ROM tests
+    to calculate a 0-100 Shoulder Injury Risk Score.
+    """
+    gps_ath = df_gps[df_gps['Name'] == athlete_name].copy()
+    er_ath = df_er[df_er['Name'] == athlete_name].copy()
+    ash_ath = df_ash[df_ash['Name'] == athlete_name].copy()
+    
+    if gps_ath.empty:
+        return pd.DataFrame()
+
+    # Estimate Hitting/Swing Count using High Jumps + 50% Moderate Jumps (if High Jumps > 0), else 65% of Total Jumps
+    gps_ath['Est_Swings'] = np.where(
+        gps_ath['High Jumps'] > 0,
+        gps_ath['High Jumps'] + (gps_ath['Moderate Jumps'] * 0.5),
+        gps_ath['Total Jumps'] * 0.65
+    )
+
+    daily = gps_ath.groupby('Date')[['Player Load', 'Total Jumps', 'High Jumps', 'Jump Load', 'Est_Swings']].sum().reset_index().sort_values('Date')
+
+    # Calculate 7-day Acute and 28-day Chronic EWMA for Swings and Player Load
+    min_d, max_d = daily['Date'].min(), daily['Date'].max()
+    full_idx = pd.date_range(start=min_d, end=max_d, freq='D')
+    cal = daily.set_index('Date').reindex(full_idx).fillna(0.0).reset_index().rename(columns={'index': 'Date'})
+
+    for col in ['Est_Swings', 'Player Load']:
+        cal[f'{col}_Acute'] = cal[col].ewm(span=7, adjust=False).mean()
+        cal[f'{col}_Chronic'] = cal[col].ewm(span=28, adjust=False).mean()
+        cal[f'{col}_ACWR'] = np.where(cal[f'{col}_Chronic'] > 0, cal[f'{col}_Acute'] / cal[f'{col}_Chronic'], 0.0)
+
+    # Filter back to active training days
+    merged = cal[cal['Date'].isin(daily['Date'])].copy().sort_values('Date')
+
+    # Merge latest ASH ISO-I test on or before each practice date
+    if not ash_ath.empty:
+        ash_i = ash_ath[ash_ath['Isometric Type'].astype(str).str.contains('I', case=False, na=False)].copy()
+        if ash_i.empty:
+            ash_i = ash_ath.copy()
+        ash_i = ash_i.sort_values('Test Date')
+        base_ash_r = ash_i['Peak Vertical Force [N] (R)'].iloc[0] if len(ash_i) > 0 else 100.0
+        base_ash_l = ash_i['Peak Vertical Force [N] (L)'].iloc[0] if len(ash_i) > 0 else 100.0
+
+        merged = pd.merge_asof(
+            merged,
+            ash_i[['Test Date', 'Peak Vertical Force [N] (L)', 'Peak Vertical Force [N] (R)', 'Peak Vertical Force [N] (Asym)(%)']],
+            left_on='Date', right_on='Test Date', direction='backward'
+        )
+        merged['ASH_Drop_R_%'] = np.where(base_ash_r > 0, ((merged['Peak Vertical Force [N] (R)'] - base_ash_r) / base_ash_r) * 100.0, 0.0)
+        merged['ASH_Drop_L_%'] = np.where(base_ash_l > 0, ((merged['Peak Vertical Force [N] (L)'] - base_ash_l) / base_ash_l) * 100.0, 0.0)
+    else:
+        merged['Peak Vertical Force [N] (L)'] = 0.0
+        merged['Peak Vertical Force [N] (R)'] = 0.0
+        merged['ASH_Drop_R_%'] = 0.0
+        merged['ASH_Drop_L_%'] = 0.0
+
+    # Merge latest External Rotation (ER) ROM test on or before each practice date
+    if not er_ath.empty:
+        er_sorted = er_ath.sort_values('Test Date')
+        base_er_r = er_sorted['R Max ROM (°)'].iloc[0] if len(er_sorted) > 0 else 110.0
+        base_er_l = er_sorted['L Max ROM (°)'].iloc[0] if len(er_sorted) > 0 else 110.0
+
+        merged = pd.merge_asof(
+            merged,
+            er_sorted[['Test Date', 'L Max ROM (°)', 'R Max ROM (°)', 'ROM Asymmetry (%)']],
+            left_on='Date', right_on='Test Date', direction='backward', suffixes=('', '_ER')
+        )
+        merged['ER_Drop_R_%'] = np.where(base_er_r > 0, ((merged['R Max ROM (°)'] - base_er_r) / base_er_r) * 100.0, 0.0)
+        merged['ER_Drop_L_%'] = np.where(base_er_l > 0, ((merged['L Max ROM (°)'] - base_er_l) / base_er_l) * 100.0, 0.0)
+    else:
+        merged['L Max ROM (°)'] = 0.0
+        merged['R Max ROM (°)'] = 0.0
+        merged['ER_Drop_R_%'] = 0.0
+        merged['ER_Drop_L_%'] = 0.0
+
+    merged.fillna(0.0, inplace=True)
+
+    # Compute Composite Shoulder Injury Risk Score (0-100 scale)
+    # 40% weight: Swing ACWR spike (>1.30)
+    # 35% weight: ASH Peak Force drop (>10% drop from baseline or <100N)
+    # 25% weight: ER ROM deficit (<100 deg or >10% drop from baseline)
+    risk_scores = []
+    risk_tiers = []
+    risk_drivers = []
+
+    for _, row in merged.iterrows():
+        score = 0.0
+        drivers = []
+
+        # 1. Swing Workload Spike Component (Max 40 pts)
+        sw_acwr = row['Est_Swings_ACWR']
+        if sw_acwr > 1.50:
+            score += 40.0
+            drivers.append(f"High Swing Spike (ACWR {sw_acwr:.2f})")
+        elif sw_acwr > 1.30:
+            score += 25.0
+            drivers.append(f"Elevated Swing Volume (ACWR {sw_acwr:.2f})")
+        elif sw_acwr > 1.15:
+            score += 10.0
+
+        # 2. ASH Isometric Force Drop Component (Max 35 pts)
+        worst_ash_drop = min(row['ASH_Drop_R_%'], row['ASH_Drop_L_%'])
+        min_ash_force = min(row['Peak Vertical Force [N] (R)'], row['Peak Vertical Force [N] (L)'])
+        if worst_ash_drop <= -15.0 or (0 < min_ash_force < 90):
+            score += 35.0
+            drivers.append(f"ASH Force Deficit ({worst_ash_drop:+.1f}%)")
+        elif worst_ash_drop <= -8.0 or (0 < min_ash_force < 100):
+            score += 20.0
+            drivers.append(f"Moderate ASH Fatigue ({worst_ash_drop:+.1f}%)")
+
+        # 3. ER ROM Restriction Component (Max 25 pts)
+        worst_er_drop = min(row['ER_Drop_R_%'], row['ER_Drop_L_%'])
+        min_er_rom = min(row['R Max ROM (°)'], row['L Max ROM (°)'])
+        if worst_er_drop <= -10.0 or (0 < min_er_rom < 90):
+            score += 25.0
+            drivers.append(f"Restricted ER ROM ({min_er_rom:.0f}°)")
+        elif worst_er_drop <= -5.0 or (0 < min_er_rom < 105):
+            score += 15.0
+            drivers.append(f"Tight ER ROM ({min_er_rom:.0f}°)")
+
+        final_s = min(100.0, round(score, 0))
+        risk_scores.append(final_s)
+        if final_s >= 60:
+            risk_tiers.append("High Risk")
+        elif final_s >= 35:
+            risk_tiers.append("Moderate Risk")
+        else:
+            risk_tiers.append("Low / Optimal")
+            
+        risk_drivers.append(", ".join(drivers) if drivers else "Normal Load & Screening")
+
+    merged['Shoulder_Risk_Score'] = risk_scores
+    merged['Risk_Status'] = risk_tiers
+    merged['Primary_Drivers'] = risk_drivers
+
+    return merged
+    
 
 # --- 5. EXECUTION BLOCK CONTEXT ---
 if check_password():
@@ -3272,7 +3490,7 @@ if check_password():
         elif selected_hub == "Workload & ACWR":
             st.markdown('<div class="section-header">Acute:Chronic Workload Ratio (EWMA)</div>', unsafe_allow_html=True)
             
-            acwr_tabs_list = ["Team Workload Summary", "Individual"]
+            acwr_tabs_list = ["Team Workload Summary", "Individual", "Shoulder Injury Risk"]
             if "acwr_active_subtab" not in st.session_state:
                 st.session_state.acwr_active_subtab = acwr_tabs_list[0]
                 
@@ -3445,7 +3663,93 @@ if check_password():
                         _, _, status_lbl = get_acwr_badge(r_val)
                         ind_metric_rows.append({"Metric": m, "Day Total": f"{target_row.get(m, 0.0):.1f}", "Acute (7d EWMA)": f"{a_ewma:.1f}", "Chronic (28d EWMA)": f"{c_ewma:.1f}", "ACWR Ratio": f"{r_val:.2f}", "Workload Zone": status_lbl})
                     st.dataframe(pd.DataFrame(ind_metric_rows), use_container_width=True, hide_index=True)
+                    
+             elif selected_acwr_tab == "Shoulder Injury Risk":
+                st.markdown('<div class="section-header">Volleyball Swing Volume & Shoulder Injury Prediction</div>', unsafe_allow_html=True)
+                
+                c_sh1, c_sh2 = st.columns([2, 2])
+                with c_sh1:
+                    sel_sh_ath = st.selectbox("Select Athlete", master_athlete_list, key="sh_risk_ath_sel")
+                with c_sh2:
+                    sync_live = st.checkbox("Sync Live Catapult API Swings (if configured in secrets.toml)", value=False, key="sh_sync_api_toggle")
 
+                source_gps_df = raw_df.copy()
+                if sync_live:
+                    live_cat_df = fetch_catapult_cloud_swings("2026-08-01", datetime.today().strftime('%Y-%m-%d'))
+                    if not live_cat_df.empty:
+                        st.caption("Live Catapult OpenField API session data merged.")
+                    else:
+                        st.caption("Using primary Google Sheets Catapult dataset (No live API token detected in secrets.toml).")
+
+                pred_df = build_injury_prediction_matrix(source_gps_df, raw_er_df, raw_ash_df, sel_sh_ath)
+
+                if pred_df.empty:
+                    st.info(f"No Catapult jump/swing workload data available for {sel_sh_ath}.")
+                else:
+                    latest_r = pred_df.iloc[-1]
+                    risk_val = latest_r['Shoulder_Risk_Score']
+                    r_status = latest_r['Risk_Status']
+                    r_color = "#D93025" if risk_val >= 60 else ("#D97706" if risk_val >= 35 else "#137333")
+                    r_bg = "#FCE8E6" if risk_val >= 60 else ("#FEF3C7" if risk_val >= 35 else "#E6F4EA")
+
+                    k_s1, k_s2, k_s3, k_s4 = st.columns(4)
+                    k_s1.metric("Latest Est. Swings", f"{int(latest_r['Est_Swings'])}", help="Derived from High-Band Jumps + 50% Moderate Jumps")
+                    k_s2.metric("Swing ACWR (7:28d)", f"{latest_r['Est_Swings_ACWR']:.2f}")
+                    k_s3.metric("Latest ASH Force (L / R)", f"{latest_r['Peak Vertical Force [N] (L)']:.0f}N / {latest_r['Peak Vertical Force [N] (R)']:.0f}N")
+                    with k_s4:
+                        st.markdown(f'''
+                            <div style="background:{r_bg}; border:1px solid {r_color}; border-radius:10px; padding:10px; text-align:center;">
+                                <div style="font-size:10px; font-weight:800; color:{r_color}; text-transform:uppercase;">SHOULDER RISK SCORE</div>
+                                <div style="font-size:24px; font-weight:900; color:{r_color}; line-height:1.1;">{int(risk_val)} / 100</div>
+                                <div style="font-size:11px; font-weight:700; color:{r_color}; margin-top:3px;">{r_status}</div>
+                            </div>
+                        ''', unsafe_allow_html=True)
+
+                    st.markdown(f'<div class="info-box"><b>Primary Risk Drivers ({latest_r["Date"].strftime("%m/%d/%Y")}):</b> {latest_r["Primary_Drivers"]}</div>', unsafe_allow_html=True)
+
+                    # Longitudinal Chart: Swing Volume vs. ASH Force & Shoulder Risk Score
+                    fig_sh_pred = make_subplots(specs=[[{"secondary_y": True}]])
+                    fig_sh_pred.add_trace(
+                        go.Bar(x=pred_df['Date'], y=pred_df['Est_Swings'], name="Est. Swings (Hitting Volume)", marker_color='#4895DB', opacity=0.45),
+                        secondary_y=False
+                    )
+                    fig_sh_pred.add_trace(
+                        go.Scatter(x=pred_df['Date'], y=pred_df['Shoulder_Risk_Score'], name="Shoulder Risk Score (0-100)", mode='lines+markers', line=dict(color='#D93025', width=3)),
+                        secondary_y=True
+                    )
+                    fig_sh_pred.add_trace(
+                        go.Scatter(x=pred_df['Date'], y=pred_df['Peak Vertical Force [N] (R)'], name="ASH Right Force (N)", mode='lines', line=dict(color='#FF8200', width=2, dash='dot')),
+                        secondary_y=False
+                    )
+                    fig_sh_pred.update_layout(
+                        height=380, template="simple_white",
+                        title=dict(text=f"<b>{sel_sh_ath} — Swing Volume vs. ASH Shoulder Force & Risk Score</b>", font=dict(size=14)),
+                        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+                        margin=dict(l=20, r=20, t=50, b=20)
+                    )
+                    fig_sh_pred.update_yaxes(title_text="Est. Swings / ASH Force (N)", secondary_y=False)
+                    fig_sh_pred.update_yaxes(title_text="Injury Risk Score (0-100)", range=[0, 105], secondary_y=True, showgrid=False)
+                    st.plotly_chart(fig_sh_pred, use_container_width=True, config=LOCKED_CONFIG, key=f"sh_risk_chart_{sel_sh_ath}")
+
+                    # Recent 15-Session Breakdown Table
+                    st.markdown("#### Recent 15 Sessions: Swing Workload & Shoulder Screening Log")
+                    disp_cols = pred_df.tail(15).sort_values('Date', ascending=False).copy()
+                    disp_cols['Date'] = disp_cols['Date'].dt.strftime('%Y-%m-%d')
+                    disp_cols['Est_Swings'] = disp_cols['Est_Swings'].round(0).astype(int)
+                    disp_cols['Est_Swings_ACWR'] = disp_cols['Est_Swings_ACWR'].map('{:.2f}'.format)
+                    disp_cols['Player Load'] = disp_cols['Player Load'].map('{:.1f}'.format)
+                    disp_cols['ASH (L/R)'] = disp_cols.apply(lambda r: f"{r['Peak Vertical Force [N] (L)']:.0f}N / {r['Peak Vertical Force [N] (R)']:.0f}N", axis=1)
+                    disp_cols['ER ROM (L/R)'] = disp_cols.apply(lambda r: f"{r['L Max ROM (°)']:.1f}° / {r['R Max ROM (°)']:.1f}°", axis=1)
+                    
+                    final_view = disp_cols[['Date', 'Est_Swings', 'Est_Swings_ACWR', 'Player Load', 'ASH (L/R)', 'ER ROM (L/R)', 'Shoulder_Risk_Score', 'Risk_Status', 'Primary_Drivers']].rename(columns={
+                        'Est_Swings': 'Est. Swings',
+                        'Est_Swings_ACWR': 'Swing ACWR',
+                        'Shoulder_Risk_Score': 'Risk Score',
+                        'Risk_Status': 'Risk Zone',
+                        'Primary_Drivers': 'Flagged Drivers'
+                    })
+                    st.dataframe(final_view, use_container_width=True, hide_index=True)
+                
 
         # =========================================================================
         # --- HUB 5: TESTING & BASELINES ------------------------------------------
