@@ -738,57 +738,100 @@ class CatapultAPIClient:
         return pd.DataFrame(), last_status
 
 
-def detect_swings_from_10hz_stream(df_10hz: pd.DataFrame, high_jumps: float = 0.0, mod_jumps: float = 0.0) -> int:
+def detect_swings_from_10hz_stream(df_10hz: pd.DataFrame, total_pl: float = 0.0, high_jumps: float = 0.0, mod_jumps: float = 0.0) -> int:
     """
-    Precision 10Hz Volleyball Swing Detector for OpenField columns:
-    ['ts', 'cs', 'lat', 'long', 'o', 'v', 'a', 'hr', 'pl', 'mp', 'sl', 'x', 'y']
+    True Absolute-Physics 10Hz Volleyball Swing Detector.
+    Uses absolute PlayerLoad impulse ('pl'/'sl') and braking/takeoff acceleration ('a', 'mp')
+    so low-volume or non-hitting athletes do NOT get false Z-score outliers.
     """
     if df_10hz.empty or len(df_10hz) < 100 or "pl" not in df_10hz.columns:
         return 0
 
-    pl_raw = pd.to_numeric(df_10hz["pl"], errors="coerce").fillna(0.0).values
+    # Sort by timestamp ('ts') and centiseconds ('cs') so 10Hz rows are strictly chronological
+    if "ts" in df_10hz.columns and "cs" in df_10hz.columns:
+        df_sorted = df_10hz.sort_values(["ts", "cs"]).reset_index(drop=True)
+    else:
+        df_sorted = df_10hz.reset_index(drop=True)
+
+    pl_raw = pd.to_numeric(df_sorted["pl"], errors="coerce").ffill().fillna(0.0).values
+    
+    # 0.1s instantaneous PlayerLoad (strictly positive steps, ignoring sensor resets)
     inst_pl = np.diff(pl_raw, prepend=pl_raw[0])
-    inst_pl = np.where((inst_pl > 0.0) & (inst_pl < 1.5), inst_pl, 0.0)
+    inst_pl = np.where((inst_pl > 0.0) & (inst_pl < 1.2), inst_pl, 0.0)
 
+    # Total session PlayerLoad from stream
+    stream_total_pl = float(np.sum(inst_pl))
+    if stream_total_pl < 15.0:
+        return 0
+
+    # Rolling 0.4s (4 samples at 10Hz) vertical + torso impulse
     pl_400ms = pd.Series(inst_pl).rolling(window=4, min_periods=1).sum().values
-    active_frames = pl_400ms[pl_400ms > 0.02]
-    if len(active_frames) < 50:
-        return 0
+    # 0.1s whip/impact jerk
+    pl_jerk = np.abs(np.diff(inst_pl, prepend=inst_pl[0]))
 
-    mean_pl = np.mean(active_frames)
-    std_pl = np.std(active_frames)
-    if std_pl <= 0:
-        return 0
+    # Extract 10Hz acceleration ('a') and metabolic power ('mp')
+    a_val = pd.to_numeric(df_sorted["a"], errors="coerce").fillna(0.0).values if "a" in df_sorted.columns else np.zeros(len(df_sorted))
+    mp_val = pd.to_numeric(df_sorted["mp"], errors="coerce").fillna(0.0).values if "mp" in df_sorted.columns else np.zeros(len(df_sorted))
 
-    # Strict 3.5-sigma burst threshold + local maximum over a 4-second (41-sample) window
-    z_thresh = mean_pl + (3.5 * std_pl)
-    local_max = pd.Series(pl_400ms).rolling(window=41, center=True, min_periods=1).max().values
-    is_swing_peak = (pl_400ms == local_max) & (pl_400ms >= z_thresh)
+    # Rolling 0.5s peak braking/takeoff acceleration magnitude
+    abs_a_500ms = pd.Series(np.abs(a_val)).rolling(window=5, min_periods=1).max().values
+    mp_500ms = pd.Series(mp_val).rolling(window=5, min_periods=1).max().values
+
+    # Must be the single highest peak in a 5-second (51-sample) window
+    local_max = pd.Series(pl_400ms).rolling(window=51, center=True, min_periods=1).max().values
+    is_local_peak = (pl_400ms == local_max)
+
+    # ABSOLUTE biomechanical thresholds (NOT personal Z-score alone):
+    # A true maximal jump + overhead swing requires an absolute 0.4s PlayerLoad impulse >= 0.42
+    # AND a sharp 0.1s jerk >= 0.13 (separates aerial takeoff+swing+landing from running/shuffling)
+    abs_impulse_floor = 0.42
+    abs_jerk_floor = 0.13
+
+    if np.nanmax(abs_a_500ms) > 1.0:
+        # Require approach plant/takeoff acceleration >= 2.3 m/s^2 alongside the absolute PL burst
+        is_swing_peak = (
+            is_local_peak &
+            (pl_400ms >= abs_impulse_floor) &
+            (pl_jerk >= abs_jerk_floor) &
+            (abs_a_500ms >= 2.3)
+        )
+    elif np.nanmax(mp_500ms) > 5.0:
+        is_swing_peak = (
+            is_local_peak &
+            (pl_400ms >= abs_impulse_floor) &
+            (pl_jerk >= abs_jerk_floor) &
+            (mp_500ms >= 25.0)
+        )
+    else:
+        is_swing_peak = (
+            is_local_peak &
+            (pl_400ms >= 0.48) &
+            (pl_jerk >= 0.15)
+        )
 
     peak_indices = np.where(is_swing_peak)[0]
     if len(peak_indices) == 0:
-        raw_10hz_swings = 0
-    else:
-        # Minimum 10 seconds (100 samples at 10Hz) between distinct full-approach swings
-        raw_10hz_swings = 1
-        last_idx = peak_indices[0]
-        for idx in peak_indices[1:]:
-            if (idx - last_idx) >= 100:
-                raw_10hz_swings += 1
-                last_idx = idx
+        return 0
 
+    # Minimum 9.0 seconds (90 samples at 10Hz) between distinct full-approach swings for the same player
+    raw_10hz_swings = 1
+    last_idx = peak_indices[0]
+    for idx in peak_indices[1:]:
+        if (idx - last_idx) >= 90:
+            raw_10hz_swings += 1
+            last_idx = idx
+
+    # If OpenField jump bands are available for this session, bound by actual high-intensity jumps
     if high_jumps > 0:
-        jump_cap = int(round((high_jumps * 0.75) + (mod_jumps * 0.15)))
-        if raw_10hz_swings > 0:
-            return min(raw_10hz_swings, jump_cap)
-        return jump_cap
+        jump_cap = int(round((high_jumps * 0.80) + (mod_jumps * 0.15)))
+        return min(raw_10hz_swings, jump_cap)
 
-    return min(raw_10hz_swings, 55)
+    return raw_10hz_swings
 
 
 @st.cache_data(ttl=600)
-def fetch_catapult_cloud_swings(start_date_str: str, end_date_str: str, cache_version: str = "v11_single_clean") -> tuple[pd.DataFrame, str]:
-    """Pulls Catapult activities and runs calibrated 10Hz + IMA Jump Envelope swing detection."""
+def fetch_catapult_cloud_swings(start_date_str: str, end_date_str: str, cache_version: str = "v12_true_physics") -> tuple[pd.DataFrame, str]:
+    """Pulls Catapult activities and runs absolute-physics 10Hz swing detection."""
     api_key = None
     region = "us"
 
@@ -810,6 +853,7 @@ def fetch_catapult_cloud_swings(start_date_str: str, end_date_str: str, cache_ve
 
         frames = []
         sensor_10hz_hits = 0
+        sample_counts_preview = []
 
         for act_idx, act in acts.head(8).iterrows():
             act_id = str(act["id"])
@@ -836,14 +880,17 @@ def fetch_catapult_cloud_swings(start_date_str: str, end_date_str: str, cache_ve
 
                     high_j = float(pd.to_numeric(ath_row.get("ima_jump_count_high", 0), errors="coerce") or 0.0)
                     med_j = float(pd.to_numeric(ath_row.get("ima_jump_count_med", 0), errors="coerce") or 0.0)
+                    tot_pl = float(pd.to_numeric(ath_row.get("total_player_load", 0), errors="coerce") or 0.0)
 
                     swings_10hz = 0
                     if len(frames) < 5 and ath_id:
                         df_10hz, _ = client.get_10hz_sensor_stream(act_id, ath_id)
                         if not df_10hz.empty:
-                            swings_10hz = detect_swings_from_10hz_stream(df_10hz, high_jumps=high_j, mod_jumps=med_j)
+                            swings_10hz = detect_swings_from_10hz_stream(df_10hz, total_pl=tot_pl, high_jumps=high_j, mod_jumps=med_j)
                             if swings_10hz > 0:
                                 sensor_10hz_hits += 1
+                            if len(frames) == 0 and len(sample_counts_preview) < 4:
+                                sample_counts_preview.append(f"{str(ath_row.get('athlete_name', ''))[:10]}:{swings_10hz}")
 
                     detected_swings_col.append(swings_10hz)
 
@@ -871,7 +918,105 @@ def fetch_catapult_cloud_swings(start_date_str: str, end_date_str: str, cache_ve
             combined["Total Jumps"] = combined["High Jumps"] + combined["Moderate Jumps"] + combined["Low Jumps"]
             combined["Jump Load"] = (combined["High Jumps"] * 3.0) + (combined["Moderate Jumps"] * 2.0) + (combined["Low Jumps"] * 1.0)
 
-            return combined, f"Synced {len(frames)} sessions | 10Hz Calibrated Streams: {sensor_10hz_hits}"
+            preview_str = ", ".join(sample_counts_preview)
+            return combined, f"Synced {len(frames)} sessions | 10Hz Streams: {sensor_10hz_hits} | Sample Swings: [{preview_str}]"
+        return pd.DataFrame(), "Found activities, but /stats returned 0 athlete rows."
+    except Exception as e:
+        return pd.DataFrame(), f"API Connection Error: {e}"
+        
+
+
+@st.cache_data(ttl=600)
+def fetch_catapult_cloud_swings(start_date_str: str, end_date_str: str, cache_version: str = "v12_true_physics") -> tuple[pd.DataFrame, str]:
+    """Pulls Catapult activities and runs absolute-physics 10Hz swing detection."""
+    api_key = None
+    region = "us"
+
+    if "catapult" in st.secrets and "api_key" in st.secrets["catapult"]:
+        api_key = st.secrets["catapult"]["api_key"]
+        region = st.secrets["catapult"].get("region", "us")
+    elif "CATAPULT_API_KEY" in st.secrets:
+        api_key = st.secrets["CATAPULT_API_KEY"]
+        region = st.secrets.get("CATAPULT_REGION", "us")
+
+    if not api_key:
+        return pd.DataFrame(), "No API key found in st.secrets."
+
+    try:
+        client = CatapultAPIClient(api_key=api_key, region=region)
+        acts, status_msg = client.get_activities()
+        if acts.empty or "id" not in acts.columns:
+            return pd.DataFrame(), f"Connected, but no activities returned ({status_msg})."
+
+        frames = []
+        sensor_10hz_hits = 0
+        sample_counts_preview = []
+
+        for act_idx, act in acts.head(8).iterrows():
+            act_id = str(act["id"])
+            st_df = client.get_activity_stats(act_id)
+            if not st_df.empty:
+                st_df["Date"] = pd.to_datetime(act.get("start_time", datetime.today()), unit="s", errors="coerce").tz_localize(None)
+                st_df["Activity"] = act.get("name", "Catapult Session")
+
+                ath_id_col = next((c for c in ["athlete_id", "athlete", "id"] if c in st_df.columns), None)
+                name_to_uuid = {}
+                if not ath_id_col:
+                    act_athletes_df = client.get_athletes_in_activity(act_id)
+                    if not act_athletes_df.empty and "id" in act_athletes_df.columns:
+                        for _, ar in act_athletes_df.iterrows():
+                            full_n = f"{ar.get('first_name', '')} {ar.get('last_name', '')}".strip()
+                            name_to_uuid[full_n.lower()] = str(ar["id"])
+
+                detected_swings_col = []
+                for _, ath_row in st_df.iterrows():
+                    ath_id = str(ath_row.get(ath_id_col, "")) if ath_id_col else ""
+                    if not ath_id or ath_id == "nan":
+                        ath_name_clean = str(ath_row.get("athlete_name", "")).strip().lower()
+                        ath_id = name_to_uuid.get(ath_name_clean, "")
+
+                    high_j = float(pd.to_numeric(ath_row.get("ima_jump_count_high", 0), errors="coerce") or 0.0)
+                    med_j = float(pd.to_numeric(ath_row.get("ima_jump_count_med", 0), errors="coerce") or 0.0)
+                    tot_pl = float(pd.to_numeric(ath_row.get("total_player_load", 0), errors="coerce") or 0.0)
+
+                    swings_10hz = 0
+                    if len(frames) < 5 and ath_id:
+                        df_10hz, _ = client.get_10hz_sensor_stream(act_id, ath_id)
+                        if not df_10hz.empty:
+                            swings_10hz = detect_swings_from_10hz_stream(df_10hz, total_pl=tot_pl, high_jumps=high_j, mod_jumps=med_j)
+                            if swings_10hz > 0:
+                                sensor_10hz_hits += 1
+                            if len(frames) == 0 and len(sample_counts_preview) < 4:
+                                sample_counts_preview.append(f"{str(ath_row.get('athlete_name', ''))[:10]}:{swings_10hz}")
+
+                    detected_swings_col.append(swings_10hz)
+
+                st_df["Sensor_Detected_Swings"] = detected_swings_col
+                frames.append(st_df)
+
+        if frames:
+            combined = pd.concat(frames, ignore_index=True)
+            rename_map = {
+                "athlete_name": "Name",
+                "total_player_load": "Player Load",
+                "ima_jump_count_high": "High Jumps",
+                "ima_jump_count_med": "Moderate Jumps",
+                "ima_jump_count_low": "Low Jumps",
+                "ima_accel_high": "IMA_Accel_High",
+                "ima_decel_high": "IMA_Decel_High",
+                "explosive_efforts": "Explosive Efforts"
+            }
+            combined.rename(columns={k: v for k, v in rename_map.items() if k in combined.columns}, inplace=True)
+            for c in ["Player Load", "High Jumps", "Moderate Jumps", "Low Jumps", "IMA_Accel_High", "IMA_Decel_High", "Explosive Efforts", "Sensor_Detected_Swings"]:
+                if c not in combined.columns:
+                    combined[c] = 0.0
+                combined[c] = pd.to_numeric(combined[c], errors="coerce").fillna(0.0)
+
+            combined["Total Jumps"] = combined["High Jumps"] + combined["Moderate Jumps"] + combined["Low Jumps"]
+            combined["Jump Load"] = (combined["High Jumps"] * 3.0) + (combined["Moderate Jumps"] * 2.0) + (combined["Low Jumps"] * 1.0)
+
+            preview_str = ", ".join(sample_counts_preview)
+            return combined, f"Synced {len(frames)} sessions | 10Hz Streams: {sensor_10hz_hits} | Sample Swings: [{preview_str}]"
         return pd.DataFrame(), "Found activities, but /stats returned 0 athlete rows."
     except Exception as e:
         return pd.DataFrame(), f"API Connection Error: {e}"
@@ -902,9 +1047,12 @@ def build_injury_prediction_matrix(df_gps, df_er, df_ash, athlete_name):
     else:
         jump_to_swing_ratio = 0.32
 
+    # Apply position-specific scaling to 10Hz bursts so non-hitters' defensive dives aren't counted as swings
+    pos_10hz_scale = 0.15 if any(p in pos_str for p in ["DS", "LIBERO", "L/DS", "DEF"]) else (0.25 if ("SET" in pos_str or pos_str == "S") else 1.0)
+
     gps_ath['Est_Swings'] = np.where(
         gps_ath['Sensor_Detected_Swings'] > 0,
-        gps_ath['Sensor_Detected_Swings'],
+        np.round(gps_ath['Sensor_Detected_Swings'] * pos_10hz_scale),
         np.where(
             gps_ath['High Jumps'] > 0,
             (gps_ath['High Jumps'] * 0.75) + (gps_ath['Moderate Jumps'] * 0.15),
