@@ -3954,18 +3954,17 @@ if check_password():
                     disp_cols['Date'] = disp_cols['Date'].dt.strftime('%Y-%m-%d')
                     disp_cols['Est_Swings'] = disp_cols['Est_Swings'].round(0).astype(int)
                     disp_cols['Est_Swings_ACWR'] = disp_cols['Est_Swings_ACWR'].map('{:.2f}'.format)
-                    disp_cols['Player Load'] = disp_cols['Player Load'].map('{:.1f}'.format)
                     
                     # --- TABLE 1: ASH SHOULDER STRENGTH SCREENING ---
                     st.markdown("#### 1. ASH Shoulder Isometric Strength Log")
-                    ash_view = disp_cols[['Date', 'Est_Swings', 'Swing ACWR' if 'Swing ACWR' in disp_cols else 'Est_Swings_ACWR', 'Shoulder_Risk_Score', 'Risk_Status']].copy()
+                    ash_view = disp_cols[['Date', 'Est_Swings', 'Est_Swings_ACWR']].copy()
+                    ash_view.rename(columns={'Est_Swings': 'Est. Swings', 'Est_Swings_ACWR': 'Swing ACWR'}, inplace=True)
+                    
                     ash_view['Baseline ASH (L/R)'] = f"{base_ash_l:.0f}N / {base_ash_r:.0f}N"
                     ash_view['Recent ASH (L/R)'] = disp_cols.apply(lambda r: f"{r['Peak Vertical Force [N] (L)']:.0f}N ({r['ASH_Drop_L_%']:+.1f}%) / {r['Peak Vertical Force [N] (R)']:.0f}N ({r['ASH_Drop_R_%']:+.1f}%)", axis=1)
                     
-                    ash_view = ash_view[['Date', 'Baseline ASH (L/R)', 'Recent ASH (L/R)', 'Shoulder_Risk_Score', 'Risk_Status']].rename(columns={
-                        'Shoulder_Risk_Score': 'Risk Score',
-                        'Risk_Status': 'Risk Zone'
-                    })
+                    ash_view['Risk Score'] = disp_cols['Shoulder_Risk_Score']
+                    ash_view['Risk Zone'] = disp_cols['Risk_Status']
                     
                     def color_risk_zones(val):
                         if isinstance(val, str):
@@ -3982,9 +3981,12 @@ if check_password():
 
                     # --- TABLE 2: EXTERNAL ROTATION ROM SCREENING ---
                     st.markdown("#### 2. External Rotation (ER) Range of Motion Log")
-                    rom_view = disp_cols[['Date']].copy()
+                    rom_view = disp_cols[['Date', 'Est_Swings', 'Est_Swings_ACWR']].copy()
+                    rom_view.rename(columns={'Est_Swings': 'Est. Swings', 'Est_Swings_ACWR': 'Swing ACWR'}, inplace=True)
+                    
                     rom_view['Baseline ER ROM (L/R)'] = f"{base_er_l:.1f}° / {base_er_r:.1f}°"
                     rom_view['Recent ER ROM (L/R)'] = disp_cols.apply(lambda r: f"{r['L Max ROM (°)']:.1f}° ({r['ER_Drop_L_%']:+.1f}%) / {r['R Max ROM (°)']:.1f}° ({r['ER_Drop_R_%']:+.1f}%)", axis=1)
+                    
                     rom_view['Risk Score'] = disp_cols['Shoulder_Risk_Score']
                     rom_view['Risk Zone'] = disp_cols['Risk_Status']
                     rom_view['Flagged Drivers'] = disp_cols['Primary_Drivers']
