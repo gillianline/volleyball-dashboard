@@ -3941,9 +3941,7 @@ if check_password():
                     fig_sh_pred.update_yaxes(title_text="Injury Risk Score (0-100)", range=[0, 105], secondary_y=True, showgrid=False)
                     st.plotly_chart(fig_sh_pred, use_container_width=True, config=LOCKED_CONFIG, key=f"sh_risk_chart_{sel_sh_ath}")
 
-                    st.markdown("#### Recent 15 Sessions: Swing Workload & Shoulder Screening Log")
-                    
-                    # Extract initial baseline values for this specific athlete
+                    # Extract initial baselines for this specific athlete
                     ath_ash_raw = raw_ash_df[raw_ash_df['Name'] == sel_sh_ath].sort_values('Test Date')
                     base_ash_l = ath_ash_raw['Peak Vertical Force [N] (L)'].iloc[0] if not ath_ash_raw.empty else 0.0
                     base_ash_r = ath_ash_raw['Peak Vertical Force [N] (R)'].iloc[0] if not ath_ash_raw.empty else 0.0
@@ -3958,24 +3956,15 @@ if check_password():
                     disp_cols['Est_Swings_ACWR'] = disp_cols['Est_Swings_ACWR'].map('{:.2f}'.format)
                     disp_cols['Player Load'] = disp_cols['Player Load'].map('{:.1f}'.format)
                     
-                    # Separate Baseline and Recent columns
-                    disp_cols['Baseline ASH (L/R)'] = f"{base_ash_l:.0f}N / {base_ash_r:.0f}N"
-                    disp_cols['Recent ASH (L/R)'] = disp_cols.apply(lambda r: f"{r['Peak Vertical Force [N] (L)']:.0f}N / {r['Peak Vertical Force [N] (R)']:.0f}N", axis=1)
+                    # --- TABLE 1: ASH SHOULDER STRENGTH SCREENING ---
+                    st.markdown("#### 1. ASH Shoulder Isometric Strength Log")
+                    ash_view = disp_cols[['Date', 'Est_Swings', 'Swing ACWR' if 'Swing ACWR' in disp_cols else 'Est_Swings_ACWR', 'Shoulder_Risk_Score', 'Risk_Status']].copy()
+                    ash_view['Baseline ASH (L/R)'] = f"{base_ash_l:.0f}N / {base_ash_r:.0f}N"
+                    ash_view['Recent ASH (L/R)'] = disp_cols.apply(lambda r: f"{r['Peak Vertical Force [N] (L)']:.0f}N ({r['ASH_Drop_L_%']:+.1f}%) / {r['Peak Vertical Force [N] (R)']:.0f}N ({r['ASH_Drop_R_%']:+.1f}%)", axis=1)
                     
-                    disp_cols['Baseline ER ROM (L/R)'] = f"{base_er_l:.1f}° / {base_er_r:.1f}°"
-                    disp_cols['Recent ER ROM (L/R)'] = disp_cols.apply(lambda r: f"{r['L Max ROM (°)']:.1f}° / {r['R Max ROM (°)']:.1f}°", axis=1)
-                    
-                    final_view = disp_cols[[
-                        'Date', 'Est_Swings', 'Est_Swings_ACWR', 'Player Load', 
-                        'Baseline ASH (L/R)', 'Recent ASH (L/R)', 
-                        'Baseline ER ROM (L/R)', 'Recent ER ROM (L/R)', 
-                        'Shoulder_Risk_Score', 'Risk_Status', 'Primary_Drivers'
-                    ]].rename(columns={
-                        'Est_Swings': 'Est. Swings',
-                        'Est_Swings_ACWR': 'Swing ACWR',
+                    ash_view = ash_view[['Date', 'Baseline ASH (L/R)', 'Recent ASH (L/R)', 'Shoulder_Risk_Score', 'Risk_Status']].rename(columns={
                         'Shoulder_Risk_Score': 'Risk Score',
-                        'Risk_Status': 'Risk Zone',
-                        'Primary_Drivers': 'Flagged Drivers'
+                        'Risk_Status': 'Risk Zone'
                     })
                     
                     def color_risk_zones(val):
@@ -3988,12 +3977,24 @@ if check_password():
                                 return 'background-color: #DCFCE7; color: #15803D; font-weight: bold;'
                         return ''
 
+                    styled_ash = ash_view.style.map(color_risk_zones, subset=['Risk Zone']).format({'Risk Score': '{:.0f}'})
+                    st.dataframe(styled_ash, use_container_width=True, hide_index=True)
+
+                    # --- TABLE 2: EXTERNAL ROTATION ROM SCREENING ---
+                    st.markdown("#### 2. External Rotation (ER) Range of Motion Log")
+                    rom_view = disp_cols[['Date']].copy()
+                    rom_view['Baseline ER ROM (L/R)'] = f"{base_er_l:.1f}° / {base_er_r:.1f}°"
+                    rom_view['Recent ER ROM (L/R)'] = disp_cols.apply(lambda r: f"{r['L Max ROM (°)']:.1f}° ({r['ER_Drop_L_%']:+.1f}%) / {r['R Max ROM (°)']:.1f}° ({r['ER_Drop_R_%']:+.1f}%)", axis=1)
+                    rom_view['Risk Score'] = disp_cols['Shoulder_Risk_Score']
+                    rom_view['Risk Zone'] = disp_cols['Risk_Status']
+                    rom_view['Flagged Drivers'] = disp_cols['Primary_Drivers']
+
                     def color_drivers(val):
                         if isinstance(val, str) and val != "Normal Load & Screening":
                             return 'color: #B91C1C; font-weight: bold;'
                         return 'color: #64748B;'
 
-                    styled_table = final_view.style.map(
+                    styled_rom = rom_view.style.map(
                         color_risk_zones, subset=['Risk Zone']
                     ).map(
                         color_drivers, subset=['Flagged Drivers']
@@ -4001,7 +4002,7 @@ if check_password():
                         'Risk Score': '{:.0f}'
                     })
 
-                    st.dataframe(styled_table, use_container_width=True, hide_index=True)
+                    st.dataframe(styled_rom, use_container_width=True, hide_index=True)
                     
         # =========================================================================
         # --- HUB 5: TESTING & BASELINES ------------------------------------------
