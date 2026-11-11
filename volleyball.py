@@ -1002,8 +1002,8 @@ def fetch_catapult_cloud_swings(start_date_str: str, end_date_str: str, cache_ve
 
 def build_injury_prediction_matrix(df_gps, df_er, df_ash, athlete_name):
     """
-    Combines deduplicated Catapult 10Hz Swing Volume & Player Load with ASH and ER ROM tests
-    to calculate a 0-100 Shoulder Injury Risk Score.
+    Combines actual OpenField High Jumps, Jump Load, and Player Load with
+    ASH ISO-I and External Rotation (ER) ROM tests to predict shoulder injury risk.
     """
     gps_ath = df_gps[df_gps['Name'] == athlete_name].copy()
     er_ath = df_er[df_er['Name'] == athlete_name].copy()
@@ -1012,46 +1012,31 @@ def build_injury_prediction_matrix(df_gps, df_er, df_ash, athlete_name):
     if gps_ath.empty:
         return pd.DataFrame()
 
-    if 'Sensor_Detected_Swings' not in gps_ath.columns:
-        gps_ath['Sensor_Detected_Swings'] = 0.0
-
-    pos_str = str(gps_ath['Position'].dropna().iloc[0]).upper() if 'Position' in gps_ath.columns and not gps_ath['Position'].dropna().empty else "HITTER"
-    if any(p in pos_str for p in ["DS", "LIBERO", "L/DS", "DEF"]):
-        jump_to_swing_ratio = 0.08
-    elif "SET" in pos_str or pos_str == "S":
-        jump_to_swing_ratio = 0.12
-    elif "MB" in pos_str or "MID" in pos_str:
-        jump_to_swing_ratio = 0.25
-    else:
-        jump_to_swing_ratio = 0.32
-
-    # Apply position-specific scaling to 10Hz bursts so non-hitters' defensive dives aren't counted as swings
-    pos_10hz_scale = 0.15 if any(p in pos_str for p in ["DS", "LIBERO", "L/DS", "DEF"]) else (0.25 if ("SET" in pos_str or pos_str == "S") else 1.0)
-
-    gps_ath['Est_Swings'] = np.where(
-        gps_ath['Sensor_Detected_Swings'] > 0,
-        np.round(gps_ath['Sensor_Detected_Swings'] * pos_10hz_scale),
-        np.where(
-            gps_ath['High Jumps'] > 0,
-            (gps_ath['High Jumps'] * 0.75) + (gps_ath['Moderate Jumps'] * 0.15),
-            gps_ath['Total Jumps'] * jump_to_swing_ratio
-        )
-    )
-
+    # Deduplicate same-day records
     gps_ath['Date'] = pd.to_datetime(gps_ath['Date']).dt.normalize()
-    daily = gps_ath.groupby('Date')[['Player Load', 'Total Jumps', 'High Jumps', 'Jump Load', 'Est_Swings']].max().reset_index().sort_values('Date')
+    daily = gps_ath.groupby('Date')[['Player Load', 'Total Jumps', 'Moderate Jumps', 'High Jumps', 'Jump Load', 'Explosive Efforts']].max().reset_index().sort_values('Date')
+
+    # Use actual High Jumps if populated in the sheet/API; otherwise use Jump Load / Total Jumps
+    # We keep the column named 'Est_Swings' so your existing Hub 4 UI table/chart doesn't break,
+    # but it now reflects actual High-Intensity Aerial Efforts (High Jumps + 35% Mod Jumps).
+    daily['Est_Swings'] = np.where(
+        (daily['High Jumps'] + daily['Moderate Jumps']) > 0,
+        daily['High Jumps'] + (daily['Moderate Jumps'] * 0.35),
+        daily['Total Jumps']
+    )
 
     min_d, max_d = daily['Date'].min(), daily['Date'].max()
     full_idx = pd.date_range(start=min_d, end=max_d, freq='D')
     cal = daily.set_index('Date').reindex(full_idx).fillna(0.0).reset_index().rename(columns={'index': 'Date'})
 
-    for col in ['Est_Swings', 'Player Load']:
+    for col in ['Est_Swings', 'Player Load', 'Jump Load']:
         cal[f'{col}_Acute'] = cal[col].ewm(span=7, adjust=False).mean()
         cal[f'{col}_Chronic'] = cal[col].ewm(span=28, adjust=False).mean()
         cal[f'{col}_ACWR'] = np.where(cal[f'{col}_Chronic'] > 0, cal[f'{col}_Acute'] / cal[f'{col}_Chronic'], 0.0)
 
     merged = cal[cal['Date'].isin(daily['Date'])].copy().sort_values('Date')
 
+    # Merge latest ASH ISO-I test on or before each practice date
     if not ash_ath.empty:
         ash_i = ash_ath[ash_ath['Isometric Type'].astype(str).str.contains('I', case=False, na=False)].copy()
         if ash_i.empty:
@@ -1073,6 +1058,7 @@ def build_injury_prediction_matrix(df_gps, df_er, df_ash, athlete_name):
         merged['ASH_Drop_R_%'] = 0.0
         merged['ASH_Drop_L_%'] = 0.0
 
+    # Merge latest External Rotation (ER) ROM test on or before each practice date
     if not er_ath.empty:
         er_sorted = er_ath.sort_values('Test Date')
         base_er_r = er_sorted['R Max ROM (°)'].iloc[0] if len(er_sorted) > 0 else 110.0
@@ -1101,16 +1087,18 @@ def build_injury_prediction_matrix(df_gps, df_er, df_ash, athlete_name):
         score = 0.0
         drivers = []
 
+        # 1. Aerial / Jump Workload Spike Component (Max 40 pts)
         sw_acwr = row['Est_Swings_ACWR']
         if sw_acwr > 1.50:
             score += 40.0
-            drivers.append(f"High Swing Spike (ACWR {sw_acwr:.2f})")
+            drivers.append(f"High Aerial Jump Spike (ACWR {sw_acwr:.2f})")
         elif sw_acwr > 1.30:
             score += 25.0
-            drivers.append(f"Elevated Swing Volume (ACWR {sw_acwr:.2f})")
+            drivers.append(f"Elevated Aerial Volume (ACWR {sw_acwr:.2f})")
         elif sw_acwr > 1.15:
             score += 10.0
 
+        # 2. ASH Isometric Force Drop Component (Max 35 pts)
         worst_ash_drop = min(row['ASH_Drop_R_%'], row['ASH_Drop_L_%'])
         min_ash_force = min(row['Peak Vertical Force [N] (R)'], row['Peak Vertical Force [N] (L)'])
         if worst_ash_drop <= -15.0 or (0 < min_ash_force < 90):
@@ -1120,6 +1108,7 @@ def build_injury_prediction_matrix(df_gps, df_er, df_ash, athlete_name):
             score += 20.0
             drivers.append(f"Moderate ASH Fatigue ({worst_ash_drop:+.1f}%)")
 
+        # 3. ER ROM Restriction Component (Max 25 pts)
         worst_er_drop = min(row['ER_Drop_R_%'], row['ER_Drop_L_%'])
         min_er_rom = min(row['R Max ROM (°)'], row['L Max ROM (°)'])
         if worst_er_drop <= -10.0 or (0 < min_er_rom < 90):
@@ -3971,6 +3960,23 @@ if check_password():
                 st.markdown('<div class="section-header">Volleyball Swing Volume & Shoulder Injury Prediction</div>', unsafe_allow_html=True)
                 
                 c_sh1, c_sh2 = st.columns([2, 2])
+                with st.expander("Inspect Available Catapult OpenField API Parameters"):
+                    if st.button("List My OpenField Parameters"):
+                        api_k = st.secrets["catapult"]["api_key"]
+                        r_p = requests.get(
+                            "https://connect-us.catapultsports.com/api/v6/parameters",
+                            headers={"Authorization": f"Bearer {api_k}", "Accept": "application/json"}
+                        )
+                        if r_p.status_code == 200:
+                            p_df = pd.DataFrame(r_p.json())
+                            # Filter to jump, ima, load, or swing related parameters
+                            if "name" in p_df.columns and "slug" in p_df.columns:
+                                rel = p_df[p_df["name"].astype(str).str.lower().str.contains("jump|ima|load|accel|spike|swing|impact|effort", na=False)]
+                                st.dataframe(rel[["name", "slug", "id"]], use_container_width=True)
+                            else:
+                                st.write(p_df.head(50))
+                        else:
+                            st.error(f"HTTP {r_p.status_code}: {r_p.text}")
                 with c_sh1:
                     sel_sh_ath = st.selectbox("Select Athlete", master_athlete_list, key="sh_risk_ath_sel")
                 with c_sh2:
