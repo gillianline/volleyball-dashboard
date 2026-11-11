@@ -528,7 +528,6 @@ def load_all_data():
     except:
         thresh_df = None
         
-        
     return df.dropna(subset=['Date']), match_df.dropna(subset=['Date']), cmj_df, phase_df, thresh_df, ash_df, er_df, calf_df, hip_df, shoulder_df
 
 
@@ -1061,11 +1060,6 @@ if check_password():
     try:
         raw_df, raw_match_df, raw_cmj_df, raw_phase_df, thresh_df, raw_ash_df, raw_er_df, raw_calf_df, raw_hip_df, raw_shoulder_df = load_all_data()
 
-        # --- MAP RAW SCREENING DATAFRAMES ---
-        ash_df = raw_ash_df.copy()
-        er_df = raw_er_df.copy()
-        cmj_df = raw_cmj_df.copy()
-        
         # --- GLOBAL SIDEBAR ---
         st.sidebar.markdown("### Active Season")
         view_seasons = ["In-Season", "Pre-Season", "Spring", "Summer"]
@@ -3878,152 +3872,98 @@ if check_password():
                     st.dataframe(pd.DataFrame(ind_metric_rows), use_container_width=True, hide_index=True)
 
             elif selected_acwr_tab == "Shoulder Injury Risk":
-                st.subheader("Volleyball Shoulder Injury Risk & Screening Dashboard")
+                st.markdown('<div class="section-header">Volleyball Swing Volume & Shoulder Injury Prediction</div>', unsafe_allow_html=True)
                 
-                # Sub-tabs for Team Overview vs Individual Deep Dive
-                risk_sub_tab1, risk_sub_tab2 = st.tabs(["Team Overview By Date", "Individual Athlete Deep-Dive"])
-                
-                # -------------------------------------------------------------------------
-                # SUB-TAB 1: TEAM OVERVIEW BY DATE (Date Picker + Color-Coded Table)
-                # -------------------------------------------------------------------------
-                with risk_sub_tab1:
-                    st.markdown("### Team Session Summary & Screening Status")
+                c_sh1, c_sh2 = st.columns([2, 2])
+                with c_sh1:
+                    sel_sh_ath = st.selectbox("Select Athlete", master_athlete_list, key="sh_risk_ath_sel")
+                with c_sh2:
+                    sync_live = st.checkbox("Sync Live Catapult API Swings", value=False, key="sh_sync_api_toggle")
+
+                source_gps_df = raw_df.copy()
+                if sync_live:
+                    live_cat_df, api_status = fetch_catapult_cloud_swings("2026-08-01", datetime.today().strftime('%Y-%m-%d'))
+                    if not live_cat_df.empty:
+                        live_cat_df['Name'] = live_cat_df['Name'].astype(str).str.strip()
+                        live_cat_df['Date'] = pd.to_datetime(live_cat_df['Date']).dt.normalize()
+                        
+                        # Remove any existing rows in source_gps_df that match the (Name, Date) of the live API data
+                        # so we don't double-count practices already in the Google Sheet
+                        live_keys = set(zip(live_cat_df['Name'], live_cat_df['Date']))
+                        mask = source_gps_df.apply(lambda r: (str(r['Name']).strip(), pd.to_datetime(r['Date']).normalize()) not in live_keys, axis=1)
+                        
+                        source_gps_df = pd.concat([source_gps_df[mask], live_cat_df], ignore_index=True)
+                        #st.caption(f"Live API Active: {api_status}")
+                    #else:
+                        #st.caption(f"Fallback to Google Sheets: {api_status}")
+                        
+
+                pred_df = build_injury_prediction_matrix(source_gps_df, raw_er_df, raw_ash_df, sel_sh_ath)
+
+                if pred_df.empty:
+                    st.info(f"No Catapult jump/swing workload data available for {sel_sh_ath}.")
+                else:
+                    latest_r = pred_df.iloc[-1]
+                    risk_val = latest_r['Shoulder_Risk_Score']
+                    r_status = latest_r['Risk_Status']
+                    r_color = "#D93025" if risk_val >= 60 else ("#D97706" if risk_val >= 35 else "#137333")
+                    r_bg = "#FCE8E6" if risk_val >= 60 else ("#FEF3C7" if risk_val >= 35 else "#E6F4EA")
+
+                    k_s1, k_s2, k_s3, k_s4 = st.columns(4)
+                    k_s1.metric("Latest Est. Swings", f"{int(latest_r['Est_Swings'])}", help="Derived from High-Band Jumps + 50% Moderate Jumps")
+                    k_s2.metric("Swing ACWR (7:28d)", f"{latest_r['Est_Swings_ACWR']:.2f}")
+                    k_s3.metric("Latest ASH Force (L / R)", f"{latest_r['Peak Vertical Force [N] (L)']:.0f}N / {latest_r['Peak Vertical Force [N] (R)']:.0f}N")
+                    with k_s4:
+                        st.markdown(f'''
+                            <div style="background:{r_bg}; border:1px solid {r_color}; border-radius:10px; padding:10px; text-align:center;">
+                                <div style="font-size:10px; font-weight:800; color:{r_color}; text-transform:uppercase;">SHOULDER RISK SCORE</div>
+                                <div style="font-size:24px; font-weight:900; color:{r_color}; line-height:1.1;">{int(risk_val)} / 100</div>
+                                <div style="font-size:11px; font-weight:700; color:{r_color}; margin-top:3px;">{r_status}</div>
+                            </div>
+                        ''', unsafe_allow_html=True)
+
+                    st.markdown(f'<div class="info-box"><b>Primary Risk Drivers ({latest_r["Date"].strftime("%m/%d/%Y")}):</b> {latest_r["Primary_Drivers"]}</div>', unsafe_allow_html=True)
+
+                    fig_sh_pred = make_subplots(specs=[[{"secondary_y": True}]])
+                    fig_sh_pred.add_trace(
+                        go.Bar(x=pred_df['Date'], y=pred_df['Est_Swings'], name="Est. Swings (Hitting Volume)", marker_color='#4895DB', opacity=0.45),
+                        secondary_y=False
+                    )
+                    fig_sh_pred.add_trace(
+                        go.Scatter(x=pred_df['Date'], y=pred_df['Shoulder_Risk_Score'], name="Shoulder Risk Score (0-100)", mode='lines+markers', line=dict(color='#D93025', width=3)),
+                        secondary_y=True
+                    )
+                    fig_sh_pred.add_trace(
+                        go.Scatter(x=pred_df['Date'], y=pred_df['Peak Vertical Force [N] (R)'], name="ASH Right Force (N)", mode='lines', line=dict(color='#FF8200', width=2, dash='dot')),
+                        secondary_y=False
+                    )
+                    fig_sh_pred.update_layout(
+                        height=380, template="simple_white",
+                        title=dict(text=f"<b>{sel_sh_ath} — Swing Volume vs. ASH Shoulder Force & Risk Score</b>", font=dict(size=14)),
+                        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+                        margin=dict(l=20, r=20, t=50, b=20)
+                    )
+                    fig_sh_pred.update_yaxes(title_text="Est. Swings / ASH Force (N)", secondary_y=False)
+                    fig_sh_pred.update_yaxes(title_text="Injury Risk Score (0-100)", range=[0, 105], secondary_y=True, showgrid=False)
+                    st.plotly_chart(fig_sh_pred, use_container_width=True, config=LOCKED_CONFIG, key=f"sh_risk_chart_{sel_sh_ath}")
+
+                    st.markdown("#### Recent 15 Sessions: Swing Workload & Shoulder Screening Log")
+                    disp_cols = pred_df.tail(15).sort_values('Date', ascending=False).copy()
+                    disp_cols['Date'] = disp_cols['Date'].dt.strftime('%Y-%m-%d')
+                    disp_cols['Est_Swings'] = disp_cols['Est_Swings'].round(0).astype(int)
+                    disp_cols['Est_Swings_ACWR'] = disp_cols['Est_Swings_ACWR'].map('{:.2f}'.format)
+                    disp_cols['Player Load'] = disp_cols['Player Load'].map('{:.1f}'.format)
+                    disp_cols['ASH (L/R)'] = disp_cols.apply(lambda r: f"{r['Peak Vertical Force [N] (L)']:.0f}N / {r['Peak Vertical Force [N] (R)']:.0f}N", axis=1)
+                    disp_cols['ER ROM (L/R)'] = disp_cols.apply(lambda r: f"{r['L Max ROM (°)']:.1f}° / {r['R Max ROM (°)']:.1f}°", axis=1)
                     
-                    all_gps_df, _ = fetch_catapult_cloud_swings("2026-08-01", datetime.today().strftime('%Y-%m-%d'))
-                    if all_gps_df.empty:
-                        all_gps_df = raw_df.copy()
-                        
-                    all_gps_df['Date'] = pd.to_datetime(all_gps_df['Date']).dt.normalize()
-                    available_dates = sorted(all_gps_df['Date'].dropna().unique(), reverse=True)
-                    
-                    if len(available_dates) > 0:
-                        selected_date = st.selectbox(
-                            "Select Practice / Match Date:", 
-                            options=available_dates, 
-                            format_func=lambda d: pd.to_datetime(d).strftime('%A, %B %d, %Y'),
-                            key="team_risk_date_sel"
-                        )
-                        
-                        team_day_rows = []
-                        unique_athletes = all_gps_df['Name'].dropna().unique()
-                        
-                        for ath in unique_athletes:
-                            mat = build_injury_prediction_matrix(all_gps_df, er_df, ash_df, ath)
-                            if not mat.empty:
-                                day_match = mat[mat['Date'] == selected_date]
-                                if not day_match.empty:
-                                    r = day_match.iloc[0].to_dict()
-                                    r['Name'] = ath
-                                    team_day_rows.append(r)
-                                else:
-                                    latest_r = mat.iloc[-1].to_dict()
-                                    latest_r['Name'] = ath
-                                    team_day_rows.append(latest_r)
-                        
-                        if team_day_rows:
-                            df_team_day = pd.DataFrame(team_day_rows)
-                            
-                            display_cols = [
-                                'Name', 'Risk_Status', 'Shoulder_Risk_Score', 
-                                'Est_Swings', 'Est_Swings_ACWR', 
-                                'ASH_Drop_R_%', 'ASH_Drop_L_%', 
-                                'ER_Drop_R_%', 'ER_Drop_L_%', 
-                                'Primary_Drivers'
-                            ]
-                            existing_disp = [c for c in display_cols if c in df_team_day.columns]
-                            df_view = df_team_day[existing_disp].copy()
-                            
-                            df_view.rename(columns={
-                                'Name': 'Athlete Name',
-                                'Risk_Status': 'Status',
-                                'Shoulder_Risk_Score': 'Risk Score',
-                                'Est_Swings': 'Est Swings',
-                                'Est_Swings_ACWR': 'Swing ACWR',
-                                'ASH_Drop_R_%': 'ASH Force (R %)',
-                                'ASH_Drop_L_%': 'ASH Force (L %)',
-                                'ER_Drop_R_%': 'ER ROM (R %)',
-                                'ER_Drop_L_%': 'ER ROM (L %)',
-                                'Primary_Drivers': 'Key Drivers'
-                            }, inplace=True)
-                            
-                            def color_risk_and_flags(val):
-                                if isinstance(val, str):
-                                    if "High Risk" in val:
-                                        return 'background-color: #ff4d4d; color: white; font-weight: bold;'
-                                    elif "Moderate Risk" in val:
-                                        return 'background-color: #ffcc00; color: black; font-weight: bold;'
-                                    elif "Low / Optimal" in val:
-                                        return 'background-color: #2eb82e; color: white;'
-                                elif isinstance(val, (int, float)):
-                                    if val <= -8.0:
-                                        return 'background-color: #ff4d4d; color: white;'
-                                    elif val >= 0.0:
-                                        return 'background-color: #2eb82e; color: white;'
-                                return ''
-
-                            styled_table = df_view.style.map(
-                                color_risk_and_flags, 
-                                subset=['Status', 'ASH Force (R %)', 'ASH Force (L %)', 'ER ROM (R %)', 'ER ROM (L %)']
-                            ).format({
-                                'Risk Score': '{:.0f}',
-                                'Est Swings': '{:.0f}',
-                                'Swing ACWR': '{:.2f}',
-                                'ASH Force (R %)': '{:+.1f}%',
-                                'ASH Force (L %)': '{:+.1f}%',
-                                'ER ROM (R %)': '{:+.1f}%',
-                                'ER ROM (L %)': '{:+.1f}%'
-                            })
-                            
-                            st.dataframe(styled_table, use_container_width=True)
-                        else:
-                            st.info("No athlete screening records found for this date.")
-                    else:
-                        st.warning("No practice dates available in dataset.")
-
-                # -------------------------------------------------------------------------
-                # SUB-TAB 2: INDIVIDUAL ATHLETE DEEP-DIVE
-                # -------------------------------------------------------------------------
-                with risk_sub_tab2:
-                    col_sel1, col_sel2 = st.columns([2, 2])
-                    with col_sel1:
-                        all_names = sorted(raw_df['Name'].dropna().unique().tolist())
-                        selected_athlete = st.selectbox("Select Athlete for Deep Dive:", options=all_names, key="indiv_risk_select")
-                    with col_sel2:
-                        sync_live_indiv = st.checkbox("Sync Live Catapult API Swings", value=True, key="indiv_sync_box")
-
-                    gps_source_df = raw_df.copy()
-                    if sync_live_indiv:
-                        live_df, api_status = fetch_catapult_cloud_swings("2026-08-01", datetime.today().strftime('%Y-%m-%d'))
-                        if not live_df.empty:
-                            live_df['Name'] = live_df['Name'].astype(str).str.strip()
-                            live_df['Date'] = pd.to_datetime(live_df['Date']).dt.normalize()
-                            live_keys = set(zip(live_df['Name'], live_df['Date']))
-                            mask = gps_source_df.apply(lambda r: (str(r['Name']).strip(), pd.to_datetime(r['Date']).normalize()) not in live_keys, axis=1)
-                            gps_source_df = pd.concat([gps_source_df[mask], live_df], ignore_index=True)
-                            st.caption(f"Live API Active: {api_status}")
-                        else:
-                            st.caption(f"Fallback to Google Sheets: {api_status}")
-
-                    prediction_df = build_injury_prediction_matrix(gps_source_df, er_df, ash_df, selected_athlete)
-
-                    if not prediction_df.empty:
-                        latest_row = prediction_df.iloc[-1]
-                        c1, c2, c3, c4 = st.columns(4)
-                        c1.metric("Current Risk Score", f"{latest_row['Shoulder_Risk_Score']:.0f} / 100", latest_row['Risk_Status'])
-                        c2.metric("Est. Swings (7d Avg)", f"{latest_row['Est_Swings_Acute']:.1f}", f"ACWR: {latest_row['Est_Swings_ACWR']:.2f}")
-                        c3.metric("ASH Force Drop (R/L)", f"{min(latest_row['ASH_Drop_R_%'], latest_row['ASH_Drop_L_%']):+.1f}%")
-                        c4.metric("ER ROM Drop (R/L)", f"{min(latest_row['ER_Drop_R_%'], latest_row['ER_Drop_L_%']):+.1f}%")
-
-                        st.markdown("---")
-                        st.markdown("#### Longitudinal Risk & Workload Timeline")
-                        chart_data = prediction_df.set_index('Date')[['Shoulder_Risk_Score']].copy()
-                        chart_data['Scaled_ACWR'] = prediction_df.set_index('Date')['Est_Swings_ACWR'] * 20
-                        st.line_chart(chart_data)
-                        
-                        st.markdown("#### Full Screening & Load History")
-                        st.dataframe(prediction_df[['Date', 'Risk_Status', 'Shoulder_Risk_Score', 'Est_Swings', 'Est_Swings_ACWR', 'ASH_Drop_R_%', 'ASH_Drop_L_%', 'ER_Drop_R_%', 'ER_Drop_L_%', 'Primary_Drivers']], use_container_width=True)
-                    else:
-                        st.warning(f"Insufficient longitudinal data for {selected_athlete}.")
+                    final_view = disp_cols[['Date', 'Est_Swings', 'Est_Swings_ACWR', 'Player Load', 'ASH (L/R)', 'ER ROM (L/R)', 'Shoulder_Risk_Score', 'Risk_Status', 'Primary_Drivers']].rename(columns={
+                        'Est_Swings': 'Est. Swings',
+                        'Est_Swings_ACWR': 'Swing ACWR',
+                        'Shoulder_Risk_Score': 'Risk Score',
+                        'Risk_Status': 'Risk Zone',
+                        'Primary_Drivers': 'Flagged Drivers'
+                    })
+                    st.dataframe(final_view, use_container_width=True, hide_index=True)
                     
         # =========================================================================
         # --- HUB 5: TESTING & BASELINES ------------------------------------------
