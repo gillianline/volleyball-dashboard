@@ -807,9 +807,22 @@ def detect_swings_from_10hz_stream(df_10hz: pd.DataFrame, total_pl: float = 0.0,
     return raw_10hz_swings
 
 
+from concurrent.futures import ThreadPoolExecutor, as_completed
+
 @st.cache_data(ttl=600)
-def fetch_catapult_cloud_swings(start_date_str: str, end_date_str: str, cache_version: str = "v17_fix_timestamp") -> tuple[pd.DataFrame, str]:
-    """Pulls session statistics and safely maps native Catapult indoor jump bands."""
+def fetch_catapult_cloud_swings(
+    start_date_str: str, 
+    end_date_str: str, 
+    max_stats_activities: int = 30,
+    max_10hz_activities: int = 5,
+    cache_version: str = "v18_live_10hz_stream"
+) -> tuple[pd.DataFrame, str]:
+    """
+    1. Pulls /stats summary jump bands across recent activities (sorted newest-first)
+       to maintain a complete 28-day chronic workload baseline.
+    2. Pulls raw 10Hz sensor streams in parallel for the most recent sessions and runs
+       detect_swings_from_10hz_stream() for true biomechanical swing counts.
+    """
     api_key = None
     region = "us"
 
@@ -829,75 +842,130 @@ def fetch_catapult_cloud_swings(start_date_str: str, end_date_str: str, cache_ve
         if acts.empty or "id" not in acts.columns:
             return pd.DataFrame(), f"Connected, but no activities returned ({status_msg})."
 
+        # Parse and sort activities newest-first so .head() always grabs the latest sessions
+        if "start_time" in acts.columns:
+            acts["parsed_start"] = pd.to_datetime(
+                acts["start_time"], unit="s", errors="coerce"
+            ).fillna(pd.to_datetime(acts["start_time"], errors="coerce"))
+            acts = acts.sort_values("parsed_start", ascending=False).reset_index(drop=True)
+        else:
+            acts["parsed_start"] = pd.Timestamp.today().normalize()
+
+        recent_acts = acts.head(max_stats_activities).copy()
+        recent_10hz_ids = set(recent_acts.head(max_10hz_activities)["id"].astype(str).tolist())
+
+        # --- STEP 1: Pull /stats for all recent activities ---
         frames = []
-        for _, act in acts.head(15).iterrows():
+        for _, act in recent_acts.iterrows():
             act_id = str(act["id"])
             st_df = client.get_activity_stats(act_id)
             if not st_df.empty:
-                # Safe scalar conversion for activity start time
-                raw_time = act.get("start_time", datetime.today())
-                dt_val = pd.to_datetime(raw_time, unit="s", errors="coerce") if isinstance(raw_time, (int, float)) else pd.to_datetime(raw_time, errors="coerce")
-                if pd.isna(dt_val):
-                    dt_val = pd.datetime.today()
-                
+                dt_val = act["parsed_start"] if pd.notna(act["parsed_start"]) else pd.Timestamp.today()
+                st_df["activity_id"] = act_id
                 st_df["Date"] = dt_val.normalize()
                 st_df["Activity"] = act.get("name", "Catapult Session")
                 frames.append(st_df)
 
-        if frames:
-            combined_raw = pd.concat(frames, ignore_index=True)
-            
-            col_map = {
-                "athlete_name": "Name",
-                "total_player_load": "Player Load",
-                "indoor_analytics_total_jump_count": "Total Jumps",
-                "total_jump_count": "Total Jumps",
-                "indoor_analytics_band1_jump_count": "Low Jumps",
-                "jump_count_low": "Low Jumps",
-                "indoor_analytics_band2_jump_count": "Moderate Jumps",
-                "jump_count_medium": "Moderate Jumps",
-                "indoor_analytics_band3_jump_count": "High Jumps",
-                "jump_count_high": "High Jumps",
-                "explosive_efforts": "Explosive Efforts"
-            }
-            combined_raw.rename(columns={k: v for k, v in col_map.items() if k in combined_raw.columns}, inplace=True)
-            combined_raw['Name'] = combined_raw['Name'].astype(str).str.strip()
-            
-            for c in ["Player Load", "Total Jumps", "Low Jumps", "Moderate Jumps", "High Jumps", "Explosive Efforts"]:
-                if c not in combined_raw.columns:
-                    combined_raw[c] = 0.0
-                combined_raw[c] = pd.to_numeric(combined_raw[c], errors="coerce").fillna(0.0)
+        if not frames:
+            return pd.DataFrame(), "Found activities, but /stats returned 0 athlete rows."
 
-            mask_zero_bands = (combined_raw["High Jumps"] == 0) & (combined_raw["Moderate Jumps"] == 0) & (combined_raw["Total Jumps"] > 0)
-            if mask_zero_bands.any():
-                combined_raw.loc[mask_zero_bands, "High Jumps"] = combined_raw.loc[mask_zero_bands, "Total Jumps"] * 0.40
-                combined_raw.loc[mask_zero_bands, "Moderate Jumps"] = combined_raw.loc[mask_zero_bands, "Total Jumps"] * 0.35
+        combined_raw = pd.concat(frames, ignore_index=True)
 
-            daily_agg = combined_raw.groupby(['Name', 'Date'], as_index=False).agg({
-                'Player Load': 'sum',
-                'Total Jumps': 'sum',
-                'Low Jumps': 'sum',
-                'Moderate Jumps': 'sum',
-                'High Jumps': 'sum',
-                'Explosive Efforts': 'sum',
-                'Activity': 'last'
-            })
+        col_map = {
+            "athlete_name": "Name",
+            "total_player_load": "Player Load",
+            "indoor_analytics_total_jump_count": "Total Jumps",
+            "total_jump_count": "Total Jumps",
+            "indoor_analytics_band1_jump_count": "Low Jumps",
+            "jump_count_low": "Low Jumps",
+            "indoor_analytics_band2_jump_count": "Moderate Jumps",
+            "jump_count_medium": "Moderate Jumps",
+            "indoor_analytics_band3_jump_count": "High Jumps",
+            "jump_count_high": "High Jumps",
+            "explosive_efforts": "Explosive Efforts"
+        }
+        combined_raw.rename(columns={k: v for k, v in col_map.items() if k in combined_raw.columns}, inplace=True)
+        combined_raw["Name"] = combined_raw["Name"].astype(str).str.strip()
 
-            daily_agg["Sensor_Detected_Swings"] = (daily_agg["High Jumps"] * 0.85) + (daily_agg["Moderate Jumps"] * 0.30)
-            daily_agg["Jump Load"] = (daily_agg["High Jumps"] * 3.0) + (daily_agg["Moderate Jumps"] * 2.0) + (daily_agg["Low Jumps"] * 1.0)
+        for c in ["Player Load", "Total Jumps", "Low Jumps", "Moderate Jumps", "High Jumps", "Explosive Efforts"]:
+            if c not in combined_raw.columns:
+                combined_raw[c] = 0.0
+            combined_raw[c] = pd.to_numeric(combined_raw[c], errors="coerce").fillna(0.0)
 
-            sample_preview = []
-            for _, pr in daily_agg.head(4).iterrows():
-                n = str(pr["Name"])[:10]
-                sw = int(pr["Sensor_Detected_Swings"])
-                sample_preview.append(f"{n}:{sw}")
+        # Initialize to 0.0 so non-10Hz rows use position-specific multipliers downstream
+        combined_raw["Sensor_Detected_Swings"] = 0.0
 
-            preview_str = ", ".join(sample_preview) if sample_preview else "Synced"
-            return daily_agg, f"Synced full-day totals via Native Slugs | [{preview_str}]"
-        return pd.DataFrame(), "Found activities, but /stats returned 0 athlete rows."
+        # --- STEP 2: Pull 10Hz Sensor Streams in Parallel for Latest Sessions ---
+        stream_tasks = []
+        for idx, row in combined_raw.iterrows():
+            act_id = str(row.get("activity_id", ""))
+            ath_id = str(row.get("athlete_id", "")).strip()
+            if act_id in recent_10hz_ids and ath_id and ath_id != "nan" and row["Player Load"] > 10.0:
+                stream_tasks.append((
+                    idx,
+                    act_id,
+                    ath_id,
+                    float(row["Player Load"]),
+                    float(row["High Jumps"]),
+                    float(row["Moderate Jumps"])
+                ))
+
+        def _process_single_stream(task):
+            row_idx, act_id, ath_id, pl_val, hj_val, mj_val = task
+            df_10hz, _ = client.get_10hz_sensor_stream(act_id, ath_id)
+            if not df_10hz.empty:
+                swings = detect_swings_from_10hz_stream(
+                    df_10hz,
+                    total_pl=pl_val,
+                    high_jumps=hj_val,
+                    mod_jumps=mj_val
+                )
+                return row_idx, float(swings), True
+            return row_idx, 0.0, False
+
+        streams_succeeded = 0
+        if stream_tasks:
+            with ThreadPoolExecutor(max_workers=5) as executor:
+                futures = [executor.submit(_process_single_stream, t) for t in stream_tasks]
+                for fut in as_completed(futures):
+                    try:
+                        r_idx, detected_swings, ok = fut.result()
+                        if ok and detected_swings > 0:
+                            combined_raw.at[r_idx, "Sensor_Detected_Swings"] = detected_swings
+                            streams_succeeded += 1
+                    except Exception:
+                        continue
+
+        # --- STEP 3: Aggregate Daily Totals ---
+        daily_agg = combined_raw.groupby(["Name", "Date"], as_index=False).agg({
+            "Player Load": "sum",
+            "Total Jumps": "sum",
+            "Low Jumps": "sum",
+            "Moderate Jumps": "sum",
+            "High Jumps": "sum",
+            "Explosive Efforts": "sum",
+            "Sensor_Detected_Swings": "sum",
+            "Activity": "last"
+        })
+
+        daily_agg["Jump Load"] = (
+            (daily_agg["High Jumps"] * 3.0)
+            + (daily_agg["Moderate Jumps"] * 2.0)
+            + (daily_agg["Low Jumps"] * 1.0)
+        )
+
+        # Build status preview showing which athletes got true 10Hz swing counts
+        sensor_rows = daily_agg[daily_agg["Sensor_Detected_Swings"] > 0]
+        sample_preview = [
+            f"{str(r['Name'])[:10]}:{int(r['Sensor_Detected_Swings'])}"
+            for _, r in sensor_rows.head(4).iterrows()
+        ]
+        preview_str = ", ".join(sample_preview) if sample_preview else "Jump-band fallback"
+
+        return daily_agg, f"10Hz API Synced ({streams_succeeded} streams) | [{preview_str}]"
+
     except Exception as e:
         return pd.DataFrame(), f"API Connection Error: {e}"
-
 
 def build_injury_prediction_matrix(df_gps, df_er, df_ash, athlete_name):
     """
@@ -3894,6 +3962,7 @@ if check_password():
                 if "auto_synced_catapult" not in st.session_state:
                     with st.spinner("Syncing live Catapult API swing data..."):
                         live_cat_df, api_status = fetch_catapult_cloud_swings("2026-08-01", datetime.today().strftime('%Y-%m-%d'))
+                        st.session_state['catapult_api_status'] = api_status
                         if not live_cat_df.empty:
                             live_cat_df['Name'] = live_cat_df['Name'].astype(str).str.strip()
                             live_cat_df['Date'] = pd.to_datetime(live_cat_df['Date']).dt.normalize()
@@ -3907,12 +3976,16 @@ if check_password():
                     sel_sh_ath = st.selectbox("Select Athlete", master_athlete_list, key="sh_risk_ath_sel")
                 with c_sh2:
                     if st.button("Refresh API Sync", use_container_width=True):
-                        live_cat_df, _ = fetch_catapult_cloud_swings("2026-08-01", datetime.today().strftime('%Y-%m-%d'))
+                        live_cat_df, api_status = fetch_catapult_cloud_swings("2026-08-01", datetime.today().strftime('%Y-%m-%d'))
+                        st.session_state['catapult_api_status'] = api_status
                         if not live_cat_df.empty:
                             live_cat_df['Name'] = live_cat_df['Name'].astype(str).str.strip()
                             live_cat_df['Date'] = pd.to_datetime(live_cat_df['Date']).dt.normalize()
                             st.session_state['synced_live_cat_df'] = live_cat_df
                         st.rerun()
+
+                if st.session_state.get('catapult_api_status'):
+                    st.caption(f"Catapult Cloud Status: {st.session_state['catapult_api_status']}")
 
                 source_gps_df = raw_df.copy()
                 live_cat_data = st.session_state.get('synced_live_cat_df', pd.DataFrame())
