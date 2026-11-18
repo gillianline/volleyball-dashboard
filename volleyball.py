@@ -746,12 +746,10 @@ def detect_swings_from_10hz_stream(
     mod_jumps: float = 0.0
 ) -> int:
     """
-    Full-Spectrum 10Hz Volleyball Swing Detector.
-    Uses all available OpenField 10Hz channels:
-      - 'pl' (PlayerLoad) & 'sl' (Side Load): 3D and lateral trunk impulse
-      - 'a' (Acceleration) & 'v' (Velocity): approach plant & jump hang-time
-      - 'o' (Orientation): mid-air torso rotation / arm-swing whip
-      - 'x', 'y': court boundary filtering (excludes sideline/bench walking)
+    Event-Window 10Hz Volleyball Swing Detector.
+    Detects explosive impulse peaks in the 10Hz stream, then inspects a 0.7s
+    window around each peak across all active channels ('pl', 'sl', 'a', 'v', 'o')
+    to separate arm-swing attacks from pure vertical block jumps and defensive moves.
     """
     if df_10hz.empty or len(df_10hz) < 100 or "pl" not in df_10hz.columns:
         return 0
@@ -766,7 +764,7 @@ def detect_swings_from_10hz_stream(
     else:
         pos_role = "PIN"  # OH / OPP / RS
 
-    # 1. Chronological Sort at 10Hz (0.1s per sample)
+    # 1. Chronological Sort at 10Hz
     if "ts" in df_10hz.columns and "cs" in df_10hz.columns:
         df_s = df_10hz.sort_values(["ts", "cs"]).reset_index(drop=True)
     elif "ts" in df_10hz.columns:
@@ -776,123 +774,105 @@ def detect_swings_from_10hz_stream(
 
     n = len(df_s)
 
-    def _get_delta_channel(col_name: str, max_step: float = 2.0) -> np.ndarray:
+    def _get_step(col_name: str, max_step: float = 2.0) -> np.ndarray:
         if col_name not in df_s.columns:
             return np.zeros(n)
         raw = pd.to_numeric(df_s[col_name], errors="coerce").ffill().fillna(0.0).values
-        # Detect cumulative vs. instantaneous channel automatically
         if np.nanmax(raw) > 15.0:
             step = np.diff(raw, prepend=raw[0])
             return np.where((step > 0.0) & (step < max_step), step, 0.0)
         return np.where((raw > 0.0) & (raw < max_step), raw, 0.0)
 
-    # 2. Extract All Kinematic Channels
-    inst_pl = _get_delta_channel("pl", max_step=1.5)
-    inst_sl = _get_delta_channel("sl", max_step=1.2)
-    inst_mp = _get_delta_channel("mp", max_step=5.0)
-
-    if float(np.sum(inst_pl)) < 15.0:
-        return 0
-
-    acc = pd.to_numeric(df_s["a"], errors="coerce").fillna(0.0).values if "a" in df_s.columns else np.zeros(n)
+    inst_pl = _get_step("pl", max_step=1.5)
+    inst_sl = _get_step("sl", max_step=1.2)
+    acc = pd.to_numeric(df_s["a"], errors="coerce").abs().fillna(0.0).values if "a" in df_s.columns else np.zeros(n)
     vel = pd.to_numeric(df_s["v"], errors="coerce").fillna(0.0).values if "v" in df_s.columns else np.zeros(n)
 
-    # Orientation ('o') angular velocity (captures rapid trunk rotation during arm swing)
     if "o" in df_s.columns:
         ori = pd.to_numeric(df_s["o"], errors="coerce").ffill().fillna(0.0).values
-        raw_d_ori = np.abs(np.diff(ori, prepend=ori[0]))
-        # Handle 360-degree wrap-around (e.g., 358 deg -> 4 deg = 6 deg change, not 354)
-        rot_rate = np.minimum(raw_d_ori, 360.0 - raw_d_ori)
+        d_ori = np.abs(np.diff(ori, prepend=ori[0]))
+        rot_rate = np.minimum(d_ori, 360.0 - d_ori)
     else:
         rot_rate = np.zeros(n)
 
-    # 3. Rolling 0.5s (5-sample) Biomechanical Features
+    if float(np.sum(inst_pl)) < 10.0:
+        return 0
+
+    # 2. 0.6s (6-sample) Rolling Impulse & Windowed Kinematics
     s_pl = pd.Series(inst_pl)
-    s_sl = pd.Series(inst_sl)
-    s_rot = pd.Series(rot_rate)
-    s_acc = pd.Series(acc)
-    s_vel = pd.Series(vel)
+    pl_600ms = s_pl.rolling(6, min_periods=1).sum().values
+    pl_jerk_win = pd.Series(np.abs(np.diff(inst_pl, prepend=inst_pl[0]))).rolling(7, center=True, min_periods=1).max().values
 
-    pl_500ms = s_pl.rolling(5, min_periods=1).sum().values
-    sl_500ms = s_sl.rolling(5, min_periods=1).sum().values
-    rot_500ms = s_rot.rolling(5, min_periods=1).max().values
-    acc_peak_500ms = s_acc.abs().rolling(5, min_periods=1).max().values
-
-    # Approach braking: velocity drop over the preceding 0.8s (8 samples)
-    vel_drop = (s_vel.shift(6).fillna(0.0) - s_vel).clip(lower=0.0).values
-
-    # Airborne / flight signature: low instantaneous load in the 0.3s immediately BEFORE landing spike
-    pre_landing_quiet = s_pl.shift(1).rolling(3, min_periods=1).mean().fillna(1.0).values
-
-    # 4. Composite Swing Likelihood Signal
-    # Combines vertical/total impulse (pl), rotational torque (sl + orientation whip), and approach braking
-    has_sl = np.any(inst_sl > 0)
-    has_ori = np.any(rot_rate > 0)
-    has_acc = np.any(acc != 0)
-
-    rot_norm = (rot_500ms / (np.percentile(rot_500ms[rot_500ms > 0], 90) + 1e-6)) if has_ori and np.any(rot_500ms > 0) else np.zeros(n)
-    sl_norm = (sl_500ms / (np.percentile(sl_500ms[sl_500ms > 0], 90) + 1e-6)) if has_sl and np.any(sl_500ms > 0) else np.zeros(n)
-    acc_norm = (acc_peak_500ms / (np.percentile(acc_peak_500ms[acc_peak_500ms > 0], 90) + 1e-6)) if has_acc and np.any(acc_peak_500ms > 0) else np.zeros(n)
-
-    # Torque multiplier boosts events that exhibit rotational whip ('sl' or 'o') alongside impact
-    rotational_factor = 1.0 + (0.25 * np.clip(rot_norm, 0, 1.5)) + (0.25 * np.clip(sl_norm, 0, 1.5))
-    swing_signal = pl_500ms * rotational_factor
-
-    active_mask = pl_500ms > 0.03
-    if np.sum(active_mask) < 40:
+    active_pl = pl_600ms[pl_600ms > 0.02]
+    if len(active_pl) < 30:
         return 0
 
-    active_sig = swing_signal[active_mask]
-    pl_jerk = np.abs(np.diff(inst_pl, prepend=inst_pl[0]))
+    # Adaptive percentile threshold tuned to actual 10Hz stream distribution
+    # (avoids hard-coded floor failures when Catapult exports scaled PL steps)
+    pct_cutoffs = {"PIN": 82, "MB": 86, "S": 90, "DS": 94}
+    imp_thresh = max(0.08, np.percentile(active_pl, pct_cutoffs[pos_role]))
+    jerk_thresh = np.percentile(pl_jerk_win[pl_600ms > 0.02], 65)
 
-    # Position-specific thresholds based on biomechanical profile
-    cfg = {
-        "PIN": {"floor": 0.24, "std_mult": 1.65, "jerk_pct": 78, "min_rot": 0.15},
-        "MB":  {"floor": 0.32, "std_mult": 2.05, "jerk_pct": 85, "min_rot": 0.30},  # Filters pure vertical block jumps
-        "S":   {"floor": 0.30, "std_mult": 2.20, "jerk_pct": 88, "min_rot": 0.35},  # Filters symmetric jump sets
-        "DS":  {"floor": 0.36, "std_mult": 2.50, "jerk_pct": 92, "min_rot": 0.45},  # Filters defensive dives/sprawls
-    }[pos_role]
+    # Local peak within 2.4s (24 samples)
+    local_max = pd.Series(pl_600ms).rolling(24, center=True, min_periods=1).max().values
+    candidate_peaks = np.where(
+        (pl_600ms == local_max) &
+        (pl_600ms >= imp_thresh) &
+        (pl_jerk_win >= jerk_thresh)
+    )[0]
 
-    dyn_thresh = max(cfg["floor"], np.mean(active_sig) + (cfg["std_mult"] * np.std(active_sig)))
-    jerk_thresh = max(0.05, np.percentile(pl_jerk[active_mask], cfg["jerk_pct"]))
-
-    # Local peak within 2.5s window
-    local_max = pd.Series(swing_signal).rolling(window=25, center=True, min_periods=1).max().values
-
-    # Require rotational whip signature if 'sl' or 'o' channels are populated
-    if has_sl or has_ori:
-        rotational_pass = (rot_norm + sl_norm) >= cfg["min_rot"]
-    else:
-        rotational_pass = np.ones(n, dtype=bool)
-
-    # For MBs and Setters, require either flight phase (jump attack) or high acceleration impulse
-    if pos_role in ["MB", "S"] and has_acc:
-        kinematic_pass = (pre_landing_quiet < 0.08) | (acc_norm >= 0.85)
-    else:
-        kinematic_pass = np.ones(n, dtype=bool)
-
-    is_swing_peak = (
-        (swing_signal == local_max) &
-        (swing_signal >= dyn_thresh) &
-        (pl_jerk >= jerk_thresh) &
-        rotational_pass &
-        kinematic_pass
-    )
-
-    peak_indices = np.where(is_swing_peak)[0]
-    if len(peak_indices) == 0:
+    if len(candidate_peaks) == 0:
         return 0
 
-    # 5. Enforce 3.2s (32-sample) minimum spacing between distinct swings
-    detected_swings = 1
-    last_idx = peak_indices[0]
-    for idx in peak_indices[1:]:
-        if (idx - last_idx) >= 32:
-            detected_swings += 1
-            last_idx = idx
+    # 3. Group candidate peaks using 3.0s (30-sample) refractory period
+    clean_events = [candidate_peaks[0]]
+    for idx in candidate_peaks[1:]:
+        if (idx - clean_events[-1]) >= 30:
+            clean_events.append(idx)
 
-    return int(detected_swings)
+    # 4. Score each candidate event across a ±0.4s window using multi-channel kinematics
+    has_sl = np.sum(inst_sl) > 0.5
+    has_acc = np.sum(acc) > 1.0
+    has_rot = np.sum(rot_rate) > 10.0
 
+    # Baseline medians for normalization
+    med_pl = np.median(pl_600ms[clean_events]) + 1e-6
+    med_sl = (np.median([np.sum(inst_sl[max(0, i-4):min(n, i+5)]) for i in clean_events]) + 1e-6) if has_sl else 1.0
+    med_acc = (np.median([np.max(acc[max(0, i-4):min(n, i+5)]) for i in clean_events]) + 1e-6) if has_acc else 1.0
+    med_rot = (np.median([np.max(rot_rate[max(0, i-4):min(n, i+5)]) for i in clean_events]) + 1e-6) if has_rot else 1.0
+
+    swing_scores = []
+    for idx in clean_events:
+        w0, w1 = max(0, idx - 4), min(n, idx + 5)
+        ev_pl = pl_600ms[idx] / med_pl
+        ev_sl = (np.sum(inst_sl[w0:w1]) / med_sl) if has_sl else 1.0
+        ev_acc = (np.max(acc[w0:w1]) / med_acc) if has_acc else 1.0
+        ev_rot = (np.max(rot_rate[w0:w1]) / med_rot) if has_rot else 1.0
+
+        # Approach velocity drop in the 0.8s prior to jump/swing
+        v_pre = np.max(vel[max(0, idx - 10):max(1, idx - 2)]) if idx >= 3 else 0.0
+        v_at = vel[idx]
+        ev_brake = 1.15 if (v_pre - v_at) > 0.6 else 1.0
+
+        # Composite kinematic score (1.0 = median explosive event for this athlete)
+        score = ((0.45 * ev_pl) + (0.25 * ev_sl) + (0.15 * ev_acc) + (0.15 * ev_rot)) * ev_brake
+        swing_scores.append(score)
+
+    swing_scores = np.array(swing_scores)
+
+    # Position selectivity: PINs swing on most explosive jumps; MBs/Setters/DS filter non-swing jumps
+    selectivity = {"PIN": 0.72, "MB": 0.88, "S": 1.15, "DS": 1.30}[pos_role]
+    verified_swings = int(np.sum(swing_scores >= selectivity))
+
+    # 5. Anchor check against Catapult /stats Jump Bands (prevents severe under/over-counting)
+    if high_jumps > 0 or mod_jumps > 0:
+        pos_ratio = {"PIN": 0.88, "MB": 0.52, "S": 0.15, "DS": 0.05}[pos_role]
+        band_anchor = (high_jumps * pos_ratio) + (mod_jumps * (pos_ratio * 0.30))
+        min_expected = int(np.floor(band_anchor * 0.75))
+        max_expected = int(np.ceil(band_anchor * 1.25)) + 4
+        return int(np.clip(verified_swings, min_expected, max_expected))
+
+    return verified_swings
 
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
