@@ -896,7 +896,7 @@ def detect_swings_from_10hz_stream(
 
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-@st.cache_data(ttl=600)
+@st.cache_data(ttl=10)
 def fetch_catapult_cloud_swings(
     start_date_str: str, 
     end_date_str: str, 
