@@ -4051,8 +4051,8 @@ if check_password():
                             st.session_state['synced_live_cat_df'] = live_cat_df
                         st.rerun()
 
-                if st.session_state.get('catapult_api_status'):
-                    st.caption(f"Catapult Cloud Status: {st.session_state['catapult_api_status']}")
+                #if st.session_state.get('catapult_api_status'):
+                    #st.caption(f"Catapult Cloud Status: {st.session_state['catapult_api_status']}")
 
                 source_gps_df = raw_df.copy()
                 live_cat_data = st.session_state.get('synced_live_cat_df', pd.DataFrame())
