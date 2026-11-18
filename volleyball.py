@@ -3771,7 +3771,7 @@ if check_password():
         elif selected_hub == "Workload & ACWR":
             st.markdown('<div class="section-header">Acute:Chronic Workload Ratio (EWMA)</div>', unsafe_allow_html=True)
             
-            acwr_tabs_list = ["Team Workload Summary", "Individual", "Shoulder Injury Risk"]
+            acwr_tabs_list = ["Team Workload Summary", "Individual", "Swig Predictions"]
             if "acwr_active_subtab" not in st.session_state or st.session_state.acwr_active_subtab not in acwr_tabs_list:
                 st.session_state.acwr_active_subtab = acwr_tabs_list[0]
                 
@@ -3955,7 +3955,7 @@ if check_password():
                         ind_metric_rows.append({"Metric": m, "Day Total": f"{target_row.get(m, 0.0):.1f}", "Acute (7d EWMA)": f"{a_ewma:.1f}", "Chronic (28d EWMA)": f"{c_ewma:.1f}", "ACWR Ratio": f"{r_val:.2f}", "Workload Zone": status_lbl})
                     st.dataframe(pd.DataFrame(ind_metric_rows), use_container_width=True, hide_index=True)
 
-            elif selected_acwr_tab == "Shoulder Injury Risk":
+            elif selected_acwr_tab == "Swig Predictions":
                 st.markdown('<div class="section-header">Volleyball Swing Volume & Shoulder Injury Prediction</div>', unsafe_allow_html=True)
                 
                 # --- AUTOMATIC BACKGROUND API SYNC ON LOAD ---
